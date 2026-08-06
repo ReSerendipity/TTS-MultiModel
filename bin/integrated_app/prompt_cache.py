@@ -34,7 +34,7 @@ import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 np: Any = None
 try:
@@ -62,7 +62,7 @@ _METADATA_VERSION: int = 3
 _META_SAVE_THROTTLE_SECONDS: float = 10.0
 _META_SAVE_DIRTY_THRESHOLD: int = 5
 
-_BinaryInput = Union[str, bytes, Any]
+_BinaryInput = str | bytes | Any
 
 
 @dataclasses.dataclass
@@ -376,10 +376,11 @@ class PromptCache:
             force: 是否强制立即保存（忽略节流条件）。
         """
         now = time.time()
-        if not force:
-            if (now - self._last_meta_save < _META_SAVE_THROTTLE_SECONDS and
-                    self._meta_dirty_count < _META_SAVE_DIRTY_THRESHOLD):
-                return
+        if not force and (
+            now - self._last_meta_save < _META_SAVE_THROTTLE_SECONDS
+            and self._meta_dirty_count < _META_SAVE_DIRTY_THRESHOLD
+        ):
+            return
 
         meta_path = self._metadata_path()
         payload: dict[str, Any] = {"version": _METADATA_VERSION}
@@ -558,9 +559,7 @@ class PromptCache:
             self._save_meta()
             return value
 
-    def _try_read_legacy(
-        self, cache_key: str, audio_hash: str | None, now: float
-    ) -> Any | None:
+    def _try_read_legacy(self, cache_key: str, audio_hash: str | None, now: float) -> Any | None:
         json_path = self._old_json_path(cache_key)
         if json_path.exists():
             try:
@@ -654,16 +653,11 @@ class PromptCache:
             existing_entry = self._meta.get(cache_key)
             self._meta[cache_key] = PromptCacheEntry(
                 key=cache_key,
-                created_at=existing_entry.created_at
-                if existing_entry is not None
-                else now,
+                created_at=existing_entry.created_at if existing_entry is not None else now,
                 last_access_ts=now,
-                access_count=existing_entry.access_count + 1
-                if existing_entry is not None
-                else 1,
+                access_count=existing_entry.access_count + 1 if existing_entry is not None else 1,
                 embedding_size=total_size,
-                audio_hash=audio_hash
-                or (existing_entry.audio_hash if existing_entry is not None else ""),
+                audio_hash=audio_hash or (existing_entry.audio_hash if existing_entry is not None else ""),
             )
             self._meta.move_to_end(cache_key)  # 新写入的放在末尾（最近使用）
 
@@ -938,6 +932,7 @@ def get_cache_stats() -> dict[str, Any]:
 # 旧版 prompt_cache 的 4 个内部辅助函数（tests/test_prompt_cache.py 依赖）
 # 为兼容未升级的测试代码，在此保留为薄包装。
 # ----------------------------------------------------------------------
+
 
 def _get_cache_file_path(cache_key: str) -> "Path":
     """向后兼容：返回指定 cache_key 对应的缓存文件路径 (.json)。

@@ -558,9 +558,7 @@ class VoxCPM2Engine(TTSEngine, ControllableTTSEngine):
             **kwargs,
         )
 
-    def load_lora(
-        self, lora_weights_path: str
-    ) -> tuple[list[str], list[str]]:
+    def load_lora(self, lora_weights_path: str) -> tuple[list[str], list[str]]:
         """加载 LoRA（Low-Rank Adaptation）微调权重并注入基础模型。
 
         将独立训练的低秩适配矩阵（通常 < 基础模型 1% 的参数量）
@@ -632,10 +630,7 @@ class VoxCPM2Engine(TTSEngine, ControllableTTSEngine):
                 lora_weights_path,
             )
             raise TTSError(
-                message=(
-                    f"LoRA 权重文件不存在: {lora_weights_path}。"
-                    "请检查路径是否正确，或通过训练界面重新导出权重。"
-                ),
+                message=(f"LoRA 权重文件不存在: {lora_weights_path}。请检查路径是否正确，或通过训练界面重新导出权重。"),
                 code="LORA_WEIGHTS_NOT_FOUND",
                 status_code=404,
             ) from e

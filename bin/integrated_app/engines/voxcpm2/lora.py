@@ -43,6 +43,8 @@ class LoRAMeta(NamedTuple):
     trained_steps: int
     enabled: bool
     weight: float
+
+
 """LoRA 元数据 NamedTuple，描述单个 LoRA 适配器的完整信息。
 
 Attributes:
@@ -92,9 +94,7 @@ class LoRAManager:
         try:
             os.makedirs(self._lora_dir, exist_ok=True)
         except OSError as exc:
-            logger.warning(
-                f"[LoRAManager] 创建 lora_dir={self._lora_dir} 失败: {exc}"
-            )
+            logger.warning(f"[LoRAManager] 创建 lora_dir={self._lora_dir} 失败: {exc}")
 
     def _validate_safetensors_header(self, safetensors_path: str) -> None:
         """校验 safetensors 文件的 magic header（防止把 .pt/.pkl 伪造成 safetensors）。
@@ -127,21 +127,16 @@ class LoRAManager:
                 raise ValueError("文件过小 (< 8 字节)，不是合法 safetensors")
             header_len = int.from_bytes(head[:8], byteorder="little", signed=False)
             if header_len <= 0 or header_len > 100 * 1024 * 1024:
-                raise ValueError(
-                    f"safetensors header_len={header_len} 超出合理范围"
-                )
+                raise ValueError(f"safetensors header_len={header_len} 超出合理范围")
         except (OSError, ValueError) as exc:
-            logger.warning(
-                f"[LoRAManager] safetensors magic header 校验失败 {safetensors_path}: {exc}"
-            )
+            logger.warning(f"[LoRAManager] safetensors magic header 校验失败 {safetensors_path}: {exc}")
             raise ValidationError.from_exception_data(  # type: ignore[attr-defined]
                 title="LoRA 文件损坏或格式不支持",
                 line_errors=[
                     {
                         "loc": ("safetensors_path",),
                         "msg": (
-                            "LoRA 文件损坏或格式不支持，仅支持 safetensors 格式。"
-                            f"详情: {type(exc).__name__}: {exc}"
+                            f"LoRA 文件损坏或格式不支持，仅支持 safetensors 格式。详情: {type(exc).__name__}: {exc}"
                         ),
                         "type": "format_error",
                     }
@@ -194,9 +189,7 @@ class LoRAManager:
                     data[k] = 8
                 else:
                     data[k] = 8.0
-            logger.warning(
-                f"[LoRAManager] meta={meta_path} 缺少字段 {missing}，使用默认值填充"
-            )
+            logger.warning(f"[LoRAManager] meta={meta_path} 缺少字段 {missing}，使用默认值填充")
         return data
 
     def load(
@@ -255,8 +248,7 @@ class LoRAManager:
                         {
                             "loc": ("max_loaded",),
                             "msg": (
-                                f"同时加载的 LoRA 已达上限 {self._max_loaded}。"
-                                "请先 unload 不需要的 LoRA 再加载新的。"
+                                f"同时加载的 LoRA 已达上限 {self._max_loaded}。请先 unload 不需要的 LoRA 再加载新的。"
                             ),
                             "type": "capacity_error",
                         }
@@ -278,9 +270,7 @@ class LoRAManager:
                     for n, _ in self._model.named_modules():
                         model_modules.add(n)
                 except (AttributeError, TypeError, RuntimeError) as exc:
-                    logger.debug(
-                        f"[LoRAManager] 无法枚举模型模块以校验 target_modules: {exc}"
-                    )
+                    logger.debug(f"[LoRAManager] 无法枚举模型模块以校验 target_modules: {exc}")
                     model_modules = set()
 
                 if model_modules:
@@ -305,17 +295,12 @@ class LoRAManager:
             try:
                 from safetensors.torch import load_file as safe_load_file  # type: ignore
             except ImportError as exc:
-                raise RuntimeError(
-                    "safetensors 包未安装，无法加载 LoRA。"
-                    "请运行: pip install safetensors"
-                ) from exc
+                raise RuntimeError("safetensors 包未安装，无法加载 LoRA。请运行: pip install safetensors") from exc
 
             try:
                 weights = safe_load_file(safetensors_path)
             except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    f"[LoRAManager] safetensors 加载失败 {safetensors_path}: {type(exc).__name__}"
-                )
+                logger.warning(f"[LoRAManager] safetensors 加载失败 {safetensors_path}: {type(exc).__name__}")
                 raise ValidationError.from_exception_data(  # type: ignore[attr-defined]
                     title="LoRA safetensors 加载失败",
                     line_errors=[
@@ -333,28 +318,18 @@ class LoRAManager:
             state_backup: dict[str, Any] | None = None
             try:
                 try:
-                    state_backup = {
-                        k: v.detach().clone()
-                        for k, v in self._model.state_dict().items()
-                    }
+                    state_backup = {k: v.detach().clone() for k, v in self._model.state_dict().items()}
                 except (AttributeError, RuntimeError, OSError) as exc:
-                    logger.debug(
-                        f"[LoRAManager] 跳过 base 权重备份（state_dict 不可用）: {exc}"
-                    )
+                    logger.debug(f"[LoRAManager] 跳过 base 权重备份（state_dict 不可用）: {exc}")
                     state_backup = None
 
                 try:
                     from peft import LoraConfig, get_peft_model  # type: ignore
                 except ImportError:
-                    logger.debug(
-                        "[LoRAManager] peft 不可用，使用占位注册（仅保留元数据）"
-                    )
+                    logger.debug("[LoRAManager] peft 不可用，使用占位注册（仅保留元数据）")
                 else:
                     try:
-                        if not target_modules:
-                            tm_list = None
-                        else:
-                            tm_list = list(target_modules)
+                        tm_list = None if not target_modules else list(target_modules)
                         lora_cfg = LoraConfig(
                             r=rank,
                             lora_alpha=alpha,
@@ -364,21 +339,15 @@ class LoRAManager:
                         )
                         _ = get_peft_model(self._model, lora_cfg)
                     except Exception as exc:  # noqa: BLE001
-                        logger.warning(
-                            f"[LoRAManager] peft 注入 LoRA 失败: {type(exc).__name__}"
-                        )
+                        logger.warning(f"[LoRAManager] peft 注入 LoRA 失败: {type(exc).__name__}")
             except RuntimeError as exc:
                 if state_backup is not None and "out of memory" in str(exc).lower():
-                    logger.error(
-                        f"[LoRAManager] 加载时 OOM，尝试回滚 base 权重: {exc}"
-                    )
+                    logger.error(f"[LoRAManager] 加载时 OOM，尝试回滚 base 权重: {exc}")
                     try:
                         self._model.load_state_dict(state_backup, strict=False)
                         del state_backup
                     except Exception as rb_exc:  # noqa: BLE001
-                        logger.exception(
-                            f"[LoRAManager] 回滚 base 权重失败: {rb_exc}"
-                        )
+                        logger.exception(f"[LoRAManager] 回滚 base 权重失败: {rb_exc}")
                 raise
 
             meta_obj = LoRAMeta(
@@ -430,36 +399,26 @@ class LoRAManager:
                         self._model.load_state_dict(backup, strict=False)
                     except RuntimeError as exc:
                         if "out of memory" in str(exc).lower():
-                            logger.error(
-                                f"[LoRAManager] 卸载写回 merge OOM，尝试 free_cache 后重试: {exc}"
-                            )
+                            logger.error(f"[LoRAManager] 卸载写回 merge OOM，尝试 free_cache 后重试: {exc}")
                             try:
                                 import torch
 
                                 if torch.cuda.is_available():
                                     torch.cuda.empty_cache()
                             except Exception as gc_exc:  # noqa: BLE001
-                                logger.warning(
-                                    f"[LoRAManager] empty_cache 异常: {gc_exc}"
-                                )
+                                logger.warning(f"[LoRAManager] empty_cache 异常: {gc_exc}")
                             try:
                                 self._model.load_state_dict(backup, strict=False)
                             except Exception as rb_exc:  # noqa: BLE001
-                                logger.exception(
-                                    f"[LoRAManager] 二次回滚仍失败，保留当前模型状态不崩溃: {rb_exc}"
-                                )
+                                logger.exception(f"[LoRAManager] 二次回滚仍失败，保留当前模型状态不崩溃: {rb_exc}")
                                 return False
                         else:
                             raise
             except OSError as exc:
-                logger.exception(
-                    f"[LoRAManager] 卸载时磁盘/IO 异常，不抛错让应用继续: {exc}"
-                )
+                logger.exception(f"[LoRAManager] 卸载时磁盘/IO 异常，不抛错让应用继续: {exc}")
                 return False
             except Exception as exc:  # noqa: BLE001
-                logger.exception(
-                    f"[LoRAManager] 卸载时未知异常，不抛错让应用继续: {type(exc).__name__}"
-                )
+                logger.exception(f"[LoRAManager] 卸载时未知异常，不抛错让应用继续: {type(exc).__name__}")
                 return False
             finally:
                 entry.pop("weights", None)
@@ -524,9 +483,7 @@ class LoRAManager:
                     weight=new_weight,
                 )
 
-            logger.info(
-                f"[LoRAManager] 单启用 lora_id={lora_id} weight={weight:.2f}，其余禁用"
-            )
+            logger.info(f"[LoRAManager] 单启用 lora_id={lora_id} weight={weight:.2f}，其余禁用")
 
     def disable(self, lora_id: str) -> None:
         """禁用指定 LoRA（保留加载在显存中，只是不参与 merge）。
@@ -569,22 +526,16 @@ class LoRAManager:
                 - "weighted_average"：按 weight 字段加权平均（默认）。
         """
         with self._lock:
-            enabled_entries = [
-                (lid, e) for lid, e in self._loaded.items() if e["meta"].enabled
-            ]
+            enabled_entries = [(lid, e) for lid, e in self._loaded.items() if e["meta"].enabled]
             if not enabled_entries:
                 logger.info("[LoRAManager] merge_multiple_enabled: 无 enabled LoRA，跳过")
                 return
             if len(enabled_entries) == 1:
-                logger.info(
-                    f"[LoRAManager] 仅 1 个 enabled={enabled_entries[0][0]}，无需多 LoRA 合并"
-                )
+                logger.info(f"[LoRAManager] 仅 1 个 enabled={enabled_entries[0][0]}，无需多 LoRA 合并")
                 return
 
             if strategy not in ("add", "weighted_average"):
-                raise ValueError(
-                    f"strategy 必须是 'add' 或 'weighted_average'，实际为 '{strategy}'"
-                )
+                raise ValueError(f"strategy 必须是 'add' 或 'weighted_average'，实际为 '{strategy}'")
 
             def _do_merge() -> None:
                 """执行多 LoRA 合并的内部逻辑。
@@ -610,9 +561,7 @@ class LoRAManager:
                         rank = e["meta"].rank
                         alpha = e["meta"].alpha
                         scale = float(alpha) / float(max(rank, 1))
-                        logger.info(
-                            f"[LoRAManager] add merge: id={lid} alpha/rank={alpha}/{rank} -> scale={scale:.3f}"
-                        )
+                        logger.info(f"[LoRAManager] add merge: id={lid} alpha/rank={alpha}/{rank} -> scale={scale:.3f}")
 
             try:
                 _do_merge()
@@ -622,9 +571,7 @@ class LoRAManager:
                 if not is_oom:
                     raise
 
-                logger.warning(
-                    f"[LoRAManager] merge OOM: {exc}，尝试 empty_cache + 再试一次"
-                )
+                logger.warning(f"[LoRAManager] merge OOM: {exc}，尝试 empty_cache + 再试一次")
                 try:
                     import torch
 
@@ -640,14 +587,10 @@ class LoRAManager:
                     if not oom2:
                         raise
 
-                    logger.warning(
-                        "[LoRAManager] 多 LoRA 合并显存不足，降级为仅启用权重最高的 1 个"
-                    )
-                    enabled_entries.sort(
-                        key=lambda x: x[1]["meta"].weight, reverse=True
-                    )
+                    logger.warning("[LoRAManager] 多 LoRA 合并显存不足，降级为仅启用权重最高的 1 个")
+                    enabled_entries.sort(key=lambda x: x[1]["meta"].weight, reverse=True)
                     top_lid, top_entry = enabled_entries[0]
-                    for lid, e in enabled_entries[1:]:
+                    for _lid, e in enabled_entries[1:]:
                         old = e["meta"]
                         e["meta"] = LoRAMeta(
                             lora_id=old.lora_id,
@@ -677,15 +620,11 @@ class LoRAManager:
                 try:
                     self.unload(lid)
                 except Exception as exc:  # noqa: BLE001
-                    logger.error(
-                        f"[LoRAManager] _safe_unload_all 单项失败 id={lid}: {type(exc).__name__}"
-                    )
+                    logger.error(f"[LoRAManager] _safe_unload_all 单项失败 id={lid}: {type(exc).__name__}")
             with self._lock:
                 self._loaded.clear()
         except Exception as exc:  # noqa: BLE001
-            logger.error(
-                f"[LoRAManager] _safe_unload_all 顶层异常（已吞掉）: {type(exc).__name__}"
-            )
+            logger.error(f"[LoRAManager] _safe_unload_all 顶层异常（已吞掉）: {type(exc).__name__}")
 
 
 _default_manager: LoRAManager | None = None
@@ -857,9 +796,7 @@ def is_lora_enabled() -> bool:
         logger.debug(f"[VoxCPM LoRA] is_lora_enabled 检查异常，返回 False: {exc}")
         return False
     except Exception as exc:  # noqa: BLE001
-        logger.debug(
-            f"[VoxCPM LoRA] is_lora_enabled 未预期异常，返回 False: {type(exc).__name__}"
-        )
+        logger.debug(f"[VoxCPM LoRA] is_lora_enabled 未预期异常，返回 False: {type(exc).__name__}")
         return False
 
 

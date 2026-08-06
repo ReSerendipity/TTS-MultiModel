@@ -14,6 +14,7 @@ TTS 用户中约 70% 是 Windows 单卡用户（RTX 3060/4090 等），Accelerat
 让同一套训练代码无需修改即可跑在"单卡 3060 / 双卡 4090 / Mac MPS / CPU 调试"
 等所有硬件组合上，极大减少了维护多套训练分支的复杂度。
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -21,7 +22,7 @@ import logging
 import os
 import random
 from collections.abc import Callable, Generator
-from typing import Any, Union, cast
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -32,9 +33,10 @@ import torch.utils.data
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
-TrainingPrecision = Union[str, Any]
+TrainingPrecision = str | Any
 try:
     from typing import Literal
+
     TrainingPrecision = Literal["fp32", "fp16", "bf16"]
 except ImportError:
     TrainingPrecision = str
@@ -233,6 +235,7 @@ class TrainingAccelerator:
         """初始化后端，ImportError/DDP 失败时按约定降级。"""
         try:
             from accelerate import Accelerator as _HFAccelerator  # type: ignore
+
             # Precision 兼容性处理：bf16 要求硬件 Ampere+ / Apple M 系列
             resolved_precision = self._resolve_precision(self._precision)
             hf_kwargs: dict[str, Any] = {
@@ -573,10 +576,10 @@ class TrainingAccelerator:
             dtype = torch.bfloat16
         try:
             if dtype is not None:
-                with torch.amp.autocast(device_type, dtype=dtype, enabled=enabled, *args, **kwargs):
+                with torch.amp.autocast(device_type, *args, dtype=dtype, enabled=enabled, **kwargs):
                     yield
             else:
-                with torch.amp.autocast(device_type, enabled=enabled, *args, **kwargs):
+                with torch.amp.autocast(device_type, *args, enabled=enabled, **kwargs):
                     yield
         except Exception:  # noqa: BLE001
             # 老版本 torch 无 amp.autocast -> 直接裸跑
@@ -712,19 +715,15 @@ class Accelerator:
             self
         """
         if self.device_ctx is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self.device_ctx.__enter__()
-            except Exception:  # noqa: BLE001
-                pass
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         """退出 CUDA device 上下文管理器。"""
         if self.device_ctx is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self.device_ctx.__exit__(exc_type, exc_value, traceback)
-            except Exception:  # noqa: BLE001
-                pass
 
     def barrier(self) -> None:
         """分布式同步 barrier；非 DDP 模式为 no-op。"""
@@ -762,10 +761,8 @@ class Accelerator:
             设备上的模型（可能是 DDP 包装）
         """
         if hasattr(model, "device"):
-            try:
+            with contextlib.suppress(Exception):
                 model.device = self.device  # type: ignore[assignment]
-            except Exception:  # noqa: BLE001
-                pass
         model = model.to(self.device)
         if self.world_size > 1:
             try:
@@ -912,7 +909,5 @@ class Accelerator:
 
     def __del__(self) -> None:
         """析构函数：best-effort 释放加速器资源和 CUDA 显存。"""
-        try:
+        with contextlib.suppress(Exception):
             self._acc.release()
-        except Exception:  # noqa: BLE001
-            pass

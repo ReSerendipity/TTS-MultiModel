@@ -11,6 +11,7 @@ training/ 目录对应 WebUI 中 LoRA 微调 Tab 的训练任务；scripts/train
 generator / optimizer / scheduler / dataloaders / tracker 等对象引用），确保
 scripts/train_voxcpm_finetune.py 的既有调用方式 100% 继续可用。
 """
+
 from __future__ import annotations
 
 import json
@@ -269,9 +270,7 @@ class StateManager:
         state_path = ckpt_dir / self.STATE_FILE
 
         # ---- state.json：.tmp + os.replace 原子写 ----
-        fd, tmp_state_str = tempfile.mkstemp(
-            prefix=self.STATE_FILE + ".", suffix=".tmp", dir=str(ckpt_dir)
-        )
+        fd, tmp_state_str = tempfile.mkstemp(prefix=self.STATE_FILE + ".", suffix=".tmp", dir=str(ckpt_dir))
         tmp_state = Path(tmp_state_str)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -283,9 +282,7 @@ class StateManager:
             # 激进清理 + 再试一次（可能因为磁盘满）
             try:
                 self.clean_old_keep_last_n(n=2)
-                fd2, tmp_state2_str = tempfile.mkstemp(
-                    prefix=self.STATE_FILE + ".", suffix=".tmp", dir=str(ckpt_dir)
-                )
+                fd2, tmp_state2_str = tempfile.mkstemp(prefix=self.STATE_FILE + ".", suffix=".tmp", dir=str(ckpt_dir))
                 tmp_state2 = Path(tmp_state2_str)
                 try:
                     with os.fdopen(fd2, "w", encoding="utf-8") as f:
@@ -295,15 +292,11 @@ class StateManager:
                     self._cleanup_tmp(tmp_state2)
                     logger.exception("保存 state.json 重试仍失败（磁盘空间不足？）: %s", retry_exc)
                     raise OSError(
-                        "保存 state.json 失败（磁盘空间不足？请清理磁盘后重试）："
-                        f" {retry_exc}"
+                        f"保存 state.json 失败（磁盘空间不足？请清理磁盘后重试）： {retry_exc}"
                     ) from retry_exc
             except OSError as outer_exc:
                 logger.exception("保存训练状态最终失败: %s", outer_exc)
-                raise OSError(
-                    "保存训练状态失败（磁盘空间不足？请清理磁盘后重试）："
-                    f" {outer_exc}"
-                ) from outer_exc
+                raise OSError(f"保存训练状态失败（磁盘空间不足？请清理磁盘后重试）： {outer_exc}") from outer_exc
         except Exception as e:
             self._cleanup_tmp(tmp_state)
             logger.exception("保存 state.json 时未预期异常: %s", e)
@@ -333,9 +326,7 @@ class StateManager:
                             "请清理磁盘后重新训练或手动补充权重：%s",
                             retry_exc,
                         )
-                        raise OSError(
-                            f"保存 LoRA 权重失败，磁盘空间不足：{retry_exc}"
-                        ) from retry_exc
+                        raise OSError(f"保存 LoRA 权重失败，磁盘空间不足：{retry_exc}") from retry_exc
         return ckpt_dir
 
     def _save_weights_atomic(self, ckpt_dir: Path, weights: dict[str, Any]) -> None:
@@ -355,9 +346,7 @@ class StateManager:
             from safetensors.torch import save_file  # type: ignore
 
             safe_path = ckpt_dir / self.WEIGHTS_SAFE
-            fd, tmp_s = tempfile.mkstemp(
-                prefix=self.WEIGHTS_SAFE + ".", suffix=".tmp", dir=str(ckpt_dir)
-            )
+            fd, tmp_s = tempfile.mkstemp(prefix=self.WEIGHTS_SAFE + ".", suffix=".tmp", dir=str(ckpt_dir))
             tmp_safe = Path(tmp_s)
             os.close(fd)  # safetensors 自己开文件
             try:
@@ -373,9 +362,7 @@ class StateManager:
             logger.debug("safetensors 保存异常，fallback 到 torch.save: %s", exc)
         # 2) fallback torch.bin
         bin_path = ckpt_dir / self.WEIGHTS_FILE
-        fd, tmp_b = tempfile.mkstemp(
-            prefix=self.WEIGHTS_FILE + ".", suffix=".tmp", dir=str(ckpt_dir)
-        )
+        fd, tmp_b = tempfile.mkstemp(prefix=self.WEIGHTS_FILE + ".", suffix=".tmp", dir=str(ckpt_dir))
         tmp_bin = Path(tmp_b)
         os.close(fd)
         try:
@@ -418,7 +405,7 @@ class StateManager:
         # 从新到旧，最多尝试 5 个
         recent = list(reversed(ckpts))[:5]
         last_error: Exception | None = None
-        for epoch, ckpt_dir in recent:
+        for _epoch, ckpt_dir in recent:
             state_path = ckpt_dir / self.STATE_FILE
             if not state_path.exists():
                 logger.debug("checkpoint %s 缺少 state.json，跳过", ckpt_dir.name)
@@ -427,9 +414,7 @@ class StateManager:
                 raw_text = state_path.read_text(encoding="utf-8")
                 data = json.loads(raw_text)
             except (OSError, json.JSONDecodeError) as exc:
-                logger.error(
-                    "checkpoint %s 损坏（%s），尝试前一个 checkpoint", ckpt_dir, exc
-                )
+                logger.error("checkpoint %s 损坏（%s），尝试前一个 checkpoint", ckpt_dir, exc)
                 last_error = exc
                 continue
             try:

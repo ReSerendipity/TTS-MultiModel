@@ -44,6 +44,7 @@ class RetryStrategy(Enum):
     - SEED_CHANGE: 更换随机种子，避免重复结果
     - COMBINED: 组合多种策略，用于未知失败类型
     """
+
     CFG_INCREASE = "cfg_increase"
     TEMP_INCREASE = "temp_increase"
     TOP_P_DECREASE = "top_p_decrease"
@@ -65,6 +66,7 @@ class FailureType(Enum):
     - INTERNAL_SILENCE: 内部异常静音，需要提高 cfg、降低 top_p
     - UNKNOWN: 未知异常，使用组合策略
     """
+
     SILENCE = "silence"
     TOO_SHORT = "too_short"
     TOO_LONG = "too_long"
@@ -96,6 +98,7 @@ class RetryConfig:
         clipping_threshold: 削波阈值（0.0-1.0），超过此值判定为爆音
         enable_combined_strategy: 未知失败类型时是否启用组合策略
     """
+
     max_retries: int = 3
     base_delay_ms: int = 100
     enable_seed_rotation: bool = True
@@ -125,6 +128,7 @@ class RetryState:
         adjustments: 已应用的调整策略列表（按顺序）
         start_time: 首次尝试开始的时间戳
     """
+
     attempt: int = 0
     failure_type: FailureType = FailureType.UNKNOWN
     failure_reason: str = ""
@@ -145,6 +149,7 @@ class RetryResult:
         final_params: 最终成功时使用的生成参数
         failure_reason: 失败原因描述（重试耗尽时包含降级说明）
     """
+
     success: bool
     wav: np.ndarray | None = None
     sample_rate: int = 48000
@@ -201,7 +206,7 @@ def detect_failure_type(
                 return True, FailureType.CLIPPING, f"检测到削波 (peak={peak:.3f}, ratio={clipping_ratio:.2%})"
 
         # 检测静音/能量过低
-        rms = float(np.sqrt(np.mean(wav_f64 ** 2)))
+        rms = float(np.sqrt(np.mean(wav_f64**2)))
         if rms < cfg.rms_threshold:
             return True, FailureType.SILENCE, f"能量过低 (RMS={rms:.6f})"
 
@@ -214,9 +219,8 @@ def detect_failure_type(
         if duration > 2.0:
             frame_size = int(sample_rate * 0.02)  # 20ms 帧
             if len(wav_f64) >= frame_size * 100:  # 至少 2 秒
-                frames = np.array_split(wav_f64[:len(wav_f64) // frame_size * frame_size],
-                                       len(wav_f64) // frame_size)
-                frame_rms = np.array([np.sqrt(np.mean(f ** 2)) for f in frames])
+                frames = np.array_split(wav_f64[: len(wav_f64) // frame_size * frame_size], len(wav_f64) // frame_size)
+                frame_rms = np.array([np.sqrt(np.mean(f**2)) for f in frames])
                 silence_frames = frame_rms < cfg.rms_threshold * 2
                 # 检测连续静音帧超过 100 帧（2秒）
                 max_consecutive_silence = 0
@@ -229,8 +233,7 @@ def detect_failure_type(
                         current_silence = 0
                 if max_consecutive_silence > 100:  # 2秒以上静音
                     silence_dur = max_consecutive_silence * 0.02
-                    return (True, FailureType.INTERNAL_SILENCE,
-                            f"内部异常静音 ({silence_dur:.1f}s)")
+                    return (True, FailureType.INTERNAL_SILENCE, f"内部异常静音 ({silence_dur:.1f}s)")
 
         return False, FailureType.UNKNOWN, "OK"
 
@@ -264,70 +267,47 @@ def adjust_params_for_retry(
     # 根据失败类型选择调整策略
     if failure_type == FailureType.SILENCE or failure_type == FailureType.TOO_SHORT:
         # 静音/过短：降低 cfg（更具表现力）+ 提高 temperature + 新 seed
-        new_params["cfg_value"] = max(
-            new_params.get("cfg_value", 2.0) - cfg.cfg_value_step * 0.5,
-            1.0
-        )
+        new_params["cfg_value"] = max(new_params.get("cfg_value", 2.0) - cfg.cfg_value_step * 0.5, 1.0)
         new_params["temperature"] = min(
-            new_params.get("temperature", 0.8) + cfg.temperature_step * attempt,
-            cfg.temperature_max
+            new_params.get("temperature", 0.8) + cfg.temperature_step * attempt, cfg.temperature_max
         )
         strategies_applied.extend([RetryStrategy.CFG_INCREASE, RetryStrategy.TEMP_INCREASE])
 
     elif failure_type == FailureType.CLIPPING:
         # 削波/爆音：降低 cfg + 降低 temperature
-        new_params["cfg_value"] = max(
-            new_params.get("cfg_value", 2.0) - cfg.cfg_value_step,
-            1.0
-        )
-        new_params["temperature"] = max(
-            new_params.get("temperature", 0.8) - cfg.temperature_step * 0.5,
-            0.5
-        )
+        new_params["cfg_value"] = max(new_params.get("cfg_value", 2.0) - cfg.cfg_value_step, 1.0)
+        new_params["temperature"] = max(new_params.get("temperature", 0.8) - cfg.temperature_step * 0.5, 0.5)
         strategies_applied.append(RetryStrategy.CFG_INCREASE)
 
     elif failure_type == FailureType.REPETITION or failure_type == FailureType.LOW_VARIANCE:
         # 重复/低方差：提高 temperature + 提高 top_p（更多样性）+ 提高 cfg
         new_params["temperature"] = min(
-            new_params.get("temperature", 0.8) + cfg.temperature_step * attempt,
-            cfg.temperature_max
+            new_params.get("temperature", 0.8) + cfg.temperature_step * attempt, cfg.temperature_max
         )
-        new_params["top_p"] = min(
-            new_params.get("top_p", 0.9) + 0.05 * attempt,
-            cfg.top_p_max
-        )
+        new_params["top_p"] = min(new_params.get("top_p", 0.9) + 0.05 * attempt, cfg.top_p_max)
         new_params["cfg_value"] = min(
-            new_params.get("cfg_value", 2.0) + cfg.cfg_value_step * attempt,
-            cfg.cfg_value_max
+            new_params.get("cfg_value", 2.0) + cfg.cfg_value_step * attempt, cfg.cfg_value_max
         )
-        strategies_applied.extend([
-            RetryStrategy.TEMP_INCREASE,
-            RetryStrategy.TOP_P_INCREASE,
-            RetryStrategy.CFG_INCREASE,
-        ])
+        strategies_applied.extend(
+            [
+                RetryStrategy.TEMP_INCREASE,
+                RetryStrategy.TOP_P_INCREASE,
+                RetryStrategy.CFG_INCREASE,
+            ]
+        )
 
     elif failure_type == FailureType.INTERNAL_SILENCE:
         # 内部静音：提高 cfg（更严格遵循条件）+ 新 seed
         new_params["cfg_value"] = min(
-            new_params.get("cfg_value", 2.0) + cfg.cfg_value_step * attempt,
-            cfg.cfg_value_max
+            new_params.get("cfg_value", 2.0) + cfg.cfg_value_step * attempt, cfg.cfg_value_max
         )
-        new_params["top_p"] = max(
-            new_params.get("top_p", 0.9) - 0.05 * attempt,
-            cfg.top_p_min
-        )
+        new_params["top_p"] = max(new_params.get("top_p", 0.9) - 0.05 * attempt, cfg.top_p_min)
         strategies_applied.extend([RetryStrategy.CFG_INCREASE, RetryStrategy.TOP_P_DECREASE])
 
     elif failure_type == FailureType.TOO_LONG:
         # 过长：提高 cfg + 降低 temperature
-        new_params["cfg_value"] = min(
-            new_params.get("cfg_value", 2.0) + cfg.cfg_value_step * 0.5,
-            cfg.cfg_value_max
-        )
-        new_params["temperature"] = max(
-            new_params.get("temperature", 0.8) - cfg.temperature_step * 0.3,
-            0.6
-        )
+        new_params["cfg_value"] = min(new_params.get("cfg_value", 2.0) + cfg.cfg_value_step * 0.5, cfg.cfg_value_max)
+        new_params["temperature"] = max(new_params.get("temperature", 0.8) - cfg.temperature_step * 0.3, 0.6)
         strategies_applied.append(RetryStrategy.CFG_INCREASE)
 
     else:
@@ -335,11 +315,10 @@ def adjust_params_for_retry(
         if cfg.enable_combined_strategy:
             new_params["cfg_value"] = min(
                 new_params.get("cfg_value", 2.0) + cfg.cfg_value_step * (attempt % 2 == 0 and 0.5 or -0.25),
-                cfg.cfg_value_max
+                cfg.cfg_value_max,
             )
             new_params["temperature"] = min(
-                new_params.get("temperature", 0.8) + cfg.temperature_step * 0.5,
-                cfg.temperature_max
+                new_params.get("temperature", 0.8) + cfg.temperature_step * 0.5, cfg.temperature_max
             )
             strategies_applied.append(RetryStrategy.COMBINED)
 
@@ -400,12 +379,7 @@ def retry_with_bad_case_detection(
             time.sleep(delay_ms / 1000.0)
 
             # 调整参数
-            current_params = adjust_params_for_retry(
-                current_params,
-                state.failure_type,
-                attempt,
-                cfg
-            )
+            current_params = adjust_params_for_retry(current_params, state.failure_type, attempt, cfg)
             state.last_params = dict(current_params)
 
             if progress_callback:
@@ -416,14 +390,10 @@ def retry_with_bad_case_detection(
             wav = generate_fn(**current_params)
 
             # 质量检测
-            has_failure, failure_type, reason = detect_failure_type(
-                wav, sample_rate, expected_duration, cfg
-            )
+            has_failure, failure_type, reason = detect_failure_type(wav, sample_rate, expected_duration, cfg)
 
             if not has_failure:
-                logger.info(
-                    f"[BadCaseRetry] 生成成功 (尝试 {attempt + 1}/{cfg.max_retries + 1})"
-                )
+                logger.info(f"[BadCaseRetry] 生成成功 (尝试 {attempt + 1}/{cfg.max_retries + 1})")
                 return RetryResult(
                     success=True,
                     wav=wav,
@@ -435,15 +405,11 @@ def retry_with_bad_case_detection(
             # 检测到失败
             state.failure_type = failure_type
             state.failure_reason = reason
-            logger.warning(
-                f"[BadCaseRetry] 尝试 {attempt + 1}/{cfg.max_retries + 1} 失败: {reason}"
-            )
+            logger.warning(f"[BadCaseRetry] 尝试 {attempt + 1}/{cfg.max_retries + 1} 失败: {reason}")
 
             # 如果是最后一次尝试，接受当前结果
             if attempt == cfg.max_retries:
-                logger.warning(
-                    f"[BadCaseRetry] 重试耗尽 ({cfg.max_retries} 次)，接受当前输出"
-                )
+                logger.warning(f"[BadCaseRetry] 重试耗尽 ({cfg.max_retries} 次)，接受当前输出")
                 return RetryResult(
                     success=True,  # 优雅降级：即使质量不佳也返回
                     wav=wav,
@@ -456,9 +422,7 @@ def retry_with_bad_case_detection(
         except Exception as e:
             state.failure_type = FailureType.UNKNOWN
             state.failure_reason = str(e)
-            logger.warning(
-                f"[BadCaseRetry] 尝试 {attempt + 1}/{cfg.max_retries + 1} 异常: {type(e).__name__}: {e}"
-            )
+            logger.warning(f"[BadCaseRetry] 尝试 {attempt + 1}/{cfg.max_retries + 1} 异常: {type(e).__name__}: {e}")
 
             if attempt == cfg.max_retries:
                 logger.error("[BadCaseRetry] 重试耗尽且所有尝试均异常")

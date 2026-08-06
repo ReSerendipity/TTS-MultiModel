@@ -12,8 +12,8 @@ def test_health_ping(client):
 
 
 def test_static_cache_headers(client):
-    """Versioned static assets are served with long-lived immutable caching."""
+    """Static assets are served with no-cache to ensure fresh content on reload."""
     response = client.get("/static/css/main.css")
     assert response.status_code == 200
     cache_control = response.headers.get("Cache-Control", "")
-    assert "immutable" in cache_control
+    assert "no-cache" in cache_control

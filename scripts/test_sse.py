@@ -60,18 +60,18 @@ import requests
 
 # SSE 流式生成 API 端点地址
 # 默认本地服务地址，端口 7869，如端口变更需修改此处
-SSE_URL = 'http://127.0.0.1:7869/api/generate/streaming_sse'
+SSE_URL = "http://127.0.0.1:7869/api/generate/streaming_sse"
 
 # 测试请求参数
 # 可根据需要修改 text、persona_name 等参数进行测试
 request_data = {
-    'text': '测试文本',              # 要合成的测试文本
-    'persona_name': 'gf1',           # 使用的音色角色名称
-    'instruction': '',               # 风格指令（空字符串表示默认风格）
-    'lang': 'Auto',                  # 语言自动检测
-    'cfg_value': '2.0',              # CFG 引导系数
-    'inference_timesteps': '10',     # 推理步数
-    'denoise': 'true'                # 启用降噪
+    "text": "测试文本",  # 要合成的测试文本
+    "persona_name": "gf1",  # 使用的音色角色名称
+    "instruction": "",  # 风格指令（空字符串表示默认风格）
+    "lang": "Auto",  # 语言自动检测
+    "cfg_value": "2.0",  # CFG 引导系数
+    "inference_timesteps": "10",  # 推理步数
+    "denoise": "true",  # 启用降噪
 }
 
 
@@ -101,47 +101,42 @@ def test_sse_stream():
         - 完整的 SSE 格式还包含 "data:" 行携带事件数据
     """
     # 发送流式 POST 请求，设置 120 秒超时
-    r = requests.post(
-        SSE_URL,
-        data=request_data,
-        stream=True,
-        timeout=120
-    )
+    r = requests.post(SSE_URL, data=request_data, stream=True, timeout=120)
 
     # 打印 HTTP 响应状态码
-    print(f'Status: {r.status_code}')
+    print(f"Status: {r.status_code}")
 
     # 统计变量初始化
-    lines_count = 0       # 接收的总行数
-    audio_count = 0       # 音频事件计数
-    event_types = {}      # 事件类型统计字典
+    lines_count = 0  # 接收的总行数
+    audio_count = 0  # 音频事件计数
+    event_types = {}  # 事件类型统计字典
 
     # 迭代读取响应流中的每一行
     for line in r.iter_lines():
         if line:
             lines_count += 1
-            line_str = line.decode('utf-8')
+            line_str = line.decode("utf-8")
             # 识别 SSE 事件类型行（以 "event:" 开头）
-            if line_str.startswith('event:'):
+            if line_str.startswith("event:"):
                 etype = line_str[6:].strip()  # 提取事件类型名称
                 event_types[etype] = event_types.get(etype, 0) + 1
                 # 统计音频片段数量
-                if etype == 'audio':
+                if etype == "audio":
                     audio_count += 1
-                elif etype == 'done':
+                elif etype == "done":
                     # 生成完成事件
-                    print(f'>>> DONE event: {line_str}')
-                elif etype == 'error':
+                    print(f">>> DONE event: {line_str}")
+                elif etype == "error":
                     # 生成错误事件
-                    print(f'>>> ERROR event: {line_str}')
+                    print(f">>> ERROR event: {line_str}")
 
     # 输出统计结果
-    print(f'\nTotal lines: {lines_count}')
-    print(f'Audio events: {audio_count}')
-    print(f'Event types: {json.dumps(event_types)}')
+    print(f"\nTotal lines: {lines_count}")
+    print(f"Audio events: {audio_count}")
+    print(f"Event types: {json.dumps(event_types)}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     脚本入口: 直接运行时执行 SSE 流式测试
     """

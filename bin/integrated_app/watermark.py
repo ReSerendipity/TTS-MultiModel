@@ -206,16 +206,12 @@ def embed_watermark(
     if timestamp is None:
         timestamp = time.time()
 
-    if audio.ndim > 1:
-        audio_mono = np.mean(audio, axis=-1)
-    else:
-        audio_mono = audio.copy()
+    audio_mono = np.mean(audio, axis=-1) if audio.ndim > 1 else audio.copy()
 
     audio_mono = audio_mono.astype(np.float32)
 
     content_hash = _compute_content_hash(audio_mono, sample_rate)
 
-    watermark_key = _generate_watermark_key(source_id, timestamp)
     payload_bytes = _bits_to_payload_bytes(source_id, timestamp, content_hash)
     payload_bits = _payload_bytes_to_bits(payload_bytes)
 
@@ -230,8 +226,7 @@ def embed_watermark(
     n_freq_bins = freq_high_bin - freq_low_bin
     if n_freq_bins < _WATERMARK_BITS:
         logger.warning(
-            f"频点数量不足（{n_freq_bins}），无法容纳 {_WATERMARK_BITS} 个水印比特。"
-            f"将有效比特数降至 {n_freq_bins}。"
+            f"频点数量不足（{n_freq_bins}），无法容纳 {_WATERMARK_BITS} 个水印比特。将有效比特数降至 {n_freq_bins}。"
         )
         effective_bits = min(_WATERMARK_BITS, n_freq_bins)
     else:
@@ -244,7 +239,7 @@ def embed_watermark(
     rng = np.random.RandomState(42)
     carrier_phases = rng.uniform(0, 2 * np.pi, size=effective_bits)
 
-    for rep in range(_WATERMARK_REPEAT):
+    for _rep in range(_WATERMARK_REPEAT):
         for frame_idx in range(n_frames):
             start = frame_idx * hop_size
             end = min(start + frame_size, n_samples)
@@ -276,10 +271,7 @@ def embed_watermark(
 
     noise_power = np.mean(watermark_signal**2)
     signal_power = np.mean(audio_mono**2)
-    if noise_power > 0:
-        snr_db = 10 * np.log10(signal_power / noise_power)
-    else:
-        snr_db = float("inf")
+    snr_db = 10 * np.log10(signal_power / noise_power) if noise_power > 0 else float("inf")
 
     if audio.ndim > 1:
         watermarked = np.stack([watermarked] * audio.shape[-1], axis=-1)
@@ -291,9 +283,7 @@ def embed_watermark(
         content_hash=content_hash,
     )
 
-    logger.info(
-        f"水印嵌入完成: source={source_id}, SNR={snr_db:.1f}dB, hash={content_hash}"
-    )
+    logger.info(f"水印嵌入完成: source={source_id}, SNR={snr_db:.1f}dB, hash={content_hash}")
 
     return watermarked.astype(np.float32), WatermarkResult(
         success=True,
@@ -333,10 +323,7 @@ def detect_watermark(
     Returns:
         WatermarkResult，包含检测到的载荷或失败信息。
     """
-    if audio.ndim > 1:
-        audio_mono = np.mean(audio, axis=-1)
-    else:
-        audio_mono = audio.copy()
+    audio_mono = np.mean(audio, axis=-1) if audio.ndim > 1 else audio.copy()
 
     audio_mono = audio_mono.astype(np.float32)
     n_samples = len(audio_mono)
@@ -351,22 +338,16 @@ def detect_watermark(
     n_freq_bins = freq_high_bin - freq_low_bin
     effective_bits = min(_WATERMARK_BITS, n_freq_bins)
 
-    bit_correlations = np.zeros(effective_bits)
-    bit_counts = np.zeros(effective_bits)
-
     rng = np.random.RandomState(42)
     carrier_phases = rng.uniform(0, 2 * np.pi, size=effective_bits)
 
     best_score = 0.0
-    best_timestamp = 0.0
     best_bits = np.zeros(effective_bits)
 
     current_time = time.time()
     candidates = [current_time]
 
-    for timestamp in candidates:
-        key = _generate_watermark_key(source_id, timestamp)
-
+    for _timestamp in candidates:
         correlations = np.zeros(effective_bits)
         counts = np.zeros(effective_bits)
 
@@ -395,7 +376,6 @@ def detect_watermark(
 
             if score > best_score:
                 best_score = score
-                best_timestamp = timestamp
                 best_bits = detected_bits
 
     detection_threshold = 0.001
@@ -411,10 +391,7 @@ def detect_watermark(
     for i in range(0, len(bits_uint8), 8):
         byte_val = 0
         for j in range(8):
-            if i + j < len(bits_uint8):
-                byte_val = (byte_val << 1) | int(bits_uint8[i + j])
-            else:
-                byte_val = byte_val << 1
+            byte_val = ((byte_val << 1) | int(bits_uint8[i + j])) if i + j < len(bits_uint8) else (byte_val << 1)
         bit_bytes.append(byte_val)
 
     try:
@@ -423,10 +400,7 @@ def detect_watermark(
             source_len = bit_bytes[1] if len(bit_bytes) > 1 else 0
             source = bytes(bit_bytes[2 : 2 + source_len]).decode("utf-8", errors="replace")
             ts_bytes = bytes(bit_bytes[2 + source_len : 2 + source_len + 8])
-            if len(ts_bytes) == 8:
-                timestamp = struct.unpack("d", ts_bytes)[0]
-            else:
-                timestamp = 0.0
+            timestamp = struct.unpack("d", ts_bytes)[0] if len(ts_bytes) == 8 else 0.0
             hash_bytes = bytes(bit_bytes[10 + source_len : 18 + source_len])
             content_hash = hash_bytes.decode("utf-8", errors="replace") if hash_bytes else ""
 

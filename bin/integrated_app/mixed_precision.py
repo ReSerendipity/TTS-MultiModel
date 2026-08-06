@@ -13,10 +13,9 @@ BF16 需要 Ampere 及以上架构（compute capability >= 8.0），如 A100/RTX
 
 from __future__ import annotations
 
-from typing import Any
-
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger("tts_multimodel")
 
@@ -48,9 +47,7 @@ class MixedPrecisionConfig:
         """校验配置合法性。"""
         valid_dtypes = {"auto", "bf16", "fp16", "fp32"}
         if self.dtype not in valid_dtypes:
-            raise ValueError(
-                f"不支持的精度类型 '{self.dtype}'，可选值: {valid_dtypes}"
-            )
+            raise ValueError(f"不支持的精度类型 '{self.dtype}'，可选值: {valid_dtypes}")
         if self.dtype == "fp32":
             self.enabled = False
             logger.info("[混合精度] dtype=fp32，已自动禁用混合精度")
@@ -112,18 +109,13 @@ def detect_optimal_dtype(config: MixedPrecisionConfig | None = None):
             props = GPUBackendManager.get_device_properties(0)
             major = props.get("major", 0)
             minor = props.get("minor", 0)
-            cc = major + minor / 10.0
 
             # Ampere 及以上 (compute capability >= 8.0) 支持 BF16
             if major >= 8:
-                logger.info(
-                    f"[混合精度] 检测到 Ampere+ GPU (SM {major}.{minor})，使用 BF16"
-                )
+                logger.info(f"[混合精度] 检测到 Ampere+ GPU (SM {major}.{minor})，使用 BF16")
                 return torch.bfloat16
             else:
-                logger.info(
-                    f"[混合精度] 检测到 Pre-Ampere GPU (SM {major}.{minor})，使用 FP16"
-                )
+                logger.info(f"[混合精度] 检测到 Pre-Ampere GPU (SM {major}.{minor})，使用 FP16")
                 return torch.float16
         except Exception as e:
             logger.warning(f"[混合精度] GPU 检测失败: {e}，回退到 FP16")
@@ -264,10 +256,7 @@ class MixedPrecisionContext:
             logger.debug("[混合精度] FP32 模式，跳过 autocast")
             return self
 
-        if self.device is not None:
-            device_type = self.device
-        else:
-            device_type = GPUBackendManager.get_autocast_device_type()
+        device_type = self.device if self.device is not None else GPUBackendManager.get_autocast_device_type()
 
         self.autocast_ctx = torch.amp.autocast(
             device_type=device_type,
@@ -276,17 +265,13 @@ class MixedPrecisionContext:
         self.autocast_ctx.__enter__()
 
         if self.use_grad_scaler:
-            self.grad_scaler = GPUBackendManager.get_grad_scaler(
-                enabled=(self.dtype == torch.float16)
-            )
+            self.grad_scaler = GPUBackendManager.get_grad_scaler(enabled=(self.dtype == torch.float16))
             if self.grad_scaler is not None:
                 logger.debug("[混合精度] 已启用 GradScaler")
             else:
                 logger.debug("[混合精度] 当前后端不支持 GradScaler")
 
-        logger.debug(
-            f"[混合精度] 进入 autocast 上下文: device={device_type}, dtype={self.dtype}"
-        )
+        logger.debug(f"[混合精度] 进入 autocast 上下文: device={device_type}, dtype={self.dtype}")
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:

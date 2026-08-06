@@ -16,6 +16,7 @@
 """
 
 import asyncio
+import contextlib
 import importlib
 import logging
 import os
@@ -59,77 +60,45 @@ def _set_event_loop(loop: asyncio.AbstractEventLoop | None) -> None:
 
 # --- Cache-aware StaticFiles ---
 
-_CACHE_MAX_AGE: dict[str, int] = {
-    ".css": 86400 * 7,
-    ".js": 86400 * 7,
-    ".png": 86400 * 30,
-    ".jpg": 86400 * 30,
-    ".jpeg": 86400 * 30,
-    ".gif": 86400 * 30,
-    ".svg": 86400 * 30,
-    ".ico": 86400 * 30,
-    ".webp": 86400 * 30,
-    ".woff": 86400 * 30,
-    ".woff2": 86400 * 30,
-    ".ttf": 86400 * 30,
-    ".eot": 86400 * 30,
-    ".map": 86400 * 7,
+_NO_CACHE_EXTENSIONS: set[str] = {
+    ".html",
+    ".json",
+    ".css",
+    ".js",
+    ".map",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".ico",
+    ".webp",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
 }
-
-_NO_CACHE_EXTENSIONS: set[str] = {".html", ".json"}
 
 
 class CachedStaticFiles(StaticFiles):
     """StaticFiles subclass that adds Cache-Control headers based on file type.
 
     Strategy:
-    - Versioned assets (CSS/JS/images/fonts): long-lived cache with immutable
+    - All static assets: no-cache to ensure fresh content on every reload
     - HTML/JSON: no-cache to ensure fresh content
     """
 
     async def get_response(self, path: str, scope: dict[str, Any]) -> Response:
         """重写父类 StaticFiles.get_response，根据文件类型添加 Cache-Control 缓存头。
 
-        缓存策略：
-            - 版本化静态资源（CSS/JS/图片/字体等）：设置长期缓存，配合 immutable 指令，
-              浏览器在 max-age 有效期内不会重新验证，直接使用本地缓存。
-            - HTML/JSON 等动态内容：设置 no-cache 强制每次验证，确保用户获取最新内容。
-            - 其他未在配置中的文件类型：不设置 Cache-Control 头，使用浏览器默认行为。
-
-        不同文件类型的 Cache-Control 设置：
-            - .html / .json：
-                - Cache-Control: no-cache, no-store, must-revalidate
-                - Pragma: no-cache（兼容 HTTP/1.0）
-                - Expires: 0（兼容旧代理）
-                效果：完全禁用缓存，每次请求都从服务器获取最新版本。
-            - .css / .js / .map（7天）：
-                Cache-Control: public, max-age=604800, immutable
-            - .png / .jpg / .jpeg / .gif / .svg / .ico / .webp（30天）：
-                Cache-Control: public, max-age=2592000, immutable
-            - .woff / .woff2 / .ttf / .eot 字体文件（30天）：
-                Cache-Control: public, max-age=2592000, immutable
-                public 允许 CDN 和代理服务器缓存，immutable 告知浏览器资源
-                不会变化，无需条件请求（如 If-Modified-Since）。
-
-        Args:
-            path: 请求的静态文件相对路径（相对于 static 目录）。
-            scope: ASGI scope 字典，包含请求的完整上下文信息。
-
-        Returns:
-            Response: 带有相应 Cache-Control 头的 HTTP 响应对象。
-                仅当响应状态码为 200 且存在 headers 属性时才添加缓存头，
-                错误响应（如 404）不修改头信息。
+        所有静态资源均设置 no-cache，刷新即可获取最新版本。
         """
         response = await super().get_response(path, scope)
         if hasattr(response, "headers") and response.status_code == 200:
             ext = os.path.splitext(path)[1].lower()
             if ext in _NO_CACHE_EXTENSIONS:
-                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+                response.headers["Cache-Control"] = "no-cache, must-revalidate"
                 response.headers["Pragma"] = "no-cache"
-                response.headers["Expires"] = "0"
-            elif ext in _CACHE_MAX_AGE:
-                max_age = _CACHE_MAX_AGE[ext]
-                response.headers["Cache-Control"] = f"public, max-age={max_age}, immutable"
         return response
 
 
@@ -186,7 +155,7 @@ def _discover_routes(package_name: str = ".routes") -> list[str]:
     if not hasattr(base_pkg, "__path__"):
         return discovered
 
-    for _importer, modname, ispkg in pkgutil.walk_packages(
+    for _importer, modname, _ispkg in pkgutil.walk_packages(
         base_pkg.__path__,
         prefix=base_pkg.__name__ + ".",
     ):
@@ -279,6 +248,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         from .model_registry import load_engine_specs_from_config
+
         load_engine_specs_from_config()
         logger.info("[lifespan] 引擎规格加载完成")
     except Exception as e:
@@ -286,6 +256,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         from .persona_manager import get_persona_manager
+
         pm = get_persona_manager()
         await run_in_threadpool(pm.warmup_cache)
         logger.info("[lifespan] Persona 缓存预热完成")
@@ -294,6 +265,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         from .monitor import get_health_monitor
+
         hm = get_health_monitor()
         hm.start_background(delay_seconds=30)
         logger.info("[lifespan] HealthMonitor 后台线程已启动")
@@ -303,6 +275,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 初始化异步生成任务队列（参考 VoiceBox 串行队列设计）
     try:
         from .task_queue import init_queue
+
         await init_queue()
         logger.info("[lifespan] 异步生成任务队列已初始化")
     except Exception as e:
@@ -316,6 +289,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         def _load_in_background() -> None:
             from .middleware.request_id import set_request_id
+
             set_request_id(f"bg-{threading.current_thread().name}")
 
             async def _update_state(**kwargs: Any) -> None:
@@ -333,10 +307,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             try:
                 if auto_engine == EngineName.INDEXTTS2.value:
                     from .model_manager import load_indextts2
+
                     logger.info("[lifespan] 后台加载 IndexTTS 2.0 模型中...")
                     gen = load_indextts2()
                 else:
                     from .model_manager import load_voxcpm2
+
                     logger.info("[lifespan] 后台加载 VoxCPM2 模型中...")
                     gen = load_voxcpm2()
                 last_status = ""
@@ -371,7 +347,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 logger.info("[lifespan] 用户可通过界面手动加载模型")
 
         load_thread = threading.Thread(
-            target=_load_in_background, daemon=True, name="model-startup-load",
+            target=_load_in_background,
+            daemon=True,
+            name="model-startup-load",
         )
         load_thread.start()
         logger.info("[lifespan] 服务已启动，模型正在后台加载...")
@@ -384,11 +362,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     async def _periodic_temp_cleanup() -> None:
         """定期清理过期临时文件，避免长时间运行后临时目录堆积。"""
         from .utils import cleanup_temp_files
+
         while not _temp_cleanup_stop.is_set():
-            try:
+            with contextlib.suppress(asyncio.TimeoutError):
                 await asyncio.wait_for(_temp_cleanup_stop.wait(), timeout=1800)  # 30分钟
-            except asyncio.TimeoutError:
-                pass
             if _temp_cleanup_stop.is_set():
                 break
             try:
@@ -414,6 +391,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         from .model_manager import unload_all_models
+
         logger.info("[lifespan] 正在卸载所有模型...")
         unload_all_models()
         logger.info("[lifespan] 所有模型已卸载")
@@ -422,6 +400,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         from .history_db import get_history_db
+
         history_manager = get_history_db()
         history_manager.close_all()
         logger.info("[lifespan] 历史记录数据库连接池已关闭")
@@ -430,6 +409,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         from .utils import cleanup_temp_files
+
         removed = cleanup_temp_files()
         logger.info(f"[lifespan] 临时文件清理完成，删除 {removed} 个文件")
     except Exception:
@@ -438,6 +418,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 关闭异步生成任务队列
     try:
         from .task_queue import shutdown_queue
+
         await shutdown_queue()
         logger.info("[lifespan] 异步生成任务队列已关闭")
     except Exception:
@@ -518,6 +499,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CSRFMiddleware)
 
     from .config import get_config
+
     api_auth = get_config().api_auth_dict
     app.add_middleware(
         APIAuthMiddleware,
@@ -536,9 +518,7 @@ def create_app() -> FastAPI:
     # 路由前缀保持 /static_pwa，便于与 /static 区分；js 文件自动获得 immutable 缓存头。
     static_pwa_dir = os.path.join(_BASE_DIR, "static_pwa")
     os.makedirs(static_pwa_dir, exist_ok=True)
-    app.mount(
-        "/static_pwa", CachedStaticFiles(directory=static_pwa_dir), name="static_pwa"
-    )
+    app.mount("/static_pwa", CachedStaticFiles(directory=static_pwa_dir), name="static_pwa")
 
     setup_logging()
 
@@ -551,6 +531,7 @@ def create_app() -> FastAPI:
         debug_mode = os.environ.get("TTS_DEBUG", "0") == "1"
         templates.env.auto_reload = debug_mode
         from .i18n import register_i18n_filters
+
         register_i18n_filters(templates.env)
     except Exception as e:
         logger.exception(f"[create_app] 模板环境初始化失败: {e}")
@@ -559,6 +540,7 @@ def create_app() -> FastAPI:
     if templates is None:
         try:
             from jinja2 import DictLoader, Environment
+
             minimal_templates = {
                 "download_guide.html": """
 <html><body><h1>TTS_MultiModel 下载引导</h1>
@@ -623,6 +605,7 @@ def create_app() -> FastAPI:
         if not models_ok:
             try:
                 from .config import get_download_hints
+
                 result["download_hints"] = get_download_hints()
             except Exception:
                 result["download_hints"] = {}

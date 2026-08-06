@@ -66,13 +66,9 @@ def is_oom_error(exc: BaseException) -> bool:
             return True
     if isinstance(exc, RuntimeError):
         error_upper = str(exc).upper()
-        if "CUDA" in error_upper and (
-            "memory" in error_str or "alloc" in error_str
-        ):
+        if "CUDA" in error_upper and ("memory" in error_str or "alloc" in error_str):
             return True
-    if isinstance(exc, MemoryError):
-        return True
-    return False
+    return bool(isinstance(exc, MemoryError))
 
 
 def _log_tier_result(tier_name: str, duration: float) -> None:
@@ -104,9 +100,7 @@ def _has_sufficient_free_vram(threshold_mb: int = 500) -> bool:
         mem_info = GPUBackendManager.get_memory_info(device)
         free_bytes = mem_info[3]
         if free_bytes >= threshold_mb * 1024 * 1024:
-            logger.info(
-                f"[GPU清理] 当前空闲显存充足 ({free_bytes / 1024**2:.0f}MB)，跳过后续层级"
-            )
+            logger.info(f"[GPU清理] 当前空闲显存充足 ({free_bytes / 1024**2:.0f}MB)，跳过后续层级")
             return True
     except Exception:
         pass
@@ -180,9 +174,7 @@ def free_gpu_memory() -> None:
 
     if is_gpu and _has_sufficient_free_vram(500):
         total_time = time.time() - t0
-        logger.info(
-            f"[GPU清理] 分层清理完成（Tier 1 即达阈值），总耗时 {total_time:.3f}s"
-        )
+        logger.info(f"[GPU清理] 分层清理完成（Tier 1 即达阈值），总耗时 {total_time:.3f}s")
         return
 
     # --- Tier 2: Medium ---
@@ -206,9 +198,7 @@ def free_gpu_memory() -> None:
 
     if is_gpu and _has_sufficient_free_vram(500):
         total_time = time.time() - t0
-        logger.info(
-            f"[GPU清理] 分层清理完成（Tier 2 即达阈值），总耗时 {total_time:.3f}s"
-        )
+        logger.info(f"[GPU清理] 分层清理完成（Tier 2 即达阈值），总耗时 {total_time:.3f}s")
         return
 
     # --- Tier 3: Heavy ---

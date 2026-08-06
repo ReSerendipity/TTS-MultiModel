@@ -59,6 +59,7 @@ from typing import Any
 
 from .cache import AdaptiveLRUCache, LRUCache
 from .config import (
+    DATA_DIR,
     INDEXTTS2_MODEL_PATH,
     ROOT_DIR,
     VOXCPM2_ASR_PATH,
@@ -130,9 +131,9 @@ except Exception as e:
 
 # --- Global dynamic estimator ---
 #: 全局生成耗时估算器单例，基于历史数据线性回归预测生成耗时
-#: 数据持久化到 ROOT_DIR/generation_times.json，最多保留 200 条历史记录
+#: 数据持久化到 data/generation_times.json，最多保留 200 条历史记录
 _time_estimator: Any = GenerationTimeEstimator(
-    data_file=os.path.join(ROOT_DIR, "generation_times.json"),
+    data_file=os.path.join(DATA_DIR, "generation_times.json"),
     max_entries=200,
 )
 
@@ -719,10 +720,8 @@ def load_voxcpm2(
         error_msg: str = f"VoxCPM2 加载失败: {type(e).__name__}: {e}"
         yield error_msg, None, None, None
     finally:
-        try:
+        with contextlib.suppress(Exception):
             _model_lock.release()
-        except Exception:
-            pass
 
 
 def load_indextts2(
@@ -861,10 +860,8 @@ def load_indextts2(
         error_msg = f"IndexTTS 2.0 加载失败: {type(e).__name__}: {e}"
         yield error_msg, None, None, None
     finally:
-        try:
+        with contextlib.suppress(Exception):
             _model_lock.release()
-        except Exception:
-            pass
 
 
 # ====================================================================

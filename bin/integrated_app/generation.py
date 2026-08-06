@@ -23,6 +23,7 @@ save_audio 与 _save_wav_compatible 的区别：
 
 from __future__ import annotations
 
+import contextlib
 import io
 import logging
 import os
@@ -95,7 +96,7 @@ def save_audio(wav: np.ndarray, sr: int, prefix: str = "audio", format: str = "w
                 logger.warning("pydub 导出 mp3 失败（%s），回退为 wav 保存", exc)
                 # 清理临时文件
                 try:
-                    if 'temp_path' in locals() and os.path.exists(temp_path):
+                    if "temp_path" in locals() and os.path.exists(temp_path):
                         os.unlink(temp_path)
                 except OSError:
                     pass
@@ -277,23 +278,80 @@ def _is_abbreviation(text: str, idx: int) -> bool:
     # 且无需联网下载任何语料。
     _ABBREVIATIONS: tuple[str, ...] = (
         # 尊称
-        "Dr", "Mr", "Mrs", "Ms", "Prof", "Sr", "Jr", "Rev", "Hon",
+        "Dr",
+        "Mr",
+        "Mrs",
+        "Ms",
+        "Prof",
+        "Sr",
+        "Jr",
+        "Rev",
+        "Hon",
         # 地址/道路
-        "St", "Ave", "Blvd", "Rd", "Ln", "Dr", "Ct", "Pl", "Cir",
+        "St",
+        "Ave",
+        "Blvd",
+        "Rd",
+        "Ln",
+        "Dr",
+        "Ct",
+        "Pl",
+        "Cir",
         # 公司/组织
-        "Inc", "Ltd", "Corp", "Co", "Dept", "Div", "Est",
+        "Inc",
+        "Ltd",
+        "Corp",
+        "Co",
+        "Dept",
+        "Div",
+        "Est",
         # 学术/学位
-        "Ph", "M.D", "B.A", "M.A", "B.Sc", "M.Sc", "Ph.D",
+        "Ph",
+        "M.D",
+        "B.A",
+        "M.A",
+        "B.Sc",
+        "M.Sc",
+        "Ph.D",
         # 拉丁缩写
-        "vs", "etc", "e.g", "i.e", "et", "al", "etc",
+        "vs",
+        "etc",
+        "e.g",
+        "i.e",
+        "et",
+        "al",
+        "etc",
         # 时间
-        "a.m", "p.m", "A.M", "P.M",
+        "a.m",
+        "p.m",
+        "A.M",
+        "P.M",
         # 国家/地区
-        "U.S", "U.S.A", "U.K", "E.U", "U.A.E",
+        "U.S",
+        "U.S.A",
+        "U.K",
+        "E.U",
+        "U.A.E",
         # 度量/单位
-        "approx", "avg", "max", "min", "vol", "no", "No",
+        "approx",
+        "avg",
+        "max",
+        "min",
+        "vol",
+        "no",
+        "No",
         # 月份
-        "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
     )
     for abbr in _ABBREVIATIONS:
         start = idx - len(abbr)
@@ -745,9 +803,7 @@ def preprocess_and_save_temp(
                     f"不支持的音频输入类型: {type(audio_input)}，支持: 文件路径/UploadFile/np.ndarray"
                 )
         else:
-            raise ValidationError(
-                f"不支持的音频输入类型: {type(audio_input)}，支持: 文件路径/UploadFile/np.ndarray"
-            )
+            raise ValidationError(f"不支持的音频输入类型: {type(audio_input)}，支持: 文件路径/UploadFile/np.ndarray")
 
         wav_p = wav.astype(np.float32)
         if wav.dtype == np.int16:
@@ -782,10 +838,8 @@ def preprocess_and_save_temp(
             tmp_p = None  # 成功移交，不再需要清理
         except Exception:
             if tmp_p and os.path.exists(tmp_p):
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(tmp_p)
-                except OSError:
-                    pass
                 tmp_p = None
             raise
 
@@ -793,10 +847,8 @@ def preprocess_and_save_temp(
 
     except (OSError, ValueError) as exc:
         if tmp_p and os.path.exists(tmp_p):
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_p)
-            except OSError:
-                pass
         if isinstance(exc, (AudioProcessingError, ValidationError)):
             raise
         raise AudioProcessingError(f"参考音频预处理失败: {exc}") from exc
@@ -839,10 +891,8 @@ def _save_wav_compatible(
         os.replace(tmp_path, out_path)
     except (OSError, ValueError) as exc:
         if os.path.exists(tmp_path):
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_path)
-            except OSError:
-                pass
         raise AudioProcessingError(f"浏览器兼容 WAV 保存失败: {exc}") from exc
     return out_path
 
@@ -850,6 +900,7 @@ def _save_wav_compatible(
 # ---------------------------------------------------------------------------
 # Seed 增量辅助
 # ---------------------------------------------------------------------------
+
 
 def increment_seed(base_seed: int, chunk_index: int) -> int:
     """为每个分块生成不同的 seed，保持韵律多样性。

@@ -14,6 +14,7 @@ training/ 目录对应 WebUI 中 LoRA 微调 Tab 的训练任务；scripts/train
 有 90% 浪费；packer 通过把多条短样本首尾拼接 / 等长分桶，padding 比例可降到 <10%，
 显存占用下降、单步训练速度显著提升。
 """
+
 from __future__ import annotations
 
 import logging
@@ -217,16 +218,12 @@ class DynamicBucketPacker:
                 logger.warning("DynamicBucketPacker: duration 异常跳过 %s: %s", e.audio_path, exc)
                 continue
             if dur < 0:
-                logger.warning(
-                    "DynamicBucketPacker: 负时长跳过 %s (duration=%s)", e.audio_path, dur
-                )
+                logger.warning("DynamicBucketPacker: 负时长跳过 %s (duration=%s)", e.audio_path, dur)
                 continue
             bidx = self._bucket_index(dur)
             buckets[bidx].append(e)
         # 每个桶内复用 LengthSortedBatchPacker 的贪心打包
-        sub_packer = LengthSortedBatchPacker(
-            max_batch_tokens=self.max_batch_tokens, sort_key=self.sort_key
-        )
+        sub_packer = LengthSortedBatchPacker(max_batch_tokens=self.max_batch_tokens, sort_key=self.sort_key)
         result: list[list[DatasetEntry]] = []
         for bucket in buckets:
             if bucket:
@@ -487,12 +484,8 @@ class AudioFeatureProcessingPacker:
             audio_mask_batch = torch.stack([pad_1d(m, pad_value=0) for m in audio_mask_list], dim=0)
             loss_mask_batch = torch.stack([pad_1d(m, pad_value=0) for m in loss_mask_list], dim=0)
             labels_batch = torch.stack([pad_1d(lbl, pad_value=0) for lbl in labels_list], dim=0)
-            audio_task_ids_batch = torch.stack(
-                [pad_1d(t, pad_value=0) for t in audio_task_ids_list], dim=0
-            )
-            audio_dataset_ids_batch = torch.stack(
-                [pad_1d(d, pad_value=0) for d in audio_dataset_ids_list], dim=0
-            )
+            audio_task_ids_batch = torch.stack([pad_1d(t, pad_value=0) for t in audio_task_ids_list], dim=0)
+            audio_dataset_ids_batch = torch.stack([pad_1d(d, pad_value=0) for d in audio_dataset_ids_list], dim=0)
 
             position_ids_list = []
             for L in lengths:

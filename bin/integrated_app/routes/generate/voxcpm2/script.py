@@ -185,21 +185,15 @@ async def generate_voxcpm_script(
                 wav_path, _ref_text = persona_data
                 if wav_path and os.path.isfile(wav_path):
                     persona_map_with_wav[safe_name] = wav_path
-                    logger.info(
-                        f"[VoxCPM剧本工坊] 已加载音色 '{safe_name}' 的参考音频"
-                    )
+                    logger.info(f"[VoxCPM剧本工坊] 已加载音色 '{safe_name}' 的参考音频")
                 else:
                     # Why：单行失败局部降级策略。
                     # 某个角色的 WAV 文件损坏/被删除时，不应该让整笔剧本（可能 50 行
                     # 20 个角色）完全失败——engine 内部对"角色找不到参考音频"会
                     # 自动 fallback 到默认音色；这里仅记录警告，不阻断主流程。
-                    logger.warning(
-                        f"[VoxCPM剧本工坊] 音色 '{safe_name}' 无WAV文件，将使用默认音色"
-                    )
+                    logger.warning(f"[VoxCPM剧本工坊] 音色 '{safe_name}' 无WAV文件，将使用默认音色")
             else:
-                logger.warning(
-                    f"[VoxCPM剧本工坊] 音色 '{safe_name}' 不存在，将使用默认音色"
-                )
+                logger.warning(f"[VoxCPM剧本工坊] 音色 '{safe_name}' 不存在，将使用默认音色")
 
     # ------------------------------------------------------------------
     # 4. 构造生成闭包（整笔剧本作为单次推理任务串行执行；engine.generate_script

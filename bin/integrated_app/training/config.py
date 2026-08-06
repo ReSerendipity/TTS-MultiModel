@@ -8,6 +8,7 @@ training/ 目录对应 WebUI 中 LoRA 微调 Tab 的训练任务；scripts/train
 配置使用 Pydantic 模型 + JSON/YAML 序列化，同时保留原有的 argbind 辅助函数
 （``load_yaml_config`` / ``parse_args_with_config``）以满足 100% 向后兼容。
 """
+
 from __future__ import annotations
 
 import builtins
@@ -56,6 +57,7 @@ class DatasetConfig(BaseModel if BaseModel is not None else object):  # type: ig
         max_duration_sec: float = Field(20.0, ge=1.0, le=600.0, description="最长有效时长，超过则丢弃或截断")
         split_ratio: float = Field(0.9, ge=0.7, le=0.99, description="train/eval 切分比例（0.7~0.99）")
     else:
+
         def __init__(
             self,
             data_dir: Path,
@@ -109,6 +111,7 @@ class LoRAConfig(BaseModel if BaseModel is not None else object):  # type: ignor
             "none", description="bias 训练策略：none=不训练 / all=全部训练 / lora_only=只训练 lora 模块 bias"
         )
     else:
+
         def __init__(
             self,
             target_modules: list[str] | None = None,
@@ -156,6 +159,7 @@ class OptimizerConfig(BaseModel if BaseModel is not None else object):  # type: 
         weight_decay: float = Field(0.01, ge=0.0, le=0.1, description="权重衰减 L2 正则系数")
         betas: tuple[float, float] = Field((0.9, 0.999), description="Adam(beta1, beta2) 动量参数")
     else:
+
         def __init__(
             self,
             optimizer_type: str = "adamw",
@@ -220,6 +224,7 @@ class TrainingConfig(BaseModel if BaseModel is not None else object):  # type: i
         output_dir: Path = Field(..., description="训练输出目录")
         seed: int = Field(42, description="全局随机种子")
     else:
+
         def __init__(
             self,
             dataset: DatasetConfig,
@@ -302,6 +307,7 @@ def _pydantic_to_dict(cfg: TrainingConfig) -> dict[str, Any]:
         raw = cfg.model_dump(mode="json") if hasattr(cfg, "model_dump") else cfg.dict()
     else:
         raw = cfg.dict()
+
     # Path 对象统一转 str，避免 JSON/YAML 序列化失败
     def _walk(node: Any) -> Any:
         if isinstance(node, Path):
@@ -311,6 +317,7 @@ def _pydantic_to_dict(cfg: TrainingConfig) -> dict[str, Any]:
         if isinstance(node, (list, tuple)):
             return [_walk(x) for x in node]
         return node
+
     return _walk(raw)
 
 
@@ -351,14 +358,10 @@ def load_training_config(path: Path) -> TrainingConfig:
     raw_text = path.read_text(encoding="utf-8")
     data: Any
     try:
-        if suffix in (".yaml", ".yml"):
-            data = yaml.safe_load(raw_text)
-        else:
-            data = json.loads(raw_text)
+        data = yaml.safe_load(raw_text) if suffix in (".yaml", ".yml") else json.loads(raw_text)
     except (json.JSONDecodeError, yaml.YAMLError, yaml.scanner.ScannerError) as e:
         raise ValueError(
-            f"训练配置 {path} 格式错误，请重新填写或使用 get_default_config 生成默认配置。\n"
-            f"解析器报错: {e}"
+            f"训练配置 {path} 格式错误，请重新填写或使用 get_default_config 生成默认配置。\n解析器报错: {e}"
         ) from e
     if not isinstance(data, dict):
         raise ValueError(f"训练配置 {path} 根节点必须是 mapping（JSON object / YAML dict）")
@@ -367,7 +370,11 @@ def load_training_config(path: Path) -> TrainingConfig:
     # Pydantic 场景：捕获并一次性列出所有错误字段，提升用户排错效率
     if BaseModel is not None:
         try:
-            return TrainingConfig.model_validate(data) if hasattr(TrainingConfig, "model_validate") else TrainingConfig(**data)  # type: ignore[call-arg]
+            return (
+                TrainingConfig.model_validate(data)
+                if hasattr(TrainingConfig, "model_validate")
+                else TrainingConfig(**data)
+            )  # type: ignore[call-arg]
         except ValidationError as e:
             errs = e.errors() if hasattr(e, "errors") else [str(e)]
             msg_lines = [f"训练配置校验失败，共 {len(errs)} 个错误字段："]
@@ -412,9 +419,7 @@ def save_training_config(cfg: TrainingConfig, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = _pydantic_to_dict(cfg)
     suffix = path.suffix.lower()
-    fd, tmp_path_str = tempfile.mkstemp(
-        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
-    )
+    fd, tmp_path_str = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
     tmp_path = Path(tmp_path_str)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:

@@ -72,8 +72,7 @@ class DotsTTSEngine(TTSEngine):
         self.optimize: bool = backend == GPUBackend.CUDA and os.name != "nt"
         self._runtime: Any = None
         logger.info(
-            f"[dots.tts] 初始化引擎: model_dir={self.model_dir}, "
-            f"precision={self.precision}, optimize={self.optimize}"
+            f"[dots.tts] 初始化引擎: model_dir={self.model_dir}, precision={self.precision}, optimize={self.optimize}"
         )
 
     # ------------------------------------------------------------------
@@ -104,8 +103,7 @@ class DotsTTSEngine(TTSEngine):
 
         if not os.path.isdir(self.model_dir):
             raise EngineLoadError(
-                f"dots.tts 模型目录不存在: {self.model_dir}\n"
-                "请运行: python scripts/download_dotstts.py 下载模型权重。",
+                f"dots.tts 模型目录不存在: {self.model_dir}\n请运行: python scripts/download_dotstts.py 下载模型权重。",
                 engine="dotstts",
             )
 
@@ -214,9 +212,7 @@ class DotsTTSEngine(TTSEngine):
         try:
             result: dict[str, Any] = self._runtime.generate(**gen_kwargs)
         except Exception as e:
-            raise GenerationError(
-                f"dots.tts 推理失败: {type(e).__name__}: {e}"
-            ) from e
+            raise GenerationError(f"dots.tts 推理失败: {type(e).__name__}: {e}") from e
 
         output_path: str = self._save_result(result)
         return output_path, f"dots.tts 克隆完成: {output_path}"
@@ -266,9 +262,7 @@ class DotsTTSEngine(TTSEngine):
                 path: str = self._save_wav(audio, sr, prefix=f"dotstts_stream_{idx}")
                 yield path, f"已生成第 {idx} 段"
         except Exception as e:
-            raise GenerationError(
-                f"dots.tts 流式推理失败: {type(e).__name__}: {e}"
-            ) from e
+            raise GenerationError(f"dots.tts 流式推理失败: {type(e).__name__}: {e}") from e
 
     def generate_voice_design(
         self, text: str, instruction: str = "", normalize: bool = True, **kwargs: Any

@@ -87,13 +87,9 @@ class ProgressManager:
 
             event_bus.notify()
         except ImportError as e:
-            logging.getLogger("tts_multimodel").debug(
-                f"[ProgressManager] SSE 模块未加载 (ImportError, 可忽略): {e}"
-            )
+            logging.getLogger("tts_multimodel").debug(f"[ProgressManager] SSE 模块未加载 (ImportError, 可忽略): {e}")
         except Exception as e:
-            logging.getLogger("tts_multimodel").debug(
-                f"[ProgressManager] SSE 通知失败 (可忽略): {e}"
-            )
+            logging.getLogger("tts_multimodel").debug(f"[ProgressManager] SSE 通知失败 (可忽略): {e}")
 
     def start(self, total_segments: int = 1, phase: str = "准备中") -> None:
         """初始化并启动新的生成任务进度追踪。
@@ -341,11 +337,7 @@ class ProgressManager:
                     f"</div>"
                 )
         except (ValueError, KeyError, AttributeError):
-            return (
-                '<div class="tts-progress-bar">'
-                '<div class="tts-progress-fill" style="width:50%"></div>'
-                "</div>"
-            )
+            return '<div class="tts-progress-bar"><div class="tts-progress-fill" style="width:50%"></div></div>'
 
     def get_progress_html(self) -> str:
         """渲染 HTMX 进度条 HTML 片段（render_html_progress_bar 的别名）。

@@ -41,6 +41,7 @@ _counter_lock = threading.Lock()
 # Pydantic 响应模型
 # ---------------------------------------------------------------------------
 
+
 class SystemStatsResponse(BaseModel):
     """生成统计响应模型。
 
@@ -66,6 +67,7 @@ class SystemStatsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # 内部计数辅助函数（向后兼容，供其他模块导入）
 # ---------------------------------------------------------------------------
+
 
 def increment_generation(success: bool = True) -> None:
     """增加一次生成计数。
@@ -104,6 +106,7 @@ def _uptime_seconds() -> float:
 # 1. Liveness: /health/ping
 # ---------------------------------------------------------------------------
 
+
 @router.get("/health/ping", summary="Liveness 探针", description="极快内存级响应，不访问 DB/GPU，供 k8s liveness 使用")
 def ping() -> dict[str, Any]:
     """存活探针：只返回当前时间戳，不做任何 I/O。
@@ -123,7 +126,10 @@ def ping() -> dict[str, Any]:
 # 2. Readiness: /health/ready
 # ---------------------------------------------------------------------------
 
-@router.get("/health/ready", summary="Readiness 探针", description="深度健康检查：模型加载状态 + DB 连通性 + GPU 可用性")
+
+@router.get(
+    "/health/ready", summary="Readiness 探针", description="深度健康检查：模型加载状态 + DB 连通性 + GPU 可用性"
+)
 async def ready() -> dict[str, Any]:
     """就绪探针：检查模型加载状态、DB 连通性与 GPU 可用性。
 
@@ -197,7 +203,13 @@ async def ready() -> dict[str, Any]:
 # 3. 生成统计: /stats
 # ---------------------------------------------------------------------------
 
-@router.get("/stats", summary="生成统计", description="累计生成统计：总数/成功率/平均耗时/OOM/熔断次数", response_model=SystemStatsResponse)
+
+@router.get(
+    "/stats",
+    summary="生成统计",
+    description="累计生成统计：总数/成功率/平均耗时/OOM/熔断次数",
+    response_model=SystemStatsResponse,
+)
 def get_stats() -> SystemStatsResponse:
     """返回全局生成统计指标。"""
     resp = SystemStatsResponse(uptime_seconds=_uptime_seconds())
@@ -215,9 +227,7 @@ def get_stats() -> SystemStatsResponse:
         resp.circuit_breaker_trips = int(report.get("circuit_breaker_trips", 0))
 
         if resp.total_generations > 0:
-            resp.success_rate = round(
-                (resp.total_generations - resp.total_errors) / resp.total_generations * 100, 2
-            )
+            resp.success_rate = round((resp.total_generations - resp.total_errors) / resp.total_generations * 100, 2)
     except Exception as exc:  # noqa: BLE001
         logger.debug(f"[stats] HealthMonitor 取数失败，回退内存计数器: {exc}")
         # 回退到本文件的内存计数器（保证接口永不抛错）
@@ -242,6 +252,7 @@ def get_stats() -> SystemStatsResponse:
 # ---------------------------------------------------------------------------
 # 3.5 队列状态: /queue
 # ---------------------------------------------------------------------------
+
 
 @router.get("/queue", summary="生成队列状态", description="异步生成任务队列状态：排队数/活跃数/已完成/已取消")
 def get_queue_status() -> dict[str, Any]:
@@ -271,7 +282,12 @@ def get_queue_status() -> dict[str, Any]:
 # 4. GPU 泄漏预警: /health/gpu-leak
 # ---------------------------------------------------------------------------
 
-@router.get("/health/gpu-leak", summary="GPU 显存泄漏检查", description="调用 HealthMonitor.check_memory_leak()，无泄漏返回 null")
+
+@router.get(
+    "/health/gpu-leak",
+    summary="GPU 显存泄漏检查",
+    description="调用 HealthMonitor.check_memory_leak()，无泄漏返回 null",
+)
 def gpu_leak() -> dict[str, Any]:
     """检查潜在 GPU 显存泄漏。
 
@@ -302,7 +318,12 @@ def gpu_leak() -> dict[str, Any]:
 # 5. 向后兼容: /health（原完整健康报告，Settings 页面仍使用）
 # ---------------------------------------------------------------------------
 
-@router.get("/health", summary="健康检查（完整）", description="向后兼容：返回 GPU/CPU/模型/缓存完整健康报告，供 Settings 页 System Stats 使用")
+
+@router.get(
+    "/health",
+    summary="健康检查（完整）",
+    description="向后兼容：返回 GPU/CPU/模型/缓存完整健康报告，供 Settings 页 System Stats 使用",
+)
 async def get_health() -> dict[str, Any]:
     """完整健康报告（原接口，100% 向后兼容）。"""
     from ...monitor import get_health_monitor
@@ -460,6 +481,7 @@ async def get_health() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # 6. 向后兼容: /shutdown
 # ---------------------------------------------------------------------------
+
 
 @router.post("/shutdown", summary="优雅关闭服务器", description="请求服务器优雅关闭，延迟 1 秒后停止进程")
 def shutdown_server() -> dict[str, Any]:

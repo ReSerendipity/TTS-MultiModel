@@ -162,15 +162,12 @@ tests/verification/
 # Temporary files
 tmp/
 
-# Root-level runtime data
-generation_times.json
-
 # ---------------------------------------------------------------------------
 # Test / audit / dogfood reports (local-only, regenerated frequently)
 # ---------------------------------------------------------------------------
-UX_UI_COMPREHENSIVE_EVALUATION_REPORT.md
-UX_UI_EVALUATION_REPORT.md
-test_report_v*.md
+docs/reports/UX_UI_COMPREHENSIVE_EVALUATION_REPORT.md
+docs/reports/UX_UI_EVALUATION_REPORT.md
+docs/reports/test_report_v*.md
 docs/UX_UI_EVALUATION_REPORT.md
 docs/USER_BEHAVIOR_TEST_REPORT.md
 docs/reports/UI_UX_OPTIMIZATION_IMPLEMENTATION_REPORT.md
@@ -193,9 +190,6 @@ docs/ui_optimization_screenshots/
 # ---------------------------------------------------------------------------
 bin/start_ui_test.py
 scripts/verify_ui_optimizations.py
-optimize_ui.py
-cleanup_cache.bat
-cleanup_reference_repos.bat
 
 # ---------------------------------------------------------------------------
 # Node / web tooling (in case it ever appears in this repo)

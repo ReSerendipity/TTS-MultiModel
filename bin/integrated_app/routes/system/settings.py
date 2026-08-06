@@ -17,6 +17,7 @@
     - ``GET  /api/system/settings``（Settings 页原返回 device/vram/cache 信息的混合格式）
 """
 
+import contextlib
 import copy
 import json
 import logging
@@ -40,11 +41,10 @@ from .logs import log_operation  # noqa: E402
 # 路径与常量
 # ---------------------------------------------------------------------------
 
+
 def _project_root() -> str:
     """定位项目根目录（config.yaml 所在目录）。"""
-    return os.path.abspath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..")
-    )
+    return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 
 
 PROJECT_ROOT: str = _project_root()
@@ -56,18 +56,20 @@ GENERATION_DEFAULTS_PATH: str = os.path.join(PROJECT_ROOT, "generation_defaults.
 
 
 # 不可热更新字段黑名单：命中任一路径 → 403 Forbidden
-BLACKLIST_PATHS: frozenset = frozenset({
-    ("models",),                       # 模型路径改动需要重启才生效
-    ("server", "host"),                # Uvicorn 绑定地址启动后不可改
-    ("server", "port"),                # Uvicorn 监听端口启动后不可改
-    ("server", "workers"),             # workers 改变需重启 Uvicorn
-    ("server", "ssl_certfile"),        # SSL 证书加载在启动期
-    ("server", "ssl_keyfile"),         # SSL 证书加载在启动期
-    ("api_auth", "enabled"),           # 中间件注册在启动期
-    ("api_auth", "token"),             # 同上
-    ("environment",),                  # 环境变量设置在启动早期
-    ("i18n",),                         # i18n 配置改动需要重启重载 locale
-})
+BLACKLIST_PATHS: frozenset = frozenset(
+    {
+        ("models",),  # 模型路径改动需要重启才生效
+        ("server", "host"),  # Uvicorn 绑定地址启动后不可改
+        ("server", "port"),  # Uvicorn 监听端口启动后不可改
+        ("server", "workers"),  # workers 改变需重启 Uvicorn
+        ("server", "ssl_certfile"),  # SSL 证书加载在启动期
+        ("server", "ssl_keyfile"),  # SSL 证书加载在启动期
+        ("api_auth", "enabled"),  # 中间件注册在启动期
+        ("api_auth", "token"),  # 同上
+        ("environment",),  # 环境变量设置在启动早期
+        ("i18n",),  # i18n 配置改动需要重启重载 locale
+    }
+)
 
 # 各数值字段合法范围（用于 PUT 校验，失败 → 400 ValidationError）
 FIELD_RANGES: dict[tuple, tuple] = {
@@ -94,8 +96,10 @@ FIELD_RANGES: dict[tuple, tuple] = {
 # Pydantic 响应/请求模型
 # ---------------------------------------------------------------------------
 
+
 class GenerationDefaultsUpdate(BaseModel):
     """VoxCPM2 生成默认参数（全部 Optional → 部分更新）。"""
+
     model_config = {"extra": "forbid"}
 
     cfg_value: float | None = None
@@ -197,6 +201,7 @@ class AudioPlayerSettingsUpdate(BaseModel):
 
 class SettingsUpdateRequest(BaseModel):
     """运行时设置部分更新请求（所有字段 Optional，未传则保持原值）。"""
+
     model_config = {"extra": "allow"}
 
     server: ServerSettingsUpdate | None = None
@@ -209,6 +214,7 @@ class SettingsUpdateRequest(BaseModel):
 
 class SettingsResponse(BaseModel):
     """GET /api/system/settings 完整设置响应（只读）。"""
+
     model_config = {"extra": "allow"}
 
     version: str = Field(default="0.0.0", description="应用版本")
@@ -281,6 +287,7 @@ async def _save_json_file(path: str, payload: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 # YAML config.yaml 读写（核心）
 # ---------------------------------------------------------------------------
+
 
 def _load_yaml_raw() -> dict[str, Any]:
     """读取 config.yaml 原生 dict；失败返回 {}。"""
@@ -388,10 +395,8 @@ def _apply_patch_to_runtime(patch: dict[str, Any]) -> None:
                         object.__setattr__(target, fk, fv)
                     elif hasattr(cfg, section_name):
                         # fallback：直接改 dict-like
-                        try:
+                        with contextlib.suppress(TypeError, KeyError):
                             target[fk] = fv  # type: ignore[index]
-                        except (TypeError, KeyError):
-                            pass
                 except (AttributeError, TypeError, ValueError):
                     pass
     except (ImportError, AttributeError, TypeError) as exc:
@@ -402,7 +407,12 @@ def _apply_patch_to_runtime(patch: dict[str, Any]) -> None:
 # 新规范 API：GET/PUT /settings + POST /reset
 # ---------------------------------------------------------------------------
 
-@router.get("/settings", summary="读取运行时设置", description="返回 config.yaml 全量设置 + 当前状态（向后兼容 Settings 页混合格式）")
+
+@router.get(
+    "/settings",
+    summary="读取运行时设置",
+    description="返回 config.yaml 全量设置 + 当前状态（向后兼容 Settings 页混合格式）",
+)
 async def get_settings() -> dict[str, Any]:
     """读取完整运行时设置。
 
@@ -438,12 +448,14 @@ async def get_settings() -> dict[str, Any]:
 
     # --- 向后兼容：Settings 页原字段（device/vram/cache 等混合信息） ---
     response["status"] = "ok"
-    response["model_path"] = merged.get("models", {}).get("voxcpm2", {}).get("path", "") \
-        if isinstance(merged.get("models"), dict) else ""
+    response["model_path"] = (
+        merged.get("models", {}).get("voxcpm2", {}).get("path", "") if isinstance(merged.get("models"), dict) else ""
+    )
 
     # --- 设备名 & VRAM ---
     try:
         from ...config import PRETRAINED_DIR
+
         response["model_path"] = PRETRAINED_DIR
     except (ImportError, AttributeError):
         pass
@@ -522,9 +534,11 @@ async def get_settings() -> dict[str, Any]:
     # LoRA 状态
     try:
         from ...model_registry import registry as _reg
+
         if _reg.current_engine == "voxcpm2":
             try:
                 from ...engines.voxcpm2_engine import fn_voxcpm_get_lora_state
+
                 lora_state = fn_voxcpm_get_lora_state()
                 response["current_lora"] = lora_state.get("name", "已加载") if lora_state.get("loaded") else "无"
             except (ImportError, AttributeError, TypeError):
@@ -537,6 +551,7 @@ async def get_settings() -> dict[str, Any]:
     # Cache 统计
     try:
         from ...model_manager import get_persona_cache_stats
+
         stats = get_persona_cache_stats()
         response["cache_hits"] = int(stats.get("hits", 0))
         response["cache_misses"] = int(stats.get("misses", 0))
@@ -552,7 +567,11 @@ async def get_settings() -> dict[str, Any]:
         }
     except (ImportError, AttributeError, TypeError, ValueError, KeyError):
         response["cache"] = {
-            "hit_rate": 0.0, "hits": 0, "misses": 0, "size": 0, "maxsize": 0,
+            "hit_rate": 0.0,
+            "hits": 0,
+            "misses": 0,
+            "size": 0,
+            "maxsize": 0,
         }
 
     # 通用设置 & 默认生成参数（向后兼容：Settings 页需要）
@@ -568,7 +587,11 @@ async def get_settings() -> dict[str, Any]:
     return response
 
 
-@router.put("/settings", summary="部分更新运行时设置", description="deep_merge 语义，未传字段保持不变；命中黑名单或范围非法返回 403/400")
+@router.put(
+    "/settings",
+    summary="部分更新运行时设置",
+    description="deep_merge 语义，未传字段保持不变；命中黑名单或范围非法返回 403/400",
+)
 async def update_settings(request: Request) -> dict[str, Any]:
     """运行时部分更新（PUT 语义）。
 
@@ -580,7 +603,7 @@ async def update_settings(request: Request) -> dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"请求体不是合法 JSON：{exc}",
-        )
+        ) from exc
     if not isinstance(payload, dict):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -614,19 +637,19 @@ async def update_settings(request: Request) -> dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
-        )
+        ) from exc
 
     _apply_patch_to_runtime(payload)
 
-    try:
+    with contextlib.suppress(Exception):
         log_operation("config_update", "Runtime settings updated", list(payload.keys()))
-    except Exception:  # noqa: BLE001
-        pass
 
     return {"status": "ok", "updated_fields": list(payload.keys()), "message": "已保存，热更新生效"}
 
 
-@router.post("/settings/reset", summary="恢复出厂默认", description="读取 config.yaml.bak，没有则回退硬编码 DefaultConfig")
+@router.post(
+    "/settings/reset", summary="恢复出厂默认", description="读取 config.yaml.bak，没有则回退硬编码 DefaultConfig"
+)
 def reset_settings() -> dict[str, Any]:
     """恢复出厂默认设置。
 
@@ -659,9 +682,14 @@ def reset_settings() -> dict[str, Any]:
             # 3) 最低保障：保留 version，其他段仅留空骨架
             defaults = {
                 "version": "2.0.2",
-                "server": {}, "generation": {}, "memory": {},
-                "models": {}, "i18n": {}, "sse": {},
-                "audio_player": {}, "ui": {},
+                "server": {},
+                "generation": {},
+                "memory": {},
+                "models": {},
+                "i18n": {},
+                "sse": {},
+                "audio_player": {},
+                "ui": {},
             }
             source = "fallback skeleton"
 
@@ -672,12 +700,10 @@ def reset_settings() -> dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
-        )
+        ) from exc
 
-    try:
+    with contextlib.suppress(Exception):
         log_operation("config_update", "Settings reset to defaults", {"source": source})
-    except Exception:  # noqa: BLE001
-        pass
 
     return {"status": "ok", "source": source, "message": "已恢复出厂设置，建议重启应用"}
 
@@ -685,6 +711,7 @@ def reset_settings() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # 向后兼容原接口：/advanced_params
 # ---------------------------------------------------------------------------
+
 
 @router.get("/advanced_params", summary="高级生成参数", description="读取 VoxCPM2 引擎专用高级参数")
 def get_advanced_params() -> dict[str, Any]:
@@ -746,6 +773,7 @@ async def save_advanced_params(request: Request) -> dict[str, Any]:
 # 向后兼容原接口：/general_settings
 # ---------------------------------------------------------------------------
 
+
 @router.post("/general_settings", summary="保存通用设置", description="持久化 UI 语言/主题/自动保存等通用偏好")
 async def save_general_settings(request: Request) -> dict[str, Any]:
     try:
@@ -778,7 +806,10 @@ async def save_general_settings(request: Request) -> dict[str, Any]:
 # 向后兼容原接口：/generation_defaults
 # ---------------------------------------------------------------------------
 
-@router.get("/generation_defaults", summary="默认生成参数", description="读取默认生成参数（sample_rate/speed/seed/silence）")
+
+@router.get(
+    "/generation_defaults", summary="默认生成参数", description="读取默认生成参数（sample_rate/speed/seed/silence）"
+)
 async def get_generation_defaults() -> dict[str, Any]:
     try:
         params = await _load_json_file(GENERATION_DEFAULTS_PATH, _DEFAULT_GENERATION_DEFAULTS)

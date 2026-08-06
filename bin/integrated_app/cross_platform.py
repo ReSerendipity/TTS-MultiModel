@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import platform
@@ -167,9 +168,7 @@ def atomic_write(file_path: str | Path, data: bytes | str) -> None:
     mode = "wb" if isinstance(data, bytes) else "w"
     encoding = None if isinstance(data, bytes) else "utf-8"
 
-    fd, tmp_path = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.name + ".", suffix=".tmp"
-    )
+    fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
     try:
         with os.fdopen(fd, mode, encoding=encoding) as f:
             f.write(data)
@@ -177,10 +176,8 @@ def atomic_write(file_path: str | Path, data: bytes | str) -> None:
             os.fsync(f.fileno())
         os.replace(tmp_path, str(path))
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp_path)
-        except OSError:
-            pass
         raise
 
 
@@ -240,7 +237,7 @@ def file_lock(file_path: str | Path):
             except OSError:
                 os.close(self.fd)
                 self.fd = None
-                raise RuntimeError(f"无法获取文件锁: {self.path}")
+                raise RuntimeError(f"无法获取文件锁: {self.path}") from None
             return self
 
         def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
@@ -423,7 +420,6 @@ def get_default_audio_output_device() -> str | None:
     """
     try:
         if IS_WINDOWS:
-
             return "Default Windows Audio Device"
         elif IS_MACOS:
             result = subprocess.run(

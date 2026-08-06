@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 import traceback
@@ -166,9 +167,7 @@ async def _force_fail_if_active(generation_id: str, error: str) -> None:
         error: 描述失败的错误消息。
     """
     try:
-        logger.error(
-            "[TaskQueue] 强制标记生成失败 %s: %s", generation_id, error
-        )
+        logger.error("[TaskQueue] 强制标记生成失败 %s: %s", generation_id, error)
         await _notify_generation_failed(generation_id, error)
     except Exception:
         traceback.print_exc()
@@ -186,9 +185,7 @@ async def enqueue_generation(generation_id: str, coro: Coroutine) -> None:
     """
     if _generation_queue is None:
         coro.close()
-        raise RuntimeError(
-            "生成队列尚未初始化。请先调用 init_queue()。"
-        )
+        raise RuntimeError("生成队列尚未初始化。请先调用 init_queue()。")
 
     async with _lock:
         _queued_generation_ids.add(generation_id)
@@ -240,10 +237,7 @@ def is_generation_active(generation_id: str) -> bool:
     Returns:
         如果生成正在排队或运行中返回 True。
     """
-    return (
-        generation_id in _queued_generation_ids
-        or generation_id in _running_generation_tasks
-    )
+    return generation_id in _queued_generation_ids or generation_id in _running_generation_tasks
 
 
 def get_queue_status() -> dict[str, Any]:
@@ -284,10 +278,8 @@ async def init_queue(force: bool = False) -> None:
         for task in list(_running_generation_tasks.values()):
             if not task.done():
                 task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
             await asyncio.wait_for(_generation_worker_task, timeout=2.0)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
-            pass
 
     _generation_queue = asyncio.Queue()
     _queued_generation_ids = set()
@@ -312,10 +304,8 @@ async def shutdown_queue() -> None:
 
     if _generation_worker_task is not None and not _generation_worker_task.done():
         _generation_worker_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
             await asyncio.wait_for(_generation_worker_task, timeout=2.0)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
-            pass
 
     _generation_queue = None
     _generation_worker_task = None
@@ -394,9 +384,7 @@ class PerEngineQueueManager:
                 except asyncio.CancelledError:
                     logger.info("[PerEngineQueue] 生成已取消: %s", job.generation_id)
                 except Exception as exc:
-                    logger.error(
-                        "[PerEngineQueue] 生成失败 %s: %s", job.generation_id, exc
-                    )
+                    logger.error("[PerEngineQueue] 生成失败 %s: %s", job.generation_id, exc)
                     await _notify_generation_failed(job.generation_id, str(exc))
             except Exception as exc:
                 logger.error("[PerEngineQueue] worker 出错 %s: %s", engine, exc)
@@ -417,14 +405,11 @@ class PerEngineQueueManager:
         """
         if engine not in self._engine_queues:
             coro.close()
-            raise RuntimeError(
-                f"引擎 {engine} 的队列尚未初始化。请先调用 init_engine_queue()。"
-            )
+            raise RuntimeError(f"引擎 {engine} 的队列尚未初始化。请先调用 init_engine_queue()。")
         job = GenerationJob(generation_id=generation_id, coro=coro)
         await self._engine_queues[engine].put(job)
         logger.debug(
-            "[PerEngineQueue] 已入队 %s -> %s (深度: %d)",
-            generation_id, engine, self._engine_queues[engine].qsize()
+            "[PerEngineQueue] 已入队 %s -> %s (深度: %d)", generation_id, engine, self._engine_queues[engine].qsize()
         )
 
     def cancel(self, engine: str, generation_id: str) -> str | None:
@@ -468,7 +453,7 @@ class PerEngineQueueManager:
         Args:
             engine: 引擎名称。
         """
-        queue = self._engine_queues.pop(engine, None)
+        self._engine_queues.pop(engine, None)
         worker = self._engine_workers.pop(engine, None)
         running = self._engine_running.pop(engine, {})
 
@@ -478,10 +463,8 @@ class PerEngineQueueManager:
 
         if worker is not None and not worker.done():
             worker.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
                 await asyncio.wait_for(worker, timeout=2.0)
-            except (asyncio.CancelledError, asyncio.TimeoutError):
-                pass
 
         logger.info("[PerEngineQueue] 队列已关闭: %s", engine)
 

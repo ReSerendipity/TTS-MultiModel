@@ -540,10 +540,7 @@ class AudioEffectsProcessor:
 
         board = _pedalboard.Pedalboard(effects)
         try:
-            if audio.ndim == 1:
-                result = board(audio, self.sample_rate)
-            else:
-                result = board(audio, self.sample_rate)
+            result = board(audio, self.sample_rate) if audio.ndim == 1 else board(audio, self.sample_rate)
         except Exception as exc:
             logger.warning("Pedalboard 处理失败（%s），返回原音频", exc)
             return audio
@@ -1023,11 +1020,8 @@ def trim_tts_output(
                 # 找到连续超过阈值区域的结束位置
                 # 从 first_pop_idx 开始找第一个低于阈值的位置
                 pop_region = above_pop[first_pop_idx:]
-                if np.all(pop_region):
-                    # 整个窗口都是爆音
-                    pop_end_rel = pop_region.size
-                else:
-                    pop_end_rel = int(np.argmax(~pop_region))
+                # 整个窗口都是爆音
+                pop_end_rel = pop_region.size if np.all(pop_region) else int(np.argmax(~pop_region))
                 j = first_pop_idx + pop_end_rel
                 j = min(j + padding_samples, pop_scan_end)
                 leading_pop_end = max(leading_pop_end, j)
@@ -1169,10 +1163,7 @@ def reduce_noise(
             if noise_sample is None:
                 # 未提供噪声剖面：取音频前 0.5s 估计
                 noise_len = min(audio.size, sample_rate // 2)
-                if noise_len > 0:
-                    noise_sample_use = audio[:noise_len]
-                else:
-                    noise_sample_use = None
+                noise_sample_use = audio[:noise_len] if noise_len > 0 else None
             else:
                 noise_sample_use = noise_sample
 
@@ -1507,10 +1498,7 @@ def validate_and_load_reference_audio(
             audio = np.mean(audio, axis=-1)
 
         # Convert to float32
-        if audio.dtype == np.int16:
-            audio = audio.astype(np.float32) / 32768.0
-        else:
-            audio = audio.astype(np.float32)
+        audio = audio.astype(np.float32) / 32768.0 if audio.dtype == np.int16 else audio.astype(np.float32)
 
         # Apply preprocessing
         audio = preprocess_reference_audio(audio, sr)

@@ -5,7 +5,7 @@
 
 数据持久化
 ----------
-训练样本以 JSON 格式存储在 ``ROOT_DIR/generation_times.json`` 文件中，
+训练样本以 JSON 格式存储在 ``data/generation_times.json`` 文件中，
 采用滑动窗口策略，最多保留 ``max_entries`` 条记录（默认 200 条），
 防止数据文件无限增长。
 
@@ -101,8 +101,7 @@ class GenerationTimeEstimator:
                 data = json.load(f)
         except json.JSONDecodeError as e:
             logger.warning(
-                "生成时间样本文件 %s 损坏（JSONDecodeError: %s），"
-                "将重置为空白并备份原文件为 .bak",
+                "生成时间样本文件 %s 损坏（JSONDecodeError: %s），将重置为空白并备份原文件为 .bak",
                 self.data_file,
                 e,
             )
@@ -131,15 +130,13 @@ class GenerationTimeEstimator:
                     continue
             elif isinstance(item, dict):
                 try:
-                    converted.append(
-                        (int(item["char_count"]), float(item["duration"]))
-                    )
+                    converted.append((int(item["char_count"]), float(item["duration"])))
                 except (KeyError, TypeError, ValueError):
                     continue
 
         # 只保留最近 max_entries 条
         if len(converted) > self.max_entries:
-            converted = converted[-self.max_entries:]
+            converted = converted[-self.max_entries :]
 
         self._samples = deque(converted, maxlen=self.max_entries)
         self._count = int(data.get("count", len(converted))) if isinstance(data, dict) else len(converted)
@@ -237,11 +234,12 @@ class GenerationTimeEstimator:
             force: 是否强制立即保存（忽略节流条件）。
         """
         now = time.time()
-        if not force:
-            # 节流：距离上次保存不足 _SAVE_THROTTLE_SECONDS 且样本数不足 _SAVE_THROTTLE_SAMPLES 时跳过
-            if (now - self._last_save_time < _SAVE_THROTTLE_SECONDS and
-                    self._samples_since_last_save < _SAVE_THROTTLE_SAMPLES):
-                return
+        # 节流：距离上次保存不足 _SAVE_THROTTLE_SECONDS 且样本数不足 _SAVE_THROTTLE_SAMPLES 时跳过
+        if not force and (
+            now - self._last_save_time < _SAVE_THROTTLE_SECONDS
+            and self._samples_since_last_save < _SAVE_THROTTLE_SAMPLES
+        ):
+            return
 
         payload = {
             "samples": [[int(c), float(s)] for c, s in self._samples],
@@ -390,9 +388,7 @@ class GenerationTimeEstimator:
             "sample_count": self._count,
             "slope": round(self._slope, 6),
             "intercept": round(self._intercept, 4),
-            "recent_samples": [
-                (int(c), round(float(d), 3)) for c, d in self._samples[-5:]
-            ],
+            "recent_samples": [(int(c), round(float(d), 3)) for c, d in self._samples[-5:]],
             "avg_duration": round(sum(durations) / len(durations), 2),
             "min_duration": round(min(durations), 2),
             "max_duration": round(max(durations), 2),

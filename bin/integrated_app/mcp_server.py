@@ -480,9 +480,7 @@ class MCPServer:
             logger.error(f"[MCP] 列出引擎失败: {e}", exc_info=True)
             return {"engines": [], "error": str(e)}
 
-    async def _handle_list_personas(
-        self, keyword: str = "", **kwargs: Any
-    ) -> dict[str, Any]:
+    async def _handle_list_personas(self, keyword: str = "", **kwargs: Any) -> dict[str, Any]:
         """列出音色工具处理函数。
 
         Args:

@@ -45,13 +45,24 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 # ---------------------------------------------------------------------------
 
 VALID_LEVELS: frozenset = frozenset({"INFO", "WARN", "ERROR"})
-VALID_ACTIONS: frozenset = frozenset({
-    "generation_start", "generation_success", "generation_failed",
-    "model_load", "model_unload", "model_switch",
-    "persona_create", "persona_update", "persona_delete",
-    "lora_load", "lora_unload",
-    "system_startup", "system_shutdown", "config_update",
-})
+VALID_ACTIONS: frozenset = frozenset(
+    {
+        "generation_start",
+        "generation_success",
+        "generation_failed",
+        "model_load",
+        "model_unload",
+        "model_switch",
+        "persona_create",
+        "persona_update",
+        "persona_delete",
+        "lora_load",
+        "lora_unload",
+        "system_startup",
+        "system_shutdown",
+        "config_update",
+    }
+)
 
 ACTION_LEVEL_MAP: dict[str, str] = {
     "generation_failed": "ERROR",
@@ -67,6 +78,7 @@ CLEAN_COUNT_THRESHOLD: int = 100_000
 # ---------------------------------------------------------------------------
 # Pydantic 响应模型
 # ---------------------------------------------------------------------------
+
 
 class LogEntryResponse(BaseModel):
     """单条操作日志响应。
@@ -107,6 +119,7 @@ class LogListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # 内存 OperationLog（向后兼容，供 settings.py 等模块调用 log_operation / get_operation_log）
 # ---------------------------------------------------------------------------
+
 
 class OperationLog:
     """内存环形缓冲区操作日志。
@@ -226,6 +239,7 @@ def log_operation(
 # DB Schema 辅助：确保 action_logs 表存在
 # ---------------------------------------------------------------------------
 
+
 def _ensure_action_logs_table(db: Any) -> None:
     """若 ``action_logs`` 表不存在则创建。幂等。
 
@@ -247,12 +261,8 @@ def _ensure_action_logs_table(db: Any) -> None:
         """
         with db._transaction() as conn:
             conn.execute(create_sql)
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_action_logs_ts_ms ON action_logs(ts_ms DESC)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_action_logs_level_action ON action_logs(level, action)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_action_logs_ts_ms ON action_logs(ts_ms DESC)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_action_logs_level_action ON action_logs(level, action)")
     except sqlite3.OperationalError:
         return
 
@@ -275,7 +285,13 @@ def _db_available() -> Any | None:
 # 1. GET /logs — 查询操作日志（分页）
 # ---------------------------------------------------------------------------
 
-@router.get("/logs", summary="查询操作日志", description="分页查询操作日志，支持 level/action/时间窗过滤", response_model=LogListResponse)
+
+@router.get(
+    "/logs",
+    summary="查询操作日志",
+    description="分页查询操作日志，支持 level/action/时间窗过滤",
+    response_model=LogListResponse,
+)
 def get_logs(
     level: str | None = Query(default=None, description="日志等级 INFO/WARN/ERROR"),
     action: str | None = Query(default=None, description="动作类型过滤，如 generation_success"),
@@ -426,6 +442,7 @@ def _query_from_memory(
 # 2. DELETE /logs/clean — 清理旧日志（30 天 OR 超过 10 万条双重阈值）
 # ---------------------------------------------------------------------------
 
+
 @router.delete("/logs/clean", summary="清理旧日志", description="清理 30 天前或超过 10 万条之前的操作日志")
 def clean_logs() -> dict[str, Any]:
     """按双重阈值清理操作日志。
@@ -472,7 +489,7 @@ def clean_logs() -> dict[str, Any]:
                 break
             except sqlite3.OperationalError as exc:
                 last_err = exc
-                logger.warning(f"[logs/clean] DB 锁/错误（attempt {attempt+1}/3）: {exc}")
+                logger.warning(f"[logs/clean] DB 锁/错误（attempt {attempt + 1}/3）: {exc}")
                 time.sleep(0.5)
         else:
             # 3 次都失败 → 500
@@ -505,6 +522,7 @@ def clean_logs() -> dict[str, Any]:
 # 向后兼容：保留原 /logs 简单接口（无分页参数时仍返回 {"logs", "total"}）
 # ---------------------------------------------------------------------------
 
+
 @router.get("/logs-compat", include_in_schema=False)
 def get_logs_simple(limit: int = 50, filter_type: str = "all") -> dict[str, Any]:
     """（内部兼容）原 Settings 页面使用的简单无分页格式。"""
@@ -514,11 +532,13 @@ def get_logs_simple(limit: int = 50, filter_type: str = "all") -> dict[str, Any]
     logs_raw = _operation_log.get_latest(limit=limit, filter_type=filter_type)
     logs_public: list[dict[str, Any]] = []
     for raw in logs_raw:
-        logs_public.append({
-            "id": raw.get("id"),
-            "timestamp": raw.get("timestamp"),
-            "type": raw.get("type"),
-            "message": raw.get("message"),
-            "details": raw.get("details", {}),
-        })
+        logs_public.append(
+            {
+                "id": raw.get("id"),
+                "timestamp": raw.get("timestamp"),
+                "type": raw.get("type"),
+                "message": raw.get("message"),
+                "details": raw.get("details", {}),
+            }
+        )
     return {"logs": logs_public, "total": len(logs_public)}

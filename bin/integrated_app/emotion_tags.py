@@ -4,6 +4,7 @@
 支持 [happy]、[sad:0.8]、[whisper] 等英文标签，以及中文标签如 [温柔]、[悲伤] 等。
 标签可通过 EmotionControlManager 转换为情感向量或 CFG 控制指令。
 """
+
 from __future__ import annotations
 
 import re
@@ -425,9 +426,7 @@ def validate_tags(tags: list[EmotionTag]) -> list[str]:
     warnings = []
     for tag in tags:
         if tag.name not in EMOTION_REGISTRY:
-            suggestions = [
-                name for name in EMOTION_REGISTRY if name.startswith(tag.name[:2])
-            ]
+            suggestions = [name for name in EMOTION_REGISTRY if name.startswith(tag.name[:2])]
             msg = f"未知情感标签: '{tag.name}'"
             if suggestions:
                 msg += f"，您是否想要: {', '.join(suggestions[:3])}?"

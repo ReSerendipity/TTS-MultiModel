@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import secrets
@@ -159,9 +160,7 @@ class SSEEventBus:
             while client_id in self._subscribers:
                 suffix += 1
                 client_id = f"{base_id}_{suffix}"
-            queue: asyncio.Queue[SSEEvent | dict[str, Any]] = asyncio.Queue(
-                maxsize=self._max_queue_size
-            )
+            queue: asyncio.Queue[SSEEvent | dict[str, Any]] = asyncio.Queue(maxsize=self._max_queue_size)
             self._subscribers[client_id] = queue
             logger.debug("SSE subscribe client_id=%s total=%d", client_id, len(self._subscribers))
             return client_id, queue
@@ -214,10 +213,8 @@ class SSEEventBus:
                     if q.full():
                         # 单 subscriber queue 满：静默丢弃最早的队头，再放入新的
                         # 使用 logger.debug 级别避免慢速客户端刷爆日志
-                        try:
+                        with contextlib.suppress(asyncio.QueueEmpty):
                             q.get_nowait()
-                        except asyncio.QueueEmpty:
-                            pass
                         logger.debug("SSE notify queue 已满，丢弃最早事件 client_id=%s", cid)
                     q.put_nowait(event)
                 except asyncio.QueueFull:
@@ -244,10 +241,8 @@ class SSEEventBus:
                 time.sleep(0.05)
                 self._event.clear()
         except Exception:
-            try:
+            with contextlib.suppress(Exception):
                 self._event.clear()
-            except Exception:
-                pass
 
     async def wait(self, timeout: float = 1.0) -> bool:
         """等待事件通知，带超时（旧代码轮询兼容 API）。
@@ -301,10 +296,8 @@ class SSEEventBus:
                 heartbeat_evt = SSEEvent(type="__heartbeat__", data={})
                 try:
                     if queue.full():
-                        try:
+                        with contextlib.suppress(asyncio.QueueEmpty):
                             queue.get_nowait()
-                        except asyncio.QueueEmpty:
-                            pass
                     queue.put_nowait(heartbeat_evt)
                 except asyncio.QueueFull:
                     pass
@@ -436,9 +429,7 @@ async def sse_events(request: Request) -> StreamingResponse:
                         )
                     else:
                         # 不识别类型：作为通用 message 事件输出
-                        yield _format_sse_frame(
-                            SSEEvent(type="message", data={"payload": str(queue_event)})
-                        )
+                        yield _format_sse_frame(SSEEvent(type="message", data={"payload": str(queue_event)}))
                     # 队列中有事件立即进入下一轮，不进入轮询分支
                     continue
 
@@ -532,9 +523,7 @@ async def sse_events(request: Request) -> StreamingResponse:
                     engine = switch_state.get("engine", "")
                     from ..model_registry import ENGINE_DISPLAY_NAMES
 
-                    default_size = ENGINE_DISPLAY_NAMES.get(
-                        registry.current_engine, registry.current_engine or "None"
-                    )
+                    default_size = ENGINE_DISPLAY_NAMES.get(registry.current_engine, registry.current_engine or "None")
                     model_size = switch_state.get("model_size", default_size)
                     es_data = json.dumps(
                         {
@@ -548,9 +537,7 @@ async def sse_events(request: Request) -> StreamingResponse:
                         ensure_ascii=False,
                     )
                     yield f"event: engine_switch\ndata: {es_data}\n\n"
-                    if sstatus in ("completed", "failed") and hasattr(
-                        request.app.state, "engine_switch_state"
-                    ):
+                    if sstatus in ("completed", "failed") and hasattr(request.app.state, "engine_switch_state"):
                         del request.app.state.engine_switch_state
 
                 # ---- model_load 事件（PF-1: 模型加载细粒度进度）----
@@ -583,9 +570,7 @@ async def sse_events(request: Request) -> StreamingResponse:
                         ensure_ascii=False,
                     )
                     yield f"event: model_load\ndata: {ml_data}\n\n"
-                    if ml_status in ("completed", "failed") and hasattr(
-                        request.app.state, "model_load_state"
-                    ):
+                    if ml_status in ("completed", "failed") and hasattr(request.app.state, "model_load_state"):
                         del request.app.state.model_load_state
 
                 # ---- time_estimate 事件 ----
@@ -625,9 +610,7 @@ async def sse_events(request: Request) -> StreamingResponse:
                             te_data = json.dumps(
                                 {
                                     "status": "idle",
-                                    "text": tracker_info.get(
-                                        "status_text", i18n_t("sse_status_idle", lang)
-                                    ),
+                                    "text": tracker_info.get("status_text", i18n_t("sse_status_idle", lang)),
                                 },
                                 ensure_ascii=False,
                             )

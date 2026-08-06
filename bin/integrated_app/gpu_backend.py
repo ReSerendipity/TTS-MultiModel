@@ -1184,7 +1184,9 @@ class GPUBackendManager:
             resolved_device = backend_arg
         else:
             # 未知类型，自动检测后端
-            logger.debug(f"[GPU Backend] _resolve_backend_and_index: 未识别的参数类型 {type(backend_arg)}，自动检测后端")
+            logger.debug(
+                f"[GPU Backend] _resolve_backend_and_index: 未识别的参数类型 {type(backend_arg)}，自动检测后端"
+            )
             resolved_backend = None
 
         return resolved_backend, resolved_index, resolved_device
@@ -1214,7 +1216,7 @@ class GPUBackendManager:
         strategy = cls._strategies.get(backend)
         if strategy is None:
             try:
-                backend_name = backend.value if hasattr(backend, 'value') else str(backend)
+                backend_name = backend.value if hasattr(backend, "value") else str(backend)
             except Exception:
                 backend_name = str(backend)
             logger.warning(
@@ -1250,9 +1252,7 @@ class GPUBackendManager:
     # ------------------------------------------------------------------
 
     @classmethod
-    def get_device(
-        cls, backend: GPUBackend | None = None, index: int = 0
-    ) -> torch.device | None:
+    def get_device(cls, backend: GPUBackend | None = None, index: int = 0) -> torch.device | None:
         """获取指定后端与索引的设备对象。
 
         Args:
@@ -1279,9 +1279,7 @@ class GPUBackendManager:
         return strategy.get_device_count()
 
     @classmethod
-    def get_device_name(
-        cls, backend: GPUBackend | None = None, index: int = 0
-    ) -> str:
+    def get_device_name(cls, backend: GPUBackend | None = None, index: int = 0) -> str:
         """获取指定后端与索引的设备名称。
 
         Args:
@@ -1295,9 +1293,7 @@ class GPUBackendManager:
         return strategy.get_device_name(index)
 
     @classmethod
-    def get_device_properties(
-        cls, backend: Any = None, index: int = 0
-    ) -> dict[str, Any]:
+    def get_device_properties(cls, backend: Any = None, index: int = 0) -> dict[str, Any]:
         """获取指定后端与索引的设备属性字典。
 
         Args:
@@ -1381,9 +1377,7 @@ class GPUBackendManager:
         strategy.synchronize(device)
 
     @classmethod
-    def get_memory_info(
-        cls, backend: GPUBackend | None = None, index: int = 0
-    ) -> tuple[int, int, int, int]:
+    def get_memory_info(cls, backend: GPUBackend | None = None, index: int = 0) -> tuple[int, int, int, int]:
         """获取指定后端与索引设备的完整显存信息。
 
         Args:
@@ -1401,9 +1395,7 @@ class GPUBackendManager:
             return (0, 0, 0, 0)
 
     @classmethod
-    def get_cuda_clear_workspaces_func(
-        cls, backend: GPUBackend | None = None
-    ) -> Callable[[], None] | None:
+    def get_cuda_clear_workspaces_func(cls, backend: GPUBackend | None = None) -> Callable[[], None] | None:
         """获取指定后端的 cuBLAS 工作区清理函数（若存在）。
 
         Args:
@@ -1431,9 +1423,7 @@ class GPUBackendManager:
         strategy.ipc_collect(device)
 
     @classmethod
-    def get_grad_scaler(
-        cls, backend: GPUBackend | None = None, enabled: bool = True
-    ) -> Any | None:
+    def get_grad_scaler(cls, backend: GPUBackend | None = None, enabled: bool = True) -> Any | None:
         """获取指定后端的梯度缩放器实例（若适用）。
 
         Args:
@@ -1474,9 +1464,7 @@ class GPUBackendManager:
         return strategy.get_process_group_backend()
 
     @classmethod
-    def format_device_string(
-        cls, backend: GPUBackend | None = None, index: int = 0
-    ) -> str:
+    def format_device_string(cls, backend: GPUBackend | None = None, index: int = 0) -> str:
         """格式化可直接用于 ``tensor.to()`` 的设备字符串。
 
         Args:
@@ -1490,9 +1478,7 @@ class GPUBackendManager:
         return strategy.format_device_string(index)
 
     @classmethod
-    def get_total_memory_gb(
-        cls, backend: GPUBackend | None = None, index: int = 0
-    ) -> float:
+    def get_total_memory_gb(cls, backend: GPUBackend | None = None, index: int = 0) -> float:
         """获取指定后端与索引设备的总显存容量（GB 为单位，方便上层比较阈值）。
 
         Args:
@@ -1504,4 +1490,4 @@ class GPUBackendManager:
             不支持显存查询的后端（CPU/MPS 等）返回 ``0.0``。
         """
         total_bytes, _allocated, _reserved, _free = cls.get_memory_info(backend, index)
-        return total_bytes / (1024 ** 3) if total_bytes > 0 else 0.0
+        return total_bytes / (1024**3) if total_bytes > 0 else 0.0

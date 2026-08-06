@@ -205,9 +205,7 @@ class VLLMBackend:
 
             if not self.is_available:
                 self._status.error = "vLLM 未安装"
-                logger.warning(
-                    "[vLLM] vLLM 未安装。安装命令: pip install vllm>=0.6.0"
-                )
+                logger.warning("[vLLM] vLLM 未安装。安装命令: pip install vllm>=0.6.0")
                 return False
 
             start_time = time.time()
@@ -217,9 +215,11 @@ class VLLMBackend:
                 from vllm import LLM
 
                 logger.info(f"[vLLM] 正在初始化引擎，模型: {model_path}")
-                logger.info(f"[vLLM] 配置: TP={self._config.tensor_parallel_size}, "
-                           f"GPU显存={self._config.gpu_memory_utilization:.0%}, "
-                           f"最大长度={self._config.max_model_len}")
+                logger.info(
+                    f"[vLLM] 配置: TP={self._config.tensor_parallel_size}, "
+                    f"GPU显存={self._config.gpu_memory_utilization:.0%}, "
+                    f"最大长度={self._config.max_model_len}"
+                )
 
                 engine_kwargs = self._config.to_vllm_kwargs()
                 engine_kwargs["model"] = model_path
@@ -233,11 +233,10 @@ class VLLMBackend:
 
                 try:
                     import torch
+
                     if torch.cuda.is_available():
                         self._status.gpu_count = torch.cuda.device_count()
-                        self._status.gpu_memory_gb = (
-                            torch.cuda.get_device_properties(0).total_mem / (1024**3)
-                        )
+                        self._status.gpu_memory_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
                 except Exception:
                     pass
 
@@ -319,6 +318,7 @@ class VLLMBackend:
 
                 try:
                     import torch
+
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
                 except ImportError:
@@ -326,10 +326,7 @@ class VLLMBackend:
 
             self._status.initialized = False
             self._status.engine_type = ""
-            logger.info(
-                f"[vLLM] 引擎已关闭。"
-                f"累计服务生成次数: {self._generation_count}"
-            )
+            logger.info(f"[vLLM] 引擎已关闭。累计服务生成次数: {self._generation_count}")
 
     def get_stats(self) -> dict:
         """获取后端统计信息。
@@ -434,8 +431,7 @@ def check_vllm_config_compatibility(model_path: str) -> dict:
             result["reason"] = f"模型架构 '{architecture}' 受 vLLM 支持"
         else:
             result["reason"] = (
-                f"模型架构 '{architecture}' 可能不被直接支持。"
-                f"支持的架构: {', '.join(sorted(supported_archs))}"
+                f"模型架构 '{architecture}' 可能不被直接支持。支持的架构: {', '.join(sorted(supported_archs))}"
             )
 
     except Exception as e:

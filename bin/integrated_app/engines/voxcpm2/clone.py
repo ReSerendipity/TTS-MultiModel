@@ -29,6 +29,7 @@
     - `_base.generate_with_template()`：端到端推理模板（分段+RAS+保存）
 """
 
+import contextlib
 import io
 import os
 import random
@@ -98,8 +99,7 @@ def _load_reference(
                 import soundfile as sf
             except ImportError as _ie:
                 raise ValidationError(
-                    "缺少 soundfile 依赖，无法解析上传的音频二进制。"
-                    "请安装 soundfile 或改为传文件路径。",
+                    "缺少 soundfile 依赖，无法解析上传的音频二进制。请安装 soundfile 或改为传文件路径。",
                     field="reference_audio",
                 ) from _ie
             try:
@@ -257,9 +257,7 @@ def fn_voxcpm_clone(
         try:
             cached_prompt = load_cached_prompt(ref_audio_path)
         except (OSError, ValueError, TypeError, RuntimeError) as _cache_exc:
-            logger.warning(
-                f"[VoxCPM可控克隆] prompt_cache 读取异常，降级走重新编码路径: {_cache_exc}"
-            )
+            logger.warning(f"[VoxCPM可控克隆] prompt_cache 读取异常，降级走重新编码路径: {_cache_exc}")
             cached_prompt = None
         if cached_prompt is not None:
             logger.info("[VoxCPM可控克隆] 使用缓存的音色特征，跳过重复编码")
@@ -413,10 +411,8 @@ def clone_from_audio(
         防止临时文件泄漏占用磁盘空间。
         """
         if _temp_path is not None and os.path.isfile(_temp_path):
-            try:
+            with contextlib.suppress(OSError, PermissionError):
                 os.remove(_temp_path)
-            except (OSError, PermissionError):  # noqa: BLE001
-                pass
 
     try:
         if not _cache_hit:
@@ -446,13 +442,9 @@ def clone_from_audio(
                         _ref_wav = np.asarray(_denoised, dtype=np.float32)
                         meta["denoise_applied"] = True
                 except (ImportError, RuntimeError, ValueError, TypeError) as _dn_err:
-                    logger.warning(
-                        f"[VoxCPM克隆] 参考音频降噪失败，使用原始参考继续: {_dn_err}"
-                    )
+                    logger.warning(f"[VoxCPM克隆] 参考音频降噪失败，使用原始参考继续: {_dn_err}")
 
-            with tempfile.NamedTemporaryFile(
-                suffix=".wav", delete=False
-            ) as _tmp:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as _tmp:
                 _temp_path = _tmp.name
             try:
                 from ...generation import _save_wav_compatible
@@ -498,13 +490,9 @@ def clone_from_audio(
                 _wav_out = np.asarray(_raw_out, dtype=np.float32)
         except RuntimeError as _rt:
             if is_oom_error(_rt) and _cached_embedding is None and _ref_wav is not None:
-                logger.error(
-                    f"[VoxCPM克隆] 嵌入计算或推理 OOM，尝试自动截前 {_FALLBACK_TRUNCATE_SEC}s 重试一次: {_rt}"
-                )
-                try:
+                logger.error(f"[VoxCPM克隆] 嵌入计算或推理 OOM，尝试自动截前 {_FALLBACK_TRUNCATE_SEC}s 重试一次: {_rt}")
+                with contextlib.suppress(RuntimeError, ImportError):
                     free_gpu_memory()
-                except (RuntimeError, ImportError):  # noqa: BLE001
-                    pass
                 _truncate_samples: int = int(_FALLBACK_TRUNCATE_SEC * float(_ref_sr))
                 if len(_ref_wav) > _truncate_samples:
                     _ref_wav = _ref_wav[:_truncate_samples]
@@ -514,17 +502,13 @@ def clone_from_audio(
                         f"[VoxCPM克隆] 已自动将参考音频截为前 {meta['reference_duration_sec']:.1f}s，显存不足导致"
                     )
                     if _temp_path is not None and os.path.isfile(_temp_path):
-                        try:
+                        with contextlib.suppress(OSError, PermissionError):
                             os.remove(_temp_path)
-                        except (OSError, PermissionError):  # noqa: BLE001
-                            pass
                         _temp_path = None
                     try:
                         from ...generation import _save_wav_compatible
 
-                        with tempfile.NamedTemporaryFile(
-                            suffix=".wav", delete=False
-                        ) as _tmp2:
+                        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as _tmp2:
                             _temp_path = _tmp2.name
                         _save_wav_compatible(_ref_wav, _temp_path, _ref_sr)
                     except (OSError, RuntimeError, ValueError, TypeError) as _sv2:
@@ -543,10 +527,8 @@ def clone_from_audio(
                             _wav_out = np.asarray(_raw_out, dtype=np.float32)
                     except RuntimeError as _rt2:
                         if is_oom_error(_rt2):
-                            try:
+                            with contextlib.suppress(RuntimeError, ImportError):
                                 free_gpu_memory()
-                            except (RuntimeError, ImportError):  # noqa: BLE001
-                                pass
                             raise InsufficientVRAMError(
                                 "语音克隆显存不足：已自动尝试将参考音频截为前 30s 重试仍然失败。"
                                 "请换用更短的参考音频（3~5秒最佳）、关闭其他已加载模型、或降低 steps。"
@@ -556,19 +538,15 @@ def clone_from_audio(
                             engine="voxcpm2",
                         ) from _rt2
                 else:
-                    try:
+                    with contextlib.suppress(RuntimeError, ImportError):
                         free_gpu_memory()
-                    except (RuntimeError, ImportError):  # noqa: BLE001
-                        pass
                     raise InsufficientVRAMError(
                         "语音克隆显存不足：请换用更短的参考音频（3~5秒最佳）、关闭其他已加载模型、或降低 steps。"
                     ) from _rt
             else:
                 if is_oom_error(_rt):
-                    try:
+                    with contextlib.suppress(RuntimeError, ImportError):
                         free_gpu_memory()
-                    except (RuntimeError, ImportError):  # noqa: BLE001
-                        pass
                     raise InsufficientVRAMError(
                         "语音克隆显存不足：请降低 steps、缩短单次生成长度、或关闭其他已加载模型。"
                     ) from _rt
@@ -577,19 +555,13 @@ def clone_from_audio(
                     engine="voxcpm2",
                 ) from _rt
 
-        if (
-            prompt_cache_key is not None
-            and prompt_cache is not None
-            and not _cache_hit
-        ):
+        if prompt_cache_key is not None and prompt_cache is not None and not _cache_hit:
             try:
                 _set_fn = getattr(prompt_cache, "set", None) or getattr(prompt_cache, "save", None)
                 if callable(_set_fn) and "prompt_cache" in _generation_kwargs:
                     _set_fn(prompt_cache_key, _generation_kwargs["prompt_cache"])
             except (OSError, PermissionError, ValueError, TypeError, RuntimeError) as _ce2:
-                logger.error(
-                    f"[VoxCPM克隆] prompt_cache 写入失败（不阻塞，本次仍返回结果）: {_ce2}"
-                )
+                logger.error(f"[VoxCPM克隆] prompt_cache 写入失败（不阻塞，本次仍返回结果）: {_ce2}")
 
         if progress_cb is not None:
             progress_cb(steps, steps)
@@ -605,8 +577,6 @@ def clone_from_audio(
         except (ImportError, RuntimeError):  # noqa: BLE001
             pass
         if _ref_wav is not None:
-            try:
+            with contextlib.suppress(Exception):
                 del _ref_wav
-            except Exception:  # noqa: BLE001
-                pass
         _do_cleanup_temp()

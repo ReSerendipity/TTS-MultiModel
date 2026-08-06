@@ -151,8 +151,7 @@ async def generate_voxcpm_design(
     # 兼顾灵活性（用户可能确实想写长一点撞运气）与预期管理。
     if instruction and len(instruction) > _VOICE_DESCRIPTION_SOFT_LIMIT_CHARS:
         logger.warning(
-            "[VoxCPM声音设计] voice_description 长度 %d 超过软上限 %d，"
-            "超出部分可能因模型 token 窗口限制被截断而不生效",
+            "[VoxCPM声音设计] voice_description 长度 %d 超过软上限 %d，超出部分可能因模型 token 窗口限制被截断而不生效",
             len(instruction),
             _VOICE_DESCRIPTION_SOFT_LIMIT_CHARS,
         )
@@ -180,9 +179,7 @@ async def generate_voxcpm_design(
             else:
                 return _error_html(request, f"音色文件不存在: {safe_name}")
         else:
-            logger.warning(
-                f"[VoxCPM声音设计] 音色 '{safe_name}' 不存在，将使用默认音色"
-            )
+            logger.warning(f"[VoxCPM声音设计] 音色 '{safe_name}' 不存在，将使用默认音色")
 
     # ------------------------------------------------------------------
     # 4. 构造生成闭包（在 executor 线程中以 CPU/GPU 绑定方式运行）

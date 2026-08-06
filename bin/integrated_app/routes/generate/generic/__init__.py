@@ -14,7 +14,6 @@
     复用统一生成执行器（信号量串行、硬超时、OOM 降级、历史入库、SSE 进度）。
 """
 
-import contextlib
 import logging
 
 from . import clone  # noqa: F401 — 导入以触发路由注册

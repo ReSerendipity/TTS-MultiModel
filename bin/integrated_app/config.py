@@ -91,6 +91,7 @@ def get_project_root():
 
 ROOT_DIR = get_project_root()
 PROJECT_ROOT = ROOT_DIR
+DATA_DIR = os.path.join(ROOT_DIR, "data")
 CACHE_DIR = os.path.join(ROOT_DIR, "cache")
 PRETRAINED_DIR = os.path.join(ROOT_DIR, "pretrained_models")
 SAVE_DIR = os.path.join(ROOT_DIR, "outputs")
@@ -111,6 +112,7 @@ DOTSTTS_MODEL_PATH = os.path.join(PRETRAINED_DIR, "dots.tts")
 
 def _ensure_dirs():
     """Create required directories."""
+    os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(CACHE_DIR, exist_ok=True)
     os.makedirs(SAVE_DIR, exist_ok=True)
     os.makedirs(PERSONA_DIR, exist_ok=True)

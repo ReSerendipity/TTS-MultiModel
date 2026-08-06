@@ -282,7 +282,7 @@ class HistoryDatabase:
                         logger.error(f"os.replace 也失败: {e2}")
                 if not rename_ok and os.path.exists(self._db_path):
                     # 两种方式都失败，提示用户手动处理
-                    raise RuntimeError("无法处理损坏数据库，请手动删除 " + corrupted_path)
+                    raise RuntimeError("无法处理损坏数据库，请手动删除 " + corrupted_path) from None
                 # Create fresh connection with unified PRAGMAs (H-R3)
                 conn = sqlite3.connect(self._db_path)
                 conn.row_factory = sqlite3.Row

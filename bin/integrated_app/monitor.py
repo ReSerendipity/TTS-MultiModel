@@ -128,11 +128,12 @@ class HealthMonitor:
                     self._baseline_stable_count += 1
                     if self._baseline_stable_count >= self._baseline_required_stable:
                         # 连续稳定样本达到阈值，建立基线（使用最近N个样本均值）
-                        recent = list(self._vram_samples)[-self._baseline_required_stable:]
+                        recent = list(self._vram_samples)[-self._baseline_required_stable :]
                         self._baseline_mb = sum(recent) / len(recent)
                         logger.debug(
                             "[HealthMonitor] 显存基线已建立: %.0fMB (稳定样本=%d)",
-                            self._baseline_mb, self._baseline_required_stable,
+                            self._baseline_mb,
+                            self._baseline_required_stable,
                         )
                 else:
                     self._baseline_stable_count = 0
@@ -141,7 +142,8 @@ class HealthMonitor:
             if abs(used_mb - self._baseline_mb) > self._baseline_tolerance_mb * 3:
                 logger.debug(
                     "[HealthMonitor] 显存剧烈变化 %.0fMB -> %.0fMB，重置基线",
-                    self._baseline_mb, used_mb,
+                    self._baseline_mb,
+                    used_mb,
                 )
                 self._baseline_mb = None
                 self._baseline_stable_count = 0

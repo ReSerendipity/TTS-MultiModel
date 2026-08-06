@@ -38,6 +38,7 @@
 
 import asyncio
 import base64
+import contextlib
 import functools
 import html
 import io
@@ -145,9 +146,7 @@ async def _load_streaming_persona(
         # persona 加载失败
         if allow_missing:
             safe_name = os.path.basename(persona_name)
-            logger.warning(
-                f"[VoxCPM流式生成] 音色 '{safe_name}' 不存在，将使用默认音色"
-            )
+            logger.warning(f"[VoxCPM流式生成] 音色 '{safe_name}' 不存在，将使用默认音色")
             if ref_audio_path:
                 return ref_audio_path, None
             return None, None
@@ -315,9 +314,7 @@ async def _acquire_streaming_semaphore(
     """
     semaphore: asyncio.Semaphore = await _get_generation_semaphore(engine)
     try:
-        await asyncio.wait_for(
-            semaphore.acquire(), timeout=_SEMAPHORE_ACQUIRE_TIMEOUT_S
-        )
+        await asyncio.wait_for(semaphore.acquire(), timeout=_SEMAPHORE_ACQUIRE_TIMEOUT_S)
         return semaphore, None
     except asyncio.TimeoutError:
         return None, _error_html(request, "系统繁忙，请稍后再试（等待超时）")
@@ -403,9 +400,7 @@ async def streaming_sse_generation(
     # S-R2: 统一 persona 加载（allow_missing=True，缺失用默认音色）
     actual_ref_path: str | None
     persona_error: HTMLResponse | None
-    actual_ref_path, persona_error = await _load_streaming_persona(
-        request, persona_name, allow_missing=True
-    )
+    actual_ref_path, persona_error = await _load_streaming_persona(request, persona_name, allow_missing=True)
     if persona_error is not None:
         return StreamingResponse(
             iter([persona_error.body.decode("utf-8", errors="replace")]),
@@ -491,10 +486,8 @@ async def streaming_sse_generation(
                 # Why：段级 CUDA OOM 时显式释放显存，给后续段/后续请求让出空间，
                 # 而不是等 Python GC/ torch 自己回收。不抛 InsufficientVRAMError
                 # 因为 SSE 通道已经打开，必须通过事件流传递错误。
-                try:
+                with contextlib.suppress(Exception):
                     free_gpu_memory()
-                except Exception:
-                    pass
             err_payload: str = json.dumps(
                 {"status": "error", "message": _safe_error_msg(e)},
                 ensure_ascii=False,
@@ -602,15 +595,11 @@ async def streaming_generation(
         )
         duration: float = time.monotonic() - start_time
         if result is None:
-            _log_generation(
-                "Streaming", text, "voxcpm2", "streaming", False, duration, error_msg="生成失败"
-            )
+            _log_generation("Streaming", text, "voxcpm2", "streaming", False, duration, error_msg="生成失败")
             return _error_html(request, "生成失败")
 
         if isinstance(result, list):
-            merged: np.ndarray = (
-                np.concatenate(result) if result else np.array([], dtype=np.float32)
-            )
+            merged: np.ndarray = np.concatenate(result) if result else np.array([], dtype=np.float32)
         else:
             merged = result
 
@@ -637,9 +626,7 @@ async def streaming_generation(
         return _success_html(filename, f"流式生成完成！耗时 {duration:.1f}秒")
     except asyncio.TimeoutError:
         duration = time.monotonic() - start_time
-        logger.error(
-            f"流式生成超时 (>{_GENERATION_HARD_TIMEOUT_S}s)，文本长度={len(text)}"
-        )
+        logger.error(f"流式生成超时 (>{_GENERATION_HARD_TIMEOUT_S}s)，文本长度={len(text)}")
         _log_generation(
             "Streaming",
             text,
@@ -656,9 +643,7 @@ async def streaming_generation(
     except Exception as e:
         duration = time.monotonic() - start_time
         logger.error(f"流式生成失败: {e}")
-        _log_generation(
-            "Streaming", text, "voxcpm2", "streaming", False, duration, error_msg=str(e)
-        )
+        _log_generation("Streaming", text, "voxcpm2", "streaming", False, duration, error_msg=str(e))
         return _error_html(request, _safe_error_msg(e))
     finally:
         # S-R3: 确保信号量释放（E4 资源安全）
@@ -710,9 +695,7 @@ async def streaming_audio_generation(
     # S-R2: 统一 persona 加载（allow_missing=True，缺失用默认音色）
     actual_ref_path: str | None
     persona_error: HTMLResponse | None
-    actual_ref_path, persona_error = await _load_streaming_persona(
-        request, persona_name, allow_missing=True
-    )
+    actual_ref_path, persona_error = await _load_streaming_persona(request, persona_name, allow_missing=True)
     if persona_error is not None:
         return persona_error
 
@@ -779,9 +762,7 @@ async def streaming_audio_generation(
     except Exception as e:
         duration = time.monotonic() - start_time
         logger.error(f"流式音频生成失败: {e}")
-        _log_generation(
-            "Streaming", text, "voxcpm2", "streaming", False, duration, error_msg=str(e)
-        )
+        _log_generation("Streaming", text, "voxcpm2", "streaming", False, duration, error_msg=str(e))
         return _error_html(request, _safe_error_msg(e))
     finally:
         # S-R3: 确保信号量释放（E4 资源安全）
@@ -855,12 +836,7 @@ async def post_process_audio(
 
     # 四个参数全为默认值时 _apply_post_processing_to_file 会直接 return 原文件，
     # 此时提示用户"啥也没干"而不是返回成功——避免"我点了后处理但听起来没变"的困惑。
-    if (
-        new_filename == safe_name
-        and tempo_factor == 1.0
-        and not pp_voice_enhancement
-        and target_lufs == -16.0
-    ):
+    if new_filename == safe_name and tempo_factor == 1.0 and not pp_voice_enhancement and target_lufs == -16.0:
         return _error_html(request, "No post-processing changes requested")
 
     safe_new: str = quote(new_filename, safe="")
@@ -900,7 +876,5 @@ async def cancel_generation(request: Request) -> dict[str, str]:
     current_eng: str = registry.current_engine
     was_generating: bool = not _progress_mgr._is_complete and _progress_mgr._phase != ""
     _progress_mgr.cancel()
-    logger.info(
-        f"[Cancel] Generation cancel requested (engine: {current_eng}, was generating: {was_generating})"
-    )
+    logger.info(f"[Cancel] Generation cancel requested (engine: {current_eng}, was generating: {was_generating})")
     return {"status": "ok", "message": "已发送取消请求"}

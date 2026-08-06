@@ -167,8 +167,7 @@ def _check_vram_circuit_breaker() -> bool:
 
         if usage_percent > _VRAM_CIRCUIT_BREAKER_THRESHOLD:
             logger.warning(
-                f"[VRAM熔断] 显存占用 {usage_percent:.1f}% 超过阈值 "
-                f"{_VRAM_CIRCUIT_BREAKER_THRESHOLD}%，终止生成"
+                f"[VRAM熔断] 显存占用 {usage_percent:.1f}% 超过阈值 {_VRAM_CIRCUIT_BREAKER_THRESHOLD}%，终止生成"
             )
             return True
 
@@ -251,9 +250,7 @@ class TTSGenerationService:
             raise EngineNotLoadedError("引擎未加载，请先加载模型")
 
         if expected_engine and registry.current_engine != expected_engine:
-            raise EngineSwitchError(
-                f"当前引擎为 {registry.current_engine}，期望 {expected_engine}"
-            )
+            raise EngineSwitchError(f"当前引擎为 {registry.current_engine}，期望 {expected_engine}")
 
     def _save_version_record(
         self,
@@ -277,6 +274,7 @@ class TTSGenerationService:
         """
         try:
             from .generation_versioning import get_version_manager
+
             vm = get_version_manager()
             return vm.save_generation(
                 audio_path=audio_path,
@@ -325,9 +323,11 @@ class TTSGenerationService:
         self._ensure_engine_ready()
         if _check_vram_circuit_breaker():
             from .exceptions import InsufficientVRAMError
+
             raise InsufficientVRAMError("显存占用过高，终止生成")
 
         from .model_registry import registry
+
         engine_name = registry.current_engine or "unknown"
 
         start_time = time.time()
@@ -335,6 +335,7 @@ class TTSGenerationService:
             engine = registry.get_current_engine()
             if engine is None:
                 from .exceptions import EngineNotLoadedError
+
                 raise EngineNotLoadedError("无法获取当前引擎实例")
 
             result = engine.generate_voice_design(
@@ -363,8 +364,7 @@ class TTSGenerationService:
             self._save_version_record(audio_path, text, gen_params, engine_name)
 
             logger.info(
-                f"[TTSGenerationService] 语音设计完成: {elapsed:.1f}s, "
-                f"时长 {duration:.1f}s, 引擎 {engine_name}"
+                f"[TTSGenerationService] 语音设计完成: {elapsed:.1f}s, 时长 {duration:.1f}s, 引擎 {engine_name}"
             )
             return GenerationResult(
                 audio_path=audio_path,
@@ -376,9 +376,7 @@ class TTSGenerationService:
 
         except Exception as e:
             elapsed = time.time() - start_time
-            logger.error(
-                f"[TTSGenerationService] 语音设计失败: {e}, 耗时 {elapsed:.1f}s"
-            )
+            logger.error(f"[TTSGenerationService] 语音设计失败: {e}, 耗时 {elapsed:.1f}s")
             raise
 
     def generate_voice_clone(
@@ -417,9 +415,11 @@ class TTSGenerationService:
         self._ensure_engine_ready()
         if _check_vram_circuit_breaker():
             from .exceptions import InsufficientVRAMError
+
             raise InsufficientVRAMError("显存占用过高，终止生成")
 
         from .model_registry import registry
+
         engine_name = registry.current_engine or "unknown"
 
         start_time = time.time()
@@ -427,6 +427,7 @@ class TTSGenerationService:
             engine = registry.get_current_engine()
             if engine is None:
                 from .exceptions import EngineNotLoadedError
+
                 raise EngineNotLoadedError("无法获取当前引擎实例")
 
             result = engine.generate_voice_clone(
@@ -456,8 +457,7 @@ class TTSGenerationService:
             self._save_version_record(audio_path, text, gen_params, engine_name)
 
             logger.info(
-                f"[TTSGenerationService] 语音克隆完成: {elapsed:.1f}s, "
-                f"时长 {duration:.1f}s, 引擎 {engine_name}"
+                f"[TTSGenerationService] 语音克隆完成: {elapsed:.1f}s, 时长 {duration:.1f}s, 引擎 {engine_name}"
             )
             return GenerationResult(
                 audio_path=audio_path,
@@ -469,9 +469,7 @@ class TTSGenerationService:
 
         except Exception as e:
             elapsed = time.time() - start_time
-            logger.error(
-                f"[TTSGenerationService] 语音克隆失败: {e}, 耗时 {elapsed:.1f}s"
-            )
+            logger.error(f"[TTSGenerationService] 语音克隆失败: {e}, 耗时 {elapsed:.1f}s")
             raise
 
     def generate_ultimate_clone(
@@ -513,6 +511,7 @@ class TTSGenerationService:
         self._ensure_engine_ready(expected_engine="voxcpm2")
         if _check_vram_circuit_breaker():
             from .exceptions import InsufficientVRAMError
+
             raise InsufficientVRAMError("显存占用过高，终止生成")
 
         from .model_registry import registry
@@ -522,6 +521,7 @@ class TTSGenerationService:
             engine = registry.get_current_engine()
             if engine is None:
                 from .exceptions import EngineNotLoadedError
+
                 raise EngineNotLoadedError("无法获取当前引擎实例")
 
             # 终极克隆需要 ControllableTTSEngine 协议
@@ -553,10 +553,7 @@ class TTSGenerationService:
 
             self._save_version_record(audio_path, text, gen_params, "voxcpm2")
 
-            logger.info(
-                f"[TTSGenerationService] 终极克隆完成: {elapsed:.1f}s, "
-                f"时长 {duration:.1f}s"
-            )
+            logger.info(f"[TTSGenerationService] 终极克隆完成: {elapsed:.1f}s, 时长 {duration:.1f}s")
             return GenerationResult(
                 audio_path=audio_path,
                 message=message,
@@ -567,9 +564,7 @@ class TTSGenerationService:
 
         except Exception as e:
             elapsed = time.time() - start_time
-            logger.error(
-                f"[TTSGenerationService] 终极克隆失败: {e}, 耗时 {elapsed:.1f}s"
-            )
+            logger.error(f"[TTSGenerationService] 终极克隆失败: {e}, 耗时 {elapsed:.1f}s")
             raise
 
     def generate_script(
@@ -600,9 +595,11 @@ class TTSGenerationService:
         self._ensure_engine_ready()
         if _check_vram_circuit_breaker():
             from .exceptions import InsufficientVRAMError
+
             raise InsufficientVRAMError("显存占用过高，终止生成")
 
         from .model_registry import registry
+
         engine_name = registry.current_engine or "unknown"
 
         start_time = time.time()
@@ -610,6 +607,7 @@ class TTSGenerationService:
             engine = registry.get_current_engine()
             if engine is None:
                 from .exceptions import EngineNotLoadedError
+
                 raise EngineNotLoadedError("无法获取当前引擎实例")
 
             result = engine.generate_script(
@@ -631,8 +629,7 @@ class TTSGenerationService:
             self._save_version_record(audio_path, text, gen_params, engine_name)
 
             logger.info(
-                f"[TTSGenerationService] 剧本生成完成: {elapsed:.1f}s, "
-                f"时长 {duration:.1f}s, 引擎 {engine_name}"
+                f"[TTSGenerationService] 剧本生成完成: {elapsed:.1f}s, 时长 {duration:.1f}s, 引擎 {engine_name}"
             )
             return GenerationResult(
                 audio_path=audio_path,
@@ -644,9 +641,7 @@ class TTSGenerationService:
 
         except Exception as e:
             elapsed = time.time() - start_time
-            logger.error(
-                f"[TTSGenerationService] 剧本生成失败: {e}, 耗时 {elapsed:.1f}s"
-            )
+            logger.error(f"[TTSGenerationService] 剧本生成失败: {e}, 耗时 {elapsed:.1f}s")
             raise
 
     async def generate_streaming(
@@ -671,6 +666,7 @@ class TTSGenerationService:
         self._ensure_engine_ready()
         if _check_vram_circuit_breaker():
             from .exceptions import InsufficientVRAMError
+
             raise InsufficientVRAMError("显存占用过高，终止生成")
 
         from .model_registry import registry
@@ -679,6 +675,7 @@ class TTSGenerationService:
             engine = registry.get_current_engine()
             if engine is None:
                 from .exceptions import EngineNotLoadedError
+
                 raise EngineNotLoadedError("无法获取当前引擎实例")
 
             # 流式生成使用生成器
@@ -731,6 +728,7 @@ class TTSGenerationService:
                 # (sample_rate, wav_data, filename) 格式
                 filename = audio_info[2]
                 from .config import SAVE_DIR
+
                 audio_path = os.path.join(SAVE_DIR, filename) if filename else ""
             elif isinstance(audio_info, str):
                 audio_path = audio_info
@@ -757,6 +755,7 @@ class TTSGenerationService:
             return 0.0
         try:
             import soundfile as sf
+
             info = sf.info(audio_path)
             return info.duration
         except Exception:
@@ -809,6 +808,7 @@ class ModelService:
 
                 # 检查是否成功加载
                 from .model_registry import registry
+
                 if registry.is_voxcpm_ready():
                     logger.info(f"[ModelService] VoxCPM2 加载成功，耗时 {load_time:.1f}s")
                     return LoadResult(
@@ -832,6 +832,7 @@ class ModelService:
                 load_time = time.time() - start_time
 
                 from .model_registry import registry
+
                 if registry.is_indextts2_ready():
                     logger.info(f"[ModelService] IndexTTS2 加载成功，耗时 {load_time:.1f}s")
                     return LoadResult(
@@ -908,10 +909,7 @@ class ModelService:
 
             switch_time = time.time() - start_time
 
-            logger.info(
-                f"[ModelService] 引擎切换完成: {from_engine} -> {engine}, "
-                f"耗时 {switch_time:.1f}s"
-            )
+            logger.info(f"[ModelService] 引擎切换完成: {from_engine} -> {engine}, 耗时 {switch_time:.1f}s")
             return SwitchResult(
                 success=True,
                 message=final_status or "引擎切换成功",
@@ -927,9 +925,7 @@ class ModelService:
         except Exception as e:
             switch_time = time.time() - start_time
             logger.error(f"[ModelService] 引擎切换异常: {e}")
-            raise EngineSwitchError(
-                f"引擎切换失败: {type(e).__name__}: {e}"
-            ) from e
+            raise EngineSwitchError(f"引擎切换失败: {type(e).__name__}: {e}") from e
 
     def get_model_status(self) -> ModelStatus:
         """获取当前模型状态。
@@ -1096,6 +1092,7 @@ class PersonaService:
                 stat = os.stat(wav_path)
                 wav_size_kb = stat.st_size / 1024
                 from datetime import datetime
+
                 created_at = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
             except OSError as e:
                 logger.debug(f"[PersonaService] 获取文件状态失败 {wav_path}: {e}")
@@ -1148,9 +1145,7 @@ class PersonaService:
         )
 
         if needs_confirm and not overwrite:
-            raise PersonaError(
-                f"音色 [{name}] 已存在，需设置 overwrite=True 覆盖"
-            )
+            raise PersonaError(f"音色 [{name}] 已存在，需设置 overwrite=True 覆盖")
 
         if "失败" in message or "❌" in message:
             raise PersonaError(message)
@@ -1199,6 +1194,7 @@ class PersonaService:
             音色目录的绝对路径字符串。
         """
         from .config import PERSONA_DIR
+
         return PERSONA_DIR
 
 

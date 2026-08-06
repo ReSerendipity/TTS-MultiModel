@@ -9,6 +9,7 @@
     .\\WPy64-312101\\python\\python.exe scripts\\benchmark_history_db.py
 可选参数：--records N（默认 20000），--repeats R（默认 20）。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -43,17 +44,20 @@ def _timeit(fn, repeats: int) -> float:
 def seed(db: HistoryDatabase, n: int) -> None:
     records = []
     for i in range(n):
-        records.append({
-            "filename": f"clip_{i}.wav",
-            "filepath": f"/outputs/clip_{i}.wav",
-            "created_at": "2026-01-01T00:00:00",
-            "file_size_bytes": 1024,
-            "duration_seconds": float(i % 12),
-            "text_preview": (f"你好世界语音合成编号{i}" if i % 4 == 0
-                             else f"hello world speech synthesis sample {i}"),
-            "engine": "voxcpm2" if i % 2 == 0 else "indextts2",
-            "created_timestamp": 1_700_000_000.0 + i,
-        })
+        records.append(
+            {
+                "filename": f"clip_{i}.wav",
+                "filepath": f"/outputs/clip_{i}.wav",
+                "created_at": "2026-01-01T00:00:00",
+                "file_size_bytes": 1024,
+                "duration_seconds": float(i % 12),
+                "text_preview": (
+                    f"你好世界语音合成编号{i}" if i % 4 == 0 else f"hello world speech synthesis sample {i}"
+                ),
+                "engine": "voxcpm2" if i % 2 == 0 else "indextts2",
+                "created_timestamp": 1_700_000_000.0 + i,
+            }
+        )
     db.insert_batch(records)
 
 
@@ -61,20 +65,23 @@ def bench_search(db: HistoryDatabase, repeats: int) -> tuple[float, float, int, 
     kw = "speech synthesis"
     db._fts_enabled = True
     fts_res = {}
-    fts_ms = _timeit(lambda: fts_res.setdefault(
-        "n", db.get_paginated_records(limit=50, offset=0, search_keyword=kw)["total"]), repeats)
+    fts_ms = _timeit(
+        lambda: fts_res.setdefault("n", db.get_paginated_records(limit=50, offset=0, search_keyword=kw)["total"]),
+        repeats,
+    )
     db._fts_enabled = False
     like_res = {}
-    like_ms = _timeit(lambda: like_res.setdefault(
-        "n", db.get_paginated_records(limit=50, offset=0, search_keyword=kw)["total"]), repeats)
+    like_ms = _timeit(
+        lambda: like_res.setdefault("n", db.get_paginated_records(limit=50, offset=0, search_keyword=kw)["total"]),
+        repeats,
+    )
     db._fts_enabled = True
     return fts_ms, like_ms, fts_res["n"], like_res["n"]
 
 
 def bench_pagination(db: HistoryDatabase, total: int, repeats: int) -> tuple[float, float]:
     deep_offset = max(0, total - 50)
-    offset_ms = _timeit(
-        lambda: db.get_paginated_records(limit=50, offset=deep_offset), repeats)
+    offset_ms = _timeit(lambda: db.get_paginated_records(limit=50, offset=deep_offset), repeats)
     # keyset：先取到接近末尾的游标，再测最后一页
     # 通过一次 offset 拿到第 deep_offset 条的游标（一次性成本，不计入循环）
     anchor = db.query_records_keyset(limit=deep_offset) if deep_offset > 0 else {"next_cursor": None}
@@ -83,9 +90,8 @@ def bench_pagination(db: HistoryDatabase, total: int, repeats: int) -> tuple[flo
         keyset_ms = _timeit(lambda: db.query_records_keyset(limit=50), repeats)
     else:
         keyset_ms = _timeit(
-            lambda: db.query_records_keyset(
-                limit=50, cursor_timestamp=cur["timestamp"], cursor_id=cur["id"]),
-            repeats)
+            lambda: db.query_records_keyset(limit=50, cursor_timestamp=cur["timestamp"], cursor_id=cur["id"]), repeats
+        )
     return offset_ms, keyset_ms
 
 
@@ -127,7 +133,7 @@ def main() -> None:
 
     fts_ms, like_ms, fts_n, like_n = bench_search(db, args.repeats)
     speedup = (like_ms / fts_ms) if fts_ms > 0 else float("inf")
-    print("=== 1. 关键词搜索 (median over %d runs) ===" % args.repeats)
+    print(f"=== 1. 关键词搜索 (median over {args.repeats} runs) ===")
     print(f"  FTS5  : {fts_ms:8.3f} ms  (matches={fts_n})")
     print(f"  LIKE  : {like_ms:8.3f} ms  (matches={like_n})")
     print(f"  parity(matches equal) = {fts_n == like_n}")
@@ -135,7 +141,7 @@ def main() -> None:
 
     off_ms, ks_ms = bench_pagination(db, total, args.repeats)
     pspeedup = (off_ms / ks_ms) if ks_ms > 0 else float("inf")
-    print("=== 2. 深分页 (offset=%d, median over %d runs) ===" % (max(0, total - 50), args.repeats))
+    print(f"=== 2. 深分页 (offset={max(0, total - 50)}, median over {args.repeats} runs) ===")
     print(f"  OFFSET: {off_ms:8.3f} ms")
     print(f"  keyset: {ks_ms:8.3f} ms")
     print(f"  speedup = {pspeedup:.1f}x\n")

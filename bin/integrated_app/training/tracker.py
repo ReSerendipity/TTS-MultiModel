@@ -13,6 +13,7 @@ training/ 目录对应 WebUI 中 LoRA 微调 Tab 的训练任务；scripts/train
 两者均为异步写入或 best-effort，单步耗时 < 1ms，不会把 10k step 的训练
 多拖出 100s。
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -130,10 +131,7 @@ class TrainingTracker:
             log_dir.mkdir(parents=True, exist_ok=True)
             return SummaryWriter(log_dir=str(log_dir))
         except ImportError:
-            logger.info(
-                "TensorBoard 未安装，仅通过 SSE 推送训练进度。"
-                " 执行 `pip install tensorboard` 可启用历史曲线。"
-            )
+            logger.info("TensorBoard 未安装，仅通过 SSE 推送训练进度。 执行 `pip install tensorboard` 可启用历史曲线。")
             return None
         except Exception as exc:  # noqa: BLE001
             logger.info("TensorBoard 初始化异常，跳过: %s", exc)
@@ -241,13 +239,11 @@ class TrainingTracker:
         self._ema_epoch_sec = float(ema) if isinstance(ema, (int, float)) and ema > 0 else None
         times = state.get("epoch_times_sec") or []
         if times:
-            try:
+            with contextlib.suppress(Exception):
                 self._epoch_times_sec = deque(
                     [float(t) for t in times if isinstance(t, (int, float)) and t > 0],
                     maxlen=_EMA_WINDOW,
                 )
-            except Exception:  # noqa: BLE001
-                pass
         ll = state.get("last_log_time")
         self._last_log_time = float(ll) if isinstance(ll, (int, float)) else None
 
@@ -321,11 +317,7 @@ class TrainingTracker:
             self._current_epoch_loss_sum += loss_f
             self._current_epoch_loss_cnt += 1
             self._recent_losses.append(loss_f)
-        running_avg = (
-            sum(self._recent_losses) / len(self._recent_losses)
-            if self._recent_losses
-            else 0.0
-        )
+        running_avg = sum(self._recent_losses) / len(self._recent_losses) if self._recent_losses else 0.0
         info: dict[str, Any] = {
             "step": int(self.step),
             "loss": loss_f,
@@ -391,10 +383,7 @@ class TrainingTracker:
                 if self._ema_epoch_sec is None:
                     self._ema_epoch_sec = epoch_sec
                 else:
-                    self._ema_epoch_sec = (
-                        _EMA_ALPHA * epoch_sec
-                        + (1.0 - _EMA_ALPHA) * self._ema_epoch_sec
-                    )
+                    self._ema_epoch_sec = _EMA_ALPHA * epoch_sec + (1.0 - _EMA_ALPHA) * self._ema_epoch_sec
         self._epoch_start_ts = now
         # 2) 训练平均 loss
         if avg_train_loss is None:
@@ -429,7 +418,9 @@ class TrainingTracker:
         info: dict[str, Any] = {
             "epoch": int(epoch),
             "avg_train_loss": float(avg_train_loss),
-            "eval_loss": float(eval_loss) if isinstance(eval_loss, (int, float)) and not math.isnan(float(eval_loss)) else None,
+            "eval_loss": float(eval_loss)
+            if isinstance(eval_loss, (int, float)) and not math.isnan(float(eval_loss))
+            else None,
             "epoch_time_sec": epoch_sec,
             "ema_epoch_sec": self._ema_epoch_sec,
             "best_eval_loss": best_eval_loss,
@@ -661,10 +652,8 @@ class TrainingTracker:
             else:
                 # 队列 / Queue 风格
                 if hasattr(bus, "put_nowait"):
-                    try:
+                    with contextlib.suppress(Exception):
                         bus.put_nowait({"event": event_type, "data": payload})
-                    except Exception:  # noqa: BLE001
-                        pass
         except Exception as exc:  # noqa: BLE001
             logger.debug("SSE 推送失败，已跳过: %s", exc)
 
@@ -675,7 +664,11 @@ class TrainingTracker:
     def _format_eta(seconds: float) -> str:
         """把秒数格式化为 'Xh Ym Zs' / 'Ym Zs' / 'Zs' 人类可读字符串。"""
         try:
-            secs = int(seconds) if isinstance(seconds, (int, float)) and not math.isnan(seconds) and not math.isinf(seconds) else 0
+            secs = (
+                int(seconds)
+                if isinstance(seconds, (int, float)) and not math.isnan(seconds) and not math.isinf(seconds)
+                else 0
+            )
         except Exception:  # noqa: BLE001
             secs = 0
         if secs <= 0:

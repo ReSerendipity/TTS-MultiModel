@@ -44,6 +44,8 @@ from ._base import (
 class PromptPair(NamedTuple):
     prompt_text: str
     prompt_audio: str | tuple[np.ndarray, int]
+
+
 """Prompt 延续模式的参考音频-文本对 NamedTuple。
 
 用于 Prompt Continuation 模式，提供一段"已读文本 + 对应音频"作为风格参考，
@@ -161,8 +163,7 @@ def validate_prompt_pair(
             sr = int(sr)
         else:
             return False, (
-                "prompt_audio 必须是文件路径(str)或(wav, sr)元组，"
-                f"实际为 {type(pair.prompt_audio).__name__}"
+                f"prompt_audio 必须是文件路径(str)或(wav, sr)元组，实际为 {type(pair.prompt_audio).__name__}"
             )
     except FileNotFoundError as exc:
         return False, f"prompt_audio 文件不存在: {exc}"
@@ -195,9 +196,7 @@ def validate_prompt_pair(
     score = 1.0 - abs(chars_per_sec - 5.0) / 10.0
     score = max(0.0, min(1.0, score))
     return True, (
-        f"OK | 对齐分数={score:.2f} | "
-        f"文本={text_chars}字 | 音频={duration:.1f}s | "
-        f"语速={chars_per_sec:.1f}字/秒"
+        f"OK | 对齐分数={score:.2f} | 文本={text_chars}字 | 音频={duration:.1f}s | 语速={chars_per_sec:.1f}字/秒"
     )
 
 
@@ -288,9 +287,7 @@ def generate_with_prompt_continuation(
                 target_sr=float(sample_rate),
             ).astype(np.float32)
         except ImportError:
-            logger.warning(
-                f"[prompt] librosa 未安装，无法重采样 prompt_sr={prompt_sr}→{sample_rate}"
-            )
+            logger.warning(f"[prompt] librosa 未安装，无法重采样 prompt_sr={prompt_sr}→{sample_rate}")
 
     max_attempts = 2
     wav_out: np.ndarray | None = None
@@ -301,18 +298,14 @@ def generate_with_prompt_continuation(
             else:
                 cutoff = int(sample_rate * 15.0)
                 if len(prompt_wav) > cutoff:
-                    logger.info(
-                        "[prompt] 二次尝试：将参考音频自动截短为前 15s 以降低显存压力"
-                    )
+                    logger.info("[prompt] 二次尝试：将参考音频自动截短为前 15s 以降低显存压力")
                     effective_prompt_wav = prompt_wav[:cutoff]
                     meta["prompt_truncated_seconds"] = 15.0
                     meta["retry_count"] = attempt - 1
                 else:
                     effective_prompt_wav = prompt_wav
 
-            _progress_mgr.update_phase(
-                f"Prompt 延续推理中（尝试 {attempt}/{max_attempts}）..."
-            )
+            _progress_mgr.update_phase(f"Prompt 延续推理中（尝试 {attempt}/{max_attempts}）...")
             logger.info(
                 f"[prompt] 生成延续文本 continuation_text={continuation_text[:40]}..."
                 f" prompt={prompt_pair.prompt_text[:40]}..."
@@ -364,9 +357,7 @@ def generate_with_prompt_continuation(
             oom_keys = ("out of memory", "outofmemoryerror", "cuda error")
             is_oom = any(k in str(exc).lower() for k in oom_keys)
             if is_oom and attempt < max_attempts:
-                logger.warning(
-                    f"[prompt] 第 {attempt} 次 OOM: {exc}，释放显存后尝试截短 prompt 重试"
-                )
+                logger.warning(f"[prompt] 第 {attempt} 次 OOM: {exc}，释放显存后尝试截短 prompt 重试")
                 try:
                     free_gpu_memory()
                 except (RuntimeError, ValueError) as free_exc:
@@ -382,14 +373,10 @@ def generate_with_prompt_continuation(
                     )
                 ) from exc
             logger.exception(f"[prompt] 第 {attempt} 次 RuntimeError(非 OOM)")
-            raise GenerationError(
-                f"Prompt 延续生成 RuntimeError: {type(exc).__name__}: {exc}"
-            ) from exc
+            raise GenerationError(f"Prompt 延续生成 RuntimeError: {type(exc).__name__}: {exc}") from exc
         except (ValueError, TypeError) as exc:
             logger.warning(f"[prompt] 参数 / 输入异常: {exc}")
-            raise GenerationError(
-                f"Prompt 延续参数错误: {type(exc).__name__}: {exc}"
-            ) from exc
+            raise GenerationError(f"Prompt 延续参数错误: {type(exc).__name__}: {exc}") from exc
         except OSError as exc:
             logger.warning(f"[prompt] 文件 IO 异常: {exc}")
             raise GenerationError(f"Prompt 延续文件操作失败: {exc}") from exc
@@ -407,9 +394,7 @@ def generate_with_prompt_continuation(
     return wav_out.astype(np.float32), sample_rate, meta
 
 
-def fn_voxcpm_prompt_continue(
-    text: str, prompt_wav_path: str, prompt_text: str
-) -> tuple[tuple | None, str]:
+def fn_voxcpm_prompt_continue(text: str, prompt_wav_path: str, prompt_text: str) -> tuple[tuple | None, str]:
     """VoxCPM2 Prompt 延续生成对外兼容入口。
 
     保留原签名 ``(text, prompt_wav_path, prompt_text) -> ((sr, wav, filename), message)``，
@@ -454,9 +439,7 @@ def fn_voxcpm_prompt_continue(
         _progress_mgr.start(total_segments=1, phase="Prompt 延续准备中...")
         start_time = time.time()
         try:
-            return _fn_voxcpm_prompt_continue_impl(
-                text, prompt_wav_path, prompt_text, start_time
-            )
+            return _fn_voxcpm_prompt_continue_impl(text, prompt_wav_path, prompt_text, start_time)
         finally:
             elapsed = time.time() - start_time
             _gen_tracker.end_generation(elapsed)

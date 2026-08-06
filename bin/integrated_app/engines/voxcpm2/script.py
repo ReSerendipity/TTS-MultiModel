@@ -82,9 +82,7 @@ class ScriptLine(NamedTuple):
     error: str | None = None
 
 
-_SCRIPT_LINE_RE: re.Pattern[str] = re.compile(
-    r"\[([^\]]+)\](?:\(([^)]+)\))?\s*(.*)", re.DOTALL
-)
+_SCRIPT_LINE_RE: re.Pattern[str] = re.compile(r"\[([^\]]+)\](?:\(([^)]+)\))?\s*(.*)", re.DOTALL)
 _INSTRUCTION_SET = {"uv_break", "pause", "silence", "break", "sep", "separator"}
 
 
@@ -93,9 +91,7 @@ def _is_instruction(role_or_token: str) -> bool:
     token = role_or_token.strip().lower()
     if token in _INSTRUCTION_SET:
         return True
-    if token.startswith("pause=") or token.startswith("silence="):
-        return True
-    return False
+    return bool(token.startswith("pause=") or token.startswith("silence="))
 
 
 def parse_script(script_text: str) -> list[ScriptLine]:
@@ -125,9 +121,7 @@ def parse_script(script_text: str) -> list[ScriptLine]:
         if not stripped:
             continue
         if "]" not in stripped:
-            logger.info(
-                f"[VoxCPM剧本工坊] 第 {idx} 行无角色/指令标记，当作注释跳过: {stripped[:40]}"
-            )
+            logger.info(f"[VoxCPM剧本工坊] 第 {idx} 行无角色/指令标记，当作注释跳过: {stripped[:40]}")
             continue
 
         m = _SCRIPT_LINE_RE.match(stripped)
@@ -297,28 +291,20 @@ def generate_script_lines(
 
     for idx, line in enumerate(lines, start=1):
         if stop_event is not None and stop_event.is_set():
-            results.append(
-                line._replace(error="用户已取消", audio=None, duration_ms=None)
-            )
+            results.append(line._replace(error="用户已取消", audio=None, duration_ms=None))
             if progress_cb is not None:
                 try:
                     progress_cb(idx, total, "已取消")
                 except (RuntimeError, ValueError) as e:
-                    logger.debug(
-                        f"[VoxCPM剧本工坊] progress_cb 异常（忽略）: {type(e).__name__}: {e}"
-                    )
+                    logger.debug(f"[VoxCPM剧本工坊] progress_cb 异常（忽略）: {type(e).__name__}: {e}")
             continue
 
-        current_stage: str = line.role if line.role else (
-            "指令行" if line.is_instruction else "空行"
-        )
+        current_stage: str = line.role if line.role else ("指令行" if line.is_instruction else "空行")
         if progress_cb is not None:
             try:
                 progress_cb(idx, total, current_stage)
             except (RuntimeError, ValueError) as e:
-                logger.debug(
-                    f"[VoxCPM剧本工坊] progress_cb 异常（忽略）: {type(e).__name__}: {e}"
-                )
+                logger.debug(f"[VoxCPM剧本工坊] progress_cb 异常（忽略）: {type(e).__name__}: {e}")
 
         if line.error:
             results.append(line)
@@ -357,10 +343,7 @@ def generate_script_lines(
 
         cfg = float(role_override.get("cfg", global_cfg))
         steps = int(role_override.get("steps", global_steps))
-        extra_kwargs: dict[str, Any] = {
-            k: v for k, v in role_override.items()
-            if k not in ("cfg", "steps")
-        }
+        extra_kwargs: dict[str, Any] = {k: v for k, v in role_override.items() if k not in ("cfg", "steps")}
 
         try:
             generate_kwargs: dict[str, Any] = dict(
@@ -396,12 +379,8 @@ def generate_script_lines(
                     free_gpu_memory()
                 results.append(line._replace(error="显存不足，生成失败"))
             else:
-                logger.exception(
-                    f"[VoxCPM剧本工坊] 第 {idx}/{total} 行（角色 {line.role}）生成失败"
-                )
-                results.append(
-                    line._replace(error=f"{type(exc).__name__}: {exc}")
-                )
+                logger.exception(f"[VoxCPM剧本工坊] 第 {idx}/{total} 行（角色 {line.role}）生成失败")
+                results.append(line._replace(error=f"{type(exc).__name__}: {exc}"))
                 with contextlib.suppress(Exception):
                     gc.collect()
                     free_gpu_memory()
@@ -421,9 +400,11 @@ def _resample_or_pad(
         try:
             import librosa
             import numpy as _np
+
             return librosa.resample(wav.astype(_np.float32), orig_sr=from_sr, target_sr=to_sr)
         except (ImportError, Exception):
             import numpy as np
+
             ratio = to_sr / float(from_sr)
             new_len = max(1, int(round(len(wav) * ratio)))
             indices = (np.arange(new_len) / ratio).astype(np.int64)
@@ -478,11 +459,7 @@ def concatenate_lines(
 
     for line in lines:
         if line.is_instruction:
-            pause_ms = (
-                line.duration_ms
-                if line.duration_ms is not None and line.duration_ms > 0
-                else silence_ms
-            )
+            pause_ms = line.duration_ms if line.duration_ms is not None and line.duration_ms > 0 else silence_ms
             pause_samples = max(0, int(sample_rate * pause_ms / 1000.0))
             if pause_samples > 0:
                 segments.append(np.zeros(pause_samples, dtype=np.float32))
@@ -590,19 +567,13 @@ def export_script_to_zip(
                 entry_json_fields.append(
                     f'    "duration_ms": {line.duration_ms if line.duration_ms is not None else "null"}'
                 )
-                entry_json_fields.append(
-                    f'    "error": {_json_str(line.error) if line.error is not None else "null"}'
-                )
+                entry_json_fields.append(f'    "error": {_json_str(line.error) if line.error is not None else "null"}')
 
                 if not first_seg:
                     manifest_lines[-1] = manifest_lines[-1] + ","
                 first_seg = False
 
-                if (
-                    not line.is_instruction
-                    and line.audio is not None
-                    and line.error is None
-                ):
+                if not line.is_instruction and line.audio is not None and line.error is None:
                     valid_seg_idx += 1
                     seg_name = f"seg_{valid_seg_idx:03d}.wav"
                     entry_json_fields.append(f'    "wav_file": {_json_str("segments/" + seg_name)}')
@@ -660,13 +631,7 @@ def _json_str(s: str | None) -> str:
     """极简 JSON 字符串转义（仅用在 manifest 内部，避免引入 json 依赖的格式复杂度）。"""
     if s is None:
         return "null"
-    escaped = (
-        s.replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
-    )
+    escaped = s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
     return f'"{escaped}"'
 
 
@@ -690,7 +655,6 @@ def fn_voxcpm_script_studio(
     """
     from ...model_registry import registry
 
-    start_time = time.time()
     if persona_map_with_wav:
         persona_map = {k: {"wav": v, "text": ""} for k, v in persona_map_with_wav.items()}
     else:
@@ -708,10 +672,8 @@ def fn_voxcpm_script_studio(
     _progress_mgr.start(total_segments=total_lines, phase="剧本合成中...")
 
     def _cb(current: int, total: int, stage: str) -> None:
-        try:
+        with contextlib.suppress(RuntimeError, ValueError):
             _progress_mgr.advance_segment(f"第 {current}/{total} 行 [{stage}] 合成中...")
-        except (RuntimeError, ValueError):
-            pass
 
     result_lines = generate_script_lines(
         model=model,
@@ -725,16 +687,16 @@ def fn_voxcpm_script_studio(
         stop_event=None,
     )
 
-    ok_count = sum(1 for l in result_lines if l.audio is not None and l.error is None)
-    fail_count = sum(1 for l in result_lines if l.error is not None and not l.is_instruction)
-    logger.info(
-        f"[VoxCPM剧本工坊] 逐段生成结束：成功 {ok_count}/{total_lines}，失败 {fail_count} 行"
-    )
+    ok_count = sum(1 for line in result_lines if line.audio is not None and line.error is None)
+    fail_count = sum(1 for line in result_lines if line.error is not None and not line.is_instruction)
+    logger.info(f"[VoxCPM剧本工坊] 逐段生成结束：成功 {ok_count}/{total_lines}，失败 {fail_count} 行")
     if ok_count == 0:
-        fails = [f"第 {l.line_id} 行({l.role}): {l.error}" for l in result_lines if l.error and not l.is_instruction]
-        raise GenerationError(
-            "剧本合成失败：所有台词行均未成功。错误明细：\n  - " + "\n  - ".join(fails[:10])
-        )
+        fails = [
+            f"第 {line.line_id} 行({line.role}): {line.error}"
+            for line in result_lines
+            if line.error and not line.is_instruction
+        ]
+        raise GenerationError("剧本合成失败：所有台词行均未成功。错误明细：\n  - " + "\n  - ".join(fails[:10]))
 
     wav_merged, sr_out = concatenate_lines(result_lines, silence_ms=300, sample_rate=48000)
 
@@ -751,7 +713,7 @@ def fn_voxcpm_script_studio(
     logger.info(
         f"[VoxCPM剧本工坊] 音频已保存: {out_path}，时长 {duration_sec:.1f}s，有效段: {ok_count}，失败: {fail_count}"
     )
-    role_count = len({l.role for l in result_lines if l.role and not l.is_instruction})
+    role_count = len({line.role for line in result_lines if line.role and not line.is_instruction})
     if fail_count > 0:
         msg = (
             f"⚠️ 合成完成（含失败）！时长 {duration_sec:.1f} 秒，角色数: {role_count}，"

@@ -10,6 +10,7 @@
   * ``POST /api/system/gpu/cleanup`` — 手动触发显存清理（free_gpu_memory + torch.cuda.empty_cache）
 """
 
+import contextlib
 import logging
 import subprocess
 import threading
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 # ---------------------------------------------------------------------------
 # Pydantic 响应模型
 # ---------------------------------------------------------------------------
+
 
 class GPUStatusResponse(BaseModel):
     """GPU 实时状态响应模型。
@@ -77,6 +79,7 @@ class GPUHistoryResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # 内部辅助：GPU 设备索引
 # ---------------------------------------------------------------------------
+
 
 def _get_gpu_device() -> int:
     """获取当前使用的 GPU 设备索引。
@@ -131,11 +134,7 @@ def _get_nvml_handle() -> Any | None:
         current_time = time.time()
 
         # 缓存命中且未过期
-        if (
-            _nvml_state["initialized"]
-            and _nvml_state["handle"] is not None
-            and not _nvml_state["init_failed"]
-        ):
+        if _nvml_state["initialized"] and _nvml_state["handle"] is not None and not _nvml_state["init_failed"]:
             if current_time - _nvml_state["init_time"] < _NVML_CACHE_TTL:
                 return _nvml_state["handle"]
             # 过期重置，准备重新初始化
@@ -211,6 +210,7 @@ def _get_nvml_handle() -> Any | None:
 # ---------------------------------------------------------------------------
 # 内部辅助：GPU 利用率
 # ---------------------------------------------------------------------------
+
 
 def _get_gpu_utilization_from_nvml() -> int | None:
     """通过 NVML 读取 GPU 计算核心利用率。"""
@@ -296,7 +296,13 @@ def _get_gpu_utilization() -> int:
 # 1. GET /gpu/status — 实时状态
 # ---------------------------------------------------------------------------
 
-@router.get("/gpu/status", summary="GPU 实时状态", description="设备名/显存/利用率/温度，无 GPU 时返回 CPU 回退结构", response_model=GPUStatusResponse)
+
+@router.get(
+    "/gpu/status",
+    summary="GPU 实时状态",
+    description="设备名/显存/利用率/温度，无 GPU 时返回 CPU 回退结构",
+    response_model=GPUStatusResponse,
+)
 def gpu_status() -> GPUStatusResponse:
     """返回当前 GPU（或 CPU 模式）的实时状态。
 
@@ -366,10 +372,8 @@ def gpu_status() -> GPUStatusResponse:
                     except ValueError:
                         pass
                     if len(parts) >= 5:
-                        try:
+                        with contextlib.suppress(ValueError):
                             resp.utilization_gpu_pct = round(float(parts[4]), 1)
-                        except ValueError:
-                            pass
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError, IndexError, ValueError):
             pass
 
@@ -380,7 +384,13 @@ def gpu_status() -> GPUStatusResponse:
 # 2. GET /gpu/history — 显存采样历史（60 秒）
 # ---------------------------------------------------------------------------
 
-@router.get("/gpu/history", summary="显存采样历史", description="最近 60 秒显存曲线，采样点 <60 条时返回已有样本不抛错", response_model=GPUHistoryResponse)
+
+@router.get(
+    "/gpu/history",
+    summary="显存采样历史",
+    description="最近 60 秒显存曲线，采样点 <60 条时返回已有样本不抛错",
+    response_model=GPUHistoryResponse,
+)
 def gpu_history() -> GPUHistoryResponse:
     """返回 HealthMonitor 中缓存的显存采样点。
 
@@ -417,7 +427,12 @@ def gpu_history() -> GPUHistoryResponse:
 # 3. POST /gpu/cleanup — 手动显存清理
 # ---------------------------------------------------------------------------
 
-@router.post("/gpu/cleanup", summary="手动清理显存", description="触发 free_gpu_memory + torch.cuda.empty_cache，推理中返回 409 Conflict")
+
+@router.post(
+    "/gpu/cleanup",
+    summary="手动清理显存",
+    description="触发 free_gpu_memory + torch.cuda.empty_cache，推理中返回 409 Conflict",
+)
 def gpu_cleanup() -> dict[str, Any]:
     """手动触发 GPU 显存清理。
 

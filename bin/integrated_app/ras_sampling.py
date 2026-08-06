@@ -311,9 +311,11 @@ class RepetitionDetector:
             return False
         last_tokens = list(window)[-6:]
         # 检查是否符合 ababab 模式
-        return (last_tokens[0] == last_tokens[2] == last_tokens[4] and
-                last_tokens[1] == last_tokens[3] == last_tokens[5] and
-                last_tokens[0] != last_tokens[1])
+        return (
+            last_tokens[0] == last_tokens[2] == last_tokens[4]
+            and last_tokens[1] == last_tokens[3] == last_tokens[5]
+            and last_tokens[0] != last_tokens[1]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -736,9 +738,7 @@ class RASContext:
         """退出上下文：记录统计信息并重置。"""
         detections = self._detector.total_detections
         if detections > 0:
-            logger.info(
-                f"[RAS] 生成任务完成，共检测到 {detections} 次 n-gram 重复"
-            )
+            logger.info(f"[RAS] 生成任务完成，共检测到 {detections} 次 n-gram 重复")
         self._detector.reset()
 
 

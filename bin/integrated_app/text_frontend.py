@@ -34,8 +34,8 @@ DEFAULT_LANGUAGE = "zh"
 
 # CJK 统一汉字（中日韩共用）
 _CJK_RANGES = [
-    (0x4E00, 0x9FFF),    # CJK Unified Ideographs
-    (0x3400, 0x4DBF),    # CJK Extension A
+    (0x4E00, 0x9FFF),  # CJK Unified Ideographs
+    (0x3400, 0x4DBF),  # CJK Extension A
     (0x20000, 0x2A6DF),  # CJK Extension B
     (0x2A700, 0x2B73F),  # CJK Extension C
     (0x2B740, 0x2B81F),  # CJK Extension D
@@ -69,7 +69,7 @@ _LATIN_RANGES = [
 ]
 
 # 中文标点范围（用于判断中文语境）
-_ZH_PUNCTUATION = set("，。！？、；：""''【】《》（）—…·")
+_ZH_PUNCTUATION = set("，。！？、；：''【】《》（）—…·")
 
 # 日文标点
 _JA_PUNCTUATION = set("。「」、・『』【】")
@@ -193,31 +193,43 @@ _ZH_SYMBOL_MAP = {
 
 # TTS 控制标签（需要保留，不被清理）
 _TTS_CONTROL_TAGS = {
-    "[uv_break]", "[laugh]", "[break]", "[breath]", "[pause]",
-    "[uv_break_0.2]", "[uv_break_0.3]", "[uv_break_0.5]",
-    "[emphasis]", "[whisper]", "[speed_up]", "[speed_down]",
-    "[volume_up]", "[volume_down]", "[pitch_up]", "[pitch_down]",
+    "[uv_break]",
+    "[laugh]",
+    "[break]",
+    "[breath]",
+    "[pause]",
+    "[uv_break_0.2]",
+    "[uv_break_0.3]",
+    "[uv_break_0.5]",
+    "[emphasis]",
+    "[whisper]",
+    "[speed_up]",
+    "[speed_down]",
+    "[volume_up]",
+    "[volume_down]",
+    "[pitch_up]",
+    "[pitch_down]",
 }
 
 # Emoji Unicode 范围（覆盖主要表情符号区域）
 _EMOJI_PATTERN = re.compile(
     "["
-    "\U0001F600-\U0001F64F"  # 表情符号
-    "\U0001F300-\U0001F5FF"  # 符号与象形文字
-    "\U0001F680-\U0001F6FF"  # 交通与地图符号
-    "\U0001F1E0-\U0001F1FF"  # 国旗
-    "\U00002500-\U00002BEF"  # 杂项符号
-    "\U00002700-\U000027BF"  # 装饰符号
-    "\U0001F900-\U0001F9FF"  # 补充符号与象形文字
-    "\U0001FA00-\U0001FA6F"  # 棋类符号
-    "\U0001FA70-\U0001FAFF"  # 符号与象形文字扩展-A
-    "\U00002600-\U000026FF"  # 杂项符号
-    "\U0000FE00-\U0000FE0F"  # 变体选择符
-    "\U0000200D"             # 零宽连接符
-    "\U00002300-\U000023FF"  # 杂项技术
-    "\U00002B50"             # 星星
+    "\U0001f600-\U0001f64f"  # 表情符号
+    "\U0001f300-\U0001f5ff"  # 符号与象形文字
+    "\U0001f680-\U0001f6ff"  # 交通与地图符号
+    "\U0001f1e0-\U0001f1ff"  # 国旗
+    "\U00002500-\U00002bef"  # 杂项符号
+    "\U00002700-\U000027bf"  # 装饰符号
+    "\U0001f900-\U0001f9ff"  # 补充符号与象形文字
+    "\U0001fa00-\U0001fa6f"  # 棋类符号
+    "\U0001fa70-\U0001faff"  # 符号与象形文字扩展-A
+    "\U00002600-\U000026ff"  # 杂项符号
+    "\U0000fe00-\U0000fe0f"  # 变体选择符
+    "\U0000200d"  # 零宽连接符
+    "\U00002300-\U000023ff"  # 杂项技术
+    "\U00002b50"  # 星星
     "]+",
-    flags=re.UNICODE
+    flags=re.UNICODE,
 )
 
 
@@ -268,9 +280,7 @@ class LanguageDetector:
         self._re_hiragana = re.compile(r"[\u3040-\u309f]")
         self._re_katakana = re.compile(r"[\u30a0-\u30ff\u31f0-\u31ff]")
         self._re_kana = re.compile(r"[\u3040-\u309f\u30a0-\u30ff\u31f0-\u31ff]")
-        self._re_hangul = re.compile(
-            r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]"
-        )
+        self._re_hangul = re.compile(r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]")
         self._re_latin = re.compile(r"[A-Za-z\u00c0-\u024f]")
         self._re_digit = re.compile(r"[0-9]")
         self._re_non_space = re.compile(r"\S")
@@ -294,26 +304,17 @@ class LanguageDetector:
             LanguageDetectionResult 包含语言代码、置信度和字符计数
         """
         if not text or not text.strip():
-            return LanguageDetectionResult(
-                language=DEFAULT_LANGUAGE, confidence=0.0
-            )
+            return LanguageDetectionResult(language=DEFAULT_LANGUAGE, confidence=0.0)
 
         # 使用 C 级正则批量统计（findall 返回匹配列表，len() 即为计数）
         kana_count = len(self._re_kana.findall(text))
         ko_count = len(self._re_hangul.findall(text))
         cjk_count = len(self._re_cjk.findall(text))
         latin_count = len(self._re_latin.findall(text))
-        digit_count = len(self._re_digit.findall(text))
         total_non_space = len(self._re_non_space.findall(text))
 
-        # other = 总非空白字符 - 已分类字符
-        classified = kana_count + ko_count + cjk_count + latin_count + digit_count
-        other_count = max(0, total_non_space - classified)
-
         if total_non_space == 0:
-            return LanguageDetectionResult(
-                language=DEFAULT_LANGUAGE, confidence=0.0
-            )
+            return LanguageDetectionResult(language=DEFAULT_LANGUAGE, confidence=0.0)
 
         # 将 CJK 汉字在中日之间分配
         ja_cjk = 0
@@ -334,10 +335,7 @@ class LanguageDetector:
         max_count = lang_counts[max_lang]
         non_other_total = sum(lang_counts.values())
 
-        if non_other_total == 0:
-            confidence = 0.0
-        else:
-            confidence = max_count / non_other_total
+        confidence = 0.0 if non_other_total == 0 else max_count / non_other_total
 
         # 检查标点辅助判断（仅用于置信度低时的增强）
         if confidence < 0.5:
@@ -345,10 +343,9 @@ class LanguageDetector:
             ja_punct_count = len(self._re_ja_punct.findall(text))
             ko_punct_count = len(self._re_ko_punct.findall(text))
 
-            if ja_punct_count > zh_punct_count and ja_punct_count > ko_punct_count:
-                if max_lang == "zh":
-                    max_lang = "ja"
-                    confidence = max(confidence, 0.5)
+            if ja_punct_count > zh_punct_count and ja_punct_count > ko_punct_count and max_lang == "zh":
+                max_lang = "ja"
+                confidence = max(confidence, 0.5)
 
         result = LanguageDetectionResult(
             language=max_lang,
@@ -460,9 +457,7 @@ class TextNormalizer:
             r"(\d{4}|\d{2})年((0?[1-9]|1[0-2])月)?"
             r"(((0?[1-9])|((1|2)[0-9])|30|31)([日号]))?"
         )
-        self._re_zh_time = re.compile(
-            r"([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:([0-5][0-9]))?"
-        )
+        self._re_zh_time = re.compile(r"([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:([0-5][0-9]))?")
         self._re_zh_time_range = re.compile(
             r"([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:([0-5][0-9]))?"
             r"[-~]([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:([0-5][0-9]))?"
@@ -478,9 +473,7 @@ class TextNormalizer:
         self._re_zh_decimal = re.compile(r"(-?)((\d+)(\.\d+))")
 
         # 英文正则
-        self._re_en_time = re.compile(
-            r"\b([01]?[0-9]|2[0-3]):([0-5][0-9])\b"
-        )
+        self._re_en_time = re.compile(r"\b([01]?[0-9]|2[0-3]):([0-5][0-9])\b")
         self._re_en_comma_number = re.compile(r"([0-9][0-9,]+[0-9])")
         self._re_en_decimal = re.compile(r"([0-9]+\.\s*[0-9]+)")
         self._re_en_ordinal = re.compile(r"[0-9]+(st|nd|rd|th)")
@@ -488,12 +481,8 @@ class TextNormalizer:
         self._re_en_year = re.compile(r"\b(\d{4})\b")
 
         # 全角转半角
-        self._re_fullwidth_digit = re.compile(
-            r"[\uff10-\uff19]"
-        )
-        self._re_fullwidth_alpha = re.compile(
-            r"[\uff21-\uff3a\uff41-\uff5a]"
-        )
+        self._re_fullwidth_digit = re.compile(r"[\uff10-\uff19]")
+        self._re_fullwidth_alpha = re.compile(r"[\uff21-\uff3a\uff41-\uff5a]")
 
         # Markdown 清理正则（按优先级排序）
         self._re_md_code_block = re.compile(r"```[\s\S]*?```", re.MULTILINE)
@@ -763,17 +752,13 @@ class TextNormalizer:
         text = self._re_zh_version.sub(self._replace_zh_version, text)
 
         # 数字+量词（必须在纯数字之前处理）
-        text = self._re_zh_positive_quantifier.sub(
-            self._replace_zh_quantifier, text
-        )
+        text = self._re_zh_positive_quantifier.sub(self._replace_zh_quantifier, text)
 
         # 小数
         text = self._re_zh_decimal.sub(self._replace_zh_decimal, text)
 
         # 纯整数（需要避免误处理已展开的中文数字）
-        text = re.compile(r"(?<![\u4e00-\u9fff])(\d+)(?![\u4e00-\u9fff\d.])").sub(
-            self._replace_zh_number, text
-        )
+        text = re.compile(r"(?<![\u4e00-\u9fff])(\d+)(?![\u4e00-\u9fff\d.])").sub(self._replace_zh_number, text)
 
         # 符号展开
         text = self._expand_zh_symbols(text)
@@ -1023,9 +1008,7 @@ class TextNormalizer:
         text = self._re_en_ordinal.sub(self._replace_en_ordinal, text)
 
         # 逗号分隔的大数字（去掉逗号，后续由数字展开处理）
-        text = self._re_en_comma_number.sub(
-            lambda m: m.group(1).replace(",", ""), text
-        )
+        text = self._re_en_comma_number.sub(lambda m: m.group(1).replace(",", ""), text)
 
         # 小数展开
         text = self._re_en_decimal.sub(self._replace_en_decimal, text)
@@ -1088,10 +1071,8 @@ class TextNormalizer:
     def _replace_en_ordinal(self, match: re.Match) -> str:
         """序数词展开：1st -> first, 2nd -> second"""
         num_str = match.group(0)
-        suffix = ""
         for s in ("st", "nd", "rd", "th"):
             if num_str.lower().endswith(s):
-                suffix = s
                 num_str = num_str[: -len(s)]
                 break
 
@@ -1147,9 +1128,7 @@ class TextNormalizer:
             return decimal_str
 
         integer_part = self._number_to_en_word(int(parts[0]))
-        decimal_digits = " ".join(
-            self._digit_to_en_word(ch) for ch in parts[1] if ch.isdigit()
-        )
+        decimal_digits = " ".join(self._digit_to_en_word(ch) for ch in parts[1] if ch.isdigit())
         return f"{integer_part} point {decimal_digits}"
 
     def _replace_en_number(self, match: re.Match) -> str:
@@ -1177,9 +1156,16 @@ class TextNormalizer:
             对应的英文单词（如 "0" -> "zero"）
         """
         digit_words = {
-            "0": "zero", "1": "one", "2": "two", "3": "three",
-            "4": "four", "5": "five", "6": "six", "7": "seven",
-            "8": "eight", "9": "nine",
+            "0": "zero",
+            "1": "one",
+            "2": "two",
+            "3": "three",
+            "4": "four",
+            "5": "five",
+            "6": "six",
+            "7": "seven",
+            "8": "eight",
+            "9": "nine",
         }
         return digit_words.get(digit, digit)
 
@@ -1196,14 +1182,38 @@ class TextNormalizer:
         num = abs(num)
 
         ones = [
-            "", "one", "two", "three", "four", "five", "six", "seven",
-            "eight", "nine", "ten", "eleven", "twelve", "thirteen",
-            "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+            "",
+            "one",
+            "two",
+            "three",
+            "four",
+            "five",
+            "six",
+            "seven",
+            "eight",
+            "nine",
+            "ten",
+            "eleven",
+            "twelve",
+            "thirteen",
+            "fourteen",
+            "fifteen",
+            "sixteen",
+            "seventeen",
+            "eighteen",
             "nineteen",
         ]
         tens = [
-            "", "", "twenty", "thirty", "forty", "fifty", "sixty",
-            "seventy", "eighty", "ninety",
+            "",
+            "",
+            "twenty",
+            "thirty",
+            "forty",
+            "fifty",
+            "sixty",
+            "seventy",
+            "eighty",
+            "ninety",
         ]
 
         def _convert(n: int) -> str:
@@ -1300,9 +1310,16 @@ class TextNormalizer:
         num_str = match.group(0)
         # 日文音读数字映射
         ja_digits = {
-            "0": "ゼロ", "1": "いち", "2": "に", "3": "さん",
-            "4": "よん", "5": "ご", "6": "ろく", "7": "なな",
-            "8": "はち", "9": "きゅう",
+            "0": "ゼロ",
+            "1": "いち",
+            "2": "に",
+            "3": "さん",
+            "4": "よん",
+            "5": "ご",
+            "6": "ろく",
+            "7": "なな",
+            "8": "はち",
+            "9": "きゅう",
         }
         return "".join(ja_digits.get(ch, ch) for ch in num_str)
 
@@ -1323,9 +1340,16 @@ class TextNormalizer:
         day = match.group(5) or ""
 
         ja_digits = {
-            "0": "ゼロ", "1": "いち", "2": "に", "3": "さん",
-            "4": "よん", "5": "ご", "6": "ろく", "7": "なな",
-            "8": "はち", "9": "きゅう",
+            "0": "ゼロ",
+            "1": "いち",
+            "2": "に",
+            "3": "さん",
+            "4": "よん",
+            "5": "ご",
+            "6": "ろく",
+            "7": "なな",
+            "8": "はち",
+            "9": "きゅう",
         }
 
         result = ""
@@ -1378,10 +1402,24 @@ class TextNormalizer:
 
         # 韩文固有数字（1-99）
         ko_native_units = {
-            1: "한", 2: "두", 3: "세", 4: "네", 5: "다섯",
-            6: "여섯", 7: "일곱", 8: "여덟", 9: "아홉", 10: "열",
-            20: "스물", 30: "서른", 40: "마흔", 50: "쉰",
-            60: "예순", 70: "일흔", 80: "여든", 90: "아흔",
+            1: "한",
+            2: "두",
+            3: "세",
+            4: "네",
+            5: "다섯",
+            6: "여섯",
+            7: "일곱",
+            8: "여덟",
+            9: "아홉",
+            10: "열",
+            20: "스물",
+            30: "서른",
+            40: "마흔",
+            50: "쉰",
+            60: "예순",
+            70: "일흔",
+            80: "여든",
+            90: "아흔",
         }
 
         # 1-99 使用固有数字
@@ -1397,8 +1435,16 @@ class TextNormalizer:
 
         # 100+ 使用汉字音读系统
         ko_digits = {
-            0: "영", 1: "일", 2: "이", 3: "삼", 4: "사",
-            5: "오", 6: "육", 7: "칠", 8: "팔", 9: "구",
+            0: "영",
+            1: "일",
+            2: "이",
+            3: "삼",
+            4: "사",
+            5: "오",
+            6: "육",
+            7: "칠",
+            8: "팔",
+            9: "구",
         }
         ko_units_small = ["", "십", "백", "천"]
         ko_units_big = ["", "만", "억", "조"]
@@ -1581,9 +1627,7 @@ class TextFrontend:
         self._normalizer = TextNormalizer()
         self._g2p = G2PProcessor()
 
-    def process(
-        self, text: str, lang: str | None = None
-    ) -> tuple[str, str]:
+    def process(self, text: str, lang: str | None = None) -> tuple[str, str]:
         """处理输入文本
 
         流程：

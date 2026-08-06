@@ -127,11 +127,6 @@ def load_engine_specs_from_config(config_models_module: Any | None = None) -> No
     """
     global _engine_specs
     try:
-        if config_models_module is None:
-            from . import config_models
-        else:
-            config_models = config_models_module
-
         try:
             from .config import get_config
 

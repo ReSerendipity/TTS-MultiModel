@@ -5,6 +5,7 @@
 相比逐句推理可显著减少 GPU kernel launch 开销，提升整体吞吐量。
 包含动态 batch size 调整、显存自适应和错误回退机制。
 """
+
 from __future__ import annotations
 
 import time
@@ -134,9 +135,7 @@ class BatchInferencer:
         """
         new_size = max(self.min_batch_size, self._current_batch_size - 1)
         if new_size < self._current_batch_size:
-            logger.warning(
-                f"批量推理 OOM，batch size {self._current_batch_size} -> {new_size}"
-            )
+            logger.warning(f"批量推理 OOM，batch size {self._current_batch_size} -> {new_size}")
             self._current_batch_size = new_size
         return self._current_batch_size
 
@@ -243,15 +242,11 @@ class BatchInferencer:
                             t_item = time.perf_counter()
                             out = inference_fn([item])
                             item_ms = (time.perf_counter() - t_item) * 1000
-                            result = BatchInferenceResult(
-                                index=idx, success=True, audio=out[0], elapsed_ms=item_ms
-                            )
+                            result = BatchInferenceResult(index=idx, success=True, audio=out[0], elapsed_ms=item_ms)
                             all_results[idx] = result
                             stats.successful += 1
                         except Exception as e:
-                            result = BatchInferenceResult(
-                                index=idx, success=False, error=str(e)
-                            )
+                            result = BatchInferenceResult(index=idx, success=False, error=str(e))
                             all_results[idx] = result
                             stats.failed += 1
                             logger.error(f"项目 {idx} 推理失败: {e}")
@@ -264,9 +259,7 @@ class BatchInferencer:
                 logger.error(f"批次 {offset} 推理异常: {e}")
                 for bi in range(len(batch_items)):
                     idx = batch_indices[bi]
-                    result = BatchInferenceResult(
-                        index=idx, success=False, error=str(e)
-                    )
+                    result = BatchInferenceResult(index=idx, success=False, error=str(e))
                     all_results[idx] = result
                     stats.failed += 1
                     if on_item_done:
@@ -333,7 +326,5 @@ def get_batch_inferencer(
     """
     global _default_inferencer
     if _default_inferencer is None:
-        _default_inferencer = BatchInferencer(
-            max_batch_size=max_batch_size, max_vram_mb=max_vram_mb
-        )
+        _default_inferencer = BatchInferencer(max_batch_size=max_batch_size, max_vram_mb=max_vram_mb)
     return _default_inferencer

@@ -53,6 +53,7 @@ SAFE_FILL_VALUE: float = 0.0
 # 重采样后端枚举
 # ---------------------------------------------------------------------------
 
+
 class ResampleBackend(Enum):
     """重采样后端选择"""
 
@@ -65,6 +66,7 @@ class ResampleBackend(Enum):
 # ---------------------------------------------------------------------------
 # 配置 dataclass
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class ResamplingConfig:
@@ -92,6 +94,7 @@ class ResamplingConfig:
 # ---------------------------------------------------------------------------
 # 内部工具函数
 # ---------------------------------------------------------------------------
+
 
 def _sanitize_audio(audio: np.ndarray, nan_protection: bool = True) -> np.ndarray:
     """清洗音频数组：确保 float32、处理 NaN/Inf、极短音频保护
@@ -127,9 +130,7 @@ def _sanitize_audio(audio: np.ndarray, nan_protection: bool = True) -> np.ndarra
                 int(inf_count),
                 SAFE_FILL_VALUE,
             )
-            audio = np.where(np.isfinite(audio), audio, SAFE_FILL_VALUE).astype(
-                np.float32
-            )
+            audio = np.where(np.isfinite(audio), audio, SAFE_FILL_VALUE).astype(np.float32)
 
     return audio
 
@@ -206,6 +207,7 @@ def _detect_backend() -> ResampleBackend:
 # 核心重采样实现
 # ---------------------------------------------------------------------------
 
+
 def _resample_scipy(audio: np.ndarray, source_sr: int, target_sr: int) -> np.ndarray:
     """使用 scipy.signal.resample 进行频域重采样
 
@@ -239,9 +241,7 @@ def _resample_librosa(audio: np.ndarray, source_sr: int, target_sr: int) -> np.n
     """
     import librosa
 
-    result = librosa.resample(
-        y=audio, orig_sr=source_sr, target_sr=target_sr
-    )
+    result = librosa.resample(y=audio, orig_sr=source_sr, target_sr=target_sr)
     return result.astype(np.float32)
 
 
@@ -312,6 +312,7 @@ def _do_resample(
 # 公共 API
 # ---------------------------------------------------------------------------
 
+
 def normalize_sample_rate(
     audio: np.ndarray,
     source_sr: int,
@@ -374,10 +375,7 @@ def normalize_sample_rate(
     # 选择后端
     if backend == ResampleBackend.AUTO:
         # 极短音频强制使用线性插值（避免频域振铃）
-        if len(audio) < SHORT_AUDIO_THRESHOLD:
-            actual_backend = ResampleBackend.LINEAR
-        else:
-            actual_backend = _detect_backend()
+        actual_backend = ResampleBackend.LINEAR if len(audio) < SHORT_AUDIO_THRESHOLD else _detect_backend()
     else:
         actual_backend = backend
 
@@ -395,18 +393,13 @@ def normalize_sample_rate(
             try:
                 result = _resample_linear(audio, source_sr, target_sr)
             except Exception as fallback_exc:
-                raise AudioProcessingError(
-                    f"重采样失败（主后端和回退后端均失败）: {fallback_exc}"
-                ) from fallback_exc
+                raise AudioProcessingError(f"重采样失败（主后端和回退后端均失败）: {fallback_exc}") from fallback_exc
         else:
             raise AudioProcessingError(f"重采样失败: {exc}") from exc
 
     # NaN/Inf 后处理保护（重采样可能引入异常值）
-    if nan_protection:
-        if not np.all(np.isfinite(result)):
-            result = np.where(np.isfinite(result), result, SAFE_FILL_VALUE).astype(
-                np.float32
-            )
+    if nan_protection and not np.all(np.isfinite(result)):
+        result = np.where(np.isfinite(result), result, SAFE_FILL_VALUE).astype(np.float32)
 
     # 后处理
     if normalize_output:
@@ -453,8 +446,7 @@ def detect_sample_rate(audio_length: int, duration_seconds: float) -> int:
 
     if deviation > 0.05:
         logger.warning(
-            "估计采样率 %.0f Hz 与最近标准采样率 %d Hz 偏差 %.1f%%，"
-            "请确认音频时长是否正确",
+            "估计采样率 %.0f Hz 与最近标准采样率 %d Hz 偏差 %.1f%%，请确认音频时长是否正确",
             estimated_sr,
             best_sr,
             deviation * 100,
@@ -508,15 +500,14 @@ def batch_resample(
             logger.error("批量重采样第 %d 段失败: %s", i, exc)
             raise
 
-    logger.debug(
-        "批量重采样完成: %d 段, %dHz -> %dHz", len(results), source_sr, target_sr
-    )
+    logger.debug("批量重采样完成: %d 段, %dHz -> %dHz", len(results), source_sr, target_sr)
     return results
 
 
 # ---------------------------------------------------------------------------
 # ResamplingPipeline 类
 # ---------------------------------------------------------------------------
+
 
 class ResamplingPipeline:
     """可配置的音频重采样管线
@@ -630,16 +621,12 @@ class ResamplingPipeline:
         """
         source_sr = ENGINE_SAMPLE_RATES.get(from_engine)
         if source_sr is None:
-            raise AudioProcessingError(
-                f"未知源引擎: {from_engine}，已知引擎: {list(ENGINE_SAMPLE_RATES.keys())}"
-            )
+            raise AudioProcessingError(f"未知源引擎: {from_engine}，已知引擎: {list(ENGINE_SAMPLE_RATES.keys())}")
 
         if to_engine is not None:
             target_sr = ENGINE_SAMPLE_RATES.get(to_engine)
             if target_sr is None:
-                raise AudioProcessingError(
-                    f"未知目标引擎: {to_engine}，已知引擎: {list(ENGINE_SAMPLE_RATES.keys())}"
-                )
+                raise AudioProcessingError(f"未知目标引擎: {to_engine}，已知引擎: {list(ENGINE_SAMPLE_RATES.keys())}")
         else:
             target_sr = self.config.target_sr
 
@@ -660,9 +647,7 @@ class ResamplingPipeline:
         """
         sr = ENGINE_SAMPLE_RATES.get(engine_name)
         if sr is None:
-            raise AudioProcessingError(
-                f"未知引擎: {engine_name}，已知引擎: {list(ENGINE_SAMPLE_RATES.keys())}"
-            )
+            raise AudioProcessingError(f"未知引擎: {engine_name}，已知引擎: {list(ENGINE_SAMPLE_RATES.keys())}")
         return sr
 
     def __repr__(self) -> str:
@@ -671,10 +656,7 @@ class ResamplingPipeline:
         Returns:
             包含目标采样率和后端信息的字符串。
         """
-        return (
-            f"ResamplingPipeline(target_sr={self.config.target_sr}, "
-            f"backend={self.config.backend.value})"
-        )
+        return f"ResamplingPipeline(target_sr={self.config.target_sr}, backend={self.config.backend.value})"
 
 
 # ---------------------------------------------------------------------------

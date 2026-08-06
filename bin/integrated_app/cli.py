@@ -550,9 +550,9 @@ def cmd_batch(args, parser):
     fail_count = 0
     start_time = time.time()
 
-    logger.info(f"\n{'='*50}")
+    logger.info(f"\n{'=' * 50}")
     logger.info(f"Batch processing: {total} tasks | Format: {output_format.upper()} | Engine: {engine or 'auto'}")
-    logger.info(f"{'='*50}\n")
+    logger.info(f"{'=' * 50}\n")
 
     for i, task in enumerate(tasks, 1):
         text = task["text"]
@@ -593,8 +593,7 @@ def cmd_batch(args, parser):
             avg_time = elapsed / i
             eta = avg_time * (total - i)
             logger.info(
-                f"[{i}/{total}] Saved: {output_file.name} ({duration:.2f}s) "
-                f"| Elapsed: {elapsed:.1f}s | ETA: {eta:.1f}s"
+                f"[{i}/{total}] Saved: {output_file.name} ({duration:.2f}s) | Elapsed: {elapsed:.1f}s | ETA: {eta:.1f}s"
             )
             success_count += 1
 
@@ -603,13 +602,13 @@ def cmd_batch(args, parser):
             logger.error(f"[{i}/{total}] FAILED: {e}")
 
     elapsed_total = time.time() - start_time
-    logger.info(f"\n{'='*50}")
+    logger.info(f"\n{'=' * 50}")
     logger.info(
         f"Batch complete: {success_count}/{total} succeeded, {fail_count} failed "
-        f"| Total time: {elapsed_total:.1f}s | Avg: {elapsed_total/max(success_count,1):.2f}s/task"
+        f"| Total time: {elapsed_total:.1f}s | Avg: {elapsed_total / max(success_count, 1):.2f}s/task"
     )
     logger.info(f"Output: {output_dir.resolve()}")
-    logger.info(f"{'='*50}")
+    logger.info(f"{'=' * 50}")
 
 
 def _parse_batch_input(input_file: Path, args, parser) -> list[dict]:

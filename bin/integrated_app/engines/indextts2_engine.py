@@ -91,6 +91,7 @@
       torch.cuda.empty_cache() 确保显存及时释放
 """
 
+import contextlib
 import gc
 import logging
 import os
@@ -389,8 +390,7 @@ class IndexTTS2Engine(TTSEngine):
             from indextts.infer_v2 import IndexTTS2
         except ImportError as e:
             raise ImportError(
-                "indextts 未安装，请运行: pip install indextts\n"
-                "或参考: https://github.com/index-tts/index-tts"
+                "indextts 未安装，请运行: pip install indextts\n或参考: https://github.com/index-tts/index-tts"
             ) from e
 
         config_path = os.path.join(self.model_dir, "config.yaml")
@@ -417,9 +417,7 @@ class IndexTTS2Engine(TTSEngine):
                 try:
                     from ..gpu_backend import GPUBackendManager
 
-                    _total, _alloc, _reserved, free_bytes = (
-                        GPUBackendManager.get_memory_info()
-                    )
+                    _total, _alloc, _reserved, free_bytes = GPUBackendManager.get_memory_info()
                     free_gb = free_bytes / (1024**3)
                 except Exception:
                     free_gb = 0.0
@@ -473,16 +471,10 @@ class IndexTTS2Engine(TTSEngine):
                     components_moved.append(attr)
                     logger.debug(f"[IndexTTS2] {attr} -> {device_str}")
                 except Exception as e:
-                    logger.warning(
-                        f"[IndexTTS2] 移动 {attr} 到 {device_str} 失败"
-                        f"(将保留在 CPU): {e}"
-                    )
+                    logger.warning(f"[IndexTTS2] 移动 {attr} 到 {device_str} 失败(将保留在 CPU): {e}")
 
         if components_moved:
-            logger.info(
-                f"[IndexTTS2] 已移动组件到 {device_str}: "
-                f"{', '.join(components_moved)}"
-            )
+            logger.info(f"[IndexTTS2] 已移动组件到 {device_str}: {', '.join(components_moved)}")
 
     def _log_memory_info(self) -> None:
         """记录 GPU 显存使用快照到日志。
@@ -499,8 +491,7 @@ class IndexTTS2Engine(TTSEngine):
             free_gb = mem_info[3] / (1024**3)
 
             logger.info(
-                f"[IndexTTS2] 显存状态: 总计 {total_gb:.2f}GB, "
-                f"已分配 {allocated_gb:.2f}GB, 可用 {free_gb:.2f}GB"
+                f"[IndexTTS2] 显存状态: 总计 {total_gb:.2f}GB, 已分配 {allocated_gb:.2f}GB, 可用 {free_gb:.2f}GB"
             )
         except Exception as e:
             logger.debug(f"[IndexTTS2] 获取显存信息失败: {e}")
@@ -580,9 +571,7 @@ class IndexTTS2Engine(TTSEngine):
             logger.debug(f"[IndexTTS2] 文本预处理失败（使用原始文本）: {e}")
 
         if not os.path.exists(spk_audio_prompt):
-            raise FileNotFoundError(
-                f"说话人参考音频不存在: {spk_audio_prompt}"
-            )
+            raise FileNotFoundError(f"说话人参考音频不存在: {spk_audio_prompt}")
 
         temp_created: bool = False
         if output_path is None:
@@ -625,10 +614,7 @@ class IndexTTS2Engine(TTSEngine):
                 # 适用场景：需要精确控制情感混合比例，API 程序化调用
                 if len(emo_vector) != 8:
                     # 维度不匹配时安全降级：记录警告但不中断流程，使用中性情感
-                    logger.warning(
-                        f"[IndexTTS2] emo_vector 应为 8 维，"
-                        f"当前为 {len(emo_vector)} 维，已忽略。"
-                    )
+                    logger.warning(f"[IndexTTS2] emo_vector 应为 8 维，当前为 {len(emo_vector)} 维，已忽略。")
                 else:
                     # 复制向量避免外部修改影响内部状态
                     infer_kwargs["emo_vector"] = list(emo_vector)
@@ -705,10 +691,7 @@ class IndexTTS2Engine(TTSEngine):
 
             if os.path.exists(output_path):
                 file_size = os.path.getsize(output_path)
-                logger.info(
-                    f"[IndexTTS2] 合成完成: {output_path} "
-                    f"({file_size / 1024:.1f} KB)"
-                )
+                logger.info(f"[IndexTTS2] 合成完成: {output_path} ({file_size / 1024:.1f} KB)")
             else:
                 logger.error(f"[IndexTTS2] 输出文件未生成: {output_path}")
 
@@ -719,10 +702,8 @@ class IndexTTS2Engine(TTSEngine):
         except Exception as e:
             logger.exception(f"[IndexTTS2] 合成失败: {e}")
             if temp_created and os.path.exists(output_path):
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(output_path)
-                except OSError:
-                    pass
             raise GenerationError(
                 f"IndexTTS 2.0 合成失败: {type(e).__name__}: {e}",
                 engine="indextts2",
@@ -848,9 +829,7 @@ class IndexTTS2Engine(TTSEngine):
                         if hasattr(self.tts, attr):
                             delattr(self.tts, attr)
                     except Exception as e:
-                        logger.debug(
-                            f"[IndexTTS2] 删除属性 {attr} 失败: {e}"
-                        )
+                        logger.debug(f"[IndexTTS2] 删除属性 {attr} 失败: {e}")
                 del self.tts
                 self.tts = None
 
@@ -1054,14 +1033,12 @@ class IndexTTS2Engine(TTSEngine):
             ValueError: ``reference_audio_path`` 为 ``None``。
         """
         if reference_audio_path is None:
-            raise ValueError(
-                "IndexTTS2 generate_voice_clone 需要 reference_audio_path。"
-            )
+            raise ValueError("IndexTTS2 generate_voice_clone 需要 reference_audio_path。")
 
         emo_text_kw: str | None = None
         use_emo_text_kw: bool = False
         if instruction and instruction.startswith("emo_text:"):
-            emo_text_kw = instruction[len("emo_text:"):].strip()
+            emo_text_kw = instruction[len("emo_text:") :].strip()
             use_emo_text_kw = True
 
         _sr, _wav, output_path = self.infer(

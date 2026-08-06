@@ -81,6 +81,7 @@ _DIALECT_NAMES: set = {"四川话", "粤语", "吴语", "东北话", "河南话"
 # R9 新增公共工具函数（SSE / 任务 ID / 音频保存+历史 / 错误响应）
 # ===========================================================================
 
+
 def format_sse_event(
     event_type: str,
     data: dict[str, Any],
@@ -252,6 +253,7 @@ def build_generation_error_response(
 # 信号量 / 并发控制
 # ===========================================================================
 
+
 async def _get_generation_semaphore(engine: str) -> asyncio.Semaphore:
     """Return the per-engine semaphore, creating it lazily if needed.
 
@@ -275,6 +277,7 @@ async def _get_generation_semaphore(engine: str) -> asyncio.Semaphore:
 # ===========================================================================
 # S-R4: Legacy history.db 一次性迁移
 # ===========================================================================
+
 
 def _migrate_legacy_history_db_if_needed() -> None:
     """REFACTOR: [S-R4] 一次性迁移 legacy history.db 到统一位置。
@@ -368,8 +371,7 @@ def _migrate_legacy_history_db_if_needed() -> None:
                 logger.debug(f"[S-R4] 重命名 legacy 文件失败（迁移已完成）: {rename_err}")
 
             logger.info(
-                f"[S-R4] 已迁移 {count} 条历史记录从 legacy history.db "
-                f"({_LEGACY_HISTORY_DB_PATH}) 到统一数据库"
+                f"[S-R4] 已迁移 {count} 条历史记录从 legacy history.db ({_LEGACY_HISTORY_DB_PATH}) 到统一数据库"
             )
         except Exception as migrate_err:  # noqa: BLE001
             # 任何异常都不阻塞应用启动
@@ -397,6 +399,7 @@ class _suppress_os_errors:
 # 引擎就绪校验 / 历史记录写入
 # ===========================================================================
 
+
 def _check_engine_ready(
     request: Any,
     engine_name: str | None = None,
@@ -416,10 +419,14 @@ def _check_engine_ready(
         engine_name = registry.current_engine
     if engine_name == "indextts2":
         if registry.indextts2_engine is None:
-            return _error_html(request, "IndexTTS 2.0 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id="indextts2")
+            return _error_html(
+                request, "IndexTTS 2.0 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id="indextts2"
+            )
     else:
         if registry.voxcpm_model is None:
-            return _error_html(request, "VoxCPM2 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id="voxcpm2")
+            return _error_html(
+                request, "VoxCPM2 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id="voxcpm2"
+            )
     return None
 
 
@@ -481,6 +488,7 @@ def _record_to_history_db(
 # ===========================================================================
 # 错误/成功 HTML 片段 + 错误消息友好化
 # ===========================================================================
+
 
 def _safe_error_msg(exc: BaseException) -> str:
     """根据异常类型返回用户友好的错误消息。
@@ -586,6 +594,7 @@ def _log_generation(
 # 音频后处理（语速 / 增强 / 响度归一化）
 # ===========================================================================
 
+
 def _apply_post_processing_to_file(
     filename: str,
     tempo_factor: float,
@@ -632,7 +641,9 @@ def _apply_post_processing_to_file(
             sr,
             normalize=True,
             tempo_factor=tempo_factor,
-            voice_enhancement=voice_enhancement if isinstance(voice_enhancement, bool) else _parse_bool_form(voice_enhancement),
+            voice_enhancement=voice_enhancement
+            if isinstance(voice_enhancement, bool)
+            else _parse_bool_form(voice_enhancement),
             target_lufs=target_lufs,
         )
 
@@ -710,6 +721,7 @@ def _error_html(
 # ===========================================================================
 # 上传辅助 / 音色解析 / 输入校验
 # ===========================================================================
+
 
 async def save_uploaded_audio(
     request: Any,
@@ -833,6 +845,7 @@ def _success_html(filename: str, status_message: str) -> HTMLResponse:
 # OOM 降级重试
 # ===========================================================================
 
+
 def _run_with_oom_retry(
     run_fn: Any,
     endpoint_name: str,
@@ -921,6 +934,7 @@ def _merge_dialect(instruction: str, dialect: str) -> str:
 # 生成执行主流程（信号量 + 硬超时 + OOM 重试 + 历史记录）
 # ===========================================================================
 
+
 async def _execute_generation(
     request: Any,
     text: str,
@@ -987,7 +1001,12 @@ async def _execute_generation(
     except asyncio.TimeoutError:
         logger.error(f"{endpoint_name} 生成超时 (>{_GENERATION_HARD_TIMEOUT_S}s)，文本长度={len(text)}")
         _log_generation(
-            endpoint_name, text, engine, voice_or_persona, False, _GENERATION_HARD_TIMEOUT_S,
+            endpoint_name,
+            text,
+            engine,
+            voice_or_persona,
+            False,
+            _GENERATION_HARD_TIMEOUT_S,
             error_msg=f"generation timeout (>{_GENERATION_HARD_TIMEOUT_S}s)",
         )
         return _error_html(request, f"生成超时（超过 {_GENERATION_HARD_TIMEOUT_S:.0f} 秒），请尝试缩短文本或减少并发")
@@ -1073,6 +1092,7 @@ async def _execute_generation_impl(
 # ===========================================================================
 # Phase 3: PWA 推送通知 hook
 # ===========================================================================
+
 
 def _trigger_push_notification(
     text: str,

@@ -32,9 +32,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-_request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "request_id", default=""
-)
+_request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="")
 
 _REQUEST_ID_SANITIZER = re.compile(r"[^A-Za-z0-9_\-]")
 _MAX_REQUEST_ID_LEN: int = 64

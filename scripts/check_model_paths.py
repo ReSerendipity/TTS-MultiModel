@@ -60,11 +60,7 @@ def check_model_paths(config_path: str = "config.yaml") -> bool:
             if os.path.isdir(entry_path):
                 # 检查目录中是否有权重文件
                 weight_exts = (".bin", ".safetensors", ".pt", ".pth", ".ckpt", ".onnx")
-                has_weights = any(
-                    f.endswith(weight_exts)
-                    for root, _, files in os.walk(entry_path)
-                    for f in files
-                )
+                has_weights = any(f.endswith(weight_exts) for root, _, files in os.walk(entry_path) for f in files)
                 if has_weights:
                     print(f"[pretrained_models/{entry}] 权重文件存在")
 

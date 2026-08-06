@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import time
@@ -43,19 +44,17 @@ def is_torch_compile_available() -> bool:
     """
     try:
         import torch
+
         # PyTorch 2.0+ 才有 torch.compile
         if not hasattr(torch, "compile"):
             return False
         # Windows 上 dynamo 后端可能有问题，检查环境变量
-        if os.name == "nt":
-            # Windows 上默认禁用，除非显式设置环境变量开启
-            if os.environ.get("TTS_ENABLE_TORCH_COMPILE", "0") != "1":
-                logger.debug("[ModelOpt] torch.compile 在 Windows 上默认禁用（设置 TTS_ENABLE_TORCH_COMPILE=1 可启用）")
-                return False
-        # 检查是否被显式禁用
-        if os.environ.get("TTS_DISABLE_TORCH_COMPILE", "0") == "1":
+        # Windows 上默认禁用，除非显式设置环境变量开启
+        if os.name == "nt" and os.environ.get("TTS_ENABLE_TORCH_COMPILE", "0") != "1":
+            logger.debug("[ModelOpt] torch.compile 在 Windows 上默认禁用（设置 TTS_ENABLE_TORCH_COMPILE=1 可启用）")
             return False
-        return True
+        # 检查是否被显式禁用
+        return os.environ.get("TTS_DISABLE_TORCH_COMPILE", "0") != "1"
     except Exception as e:
         logger.debug(f"[ModelOpt] torch.compile 可用性检查失败: {e}")
         return False
@@ -156,10 +155,8 @@ def warmup_model(
     def _report(msg: str) -> None:
         logger.info(f"[ModelWarmup] {msg}")
         if progress_callback is not None:
-            try:
+            with contextlib.suppress(Exception):
                 progress_callback(msg)
-            except Exception:
-                pass
 
     _report("正在预热模型...")
     start_time = time.time()
@@ -175,7 +172,7 @@ def warmup_model(
             wav = model.generate(
                 text=warmup_text,
                 max_len=100,  # 限制长度，快速完成
-                seed=42,      # 固定 seed，确定性预热
+                seed=42,  # 固定 seed，确定性预热
             )
             if wav is not None and len(wav) > 0:
                 duration = len(wav) / 48000 if hasattr(model, "generate") else 0
@@ -236,10 +233,8 @@ def warmup_indextts2(
     def _report(msg: str) -> None:
         logger.info(f"[IndexTTS2-Warmup] {msg}")
         if progress_callback is not None:
-            try:
+            with contextlib.suppress(Exception):
                 progress_callback(msg)
-            except Exception:
-                pass
 
     _report("正在预热 IndexTTS2 模型...")
     start_time = time.time()

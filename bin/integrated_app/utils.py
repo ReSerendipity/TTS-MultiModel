@@ -153,14 +153,12 @@ def add_tag(text: str, tag: str, is_speaker: bool = True) -> str:
     Returns:
         str: 包装标签后的文本。
     """
-    try:
+    # 用户对象可能实现了一个会抛 TypeError/ValueError/AttributeError 的
+    # __str__；这里作为 UI 包装函数走"能转就转，不能转就放过"，
+    # 后续 rstrip 分支再兜底做二次 str()（下方 AttributeError 分支同样处理）。
+    # 禁止裸 except，避免把 MemoryError / KeyboardInterrupt / SystemExit 吃掉。
+    with contextlib.suppress(TypeError, ValueError, AttributeError):
         text = str(text)
-    except (TypeError, ValueError, AttributeError):
-        # 用户对象可能实现了一个会抛 TypeError/ValueError/AttributeError 的
-        # __str__；这里作为 UI 包装函数走"能转就转，不能转就放过"，
-        # 后续 rstrip 分支再兜底做二次 str()（下方 AttributeError 分支同样处理）。
-        # 禁止裸 except，避免把 MemoryError / KeyboardInterrupt / SystemExit 吃掉。
-        pass
 
     if not tag or tag == "(暂无音色)":
         return text

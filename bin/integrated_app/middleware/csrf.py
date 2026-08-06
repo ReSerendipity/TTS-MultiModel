@@ -100,10 +100,7 @@ def _is_skip_path(path: str) -> bool:
     """
     if path in _SKIP_EXACT_PATHS:
         return True
-    for prefix in _SKIP_PREFIX_PATHS:
-        if path.startswith(prefix):
-            return True
-    return False
+    return any(path.startswith(prefix) for prefix in _SKIP_PREFIX_PATHS)
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):

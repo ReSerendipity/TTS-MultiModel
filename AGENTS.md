@@ -272,6 +272,15 @@ ui:            # UI 布局（侧边栏宽度等）
 
 ---
 
+## 6½. 实现陷阱（代码不可直接推断）
+
+- **静态文件缓存陷阱**：自定义 StaticFiles 子类（如 `CachedStaticFiles`）曾为 CSS/JS 设置 `immutable` + 长期 `max-age`（1年/7天等），导致修改 CSS/JS 后刷新页面仍显示旧版。修改此类文件后务必：(1) 检查 `Cache-Control` 头是否含 `immutable`；(2) 检查 `base.html` 中 `?v=` 版本号是否需要递增；(3) 最稳妥方案是将 CSS/JS 的 Cache-Control 改为 `no-cache, must-revalidate`，使每次刷新都向服务器验证
+- GPU 后端支持 NVIDIA CUDA、Apple MPS 和 CPU，启动时自动检测
+- 模型状态通过 `model_registry` 监听器桥接到 SSE 事件总线，模块间解耦，不要直接 import event_bus
+- 测试场景中应避免真实模型自动加载，优先使用 mock 或现有测试夹具
+
+---
+
 ## 7. 安全与变更边界
 
 - **敏感信息**：严禁读取或修改 `.env`、密钥或证书文件。

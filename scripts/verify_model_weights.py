@@ -91,15 +91,16 @@ def verify_engine(engine_name: str, project_root: str) -> bool:
             all_ok = False
             continue
 
-        print(f"[{engine_name}] OK: {filename} ({actual_size / (1024*1024):.1f} MB)")
+        print(f"[{engine_name}] OK: {filename} ({actual_size / (1024 * 1024):.1f} MB)")
 
     return all_ok
 
 
 def main():
     parser = argparse.ArgumentParser(description="模型权重完整性校验")
-    parser.add_argument("--model", default="all", choices=["all", "dotstts", "voxcpm2", "indextts2"],
-                        help="校验哪个引擎")
+    parser.add_argument(
+        "--model", default="all", choices=["all", "dotstts", "voxcpm2", "indextts2"], help="校验哪个引擎"
+    )
     parser.add_argument("--sha256", action="store_true", help="计算并输出 SHA256（耗时较长）")
     args = parser.parse_args()
 

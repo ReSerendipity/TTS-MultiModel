@@ -50,6 +50,8 @@ class SegmentResult(NamedTuple):
     sample_rate: int
     duration_ms: int
     seed_used: int
+
+
 """流式生成单段结果 NamedTuple，封装一段音频的完整生成信息。
 
 Attributes:
@@ -123,10 +125,7 @@ def split_text_for_streaming(
             if best_pos != -1:
                 break
 
-        if best_pos != -1:
-            cut = best_pos + 1
-        else:
-            cut = end_target
+        cut = best_pos + 1 if best_pos != -1 else end_target
 
         seg = text[cursor:cut].strip()
         if seg:
@@ -216,9 +215,7 @@ def stream_generate(
     if not segments:
         raise ValueError("stream_generate: segments 不能为空")
     if mode not in ("sse", "binary"):
-        raise ValueError(
-            f"stream_generate: mode 必须是 'sse' 或 'binary'，实际为 '{mode}'"
-        )
+        raise ValueError(f"stream_generate: mode 必须是 'sse' 或 'binary'，实际为 '{mode}'")
 
     total = len(segments)
     all_seed_used: list[int] = []
@@ -231,9 +228,7 @@ def stream_generate(
     try:
         for idx, seg_text in enumerate(segments):
             if stop_event is not None and stop_event.is_set():
-                logger.info(
-                    f"[streaming] stop_event 已触发，终止流式生成（{idx}/{total}）"
-                )
+                logger.info(f"[streaming] stop_event 已触发，终止流式生成（{idx}/{total}）")
                 break
             if progress_cb is not None:
                 try:
@@ -264,11 +259,7 @@ def stream_generate(
                     chunks_collected: list[np.ndarray] = []
                     for chunk in model.generate_streaming(**kwargs):
                         chunks_collected.append(chunk)
-                    wav = (
-                        np.concatenate(chunks_collected)
-                        if chunks_collected
-                        else np.array([], dtype=np.float32)
-                    )
+                    wav = np.concatenate(chunks_collected) if chunks_collected else np.array([], dtype=np.float32)
                 else:
                     wav = model.generate(**kwargs)
 
@@ -281,10 +272,7 @@ def stream_generate(
                 total_duration_ms += dur_ms
                 success_count += 1
 
-                if merged_audio is None:
-                    merged_audio = wav
-                else:
-                    merged_audio = np.concatenate([merged_audio, wav])
+                merged_audio = wav if merged_audio is None else np.concatenate([merged_audio, wav])
 
                 if mode == "sse":
                     wav_bytes = _wav_to_bytes(wav, sample_rate)
@@ -311,9 +299,7 @@ def stream_generate(
                 )
                 is_oom = any(k in str(run_exc).lower() for k in oom_keywords)
                 if is_oom:
-                    logger.error(
-                        f"[streaming] 第 {idx}/{total} 段 CUDA OOM: {run_exc}，尝试释放显存后继续"
-                    )
+                    logger.error(f"[streaming] 第 {idx}/{total} 段 CUDA OOM: {run_exc}，尝试释放显存后继续")
                     try:
                         free_gpu_memory()
                     except (RuntimeError, ValueError) as free_exc:
@@ -351,9 +337,7 @@ def stream_generate(
             except GeneratorExit:
                 raise
             except Exception as exc:
-                logger.exception(
-                    f"[streaming] 第 {idx}/{total} 段未预期异常: {type(exc).__name__}"
-                )
+                logger.exception(f"[streaming] 第 {idx}/{total} 段未预期异常: {type(exc).__name__}")
                 if mode == "sse":
                     yield {
                         "type": "error",
@@ -375,9 +359,7 @@ def stream_generate(
                 timestamp = int(time.time())
                 final_path = f"{SAVE_DIR}/streaming_merged_{timestamp}.wav"
                 _save_wav_compatible(merged_audio, final_path, sample_rate)
-                final_audio_url = (
-                    f"/api/audio/file/{int(time.time())}_{len(merged_audio)}.wav"
-                )
+                final_audio_url = f"/api/audio/file/{int(time.time())}_{len(merged_audio)}.wav"
             except (OSError, ValueError) as save_exc:
                 logger.warning(f"[streaming] 合并音频保存失败: {save_exc}")
                 final_audio_url = ""
@@ -451,9 +433,7 @@ def fn_voxcpm_streaming(
 
     if total == 1:
         _progress_mgr.advance_segment("流式推理生成中...")
-        logger.info(
-            f"[VoxCPM流式生成] 第 1/1 段，使用 {'reference_wav' if ref_audio_path else '默认音色'} 模式..."
-        )
+        logger.info(f"[VoxCPM流式生成] 第 1/1 段，使用 {'reference_wav' if ref_audio_path else '默认音色'} 模式...")
 
         if hasattr(registry.voxcpm_model, "generate_streaming"):
             return registry.voxcpm_model.generate_streaming(
@@ -495,9 +475,7 @@ def fn_voxcpm_streaming(
         if idx > 0:
             avg = elapsed / idx
             remaining = avg * (total - idx)
-            logger.info(
-                f"[VoxCPM流式生成] 第 {idx + 1}/{total} 段，已耗时 {elapsed:.1f}s，预计剩余 {remaining:.1f}s"
-            )
+            logger.info(f"[VoxCPM流式生成] 第 {idx + 1}/{total} 段，已耗时 {elapsed:.1f}s，预计剩余 {remaining:.1f}s")
         else:
             logger.info(f"[VoxCPM流式生成] 第 {idx + 1}/{total} 段...")
 

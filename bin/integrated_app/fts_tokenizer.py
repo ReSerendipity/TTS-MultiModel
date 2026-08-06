@@ -30,6 +30,7 @@ def _check_jieba() -> bool:
     if _jieba_available is None:
         try:
             import jieba  # noqa: F401
+
             _jieba_available = True
         except ImportError:
             _jieba_available = False
@@ -78,7 +79,7 @@ def build_segmented_fts_query(keyword: str) -> str:
         return '""'
 
     # 检测是否包含中文字符
-    has_cjk = any('\u4e00' <= ch <= '\u9fff' for ch in keyword)
+    has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in keyword)
 
     if not has_cjk or not _check_jieba():
         # 非中文或无 jieba：使用原始 trigram phrase

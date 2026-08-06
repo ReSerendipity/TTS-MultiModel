@@ -186,9 +186,7 @@ async def generate_voxcpm_clone(
             return err
         if ref_path:
             actual_ref_path = ref_path
-            logger.info(
-                f"[VoxCPM克隆] 已加载音色 '{os.path.basename(persona_name)}' 的参考音频"
-            )
+            logger.info(f"[VoxCPM克隆] 已加载音色 '{os.path.basename(persona_name)}' 的参考音频")
 
     # 4. 解析 bool 开关
     clone_norm: bool = _parse_bool_form(norm)
@@ -297,9 +295,7 @@ async def generate_voxcpm_ultimate(
             return err
         if ref_path:
             actual_ref_path = ref_path
-            logger.info(
-                f"[VoxCPM极致克隆] 已加载音色 '{os.path.basename(persona_name)}' 的参考音频"
-            )
+            logger.info(f"[VoxCPM极致克隆] 已加载音色 '{os.path.basename(persona_name)}' 的参考音频")
 
     advanced_norm: bool = _parse_bool_form(norm)
     advanced_denoise: float = 1.0 if _parse_bool_form(denoise) else 0.0
@@ -451,11 +447,7 @@ async def generate_voxcpm_prompt_continue(
         from ....config import SAVE_DIR
 
         if isinstance(result, tuple) and len(result) >= 3:
-            audio_path: str = (
-                os.path.join(SAVE_DIR, result[2])
-                if not os.path.isabs(result[2])
-                else result[2]
-            )
+            audio_path: str = os.path.join(SAVE_DIR, result[2]) if not os.path.isabs(result[2]) else result[2]
             await asyncio.to_thread(
                 _record_to_history_db,
                 filepath=audio_path,

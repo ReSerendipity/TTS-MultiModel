@@ -287,14 +287,10 @@ def create_training_checkpoint_callback(
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": training_state.optimizer.state_dict(),
                 "scheduler_state_dict": (
-                    training_state.scheduler.state_dict()
-                    if hasattr(training_state.scheduler, "state_dict")
-                    else {}
+                    training_state.scheduler.state_dict() if hasattr(training_state.scheduler, "state_dict") else {}
                 ),
                 "tracker_state_dict": (
-                    training_state.tracker.state_dict()
-                    if hasattr(training_state.tracker, "state_dict")
-                    else {}
+                    training_state.tracker.state_dict() if hasattr(training_state.tracker, "state_dict") else {}
                 ),
             }
 

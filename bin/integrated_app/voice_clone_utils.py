@@ -35,9 +35,7 @@ MAX_REFERENCE_DURATION: float = 30.0
 RECOMMENDED_DURATION: float = 10.0
 
 # 音频格式白名单
-SUPPORTED_AUDIO_FORMATS: frozenset[str] = frozenset(
-    {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac"}
-)
+SUPPORTED_AUDIO_FORMATS: frozenset[str] = frozenset({".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac"})
 
 # 最低采样率要求
 MIN_SAMPLE_RATE: int = 16000
@@ -133,9 +131,7 @@ def validate_reference_audio(audio_path: str) -> AudioQualityResult:
 
     ext = os.path.splitext(audio_path)[1].lower()
     if ext not in SUPPORTED_AUDIO_FORMATS:
-        raise ValueError(
-            f"不支持的音频格式: {ext}，支持的格式: {', '.join(SUPPORTED_AUDIO_FORMATS)}"
-        )
+        raise ValueError(f"不支持的音频格式: {ext}，支持的格式: {', '.join(SUPPORTED_AUDIO_FORMATS)}")
 
     issues: list[str] = []
     warnings: list[str] = []

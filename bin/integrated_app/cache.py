@@ -301,13 +301,12 @@ class AdaptiveLRUCache(LRUCache):
             if old_max != target:
                 try:
                     gpu_pct = self._get_gpu_memory_percent()
-                    logger.info(
-                        f"[AdaptiveCache] 容量已调整: {old_max} -> {target} "
-                        f"(GPU 使用率: {gpu_pct:.1f}%)"
-                    )
+                    logger.info(f"[AdaptiveCache] 容量已调整: {old_max} -> {target} (GPU 使用率: {gpu_pct:.1f}%)")
                 except Exception:
                     logger.info(
-                        "[AdaptiveCache] 容量已调整: %d -> %d", old_max, target,
+                        "[AdaptiveCache] 容量已调整: %d -> %d",
+                        old_max,
+                        target,
                     )
         return target
 

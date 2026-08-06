@@ -125,24 +125,16 @@ def _validate_ultimate_params(params: _UltimateParams) -> tuple[bool, list[str]]
         errors.append(f"seed={params.seed} 非法，允许 -1（随机）或 >=0 的整数")
     if not (0.0001 <= params.sigma_min < params.sigma_max):
         errors.append(
-            f"sigma_min={params.sigma_min}, sigma_max={params.sigma_max} 非法，"
-            f"需满足 0.0001 <= sigma_min < sigma_max"
+            f"sigma_min={params.sigma_min}, sigma_max={params.sigma_max} 非法，需满足 0.0001 <= sigma_min < sigma_max"
         )
     if not (0.5 <= params.rho <= 20.0):
         errors.append(f"rho={params.rho} 超出合法范围 [0.5, 20.0]")
     if not (0.0 <= params.cfg_rescale <= 1.5):
         errors.append(f"cfg_rescale={params.cfg_rescale} 超出合法范围 [0.0, 1.5]")
-    if params.reference_quantize_bits is not None:
-        if params.reference_quantize_bits not in (4, 8, 16):
-            errors.append(
-                f"reference_quantize_bits={params.reference_quantize_bits} 非法，"
-                f"允许 None / 4 / 8 / 16"
-            )
+    if params.reference_quantize_bits is not None and params.reference_quantize_bits not in (4, 8, 16):
+        errors.append(f"reference_quantize_bits={params.reference_quantize_bits} 非法，允许 None / 4 / 8 / 16")
     if not (1 <= params.min_len <= params.max_len):
-        errors.append(
-            f"min_len={params.min_len}, max_len={params.max_len} 非法，"
-            f"需满足 1 <= min_len <= max_len"
-        )
+        errors.append(f"min_len={params.min_len}, max_len={params.max_len} 非法，需满足 1 <= min_len <= max_len")
 
     return len(errors) == 0, errors
 
@@ -162,8 +154,7 @@ def _apply_sampler_fallback(sampler: str) -> str:
     if sampler in _VALID_SAMPLERS:
         return sampler
     logger.warning(
-        f"[VoxCPM终极克隆] 未知 sampler: '{sampler}'，"
-        f"使用默认 {_DEFAULT_SAMPLER}，合法取值为 {list(_VALID_SAMPLERS)}"
+        f"[VoxCPM终极克隆] 未知 sampler: '{sampler}'，使用默认 {_DEFAULT_SAMPLER}，合法取值为 {list(_VALID_SAMPLERS)}"
     )
     return _DEFAULT_SAMPLER
 
@@ -187,10 +178,7 @@ def _warn_unrecognized_expert_kwargs(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
         if not any(k.startswith(p) for p in known_prefixes) and "_" in k:
             continue
-        logger.warning(
-            f"[VoxCPM终极克隆] 终极模式忽略未识别参数 {k}={v}（请检查拼写，"
-            f"若为实验性参数请确认后端已支持）"
-        )
+        logger.warning(f"[VoxCPM终极克隆] 终极模式忽略未识别参数 {k}={v}（请检查拼写，若为实验性参数请确认后端已支持）")
 
 
 def _build_generate_kwargs(
@@ -310,10 +298,7 @@ def _run_generate_with_oom_fallback(
                 logger.info(f"[VoxCPM终极克隆] 显存不足，自动降级：{desc}（第 {attempt} 次尝试）")
                 mutator()
                 continue
-            logger.error(
-                f"[VoxCPM终极克隆] 三级 OOM 降级全部失败，"
-                f"抛出 InsufficientVRAMError：{exc}"
-            )
+            logger.error(f"[VoxCPM终极克隆] 三级 OOM 降级全部失败，抛出 InsufficientVRAMError：{exc}")
             raise InsufficientVRAMError(
                 "终极克隆显存不足，已依次尝试："
                 "关闭 stochastic_sampling → 参考嵌入 8bit → sigma_max 限制，"
@@ -409,9 +394,7 @@ def ultimate_clone(
     )
     is_valid, errs = _validate_ultimate_params(raw_params)
     if not is_valid:
-        raise ValidationError(
-            "终极克隆参数校验失败：\n  - " + "\n  - ".join(errs)
-        )
+        raise ValidationError("终极克隆参数校验失败：\n  - " + "\n  - ".join(errs))
 
     raw_params.sampler = _apply_sampler_fallback(raw_params.sampler)
     raw_params.guidance_mode = _apply_guidance_mode_fallback(raw_params.guidance_mode)
@@ -425,18 +408,14 @@ def ultimate_clone(
         if isinstance(reference_audio, str):
             ref_audio_path = reference_audio
         elif isinstance(reference_audio, bytes):
-            tmp = tempfile.NamedTemporaryFile(suffix="_ref.wav", delete=False)
-            try:
+            with tempfile.NamedTemporaryFile(suffix="_ref.wav", delete=False) as tmp:
                 tmp.write(reference_audio)
-            finally:
-                tmp.close()
             ref_audio_path = tmp.name
             created_tmp_ref = tmp.name
         elif isinstance(reference_audio, tuple) and len(reference_audio) == 2:
             wav_arr, sr = reference_audio
-            tmp = tempfile.NamedTemporaryFile(suffix="_ref.wav", delete=False)
-            tmp_name = tmp.name
-            tmp.close()
+            with tempfile.NamedTemporaryFile(suffix="_ref.wav", delete=False) as tmp:
+                tmp_name = tmp.name
             from ...generation import _save_wav_compatible
 
             _save_wav_compatible(wav_arr, tmp_name, int(sr))
@@ -446,21 +425,12 @@ def ultimate_clone(
         processed_ref_for_asr = ref_audio_path
         if ref_audio_path and denoise_reference and hasattr(model, "denoiser") and model.denoiser:
             try:
-                with tempfile.NamedTemporaryFile(
-                    suffix="_denoised_ref.wav", delete=False
-                ) as tmp:
+                with tempfile.NamedTemporaryFile(suffix="_denoised_ref.wav", delete=False) as tmp:
                     processed_ref_for_asr = tmp.name
-                model.denoiser.enhance(
-                    ref_audio_path, processed_ref_for_asr, normalize_loudness=True
-                )
-                logger.info(
-                    f"[VoxCPM终极克隆] 参考音频降噪完成: "
-                    f"{ref_audio_path} -> {processed_ref_for_asr}"
-                )
+                model.denoiser.enhance(ref_audio_path, processed_ref_for_asr, normalize_loudness=True)
+                logger.info(f"[VoxCPM终极克隆] 参考音频降噪完成: {ref_audio_path} -> {processed_ref_for_asr}")
             except (OSError, RuntimeError, ValueError) as e:
-                logger.warning(
-                    f"[VoxCPM终极克隆] 参考音频降噪失败，使用原始音频: {type(e).__name__}: {e}"
-                )
+                logger.warning(f"[VoxCPM终极克隆] 参考音频降噪失败，使用原始音频: {type(e).__name__}: {e}")
                 processed_ref_for_asr = ref_audio_path
 
         if processed_ref_for_asr:
@@ -471,13 +441,10 @@ def ultimate_clone(
                     res = registry.voxcpm_asr.generate(input=processed_ref_for_asr)
                     if res and len(res) > 0 and isinstance(res[0], dict) and "text" in res[0]:
                         ref_text = str(res[0]["text"])
-                        logger.info(
-                            f"[VoxCPM终极克隆] ASR 识别参考文本: {ref_text[:60]}..."
-                        )
+                        logger.info(f"[VoxCPM终极克隆] ASR 识别参考文本: {ref_text[:60]}...")
             except (RuntimeError, OSError, AttributeError, ValueError) as e:
                 logger.warning(
-                    f"[VoxCPM终极克隆] ASR 识别失败（不影响克隆，继续使用空 prompt_text）: "
-                    f"{type(e).__name__}: {e}"
+                    f"[VoxCPM终极克隆] ASR 识别失败（不影响克隆，继续使用空 prompt_text）: {type(e).__name__}: {e}"
                 )
             finally:
                 if (
@@ -488,9 +455,7 @@ def ultimate_clone(
                     with contextlib.suppress(OSError):
                         os.remove(processed_ref_for_asr)
 
-        wav, used_params = _run_generate_with_oom_fallback(
-            model, target_text, ref_audio_path, ref_text, raw_params
-        )
+        wav, used_params = _run_generate_with_oom_fallback(model, target_text, ref_audio_path, ref_text, raw_params)
 
         params_used: dict[str, Any] = {
             "cfg": used_params.cfg,
@@ -516,9 +481,7 @@ def ultimate_clone(
             try:
                 progress_cb(used_params.steps, used_params.steps)
             except (RuntimeError, ValueError) as e:
-                logger.debug(
-                    f"[VoxCPM终极克隆] progress_cb 调用异常（忽略）: {type(e).__name__}: {e}"
-                )
+                logger.debug(f"[VoxCPM终极克隆] progress_cb 调用异常（忽略）: {type(e).__name__}: {e}")
 
         return wav, 48000, params_used
 
@@ -656,9 +619,7 @@ def _fn_voxcpm_ultimate_clone_impl(
             registry.voxcpm_model.denoiser.enhance(ref_audio_path, processed_ref_path_for_asr, normalize_loudness=True)
             logger.info(f"[VoxCPM极致克隆] ZipEnhancer降噪完成: {ref_audio_path} -> {processed_ref_path_for_asr}")
         except (OSError, RuntimeError, ValueError) as e:
-            logger.warning(
-                f"[VoxCPM极致克隆] ZipEnhancer降噪失败，使用原始音频: {type(e).__name__}: {e}"
-            )
+            logger.warning(f"[VoxCPM极致克隆] ZipEnhancer降噪失败，使用原始音频: {type(e).__name__}: {e}")
             processed_ref_path_for_asr = ref_audio_path
 
     ref_text = ""
@@ -669,12 +630,14 @@ def _fn_voxcpm_ultimate_clone_impl(
                 ref_text = str(res[0]["text"])
                 logger.info(f"[VoxCPM极致克隆] ASR 识别成功: {ref_text[:50]}...")
         except (RuntimeError, OSError, AttributeError, ValueError, PydanticValidationError) as e:
-            logger.warning(
-                f"[VoxCPM极致克隆] ASR 识别失败: {type(e).__name__}: {e}"
-            )
+            logger.warning(f"[VoxCPM极致克隆] ASR 识别失败: {type(e).__name__}: {e}")
             ref_text = ""
         finally:
-            if processed_ref_path_for_asr != ref_audio_path and processed_ref_path_for_asr and os.path.isfile(processed_ref_path_for_asr):
+            if (
+                processed_ref_path_for_asr != ref_audio_path
+                and processed_ref_path_for_asr
+                and os.path.isfile(processed_ref_path_for_asr)
+            ):
                 with contextlib.suppress(OSError):
                     os.remove(processed_ref_path_for_asr)
 

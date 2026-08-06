@@ -31,6 +31,7 @@ logger = logging.getLogger("tts_multimodel")
 # 请求/响应模型
 # ---------------------------------------------------------------------------
 
+
 class BatchSpeechRequest(BaseModel):
     """批量语音合成请求模型。
 
@@ -160,6 +161,7 @@ _VOICE_PERSONA_MAP: dict[str, str] = {
 # 音频格式转换辅助
 # ---------------------------------------------------------------------------
 
+
 def _convert_audio_format(
     wav_path: str,
     target_format: str,
@@ -179,9 +181,7 @@ def _convert_audio_format(
     try:
         from pydub import AudioSegment
     except ImportError:
-        logger.warning(
-            "[OpenAI API] pydub 未安装，无法转换格式，返回原始 WAV"
-        )
+        logger.warning("[OpenAI API] pydub 未安装，无法转换格式，返回原始 WAV")
         return wav_path
 
     try:
@@ -222,6 +222,7 @@ def _stream_file(filepath: str, chunk_size: int = 8192):
 # ---------------------------------------------------------------------------
 # TaskCancelManager: 生成任务取消管理器
 # ---------------------------------------------------------------------------
+
 
 class TaskCancelManager:
     """生成任务取消管理器。
@@ -380,8 +381,10 @@ class TaskCancelManager:
 # BatchGenerationManager: 批量生成管理器
 # ---------------------------------------------------------------------------
 
+
 class BatchStatus(str, Enum):
     """批量生成任务状态。"""
+
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -454,9 +457,7 @@ class BatchGenerationManager:
             }
 
         # 启动后台任务
-        asyncio.create_task(
-            self._execute_batch(batch_id, texts, params)
-        )
+        asyncio.create_task(self._execute_batch(batch_id, texts, params))
 
         logger.info(
             f"[BatchGenerationManager] 提交批量任务: batch_id={batch_id}, "
@@ -505,9 +506,7 @@ class BatchGenerationManager:
                         else:
                             batch["failed"] += 1
                 except Exception as e:
-                    logger.error(
-                        f"[BatchGenerationManager] 项 {index} 生成失败: {e}"
-                    )
+                    logger.error(f"[BatchGenerationManager] 项 {index} 生成失败: {e}")
                     with self._lock:
                         batch = self._batches.get(batch_id)
                         if batch is not None:
@@ -516,10 +515,7 @@ class BatchGenerationManager:
                     self._cancel_manager.unregister(task_id)
 
         # 并发执行所有项
-        tasks = [
-            _process_item(i, text)
-            for i, text in enumerate(texts)
-        ]
+        tasks = [_process_item(i, text) for i, text in enumerate(texts)]
         await asyncio.gather(*tasks, return_exceptions=True)
 
         # 更新最终状态
@@ -650,11 +646,13 @@ class BatchGenerationManager:
 
             results = []
             for i, r in enumerate(batch["results"]):
-                results.append({
-                    "index": i,
-                    "path": r,
-                    "status": "success" if r is not None else "failed",
-                })
+                results.append(
+                    {
+                        "index": i,
+                        "path": r,
+                        "status": "success" if r is not None else "failed",
+                    }
+                )
             return results
 
     def cancel_batch(self, batch_id: str) -> bool:
@@ -699,15 +697,13 @@ class BatchGenerationManager:
             list[dict[str, Any]]: 批量任务状态列表
         """
         with self._lock:
-            return [
-                self.get_batch_status(bid)
-                for bid in self._batches
-            ]
+            return [self.get_batch_status(bid) for bid in self._batches]
 
 
 # ---------------------------------------------------------------------------
 # OpenAICompatibleRouter: FastAPI APIRouter
 # ---------------------------------------------------------------------------
+
 
 class OpenAICompatibleRouter:
     """OpenAI 兼容 API 路由器。
@@ -840,7 +836,7 @@ class OpenAICompatibleRouter:
                 raise HTTPException(
                     status_code=500,
                     detail=f"生成失败: {str(e)}",
-                )
+                ) from e
             finally:
                 self._cancel_manager.unregister(task_id)
 

@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -60,9 +61,7 @@ class GenerationVersion:
 
     def __post_init__(self) -> None:
         if not self.created_at_str:
-            self.created_at_str = datetime.fromtimestamp(self.created_at).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+            self.created_at_str = datetime.fromtimestamp(self.created_at).strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ---------------------------------------------------------------------------
@@ -145,12 +144,8 @@ class VersionManager:
             )
             """
         )
-        self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_parent_id ON generation_versions(parent_id)"
-        )
-        self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_created_at ON generation_versions(created_at)"
-        )
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_parent_id ON generation_versions(parent_id)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON generation_versions(created_at)")
         self._conn.commit()
 
     def save_generation(
@@ -192,9 +187,7 @@ class VersionManager:
                     self._memory_store[version_id] = version
                 else:
                     self._save_to_db(version)
-                logger.debug(
-                    f"[VersionManager] 保存版本记录: {version_id}, engine={engine}"
-                )
+                logger.debug(f"[VersionManager] 保存版本记录: {version_id}, engine={engine}")
                 return version_id
             except Exception as e:
                 logger.warning(f"[VersionManager] 保存版本记录失败: {e}")
@@ -281,10 +274,8 @@ class VersionManager:
         """
         params = {}
         if row[4]:
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 params = json.loads(row[4])
-            except json.JSONDecodeError:
-                pass
 
         return GenerationVersion(
             version_id=row[0],
@@ -322,9 +313,7 @@ class VersionManager:
         chain.reverse()
         return chain
 
-    def list_recent(
-        self, limit: int = 50, engine: str | None = None
-    ) -> list[GenerationVersion]:
+    def list_recent(self, limit: int = 50, engine: str | None = None) -> list[GenerationVersion]:
         """列出最近的版本记录。
 
         Args:
@@ -348,9 +337,7 @@ class VersionManager:
                 logger.warning(f"[VersionManager] 列出最近版本失败: {e}")
                 return []
 
-    def _list_recent_from_db(
-        self, limit: int, engine: str | None
-    ) -> list[GenerationVersion]:
+    def _list_recent_from_db(self, limit: int, engine: str | None) -> list[GenerationVersion]:
         """从数据库查询最近版本。
 
         Args:
@@ -380,10 +367,8 @@ class VersionManager:
         """关闭数据库连接，释放资源。"""
         with self._lock:
             if self._conn is not None:
-                try:
+                with contextlib.suppress(Exception):
                     self._conn.close()
-                except Exception:
-                    pass
                 self._conn = None
 
 

@@ -130,17 +130,13 @@ def build_advanced_params(**overrides: Any) -> AdvancedParamsConfig:
     invalid_keys = [k for k in overrides if k not in valid_keys]
     if invalid_keys:
         logger.warning(
-            f"build_advanced_params: 忽略未定义参数 {invalid_keys}，"
-            f"合法字段为 {sorted(valid_keys)}。请检查参数拼写。"
+            f"build_advanced_params: 忽略未定义参数 {invalid_keys}，合法字段为 {sorted(valid_keys)}。请检查参数拼写。"
         )
     filtered = {k: v for k, v in overrides.items() if k in valid_keys}
     try:
         return AdvancedParamsConfig(**filtered)
     except ValidationError as e:
-        logger.warning(
-            f"build_advanced_params: 参数验证失败，回退为默认配置。"
-            f"错误详情: {e}"
-        )
+        logger.warning(f"build_advanced_params: 参数验证失败，回退为默认配置。错误详情: {e}")
         return _DEFAULT_ADVANCED
 
 
@@ -480,7 +476,9 @@ def generate_with_template(
         if use_ras and ras_ctx is not None:
             # 使用增强的 Bad Case 检测（替代简单的 _check_segment_quality）
             has_failure, failure_type, reason = detect_failure_type(
-                wav, sample_rate, config=retry_config,
+                wav,
+                sample_rate,
+                config=retry_config,
             )
             if not has_failure:
                 # 兼容原有的简单质量检查（双重保险）
@@ -586,7 +584,7 @@ def generate_with_template(
                 audio_segments,
                 sr=sample_rate,
                 crossfade_duration=0.05,  # 50ms crossfade
-                silence_duration=0.15,     # crossfade 失败时回退到 150ms 静音
+                silence_duration=0.15,  # crossfade 失败时回退到 150ms 静音
             )
             if merged is None:
                 merged = np.concatenate(audio_segments)

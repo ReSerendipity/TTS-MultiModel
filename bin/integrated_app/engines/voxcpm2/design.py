@@ -270,9 +270,7 @@ def fn_voxcpm_design(
             )
         except RuntimeError as _rt_exc:
             if is_oom_error(_rt_exc):
-                logger.error(
-                    f"[VoxCPM声音设计] 检测到 CUDA OOM，执行三级显存清理后重抛: {_rt_exc}"
-                )
+                logger.error(f"[VoxCPM声音设计] 检测到 CUDA OOM，执行三级显存清理后重抛: {_rt_exc}")
                 try:
                     free_gpu_memory()
                 except (RuntimeError, ImportError) as _cleanup_exc:
@@ -418,9 +416,7 @@ def generate_voice_from_description(
                 ) from _step_exc
             except ValueError as _val_exc:
                 if "denoise" in str(_val_exc).lower() or "audio" in str(_val_exc).lower():
-                    logger.warning(
-                        f"[VoxCPM声音设计] 降噪后处理异常，降级返回原始音频: {_val_exc}"
-                    )
+                    logger.warning(f"[VoxCPM声音设计] 降噪后处理异常，降级返回原始音频: {_val_exc}")
                     if len(_results) > 0:
                         continue
                 raise GenerationError(

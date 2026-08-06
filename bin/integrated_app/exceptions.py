@@ -274,6 +274,7 @@ class ModelNotLoadedError(EngineNotLoadedError):
     与 EngineNotLoadedError 功能相同，用于模型层面的未加载检查，
     保持与旧代码导入兼容性。
     """
+
     pass
 
 
@@ -449,9 +450,7 @@ def tts_error_handler(func: F) -> F:
                 "未预期的异常被 tts_error_handler 捕获，将包装为 GenerationError: %s",
                 type(e).__name__,
             )
-            raise GenerationError(
-                f"未知错误: {type(e).__name__}: {e}"
-            ) from e
+            raise GenerationError(f"未知错误: {type(e).__name__}: {e}") from e
 
     @functools.wraps(func)
     async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -464,9 +463,7 @@ def tts_error_handler(func: F) -> F:
                 "未预期的异常被 tts_error_handler 捕获，将包装为 GenerationError: %s",
                 type(e).__name__,
             )
-            raise GenerationError(
-                f"未知错误: {type(e).__name__}: {e}"
-            ) from e
+            raise GenerationError(f"未知错误: {type(e).__name__}: {e}") from e
 
     if asyncio.iscoroutinefunction(func):
         return cast(F, async_wrapper)

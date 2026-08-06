@@ -61,9 +61,7 @@ def download_dotstts_model() -> bool:
 
     try:
         cache_dir = model_dir.parent / ".cache" / "dotstts"
-        downloaded_path = snapshot_download(
-            _REPO_ID, cache_dir=str(cache_dir), local_dir=str(model_dir)
-        )
+        downloaded_path = snapshot_download(_REPO_ID, cache_dir=str(cache_dir), local_dir=str(model_dir))
         logger.info(f"下载完成: {downloaded_path}")
 
         # 校验目录非空

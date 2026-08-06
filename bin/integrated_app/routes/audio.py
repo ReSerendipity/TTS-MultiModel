@@ -55,7 +55,7 @@ router = APIRouter(prefix="/api", tags=["audio"])
 logger = logging.getLogger("tts_multimodel.audio_routes")
 
 # ---- 常量 ----------------------------------------------------------------
-_CHUNK_SIZE = 1024 * 1024                    # 1 MB 流式读写块
+_CHUNK_SIZE = 1024 * 1024  # 1 MB 流式读写块
 _CACHE_AUDIO_HEADER = "public, max-age=3600"  # 用户生成音频: 1 小时
 _CACHE_STATIC_HEADER = "public, max-age=86400, immutable"  # 静态样本: 1 天
 _AUDIO_ACCEPT_RANGES = "bytes"
@@ -83,6 +83,7 @@ _AUDIO_MAGIC_BYTES = {
 # ---------------------------------------------------------------------------
 # 路径安全：三重校验
 # ---------------------------------------------------------------------------
+
 
 def _build_content_disposition(filename: str, disposition: str = "attachment") -> str:
     """构建 RFC 5987 兼容的 Content-Disposition 响应头。
@@ -126,10 +127,7 @@ def _build_content_disposition(filename: str, disposition: str = "attachment") -
     rfc5987_name = f"UTF-8''{encoded_name}"
 
     # 返回双编码格式，浏览器会优先选择支持的编码
-    return (
-        f'{disposition}; filename="{ascii_fallback}"; '
-        f"filename*={rfc5987_name}"
-    )
+    return f'{disposition}; filename="{ascii_fallback}"; filename*={rfc5987_name}'
 
 
 def _safe_file_path(root_dir: Path, user_input: str) -> Path:
@@ -169,7 +167,8 @@ def _safe_file_path(root_dir: Path, user_input: str) -> Path:
     except ValueError:
         logger.warning(
             "_safe_file_path realpath 越界 (安全审计): root=%s candidate=%s",
-            root_abs, candidate_abs,
+            root_abs,
+            candidate_abs,
         )
         raise HTTPException(status_code=403, detail="非法路径") from None
 
@@ -180,14 +179,14 @@ def _safe_file_path(root_dir: Path, user_input: str) -> Path:
 # 上传 / 校验辅助
 # ---------------------------------------------------------------------------
 
+
 def _sync_history_incremental() -> None:
     """后台任务：仅同步比上次水位线新的文件（增量）。"""
     try:
         history_manager = get_history_db()
         before = history_manager.last_sync_mtime
         history_manager.sync_from_filesystem(since_mtime=before)
-        logger.info("[历史同步] 增量同步完成，水位线: %.3f -> %.3f",
-                    before, history_manager.last_sync_mtime)
+        logger.info("[历史同步] 增量同步完成，水位线: %.3f -> %.3f", before, history_manager.last_sync_mtime)
     except Exception as exc:  # noqa: BLE001
         logger.error("[历史同步] 后台增量同步失败: %s", exc, exc_info=True)
 
@@ -294,8 +293,10 @@ def _validate_ids(ids: Any, max_count: int = _MAX_BATCH_OPERATION_COUNT) -> tupl
 #   零拷贝 sendfile 机制保持性能。
 # ---------------------------------------------------------------------------
 
-def _serve_safe_file(fs_path: Path, media_type: str, download_name: str, cache_header: str,
-                     disposition: str = "inline") -> Response:
+
+def _serve_safe_file(
+    fs_path: Path, media_type: str, download_name: str, cache_header: str, disposition: str = "inline"
+) -> Response:
     """通用安全文件服务：处理 FileNotFoundError / PermissionError 统一响应。
 
     Args:
@@ -433,6 +434,7 @@ async def get_speaker_sample(key: str) -> Response:
 # 上传
 # ---------------------------------------------------------------------------
 
+
 @router.post("/upload/audio", summary="上传音频", description="上传音频文件到服务器（用于克隆参考）")
 async def upload_audio(file: UploadFile = File(...)) -> Response:
     """上传音频文件（CSRF 由中间件统一校验）。
@@ -452,14 +454,19 @@ async def upload_audio(file: UploadFile = File(...)) -> Response:
         _, ext = os.path.splitext(original_name)
         ext_lower = ext.lower()
         if ext_lower not in ALLOWED_AUDIO_EXTENSIONS:
-            return JSONResponse({
-                "status": "error",
-                "message": (f"Unsupported file type: {ext_lower}. "
-                            f"Allowed: {', '.join(sorted(ALLOWED_AUDIO_EXTENSIONS))}"),
-            }, status_code=400)
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "message": (
+                        f"Unsupported file type: {ext_lower}. Allowed: {', '.join(sorted(ALLOWED_AUDIO_EXTENSIONS))}"
+                    ),
+                },
+                status_code=400,
+            )
 
         timestamp = int(time.time() * 1000)
         import secrets as _secrets
+
         suffix = _secrets.token_hex(4)
         filename = f"temp_upload_{timestamp}_{suffix}{ext_lower}"
         file_path = os.path.join(SAVE_DIR, filename)
@@ -473,11 +480,16 @@ async def upload_audio(file: UploadFile = File(...)) -> Response:
                 os.remove(file_path)
             except OSError as exc:
                 logger.debug("清理格式不匹配文件失败: %s", exc)
-            return JSONResponse({
-                "status": "error",
-                "message": ("File content does not match the claimed audio format. "
-                            "The file may be corrupted or not a valid audio file."),
-            }, status_code=400)
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "message": (
+                        "File content does not match the claimed audio format. "
+                        "The file may be corrupted or not a valid audio file."
+                    ),
+                },
+                status_code=400,
+            )
 
         return JSONResponse({"status": "ok", "path": file_path, "filename": filename})
     except HTTPException:
@@ -490,6 +502,7 @@ async def upload_audio(file: UploadFile = File(...)) -> Response:
 # ---------------------------------------------------------------------------
 # 历史记录查询与批量操作
 # ---------------------------------------------------------------------------
+
 
 @router.get("/history/table", summary="历史记录", description="获取生成历史记录分页表格")
 async def history_table(request: Request) -> Response:
@@ -556,13 +569,15 @@ async def history_table(request: Request) -> Response:
         duration_str = f"{duration:.1f}s" if duration > 0 else "<1s"
         records.append([rec.get("filename", ""), rec.get("created_at", ""), duration_str, size_str])
 
-    return JSONResponse({
-        "status": "ok",
-        "records": records,
-        "total": result["total"],
-        "hasMore": result["hasMore"],
-        "loaded": result["loaded"],
-    })
+    return JSONResponse(
+        {
+            "status": "ok",
+            "records": records,
+            "total": result["total"],
+            "hasMore": result["hasMore"],
+            "loaded": result["loaded"],
+        }
+    )
 
 
 @router.post("/batch_export_history", summary="批量导出", description="批量导出历史记录音频为 ZIP")

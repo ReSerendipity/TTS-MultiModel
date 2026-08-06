@@ -267,8 +267,7 @@ async def generate_indextts2(
         if unknown_keys:
             return _error_html(
                 request,
-                f"未知情感标签：{', '.join(unknown_keys)}，"
-                f"支持 8 维：{', '.join(_EMOTION_LABELS_WHITELIST)}",
+                f"未知情感标签：{', '.join(unknown_keys)}，支持 8 维：{', '.join(_EMOTION_LABELS_WHITELIST)}",
             )
         # 缺键补 0（当前硬编码 8 键必然全有，但防御性保证未来的变动）
         for label in _EMOTION_LABELS_WHITELIST:
@@ -283,9 +282,9 @@ async def generate_indextts2(
                 # 是非常自然的操作——用户就是想表达"又喜又怒"。直接 400 拒绝
                 # 体验太差；自动换算到 happy=0.5/angry=0.5 则符合直觉（各占一半）。
                 from ..utils import logger as _logger
+
                 _logger.warning(
-                    "[IndexTTS2] 8 维情感向量总和 %.2f > 上限 %.2f，已自动归一化。"
-                    "原始值：%s",
+                    "[IndexTTS2] 8 维情感向量总和 %.2f > 上限 %.2f，已自动归一化。原始值：%s",
                     emo_sum,
                     _EMOTION_VECTOR_SUM_UPPER_BOUND,
                     emotion_dict,
@@ -328,9 +327,7 @@ async def generate_indextts2(
                     infer_kwargs["emo_audio_prompt"] = emotion_data
                 elif emotion_mode == _EMOTION_MODE_VECTOR:
                     # 必须按白名单固定顺序传 list 给 engine（内部按 index 对齐）
-                    ordered_values = [
-                        float(emotion_data[label]) for label in _EMOTION_LABELS_WHITELIST
-                    ]
+                    ordered_values = [float(emotion_data[label]) for label in _EMOTION_LABELS_WHITELIST]
                     infer_kwargs["emo_vector"] = ordered_values
             infer_kwargs["emo_alpha"] = emotion_alpha
             if target_dur is not None:
@@ -344,9 +341,7 @@ async def generate_indextts2(
 
                 sr, data = wavfile.read(result_path)
                 if data.dtype != np.int16:
-                    data = (
-                        data.astype(np.float32) * 32768.0
-                    ).clip(-32768, 32767).astype(np.int16)
+                    data = (data.astype(np.float32) * 32768.0).clip(-32768, 32767).astype(np.int16)
                 all_audio.append(data)
                 # 临时 WAV 文件用完即删：避免 SAVE_DIR/tmp 堆积
                 with contextlib.suppress(OSError):
@@ -355,9 +350,7 @@ async def generate_indextts2(
         if not all_audio:
             return None, "生成失败：未产生任何音频数据"
 
-        combined: np.ndarray = (
-            np.concatenate(all_audio) if len(all_audio) > 1 else all_audio[0]
-        )
+        combined: np.ndarray = np.concatenate(all_audio) if len(all_audio) > 1 else all_audio[0]
         timestamp: int = int(time.time())
         filename: str = f"indextts2_{timestamp}.wav"
         output_path: str = os.path.join(SAVE_DIR, filename)

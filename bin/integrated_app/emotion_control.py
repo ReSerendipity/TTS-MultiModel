@@ -26,37 +26,67 @@ logger = logging.getLogger("tts_multimodel")
 
 # 与 IndexTTS2Engine.EMOTION_DIMENSIONS 保持一致
 EMOTION_DIMENSION_NAMES: tuple[str, ...] = (
-    "happy",       # 开心
-    "angry",       # 愤怒
-    "sad",         # 悲伤
-    "afraid",      # 害怕
-    "disgusted",   # 厌恶
-    "melancholic", # 忧郁
-    "surprised",   # 惊讶
-    "calm",        # 平静
+    "happy",  # 开心
+    "angry",  # 愤怒
+    "sad",  # 悲伤
+    "afraid",  # 害怕
+    "disgusted",  # 厌恶
+    "melancholic",  # 忧郁
+    "surprised",  # 惊讶
+    "calm",  # 平静
 )
 
 # 预设情感：名称 -> 情感维度字典
 EMOTION_PRESETS: dict[str, dict[str, float]] = {
     "neutral": {
-        "happy": 0.0, "angry": 0.0, "sad": 0.0, "afraid": 0.0,
-        "disgusted": 0.0, "melancholic": 0.0, "surprised": 0.0, "calm": 0.5,
+        "happy": 0.0,
+        "angry": 0.0,
+        "sad": 0.0,
+        "afraid": 0.0,
+        "disgusted": 0.0,
+        "melancholic": 0.0,
+        "surprised": 0.0,
+        "calm": 0.5,
     },
     "happy": {
-        "happy": 0.9, "angry": 0.0, "sad": 0.0, "afraid": 0.0,
-        "disgusted": 0.0, "melancholic": 0.0, "surprised": 0.1, "calm": 0.1,
+        "happy": 0.9,
+        "angry": 0.0,
+        "sad": 0.0,
+        "afraid": 0.0,
+        "disgusted": 0.0,
+        "melancholic": 0.0,
+        "surprised": 0.1,
+        "calm": 0.1,
     },
     "sad": {
-        "happy": 0.0, "angry": 0.0, "sad": 0.9, "afraid": 0.0,
-        "disgusted": 0.0, "melancholic": 0.3, "surprised": 0.0, "calm": 0.1,
+        "happy": 0.0,
+        "angry": 0.0,
+        "sad": 0.9,
+        "afraid": 0.0,
+        "disgusted": 0.0,
+        "melancholic": 0.3,
+        "surprised": 0.0,
+        "calm": 0.1,
     },
     "angry": {
-        "happy": 0.0, "angry": 0.9, "sad": 0.0, "afraid": 0.0,
-        "disgusted": 0.2, "melancholic": 0.0, "surprised": 0.0, "calm": 0.0,
+        "happy": 0.0,
+        "angry": 0.9,
+        "sad": 0.0,
+        "afraid": 0.0,
+        "disgusted": 0.2,
+        "melancholic": 0.0,
+        "surprised": 0.0,
+        "calm": 0.0,
     },
     "calm": {
-        "happy": 0.0, "angry": 0.0, "sad": 0.0, "afraid": 0.0,
-        "disgusted": 0.0, "melancholic": 0.0, "surprised": 0.0, "calm": 0.9,
+        "happy": 0.0,
+        "angry": 0.0,
+        "sad": 0.0,
+        "afraid": 0.0,
+        "disgusted": 0.0,
+        "melancholic": 0.0,
+        "surprised": 0.0,
+        "calm": 0.9,
     },
 }
 
@@ -161,10 +191,7 @@ class EmotionVector:
             ValueError: 列表长度不等于 8 时抛出
         """
         if len(values) != len(EMOTION_DIMENSION_NAMES):
-            raise ValueError(
-                f"情感向量需要 {len(EMOTION_DIMENSION_NAMES)} 个值，"
-                f"实际收到 {len(values)} 个"
-            )
+            raise ValueError(f"情感向量需要 {len(EMOTION_DIMENSION_NAMES)} 个值，实际收到 {len(values)} 个")
         return cls(**dict(zip(EMOTION_DIMENSION_NAMES, values)))
 
     @classmethod
@@ -183,9 +210,7 @@ class EmotionVector:
         name_lower = name.strip().lower()
         if name_lower not in EMOTION_PRESETS:
             available = ", ".join(sorted(EMOTION_PRESETS.keys()))
-            raise ValueError(
-                f"未知预设情感 '{name}'，可选: {available}"
-            )
+            raise ValueError(f"未知预设情感 '{name}'，可选: {available}")
         return cls.from_dict(EMOTION_PRESETS[name_lower])
 
     def is_neutral(self, threshold: float = 0.01) -> bool:
@@ -253,20 +278,19 @@ class EmotionVector:
 # ---------------------------------------------------------------------------
 
 # ChatTTS 风格标签的正则模式
-_CHAT_TTS_TAG_PATTERN = re.compile(
-    r"\[(?P<tag>laugh|uv_break|oral_(?P<oral_idx>\d))\]"
-)
+_CHAT_TTS_TAG_PATTERN = re.compile(r"\[(?P<tag>laugh|uv_break|oral_(?P<oral_idx>\d))\]")
 
 # Chatterbox 风格 [paralinguistic] 标签的正则模式
-_CHATTERBOX_TAG_PATTERN = re.compile(
-    r"\[(?P<tag>[^\]]+)\]"
-)
+_CHATTERBOX_TAG_PATTERN = re.compile(r"\[(?P<tag>[^\]]+)\]")
 
 # 已知的特殊标签（不作为普通副语言标签处理）
-_KNOWN_CHAT_TTS_TAGS = frozenset({
-    "laugh", "uv_break",
-    *(f"oral_{i}" for i in range(10)),
-})
+_KNOWN_CHAT_TTS_TAGS = frozenset(
+    {
+        "laugh",
+        "uv_break",
+        *(f"oral_{i}" for i in range(10)),
+    }
+)
 
 
 @dataclass
@@ -278,6 +302,7 @@ class ProsodyTag:
         tag_type: 标签类型 (chatTTS / paralinguistic)
         tag_value: 标签值（如 "laugh", "uv_break", "oral_5" 或副语言描述文本）
     """
+
     position: int
     tag_type: str
     tag_value: str
@@ -316,11 +341,13 @@ class ProsodyTagParser:
         # 先解析 ChatTTS 风格标签
         for m in _CHAT_TTS_TAG_PATTERN.finditer(text):
             tag_value = m.group("tag")
-            tags.append(ProsodyTag(
-                position=m.start(),
-                tag_type="chatTTS",
-                tag_value=tag_value,
-            ))
+            tags.append(
+                ProsodyTag(
+                    position=m.start(),
+                    tag_type="chatTTS",
+                    tag_value=tag_value,
+                )
+            )
 
         # 再解析 Chatterbox 风格副语言标签（排除已匹配的 ChatTTS 标签）
         chatTTS_spans = {m.start(): m.end() for m in _CHAT_TTS_TAG_PATTERN.finditer(text)}
@@ -332,11 +359,13 @@ class ProsodyTagParser:
             # 跳过与 ChatTTS 标签位置重叠的匹配
             if m.start() in chatTTS_spans:
                 continue
-            tags.append(ProsodyTag(
-                position=m.start(),
-                tag_type="paralinguistic",
-                tag_value=tag_value,
-            ))
+            tags.append(
+                ProsodyTag(
+                    position=m.start(),
+                    tag_type="paralinguistic",
+                    tag_value=tag_value,
+                )
+            )
 
         # 按位置排序
         tags.sort(key=lambda t: t.position)
@@ -404,10 +433,7 @@ class ProsodyTagParser:
             str: 副语言描述拼接文本（如 "sigh, gasp"）
         """
         tags = self.parse(text)
-        paralinguistic = [
-            t.tag_value for t in tags
-            if t.tag_type == "paralinguistic"
-        ]
+        paralinguistic = [t.tag_value for t in tags if t.tag_type == "paralinguistic"]
         return ", ".join(paralinguistic)
 
 
@@ -417,9 +443,9 @@ class ProsodyTagParser:
 
 # 风格预设 -> CFG 值范围
 _CFG_PRESETS: dict[str, tuple[float, float]] = {
-    "natural": (1.0, 1.5),     # 自然风格：低 CFG，减少过度强化
+    "natural": (1.0, 1.5),  # 自然风格：低 CFG，减少过度强化
     "expressive": (2.0, 3.0),  # 表现力风格：中等 CFG，增强风格表达
-    "dramatic": (3.0, 5.0),    # 戏剧风格：高 CFG，最大化风格差异
+    "dramatic": (3.0, 5.0),  # 戏剧风格：高 CFG，最大化风格差异
 }
 
 # 风格预设 -> 推荐默认 CFG 值
@@ -459,8 +485,7 @@ class CFGController:
         clamped = max(_CFG_MIN, min(_CFG_MAX, float(cfg_value)))
         if clamped != cfg_value:
             logger.debug(
-                f"[CFGController] CFG 值 {cfg_value} 超出合法范围 "
-                f"[{_CFG_MIN}, {_CFG_MAX}]，已钳制为 {clamped}"
+                f"[CFGController] CFG 值 {cfg_value} 超出合法范围 [{_CFG_MIN}, {_CFG_MAX}]，已钳制为 {clamped}"
             )
         return clamped
 
@@ -479,9 +504,7 @@ class CFGController:
         style_lower = style.strip().lower()
         if style_lower not in _CFG_DEFAULTS:
             available = ", ".join(sorted(_CFG_DEFAULTS.keys()))
-            raise ValueError(
-                f"未知风格 '{style}'，可选: {available}"
-            )
+            raise ValueError(f"未知风格 '{style}'，可选: {available}")
         return _CFG_DEFAULTS[style_lower]
 
     def get_cfg_range_for_style(self, style: str) -> tuple[float, float]:
@@ -499,9 +522,7 @@ class CFGController:
         style_lower = style.strip().lower()
         if style_lower not in _CFG_PRESETS:
             available = ", ".join(sorted(_CFG_PRESETS.keys()))
-            raise ValueError(
-                f"未知风格 '{style}'，可选: {available}"
-            )
+            raise ValueError(f"未知风格 '{style}'，可选: {available}")
         return _CFG_PRESETS[style_lower]
 
     def list_styles(self) -> list[str]:
@@ -620,6 +641,7 @@ class InstructResult:
         dialect: 方言提示（如 "cantonese", "sichuan"）
         raw_instruction: 原始指令文本
     """
+
     emotion: EmotionVector | None = None
     emotion_name: str | None = None
     speed: str | None = None

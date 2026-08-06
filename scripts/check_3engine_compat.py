@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """TTS_MultiModel 3 引擎兼容性检测脚本。
 
 检测 VoxCPM2 / IndexTTS2 / dots.tts 三个引擎在当前 Python 环境下的
@@ -140,9 +139,7 @@ def check_package_version(
         return CheckResult(name, label, "FAIL", f"未安装（{import_name} import 失败）")
     if _version_satisfies(version, min_version):
         return CheckResult(name, label, "OK", f">= {min_version}", version)
-    return CheckResult(
-        name, label, "WARN", f">= {min_version} 不满足!", version
-    )
+    return CheckResult(name, label, "WARN", f">= {min_version} 不满足!", version)
 
 
 def check_import(name: str, label: str, import_path: str) -> CheckResult:
@@ -153,14 +150,10 @@ def check_import(name: str, label: str, import_path: str) -> CheckResult:
     except ImportError as e:
         return CheckResult(name, label, "FAIL", f"import 失败: {e}")
     except Exception as e:
-        return CheckResult(
-            name, label, "FAIL", f"import 异常 ({type(e).__name__}): {e}"
-        )
+        return CheckResult(name, label, "FAIL", f"import 异常 ({type(e).__name__}): {e}")
 
 
-def check_class_import(
-    name: str, label: str, module_path: str, class_name: str
-) -> CheckResult:
+def check_class_import(name: str, label: str, module_path: str, class_name: str) -> CheckResult:
     """检测模块中的类是否可 import。"""
     try:
         mod = importlib.import_module(module_path)
@@ -171,9 +164,7 @@ def check_class_import(
     except ImportError as e:
         return CheckResult(name, label, "FAIL", f"import 失败: {e}")
     except Exception as e:
-        return CheckResult(
-            name, label, "FAIL", f"import 异常 ({type(e).__name__}): {e}"
-        )
+        return CheckResult(name, label, "FAIL", f"import 异常 ({type(e).__name__}): {e}")
 
 
 def run_all_checks() -> list[CheckResult]:
@@ -181,34 +172,22 @@ def run_all_checks() -> list[CheckResult]:
     results: list[CheckResult] = []
 
     # 1. torch >= 2.5.1
-    results.append(
-        check_package_version("torch", "torch", "torch", "2.5.1")
-    )
+    results.append(check_package_version("torch", "torch", "torch", "2.5.1"))
 
     # 2. transformers >= 4.57.0
-    results.append(
-        check_package_version("transformers", "transformers", "transformers", "4.57.0")
-    )
+    results.append(check_package_version("transformers", "transformers", "transformers", "4.57.0"))
 
     # 3. numpy >= 2.2.6
-    results.append(
-        check_package_version("numpy", "numpy", "numpy", "2.2.6")
-    )
+    results.append(check_package_version("numpy", "numpy", "numpy", "2.2.6"))
 
     # 4. pydantic >= 2.12.5
-    results.append(
-        check_package_version("pydantic", "pydantic", "pydantic", "2.12.5")
-    )
+    results.append(check_package_version("pydantic", "pydantic", "pydantic", "2.12.5"))
 
     # 5. funasr 可 import
-    results.append(
-        check_import("funasr", "funasr", "funasr")
-    )
+    results.append(check_import("funasr", "funasr", "funasr"))
 
     # 6. fastapi 可 import
-    results.append(
-        check_import("fastapi", "fastapi", "fastapi")
-    )
+    results.append(check_import("fastapi", "fastapi", "fastapi"))
 
     # 7. VoxCPM2 模块可 import
     results.append(
@@ -235,20 +214,12 @@ def run_all_checks() -> list[CheckResult]:
     # sys.path 已在模块顶部设置了 _VENDOR_DIR
     try:
         importlib.import_module("dots_tts")
-        results.append(
-            CheckResult("dotstts", "dots.tts", "OK", "import OK (vendor stub 生效)")
-        )
+        results.append(CheckResult("dotstts", "dots.tts", "OK", "import OK (vendor stub 生效)"))
     except ImportError as e:
         # dots_tts 可能未安装，这是可预期的（需要单独安装）
-        results.append(
-            CheckResult("dotstts", "dots.tts", "FAIL", f"import 失败: {e}")
-        )
+        results.append(CheckResult("dotstts", "dots.tts", "FAIL", f"import 失败: {e}"))
     except Exception as e:
-        results.append(
-            CheckResult(
-                "dotstts", "dots.tts", "FAIL", f"import 异常 ({type(e).__name__}): {e}"
-            )
-        )
+        results.append(CheckResult("dotstts", "dots.tts", "FAIL", f"import 异常 ({type(e).__name__}): {e}"))
 
     return results
 
@@ -266,13 +237,12 @@ def format_text_output(results: list[CheckResult]) -> str:
         status_tag = f"[{r.status}]"
         # 对齐标签（最长标签约 13 字符）
         label_padded = r.label.ljust(13)
-        if r.version:
-            version_part = f": {r.version}"
-        else:
-            version_part = ""
+        version_part = f": {r.version}" if r.version else ""
 
         if r.status == "OK":
-            detail_part = f"  {r.detail}" if r.detail and r.detail != "import OK" and not r.detail.startswith("import OK") else ""
+            detail_part = (
+                f"  {r.detail}" if r.detail and r.detail != "import OK" and not r.detail.startswith("import OK") else ""
+            )
             if not version_part and r.detail:
                 version_part = f"  {r.detail}"
             lines.append(f"{status_tag} {label_padded}{version_part}{detail_part}")
@@ -310,9 +280,7 @@ def format_json_output(results: list[CheckResult]) -> str:
 # 主入口
 # ---------------------------------------------------------------------------
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="TTS_MultiModel 3 引擎兼容性检测"
-    )
+    parser = argparse.ArgumentParser(description="TTS_MultiModel 3 引擎兼容性检测")
     parser.add_argument(
         "--json",
         action="store_true",

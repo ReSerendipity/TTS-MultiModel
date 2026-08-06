@@ -13,6 +13,7 @@ training/ 目录对应 WebUI 中 LoRA 微调 Tab 的训练任务；scripts/train
   - 进阶：在 ``data_dir`` 下放 ``metadata.jsonl``，每行形如
     ``{"audio_file": "sample001.wav", "text": "你好", "speaker_id": "spk_1", "duration": 2.3}``
 """
+
 from __future__ import annotations
 
 import json
@@ -122,7 +123,9 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
             ValueError: 数据集目录不存在或没有可用样本时抛出
         """
         # Legacy：第一个参数是 HuggingFace Dataset -> 原样保留（老代码兼容）
-        if isinstance(data_dir, HFDataset) or (hasattr(data_dir, "column_names") and hasattr(data_dir, "__getitem__") and hasattr(data_dir, "__len__")):
+        if isinstance(data_dir, HFDataset) or (
+            hasattr(data_dir, "column_names") and hasattr(data_dir, "__getitem__") and hasattr(data_dir, "__len__")
+        ):
             self._legacy_dataset = data_dir  # type: ignore[assignment]
             self._entries = []
             self._skipped_paths = []
@@ -563,12 +566,16 @@ class BatchProcessor:
                     continue
                 # 简单重采样：若 sr != sample_rate 直接线性插值（够用于训练时长预估）
                 if sr != self.sample_rate:
-                    wav_arr = torch.nn.functional.interpolate(
-                        wav_arr.unsqueeze(0).unsqueeze(0),
-                        scale_factor=float(self.sample_rate) / float(sr),
-                        mode="linear",
-                        align_corners=False,
-                    ).squeeze(0).squeeze(0)
+                    wav_arr = (
+                        torch.nn.functional.interpolate(
+                            wav_arr.unsqueeze(0).unsqueeze(0),
+                            scale_factor=float(self.sample_rate) / float(sr),
+                            mode="linear",
+                            align_corners=False,
+                        )
+                        .squeeze(0)
+                        .squeeze(0)
+                    )
                 text_ids = self._tokenize(entry.text)
                 legacy_batch.append(
                     {
@@ -605,12 +612,16 @@ class BatchProcessor:
                 logger.warning("损坏样本已跳过: %s, 原因: %s", entry.audio_path, e)
                 continue
             if sr != self.sample_rate:
-                wav_arr = torch.nn.functional.interpolate(
-                    wav_arr.unsqueeze(0).unsqueeze(0),
-                    scale_factor=float(self.sample_rate) / float(sr),
-                    mode="linear",
-                    align_corners=False,
-                ).squeeze(0).squeeze(0)
+                wav_arr = (
+                    torch.nn.functional.interpolate(
+                        wav_arr.unsqueeze(0).unsqueeze(0),
+                        scale_factor=float(self.sample_rate) / float(sr),
+                        mode="linear",
+                        align_corners=False,
+                    )
+                    .squeeze(0)
+                    .squeeze(0)
+                )
             audio_arrays.append(wav_arr)
             ids = self._tokenize(entry.text)
             text_tokens_list.append(torch.tensor(ids, dtype=torch.int32))
@@ -698,6 +709,7 @@ def create_dataloaders(
         (train_dataloader, eval_dataloader)
     """
     from .config import DatasetConfig  # local 防循环
+
     ds_cfg: DatasetConfig = cfg.dataset
     train_ds = HFVoxCPMDataset(
         data_dir=ds_cfg.data_dir,
@@ -731,8 +743,10 @@ def create_dataloaders(
         sample_rate=ds_cfg.sample_rate,
         max_length=1024,
     )
+
     def _collate(batch: list[DatasetEntry]) -> dict[str, torch.Tensor]:
         return batch_proc(batch)
+
     if accelerator is not None and hasattr(accelerator, "prepare_dataloader"):
         train_loader = accelerator.prepare_dataloader(
             train_ds,
