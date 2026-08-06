@@ -3,14 +3,14 @@
 > 编制日期：2026-08-01
 > 编制者：AI 代理
 > 目标执行者：项目维护者（你）
-> 关联文档：[`docs/ROADMAP.md`](ROADMAP.md) §5.5 阶段 E / [`docs/STAGE_E_PWA_FEASIBILITY.md`](STAGE_E_PWA_FEASIBILITY.md) / [`docs/STAGE_E_QUALITY_REPORT.md`](STAGE_E_QUALITY_REPORT.md)
+> 关联文档：[`docs/ROADMAP.md`](ROADMAP.md) §5.5 阶段 E / [`docs/STAGE_E_QUALITY_REPORT.md`](STAGE_E_QUALITY_REPORT.md)
 > 健康度基线：3 引擎兼容 9/9 ✅ / pytest 353 passed ✅ / 覆盖率 26.05% ✅
 
 ---
 
 ## 0. 任务包总览
 
-### 0.1 6 个原子任务包（含一个不实施）
+### 0.1 5 个原子任务包
 
 | 编号 | 任务 | 工期 | 前置 | ROI | 推荐顺序 | 状态 |
 |------|------|------|------|-----|---------|------|
@@ -19,9 +19,8 @@
 | **TB.3** | E.2 LLM-driven 提示词编排 | 2 周 | 无 | 高（差异化） | 3️⃣ 第二周起 | ⏳ 待执行 |
 | **TB.4** | E.3 TypeScript 类型化（渐进式） | 3 周 | 无 | 中（工程化） | 4️⃣ 可与 TB.2/3 并行 | ⏳ 待执行 |
 | **TB.5** | E.4 插件化架构 | 2 周 | 阶段 C 完成 | 中（生态） | 5️⃣ 后期 | ⏳ 待执行 |
-| ~~TB.6~~ | ~~E.5 PWA 离线优先~~ | 5.5 周 | — | 低（已调研） | ❌ 不实施 | ❌ 已决策不做 |
 
-**总工期**：8 周（不含 E.5）
+**总工期**：8 周
 **总 commit 数**：预估 15-20 个原子 commit
 **质量门禁**：每个 commit 前必跑 `scripts/stage_e_quality_gate.bat`
 
@@ -44,8 +43,7 @@
 1. **本文档**（你正在读的）
 2. [`docs/ROADMAP.md`](ROADMAP.md) §5.5 阶段 E 详细规划
 3. [`docs/STAGE_E_QUALITY_REPORT.md`](STAGE_E_QUALITY_REPORT.md) 健康度基线
-4. [`docs/STAGE_E_PWA_FEASIBILITY.md`](STAGE_E_PWA_FEASIBILITY.md) PWA 决策（E.5 为什么不做的详细论证）
-5. [`AGENTS.md`](../AGENTS.md) 全文（项目硬约束、编码规范、CI 门禁）
+4. [`AGENTS.md`](../AGENTS.md) 全文（项目硬约束、编码规范、CI 门禁）
 
 ### 1.2 通用约束（AGENTS.md §6 硬约束）
 
@@ -550,37 +548,7 @@ git commit -m "feat(plugins,stage-e): plugin architecture with hook + discovery
 
 ---
 
-## 7. ~~TB.6 E.5 PWA 离线优先~~（不实施）
-
-### 7.1 决策记录
-
-| 项 | 决策 |
-|----|------|
-| 调研报告 | [`docs/STAGE_E_PWA_FEASIBILITY.md`](STAGE_E_PWA_FEASIBILITY.md)（304 行） |
-| 结论 | **不实施** |
-| 理由 | ROI 最低 / 5.5 周工期 / 与现有 SSE 能力重叠 / 离线生成不可行（10GB+ 模型） |
-| 替代 | 延后到阶段 F 重新评估 |
-
-### 7.2 最小化方案（仅供未来参考）
-
-如果未来坚持要做 PWA，最小化方案（2 天）：
-
-- [ ] 创建 `bin/integrated_app/static/manifest.json`（半天）
-- [ ] 创建 `bin/integrated_app/static/sw.js`（基础缓存，1 天）
-- [ ] `templates/base.html` 引入 `<link rel="manifest">`（半天）
-- [ ] DevTools → Application → Manifest 校验
-
-不做：IndexedDB 音频缓存、推送通知、后台同步。
-
-### 7.3 阶段 F 评估时机
-
-- 等阶段 E 的 E.1（Streaming）和 E.2（LLM）落地后
-- 等用户量增长（>1k）后
-- 重新调研"断网回听"和"推送通知"的真实用户基础
-
----
-
-## 8. 推进节奏建议
+## 7. 推进节奏建议
 
 ### 8.1 8 周时间线
 
@@ -722,7 +690,6 @@ TB.1 ──> TB.2 ──> [完成核心体验]
 | LLM API 成本 | 中 | 离线 Ollama 优先 |
 | TS 类型化工作量低估 | 中 | 渐进式，每个 JS 独立提交 |
 | 插件化破坏性 | 高 | 严格向后兼容 + 完整测试 |
-| PWA 后悔 | 低 | 调研已记录，延后阶段 F |
 
 ---
 

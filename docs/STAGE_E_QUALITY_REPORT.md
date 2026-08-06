@@ -2,7 +2,7 @@
 
 > 报告日期：2026-08-01
 > 报告者：AI 代理
-> 关联文档：[`docs/ROADMAP.md`](ROADMAP.md) 阶段 E / [`docs/STAGE_E_PWA_FEASIBILITY.md`](STAGE_E_PWA_FEASIBILITY.md)
+> 关联文档：[`docs/ROADMAP.md`](ROADMAP.md) 阶段 E
 > 测试解释器：`c:\Users\Doro\TTS_MultiModel\WPy64-312101\python\python.exe` (Python 3.12.10)
 
 ---
@@ -187,7 +187,6 @@ collecting ... collected 473 items / 44 deselected / 429 selected
 ### 5.3 推进建议
 
 ✅ **可立即推进阶段 E.1 - E.4**（Streaming / LLM-driven / TypeScript / 插件化）
-🟡 **PWA（E.5）建议延后到阶段 F**（见 `STAGE_E_PWA_FEASIBILITY.md`）
 🟡 **测试覆盖率 30% 目标可在阶段 A 末或阶段 E 中达成**
 
 ---
@@ -199,8 +198,7 @@ collecting ... collected 473 items / 44 deselected / 429 selected
 | `docs/.stage_e_compat_output.txt` | `check_3engine_compat.py` 完整输出（1144 字节） |
 | `docs/.stage_e_pytest_output.txt` | pytest 完整输出（含 473 个测试 + 覆盖率明细） |
 | `scripts/stage_e_quality_gate.bat` | pytest 离线运行包装脚本（阶段 E 质量门禁可复现） |
-| `docs/ROADMAP.md` §5.5 阶段 E 详细规划 | 5 子项 + PWA 评估说明 |
-| `docs/STAGE_E_PWA_FEASIBILITY.md` | PWA 调研报告（结论：降级到阶段 F） |
+| `docs/ROADMAP.md` §5.5 阶段 E 详细规划 | 5 子项 |
 
 ---
 
@@ -217,6 +215,5 @@ collecting ... collected 473 items / 44 deselected / 429 selected
 2. **E.2 LLM-driven 提示词编排**（2 周，差异化功能）
 3. **E.3 TypeScript 类型化**（3 周，工程化渐进）
 4. **E.4 插件化架构**（2 周，需等 C 完成）
-5. ~~E.5 PWA~~ — 延后到阶段 F
 
 **质量度量留痕**：本报告作为阶段 E 启动前的"质量基线快照"，每个阶段 E 子任务完成时，建议用相同脚本重跑并对比增量。

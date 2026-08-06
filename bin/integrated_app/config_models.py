@@ -311,85 +311,6 @@ class UIConfig(BaseModel):
     sidebar_collapsed_width: int = Field(default=52, description="侧边栏折叠宽度（px）")
 
 
-class PwaConfig(BaseModel):
-    """PWA（Progressive Web App）离线优先配置。
-
-    控制 Service Worker 注册、预缓存清单、缓存策略和 Phase 1-4 功能开关。
-    详细规划见 ``docs/STAGE_E_EXECUTION_PLAN.md`` 与
-    ``docs/ROADMAP.md`` §5.5。
-
-    Attributes:
-        enabled: 是否启用 PWA。``False`` 时 SW 不注册，安装 banner 不显示。
-        cache_version: 当前 SW 缓存版本号（v1、v2...）。修改时触发旧缓存清理。
-        offline_enabled: 是否启用离线功能。Phase 1 = 仅 app shell 离线。
-        precache_urls: install 时预缓存的 URL 列表，必须与路由层一致。
-        api_cache_max_age_s: ``/api/*`` GET stale-while-revalidate 最长秒数。
-        html_cache_max_entries: HTML 页面 LRU 缓存最大条目数。
-        scope: SW scope，与 ``manifest.json`` 的 ``scope`` 字段保持一致。
-        vapid_public_key: VAPID 公钥，Phase 3 推送通知启用后填充（Base64URL）。
-    """
-
-    model_config = ConfigDict(extra="ignore")
-
-    enabled: bool = Field(default=True, description="启用 PWA")
-    cache_version: str = Field(default="v1", description="SW 缓存版本号")
-    offline_enabled: bool = Field(default=True, description="启用离线功能")
-    precache_urls: list[str] = Field(
-        default_factory=lambda: ["/", "/favicon.ico", "/manifest.json"],
-        description="install 预缓存 URL 列表",
-    )
-    api_cache_max_age_s: int = Field(default=300, ge=0, le=86400, description="API 缓存最大时长（秒）")
-    html_cache_max_entries: int = Field(default=50, ge=0, le=500, description="HTML 缓存条目数")
-    scope: str = Field(default="/", description="SW scope")
-    vapid_public_key: str = Field(default="", description="VAPID 公钥（Phase 3 推送通知，Base64URL）")
-
-    # ===== Phase 3: VAPID 推送通知 =====
-    # 生成密钥对：python scripts/generate_vapid_keys.py
-    # 公钥填 vapid_public_key，私钥填 vapid_private_key
-    vapid_private_key: str = Field(
-        default="",
-        description="VAPID 私钥（PEM 格式，Phase 3 推送签名用）",
-    )
-    vapid_subject: str = Field(
-        default="",
-        description="VAPID subject（mailto: 或 https:// URL，推送 JWT claim）",
-    )
-
-    # ===== Phase 2: IndexedDB 音频缓存 =====
-    # 详细设计见 docs/STAGE_E_PWA_PHASE2.md §3
-    # 硬约束：字段名必须与 sw.js 顶部 IDB_* 常量保持同步（人工对齐）
-    idb_audio_cache: bool = Field(
-        default=False,
-        description="Phase 2: 是否启用 IndexedDB 持久化音频缓存（仅本地生成音频）",
-    )
-    idb_max_size_mb: int = Field(
-        default=100,
-        ge=10,
-        le=2000,
-        description="IDB 音频缓存最大字节 (MB)，超出触发 LRU 清理",
-    )
-    idb_lru_target_pct: int = Field(
-        default=80,
-        ge=50,
-        le=95,
-        description="LRU 清理目标百分比（占 max_size），保留缓冲避免频繁清理",
-    )
-    idb_broadcast_channel: bool = Field(
-        default=True,
-        description="是否启用 BroadcastChannel 跨标签页同步",
-    )
-    idb_persist_request: bool = Field(
-        default=True,
-        description="启动时是否调 navigator.storage.persist() 请求持久化",
-    )
-
-    # ===== Phase 4: Background Sync =====
-    background_sync: bool = Field(
-        default=True,
-        description="Phase 4: 是否启用 Background Sync 离线生成队列",
-    )
-
-
 class ApiAuthConfig(BaseModel):
     """API Bearer Token 认证配置。
 
@@ -487,7 +408,6 @@ class AppConfig(BaseModel):
         sse: SSEConfig — SSE 事件流参数。
         audio_player: AudioPlayerConfig — WebUI 播放器参数。
         ui: UIConfig — WebUI 布局参数。
-        pwa: PwaConfig — PWA 离线优先配置（Phase 1-4，见 ``STAGE_E_EXECUTION_PLAN.md``）。
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -503,7 +423,6 @@ class AppConfig(BaseModel):
     sse: SSEConfig = Field(default_factory=SSEConfig)
     audio_player: AudioPlayerConfig = Field(default_factory=AudioPlayerConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
-    pwa: PwaConfig = Field(default_factory=PwaConfig)
 
     @field_validator("server")
     @classmethod
@@ -604,36 +523,7 @@ def load_config_dict(yaml_data: Any) -> AppConfig:
         sse=yaml_data.get("sse", {}),
         audio_player=yaml_data.get("audio_player", {}),
         ui=yaml_data.get("ui", {}),
-        pwa=yaml_data.get("pwa", {}),
     )
 
 
-def _apply_env_overrides(config: AppConfig) -> AppConfig:
-    """Apply environment variable overrides for sensitive config fields.
 
-    Environment variables take precedence over config.yaml values.
-    This allows keeping secrets (like VAPID private keys) out of the
-    tracked config.yaml file by placing them in a .env file or system
-    environment variables instead.
-
-    Supported overrides:
-        VAPID_PUBLIC_KEY  -> config.pwa.vapid_public_key
-        VAPID_PRIVATE_KEY -> config.pwa.vapid_private_key
-        VAPID_SUBJECT     -> config.pwa.vapid_subject
-
-    Args:
-        config: The AppConfig instance loaded from YAML.
-
-    Returns:
-        AppConfig: The same instance with env-overridden fields updated.
-    """
-    env_map = {
-        "VAPID_PUBLIC_KEY": "vapid_public_key",
-        "VAPID_PRIVATE_KEY": "vapid_private_key",
-        "VAPID_SUBJECT": "vapid_subject",
-    }
-    for env_key, field_name in env_map.items():
-        env_val = os.environ.get(env_key)
-        if env_val:
-            setattr(config.pwa, field_name, env_val)
-    return config

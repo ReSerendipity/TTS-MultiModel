@@ -801,13 +801,5 @@
   "advanced": "高级",
   "enter_text_and_click_generate": "输入文本，点击生成，即可体验AI语音合成",
   "ready_to_create": "准备好创建你的专属音色了吗？",
-  "try_sample_text": "试试示例文本",
-  "pwa_install_button": "安装应用",
-  "pwa_ios_install_title": "iOS 用户：点击底部分享按钮 → 选择「添加到主屏幕」→ 点击「添加」",
-  "pwa_dismiss": "关闭",
-  "pwa_update_available": "检测到新版本，点击刷新以使用最新功能",
-  "pwa_update_now": "立即刷新",
-  "pwa_push_enable": "开启推送通知",
-  "pwa_cache_label": "离线缓存",
-  "pwa_cache_clear": "清空"
+  "try_sample_text": "试试示例文本"
 }

@@ -121,34 +121,4 @@ ui:
   sidebar_width: 240
   sidebar_collapsed_width: 52
 
-# PWA (Progressive Web App) 离线优先配置
-# Refs: docs/ROADMAP.md §5.5 stage E, docs/STAGE_E_EXECUTION_PLAN.md TB.6
-pwa:
-  enabled: true
-  cache_version: "v3"  # Phase 3+4: 升级到 v3 触发旧缓存清理 + 启用 push/sync
-  offline_enabled: true
-  scope: "/"
-  api_cache_max_age_s: 300
-  html_cache_max_entries: 50
-  precache_urls:
-    - "/"
-    - "/favicon.ico"
-    - "/manifest.json"
-    - "/static_pwa/js/idb_cache.js"  # Phase 2: SW importScripts 依赖
-  # Phase 3 推送通知：VAPID 密钥
-  # 安全：密钥通过 .env 环境变量注入，请勿在此填写！
-  # 生成密钥：python scripts/generate_vapid_keys.py
-  # 配置方法：复制 .env.example 为 .env，填入生成的密钥
-  vapid_public_key: ""   # 或设环境变量 VAPID_PUBLIC_KEY
-  vapid_private_key: ""  # 或设环境变量 VAPID_PRIVATE_KEY
-  vapid_subject: ""      # 或设环境变量 VAPID_SUBJECT
-  # ===== Phase 2: IndexedDB 音频缓存 =====
-  # 详细设计见 docs/STAGE_E_PWA_PHASE2.md
-  # 硬约束：cache_version 与 sw.js 顶部 VERSION 常量保持同步
-  idb_audio_cache: true           # 用户决策：仅本地生成音频，100MB 保守
-  idb_max_size_mb: 100            # 超出触发 LRU 清理到 idb_lru_target_pct
-  idb_lru_target_pct: 80          # 清理后保留 80% 容量作为缓冲
-  idb_broadcast_channel: true     # 跨标签页事件通知
-  idb_persist_request: true       # 调 navigator.storage.persist() 请求持久化
-  # ===== Phase 4: Background Sync 离线生成队列 =====
-  background_sync: true            # SW sync 事件 + IndexedDB 任务队列
+

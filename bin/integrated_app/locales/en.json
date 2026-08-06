@@ -800,13 +800,5 @@
   "advanced": "Advanced",
   "enter_text_and_click_generate": "Enter text and click generate to experience AI voice synthesis",
   "ready_to_create": "Ready to create your unique voice?",
-  "try_sample_text": "Try Sample Text",
-  "pwa_install_button": "Install App",
-  "pwa_ios_install_title": "iOS users: tap the share button → choose Add to Home Screen → tap Add",
-  "pwa_dismiss": "Dismiss",
-  "pwa_update_available": "A new version is available. Refresh to use the latest features.",
-  "pwa_update_now": "Refresh Now",
-  "pwa_push_enable": "Enable Push Notifications",
-  "pwa_cache_label": "Offline Cache",
-  "pwa_cache_clear": "Clear"
+  "try_sample_text": "Try Sample Text"
 }

@@ -1073,9 +1073,7 @@ async def _execute_generation_impl(
             _apply_post_processing_to_file, filename, tempo_factor, pp_voice_enhancement, target_lufs
         )
         if degraded_note:
-            _trigger_push_notification(text, filename, engine, duration)
             return _partial_success_html(filename, msg, degraded_note)
-        _trigger_push_notification(text, filename, engine, duration)
         return _success_html(filename, msg)
     except Exception as e:  # noqa: BLE001
         duration = time.monotonic() - start_time
@@ -1087,47 +1085,6 @@ async def _execute_generation_impl(
         elif isinstance(e, ValueError):
             error_type = "validation"
         return _error_html(request, _safe_error_msg(e), error_type=error_type)
-
-
-# ===========================================================================
-# Phase 3: PWA 推送通知 hook
-# ===========================================================================
-
-
-def _trigger_push_notification(
-    text: str,
-    filename: str,
-    engine: str,
-    duration: float,
-) -> None:
-    """生成成功后触发 PWA 推送通知（fire-and-forget，不阻塞响应）。
-
-    通过 ``asyncio.create_task`` 异步发送推送，即使推送失败也不影响
-    生成结果返回。推送功能未配置或 pywebpush 未安装时静默跳过。
-
-    Args:
-        text: 生成文本（用于推送预览）。
-        filename: 音频文件名（用于构造访问 URL）。
-        engine: 引擎名称。
-        duration: 生成耗时（秒）。
-    """
-    try:
-        from urllib.parse import quote
-
-        from ...push_sender import notify_generation_complete
-
-        audio_url = f"/api/audio/{quote(filename, safe='')}"
-        # fire-and-forget：不 await，不阻塞 HTTP 响应
-        asyncio.create_task(
-            notify_generation_complete(
-                text_preview=text,
-                audio_url=audio_url,
-                engine=engine,
-                duration=duration,
-            )
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("push notification trigger skipped: %s", exc)
 
 
 # ===========================================================================

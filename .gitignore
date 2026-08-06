@@ -18,13 +18,6 @@ get-pip.py
 # Static generated files
 static/
 
-# PWA assets (manifest.json / sw.js / pwa.js) tracked explicitly
-# to keep them under code review independent of the deployment-artifact static/.
-# Note: a parent-directory ignore (static/) makes a child `!` rule ineffective
-# for already-tracked siblings, so the first commit must use `git add -f`.
-!bin/integrated_app/static_pwa/
-!bin/integrated_app/static_pwa/**
-
 # IDE
 .vscode/
 .idea/

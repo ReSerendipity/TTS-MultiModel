@@ -512,14 +512,6 @@ def create_app() -> FastAPI:
     os.makedirs(static_dir, exist_ok=True)
     app.mount("/static", CachedStaticFiles(directory=static_dir), name="static")
 
-    # --- 静态文件挂载：/static_pwa ---
-    # PWA 专用静态资源目录（manifest.json / sw.js / js/pwa.js）。
-    # 与 /static 平级但独立可追踪，避免被 .gitignore 第 19 行的 static/ 规则误排除。
-    # 路由前缀保持 /static_pwa，便于与 /static 区分；js 文件自动获得 immutable 缓存头。
-    static_pwa_dir = os.path.join(_BASE_DIR, "static_pwa")
-    os.makedirs(static_pwa_dir, exist_ok=True)
-    app.mount("/static_pwa", CachedStaticFiles(directory=static_pwa_dir), name="static_pwa")
-
     setup_logging()
 
     # --- Jinja2 模板初始化，模板缺失时回退到最小模板 ---

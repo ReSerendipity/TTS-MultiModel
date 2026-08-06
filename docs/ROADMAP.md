@@ -313,35 +313,28 @@
 | E.2 | LLM-driven 提示词编排 | `LLMProvider` 抽象 + 3 个内置模板 + 1 个 OpenAI 兼容实现 | 2 周 | 无 |
 | E.3 | TypeScript 类型化（渐进式） | `tsconfig.json` + 28 JS 全部加 `.d.ts` + `tsc --noEmit` 0 错误 | 3 周 | 无 |
 | E.4 | 插件化架构 | `engine_registry` 加 hook + 第三方插件示例 + `plugin.yaml` schema | 2 周 | C 完成 |
-| E.5 | PWA 离线优先 | 见 [`docs/STAGE_E_PWA_FEASIBILITY.md`](STAGE_E_PWA_FEASIBILITY.md)（调研建议降级到阶段 F） | 5.5 周 | — |
 
 **依赖**：
 - E.1 无前置（独立）
 - E.2 无前置（独立）
 - E.3 无前置（独立）
 - E.4 依赖 C 完成（`MultiEngineRegistry` 已支持多引擎）
-- E.5 暂不实施（见 PWA 调研报告），可在阶段 F 重新评估
 
 **验收标准**：
 - 4 语言 i18n 包含 `streaming.*` / `llm.*` / `plugin.*` 相关键
 - LLM provider 可配置：`config.yaml` 增加 `llm.provider: openai|anthropic|ollama`
 - `npx tsc --noEmit` 0 错误
 - 第三方插件可独立注册到 `engine_registry`（`pip install tts-plugin-foo` 即生效）
-- PWA 阶段：根据用户决策
 
 **价值**：
 - E.1 高（实时性是 TTS 核心体验，FastAPI 已有 SSE 但缺 chunked audio）
 - E.2 高（LLM 编排降低用户门槛，是差异化功能）
 - E.3 中（工程化收益渐进，3 周投入获得 IDE 提示 + 重构安全）
 - E.4 中（生态扩展，但当前 3 引擎够用）
-- E.5 待评估（详见 `STAGE_E_PWA_FEASIBILITY.md`）
 
 **关键风险**：
 - E.3 TS 与现有 28 个原生 JS 不兼容（需渐进改造，保留 .js 兼容）
 - E.4 插件化破坏性大（必须保持向后兼容 `current_engine`）
-- E.5 PWA 推送通知需要 HTTPS + VAPID 密钥（见调研报告）
-
-**PWA 特别说明**：根据 [`docs/STAGE_E_PWA_FEASIBILITY.md`](STAGE_E_PWA_FEASIBILITY.md) 调研（2026-08-01），E.5 ROI 最低（5.5 周工期 vs 有限用户场景），且与现有 SSE 能力重叠。建议降级到阶段 F，阶段 E 优先推进 E.1-E.4。如用户坚持，可选最小化方案（仅 manifest + 基础 SW，2 天）。
 
 **质量基线（2026-08-01 快照）**：
 - 3 引擎兼容性检测：`scripts/check_3engine_compat.py` **9/9 通过**（WinPython 解释器）

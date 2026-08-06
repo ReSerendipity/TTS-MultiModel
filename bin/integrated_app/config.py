@@ -11,7 +11,6 @@ import re
 from .config_models import (
     ApiAuthConfig,
     GenerationDefaultsConfig,
-    _apply_env_overrides,
     load_config_dict,
 )
 from .config_models import (
@@ -237,10 +236,6 @@ class AppConfig:
 
         # Build validated Pydantic config
         self._pydantic_config = load_config_dict(self._yaml_config or {})
-
-        # Apply environment variable overrides for sensitive fields
-        # (e.g. VAPID keys from .env file)
-        _apply_env_overrides(self._pydantic_config)
 
     # -- Raw section accessors ------------------------------------------------
 

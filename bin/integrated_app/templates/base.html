@@ -52,20 +52,6 @@
     <script src="/static/js/api_cache.js?v={{ app_version }}"></script>
     <!-- Prototype V4 theme - shared JS utilities for .pv-theme components -->
     <script src="/static/js/prototype_v4.js?v={{ app_version }}"></script>
-
-    <!-- ===================================================================
-         PWA Phase 1: Manifest + theme color + iOS meta
-         Refs: docs/ROADMAP.md §5.5 stage E, AGENTS.md §6.5 (SSE passthrough)
-         =================================================================== -->
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/favicon.ico">
-    <meta name="theme-color" content="#6B5CE7">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="TTS MultiModel">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="TTS MultiModel">
-    <meta name="format-detection" content="telephone=no">
 </head>
 <body><a href="#main-content" class="skip-link">{{ "skip_to_main_content"|t(lang) }}</a><div class="app-shell">
         <!-- Sidebar Overlay (mobile) -->
@@ -641,80 +627,5 @@
     <div id="toast-container" class="tts-toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
 
     <script src="/static/js/command_palette.js?v={{ app_version }}"></script>
-
-    <!-- ================================================================
-         PWA Phase 1-4: Service Worker + Install / Update / iOS banners
-         + Phase 3: Push notification subscribe button
-         + Phase 2.5: IDB cache management panel
-         Hidden by default; toggled by /static_pwa/js/pwa.js based on events.
-         ================================================================ -->
-    <button id="pwa-install-btn" hidden type="button"
-            aria-label="{{ 'pwa_install_button' | t(lang) }}"
-            onclick="window.__pwa_install__()"
-            style="position:fixed;bottom:24px;right:24px;z-index:9999;padding:12px 20px;
-                   background:var(--tts-primary,#6B5CE7);color:white;border:none;
-                   border-radius:8px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.18);
-                   cursor:pointer;font-size:14px;">
-        {{ "pwa_install_button" | t(lang) }}
-    </button>
-
-    <!-- Phase 3: Push notification subscribe button -->
-    <button id="pwa-push-btn" hidden type="button"
-            aria-label="{{ 'pwa_push_enable' | t(lang) }}"
-            onclick="window.__pwa_subscribe_push__()"
-            style="position:fixed;bottom:68px;right:24px;z-index:9999;padding:10px 16px;
-                   background:#3b82f6;color:white;border:none;
-                   border-radius:8px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.18);
-                   cursor:pointer;font-size:13px;">
-        {{ "pwa_push_enable" | t(lang) }}
-    </button>
-
-    <!-- Phase 2.5: IDB cache management panel -->
-    <div id="pwa-cache-panel"
-         style="position:fixed;bottom:24px;left:24px;z-index:9998;padding:8px 14px;
-                background:rgba(15,17,21,.92);color:#e2e8f0;border-radius:8px;
-                font-size:12px;display:flex;align-items:center;gap:10px;
-                box-shadow:0 2px 8px rgba(0,0,0,.2);max-width:280px;">
-        <span style="opacity:.7;">{{ "pwa_cache_label" | t(lang) }}:</span>
-        <span id="pwa-cache-usage" style="font-weight:600;min-width:70px;">—</span>
-        <div style="flex:1;height:6px;background:rgba(255,255,255,.15);border-radius:3px;overflow:hidden;min-width:40px;">
-            <div id="pwa-cache-bar" style="width:0%;height:100%;background:#6B5CE7;border-radius:3px;transition:width .3s ease;"></div>
-        </div>
-        <button onclick="window.__pwa_clear_cache__()"
-                style="background:transparent;border:1px solid rgba(255,255,255,.3);
-                   color:#e2e8f0;padding:3px 10px;border-radius:4px;cursor:pointer;
-                   font-size:11px;white-space:nowrap;"
-                title="{{ 'pwa_cache_clear' | t(lang) }}">{{ "pwa_cache_clear" | t(lang) }}</button>
-    </div>
-
-    <div id="pwa-ios-banner" hidden role="dialog" aria-label="iOS install guide"
-         style="position:fixed;bottom:0;left:0;right:0;background:rgba(107,92,231,.95);
-                color:white;padding:16px 24px;text-align:center;z-index:9999;font-size:14px;
-                line-height:1.6;">
-        <span style="font-weight:600;">{{ "pwa_ios_install_title" | t(lang) }}</span>
-        <button onclick="document.getElementById('pwa-ios-banner').hidden=true"
-                style="background:transparent;border:1px solid rgba(255,255,255,.7);
-                       color:white;padding:4px 12px;border-radius:4px;cursor:pointer;
-                       margin-left:16px;font-size:13px;">{{ "pwa_dismiss" | t(lang) }}</button>
-    </div>
-
-    <div id="pwa-update-banner" hidden role="alert"
-         style="position:fixed;top:0;left:0;right:0;background:#f59e0b;color:white;
-                padding:12px 20px;text-align:center;z-index:9999;font-size:14px;
-                line-height:1.5;display:flex;align-items:center;justify-content:center;
-                flex-wrap:wrap;gap:8px;">
-        <span>{{ "pwa_update_available" | t(lang) }}</span>
-        <button onclick="window.__pwa_apply_update__()"
-                style="background:white;color:#f59e0b;border:none;padding:6px 14px;
-                       border-radius:4px;cursor:pointer;font-weight:600;font-size:13px;">{{ "pwa_update_now" | t(lang) }}</button>
-        <button onclick="document.getElementById('pwa-update-banner').hidden=true"
-                style="background:transparent;border:1px solid rgba(255,255,255,.7);
-                       color:white;padding:6px 14px;border-radius:4px;cursor:pointer;
-                       font-size:13px;">{{ "pwa_dismiss" | t(lang) }}</button>
-    </div>
-
-    <!-- Phase 2.5: idb_cache.js for window-context IDB access (clear cache) -->
-    <script defer src="/static_pwa/js/idb_cache.js?v={{ app_version }}"></script>
-    <script defer src="/static_pwa/js/pwa.js?v={{ app_version }}"></script>
 </body>
 </html>
