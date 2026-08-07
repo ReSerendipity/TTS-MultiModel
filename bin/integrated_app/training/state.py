@@ -1,5 +1,8 @@
 """训练状态断点续训与 checkpoint 管理。
 
+# P2 法律注释：本模块仅用于 TTS_MultiModel 平台内的 VoxCPM LoRA 微调。
+# 训练产生的 checkpoint 应保留 origin 元数据，便于版权追溯。
+
 training/ 目录对应 WebUI 中 LoRA 微调 Tab 的训练任务；scripts/train_voxcpm_finetune.py
 在训练主循环中：
   - 每个 epoch 结束调用 ``StateManager.save`` 写入 ``checkpoint-N/state.json`` +

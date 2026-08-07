@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 ReSerendipity
+# SPDX-License-Identifier: Apache-2.0
 """TTS 引擎抽象层模块 —— 基于 Python Protocol 的解耦架构。
 
 本模块定义了 TTS 引擎接口协议（Protocol）与引擎注册表机制，是路由层（Routes）

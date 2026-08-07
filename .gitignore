@@ -117,6 +117,8 @@ prof/
 
 # Runtime data (generated at runtime)
 data/generation_times.json
+data/.csrf_secret
+data/.history_hmac_key
 
 # Server runtime
 .server_port

@@ -75,8 +75,10 @@ generation:
   emotion_tags_enabled: true
   emotion_tags_strip_for_engine: false  # Keep tags in text for engine processing
   # Neural watermarking (inspired by Chatterbox Perth)
-  watermark_enabled: false
-  watermark_source_id: "tts-multimodel"
+  # P0 修复：水印现已强制接入生成管线（generation.py / dotstts_engine / streaming），
+  # source_id 为代码常量，不可通过配置禁用或篡改，确保所有生成音频可追溯来源。
+  watermark_enabled: true  # 此字段保留用于文档参考，实际水印由代码强制启用
+  watermark_source_id: "tts-multimodel"  # 此字段保留用于文档参考，实际值由代码常量决定
   watermark_strength: 0.008
 
 # vLLM acceleration (optional, requires pip install vllm>=0.6.0)

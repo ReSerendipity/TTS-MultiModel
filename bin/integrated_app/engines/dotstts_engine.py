@@ -320,6 +320,25 @@ class DotsTTSEngine(TTSEngine):
         """
         import soundfile as sf
 
+        # P0 安全修复：写盘前强制嵌入水印，用于生成内容来源追溯。
+        # source_id 为代码常量，不可通过配置篡改。
+        try:
+            import numpy as np
+
+            from ..watermark import watermark_audio
+
+            audio_wm, wm_meta = watermark_audio(
+                np.asarray(audio, dtype=np.float32),
+                sample_rate,
+                enable=True,
+                source_id="tts-multimodel",
+            )
+            if wm_meta.get("watermarked"):
+                logger.debug("[dots.tts] 水印嵌入成功: snr=%.1fdB", wm_meta.get("snr_db", 0.0))
+            audio = audio_wm
+        except Exception as wm_exc:
+            logger.warning("[dots.tts] 水印嵌入异常（已忽略）: %s", wm_exc)
+
         os.makedirs(SAVE_DIR, exist_ok=True)
         output_path: str = os.path.join(SAVE_DIR, f"{prefix}_{int(time.time() * 1000)}.wav")
         sf.write(output_path, audio, sample_rate)

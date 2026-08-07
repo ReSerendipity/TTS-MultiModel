@@ -758,6 +758,16 @@ async def save_uploaded_audio(
     if len(content) > MAX_UPLOAD_SIZE_BYTES:
         return None, _error_html(request, f"上传文件大小超过 {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB 限制")
 
+    # P0 安全修复：写盘前执行魔术字节校验（fail-closed 白名单模式）
+    from ..audio import _validate_audio_content
+
+    ext_lower = ext.lower()
+    if not _validate_audio_content(content[:16], ext_lower):
+        return None, _error_html(
+            request,
+            f"音频文件内容与声明格式不匹配（{ext_lower}），可能为伪装文件",
+        )
+
     async with aiofiles.open(upload_path, "wb") as f:
         await f.write(content)
 
@@ -1128,6 +1138,12 @@ async def validate_audio_upload(
     except (OSError, ValueError) as read_err:
         logger.warning(f"读取音频文件失败: {read_err}")
         return False, f"读取音频文件失败: {read_err}"
+
+    # P0 安全修复：写盘前执行魔术字节校验（fail-closed 白名单模式）
+    from ..audio import _validate_audio_content
+
+    if not _validate_audio_content(content[:16], ext):
+        return False, f"音频文件内容与声明格式不匹配（{ext}），可能为伪装文件"
 
     return True, ""
 

@@ -237,6 +237,62 @@ def _kill_port_occupant(port, ip="127.0.0.1"):
             pass
 
 
+def verify_binaries():
+    """P2 安全修复：校验关键二进制文件的 SHA256 完整性。
+
+    读取 bin/SHA256SUMS.known-good 文件并逐项验证。
+    如果校验清单为空或不存在，仅打印提示信息。
+    """
+    import hashlib
+
+    checksum_file = os.path.join(_bin_dir, "SHA256SUMS.known-good")
+    if not os.path.exists(checksum_file):
+        logger.warning("[verify-binaries] 校验清单不存在: %s，跳过校验", checksum_file)
+        return True
+
+    entries = []
+    with open(checksum_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split(None, 1)
+            if len(parts) == 2:
+                entries.append((parts[0].lower().strip(), parts[1].strip()))
+
+    if not entries:
+        logger.info("[verify-binaries] 校验清单为空，跳过校验")
+        logger.info("[verify-binaries] 提示: 请运行 sha256sum 生成校验值并填入 SHA256SUMS.known-good")
+        return True
+
+    all_ok = True
+    for expected_hash, rel_path in entries:
+        file_path = os.path.join(_bin_dir, rel_path)
+        if not os.path.exists(file_path):
+            logger.error("[verify-binaries] [FAIL] 文件缺失: %s", rel_path)
+            all_ok = False
+            continue
+
+        sha256 = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            while True:
+                chunk = f.read(8192)
+                if not chunk:
+                    break
+                sha256.update(chunk)
+        actual_hash = sha256.hexdigest()
+
+        if actual_hash == expected_hash:
+            logger.info("[verify-binaries] [OK] %s", rel_path)
+        else:
+            logger.error("[verify-binaries] [FAIL] %s — 哈希不匹配", rel_path)
+            logger.error("  期望: %s", expected_hash)
+            logger.error("  实际: %s", actual_hash)
+            all_ok = False
+
+    return all_ok
+
+
 def start_app():
     """
     应用主启动函数
@@ -409,4 +465,15 @@ def start_app():
 if __name__ == "__main__":
     logging.getLogger("asyncio").setLevel(logging.CRITICAL)
     os.system("")
+
+    # P2 安全修复：支持 --verify-binaries 命令行选项
+    if "--verify-binaries" in sys.argv:
+        ok = verify_binaries()
+        if ok:
+            print("[verify-binaries] 所有校验通过！")
+        else:
+            print("[verify-binaries] 校验失败，请检查上方日志！")
+            sys.exit(1)
+        sys.exit(0)
+
     start_app()

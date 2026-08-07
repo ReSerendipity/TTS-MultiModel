@@ -86,6 +86,11 @@
                     {{ "generate_prompt_continue"|t(lang) }}
                 </button>
                 <div class="gen-hint">Ctrl+Enter</div>
+
+                {# P3 安全合规：Prompt 延续模式法律警告 — 提醒用户仅用于合法授权音频 #}
+                <div class="legal-notice" style="margin-top:12px;padding:8px 12px;border-left:3px solid var(--warn, #f59e0b);background:var(--warn-bg, rgba(245,158,11,0.08));border-radius:4px;font-size:11px;color:var(--t3,#888);line-height:1.5;">
+                    {{ "prompt_continue_legal_warning"|t(lang) }}
+                </div>
             </form>
         </div>
 

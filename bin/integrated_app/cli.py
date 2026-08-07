@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 ReSerendipity
+# SPDX-License-Identifier: Apache-2.0
 """VoxCPM 命令行接口模块。
 
 提供多引擎 TTS 的命令行工具，支持语音设计、语音克隆和批量处理三种模式。
@@ -1074,6 +1076,17 @@ def main():
         4. 根据 command 字段分发到对应子命令处理函数
         5. 若无子命令（旧版用法），调用 _dispatch_legacy 自动分发
     """
+    # P2: CLI 品牌化 — stderr 输出版本归属，增加剥离成本
+    import sys as _sys
+
+    _sys.stderr.write(
+        "TTS_MultiModel CLI v2.1.0 © ReSerendipity, Apache 2.0\n"
+        "Official: https://github.com/ReSerendipity/TTS_MultiModel\n"
+        "⚠️  Legal: 请勿用于诈骗、伪造身份等非法活动。\n"
+        "   $schema: https://github.com/ReSerendipity/TTS_MultiModel/v2.1.0/schema/output.json\n"
+    )
+    _sys.stderr.flush()
+
     parser = _build_parser()
     args = parser.parse_args()
 

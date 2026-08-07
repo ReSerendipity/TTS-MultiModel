@@ -162,6 +162,8 @@ class LoRAManager:
                 "alpha": 8.0,
                 "target_modules": [],
                 "trained_steps": 0,
+                # P2: origin 元数据字段 — 标记 LoRA 权重来源，便于版权追溯
+                "origin": "TTS_MultiModel LoRA Pipeline",
             }
         try:
             with open(meta_path, encoding="utf-8") as f:
@@ -263,6 +265,10 @@ class LoRAManager:
             alpha = float(raw_meta.get("alpha", 8.0))
             trained_steps = int(raw_meta.get("trained_steps", 0))
             name = str(raw_meta.get("name", lora_id))
+            # P2: 读取 origin 元数据字段（如存在），用于版权追溯
+            origin = str(raw_meta.get("origin", "unknown"))
+            if origin != "unknown":
+                logger.debug(f"[LoRAManager] LoRA origin: {origin}")
 
             if target_modules:
                 model_modules = set()

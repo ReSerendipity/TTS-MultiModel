@@ -54,6 +54,11 @@ from .persona_metadata import (
 
 logger: logging.Logger = logging.getLogger("tts_multimodel")
 
+# P2 安全修复：.pt 嵌入文件来源追溯元数据
+# 保存 .pt 文件时自动写入 origin 字段，加载时校验来源，防止嵌入被批量导出后无法追溯。
+PERSONA_PT_ORIGIN = "TTS_MultiModel v2.1.0"
+PERSONA_PT_FORMAT_VERSION = 1
+
 
 def _validate_persona_name(name: str) -> tuple[bool, str]:
     """验证音色名称合法性，防止路径遍历与同形字攻击。
@@ -419,7 +424,23 @@ def load_persona_embedding(name: str) -> Any | None:
         try:
             import torch
 
-            embedding = torch.load(pt_path, map_location="cpu")
+            raw = torch.load(pt_path, map_location="cpu")
+            # P2 安全修复：校验 .pt 文件来源元数据
+            # 新格式: {"data": payload, "_meta": {"origin": "TTS_MultiModel v2.x", ...}}
+            # 旧格式: 直接存储 (wav_path, ref_text) 元组，无 _meta 键
+            if isinstance(raw, dict) and "_meta" in raw:
+                meta = raw.get("_meta", {})
+                origin = meta.get("origin", "")
+                if origin and origin != PERSONA_PT_ORIGIN:
+                    logger.warning(
+                        f"[嵌入加载] 音色 [{name}] .pt 文件 origin 不匹配: "
+                        f"期望 '{PERSONA_PT_ORIGIN}'，实际 '{origin}'，可能为外部导入文件"
+                    )
+                embedding = raw.get("data")
+            else:
+                # 向后兼容：旧格式 .pt 文件直接存储原始数据
+                logger.debug(f"[嵌入加载] 音色 [{name}] .pt 文件为旧格式（无 origin 元数据）")
+                embedding = raw
             _persona_embedding_cache.put(name, embedding)
             return embedding
         except Exception as e:
@@ -444,10 +465,23 @@ def load_persona_embedding(name: str) -> Any | None:
             )
         result = (wav_path, ref_text)
 
+    # P2 安全修复：保存 .pt 文件时写入 origin 元数据，用于来源追溯
+    # 格式: {"data": original_payload, "_meta": {"origin": ..., "version": ..., "created_at": ...}}
+    # 向后兼容：加载时检测旧格式（非 dict 或无 _meta 键）自动降级
     with contextlib.suppress(Exception):
         import torch
 
-        torch.save(result, pt_path)
+        torch.save(
+            {
+                "data": result,
+                "_meta": {
+                    "origin": PERSONA_PT_ORIGIN,
+                    "format_version": PERSONA_PT_FORMAT_VERSION,
+                    "created_at": datetime.now().isoformat(),
+                },
+            },
+            pt_path,
+        )
 
     _persona_embedding_cache.put(name, result)
     return result

@@ -31,6 +31,7 @@
   "prompt_audio": "引导音频",
   "prompt_text_label": "参考音频转写文本",
   "generate_prompt_continue": "Prompt 延续生成",
+  "prompt_continue_legal_warning": "法律提示：本功能可基于已有音频自动生成后续内容，可能产生衍生作品。请确保您拥有参考音频的合法授权（如自有版权、公有领域或已获版权方许可）。将受版权保护的歌曲、有声书等音频用于生成衍生内容可能构成侵权，使用者自行承担全部法律责任。",
   "enter_prompt_text": "请输入引导文本",
   "voice_clone_desc": "轻量级语音克隆，适合快速测试和简单场景",
   "ultimate_clone_desc": "高级语音克隆，提供完整的参数控制和精细调节",

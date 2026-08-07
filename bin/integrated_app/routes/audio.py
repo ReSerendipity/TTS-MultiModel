@@ -194,8 +194,9 @@ def _sync_history_incremental() -> None:
 def _validate_audio_content(content: bytes, claimed_ext: str) -> bool:
     """根据魔数签名验证音频文件内容是否匹配声明的扩展名。
 
-    lenient fallback：无法判定格式时返回 True；仅在确定检测到的格式与声
-    明扩展名不匹配时返回 False。
+    fail-closed 策略（P0 安全修复）：无法判定格式时返回 False（拒绝上传），
+    仅在检测到的格式与声明扩展名匹配时返回 True。白名单模式确保伪装文件
+    （如 evil.wav.php）无法通过校验。
 
     Args:
         content:     文件首 16 字节以上内容。
@@ -206,8 +207,8 @@ def _validate_audio_content(content: bytes, claimed_ext: str) -> bool:
     """
     header = content[:16]
     if len(header) < 4:
-        logger.warning("音频文件过短，无法验证魔数签名，允许上传")
-        return True
+        logger.warning("音频文件过短，无法验证魔数签名，拒绝上传（fail-closed）")
+        return False
 
     if header[:3] == b"\x00\x00\x00" and len(header) >= 8 and header[4:8] == b"ftyp":
         return claimed_ext in {".m4a", ".mp4"}
@@ -221,8 +222,9 @@ def _validate_audio_content(content: bytes, claimed_ext: str) -> bool:
             break
 
     if detected_ext is None:
-        logger.warning("无法通过魔数签名确定音频格式（声明扩展名 '%s'），允许上传", claimed_ext)
-        return True
+        # P0 安全修复：fail-closed — 无法识别魔数签名时拒绝上传
+        logger.warning("无法通过魔数签名确定音频格式（声明扩展名 '%s'），拒绝上传（fail-closed）", claimed_ext)
+        return False
 
     return detected_ext == claimed_ext
 

@@ -52,9 +52,13 @@ ruff format bin/integrated_app/ scripts/ --check --diff
 # 依赖一致性检查（对应 ci.yml test job 的阻断步骤）
 python scripts/sync_requirements.py --check
 
-# CPU-only 单元测试 + 覆盖率门槛（对应 ci.yml test job，需先设置离线环境变量）
+# 3引擎兼容性检查（对应 ci.yml compat job）
+# 需先设置离线环境变量
 # Linux/macOS: export TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 MODELSCOPE_OFFLINE=1 CUDA_VISIBLE_DEVICES=""
 # Windows PowerShell: $env:TRANSFORMERS_OFFLINE="1"; $env:HF_HUB_OFFLINE="1"; $env:MODELSCOPE_OFFLINE="1"; $env:CUDA_VISIBLE_DEVICES=""
+python scripts/check_3engine_compat.py
+
+# CPU-only 单元测试 + 覆盖率门槛（对应 ci.yml test job，需先设置离线环境变量）
 pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=20 -k "not gpu and not cuda and not vram" -m "not integration"
 ```
 
@@ -129,13 +133,22 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 | [i18n.py](bin/integrated_app/i18n.py) | 国际化：支持 zh/en/ja/ko 四种语言 |
 | [utils.py](bin/integrated_app/utils.py) | 通用工具函数（临时文件清理、角色颜色、标签处理） |
 | [cli.py](bin/integrated_app/cli.py) | 命令行接口（VoxCPM 多引擎 CLI） |
+| [emotion_control.py](bin/integrated_app/emotion_control.py) | 情感标签解析与控制 |
+| [emotion_tags.py](bin/integrated_app/emotion_tags.py) | 情感标签系统 |
+| [text_frontend.py](bin/integrated_app/text_frontend.py) | 文本前端处理（分词、规范化） |
+| [service_layer.py](bin/integrated_app/service_layer.py) | 服务层抽象 |
+| [task_queue.py](bin/integrated_app/task_queue.py) | 任务队列管理 |
+| [signal_handlers.py](bin/integrated_app/signal_handlers.py) | 信号处理器 |
+| [vllm_backend.py](bin/integrated_app/vllm_backend.py) | vLLM 加速后端 |
+| [openai_api.py](bin/integrated_app/openai_api.py) | OpenAI 兼容 API |
+| [mcp_server.py](bin/integrated_app/mcp_server.py) | MCP 服务器 |
 
 ### 5.3 TTS 引擎
 
-引擎通过 `InMemoryEngineRegistry` 注册，支持运行时动态发现和切换。
+引擎通过 `InMemoryEngineRegistry` 注册，支持运行时动态发现和切换。引擎配置在 `config.yaml` 的 `models.engines` 中声明。
 
 #### VoxCPM2（核心引擎）
-位于 `engines/voxcpm2/`，子模块结构：
+位于 `bin/integrated_app/engines/voxcpm2/`，子模块结构：
 
 | 子模块 | 功能 |
 |--------|------|
@@ -151,12 +164,19 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 | `_base.py` | 共享工具函数和高级参数构建 |
 
 #### IndexTTS2（情感控制引擎）
-位于 `engines/indextts2_engine.py`，支持：
+位于 `bin/integrated_app/engines/indextts2_engine.py`，支持：
 - 零样本语音克隆
 - 8 维情感向量控制（happy/angry/sad/afraid/disgusted/melancholic/surprised/calm）
 - 时长控制
 - 多后端 GPU 支持（CUDA/MPS/CPU）
 - 最低 6GB 显存 + 16GB 内存
+
+#### dots.tts（克隆引擎）
+位于 `bin/integrated_app/engines/dotstts_engine.py`，支持：
+- 零样本语音克隆
+- 中英文双语支持
+- 高质量语音合成（48kHz 采样率）
+- 最低 8GB 显存 + 16GB 内存
 
 #### 角色存储
 位于 `personas/`，每个角色包含：
@@ -166,7 +186,7 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 
 ### 5.4 路由结构
 
-路由通过 `pkgutil` 自动发现，位于 `routes/` 下：
+路由通过 `pkgutil` 自动发现，位于 `bin/integrated_app/routes/` 下：
 
 | 路由模块 | 前缀 | 职责 |
 |----------|------|------|
@@ -174,11 +194,12 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 | `tabs.py` | `/tabs` | HTMX 标签页加载（voice_design/clone/ultimate/script/indextts2 等） |
 | `model.py` | `/api/model` | 模型状态、加载/卸载、预加载、引擎切换、LoRA 管理 |
 | `audio.py` | `/api/audio` | 音频文件服务（生成结果、Persona 音频、说话人样本） |
-| `persona.py` | — | 音色管理（已拆分为 `routes/api/persona.py` 和 `routes/web/persona.py`） |
+| `persona.py` | `/api/persona` | 音色管理（已拆分为 `routes/api/persona.py` 和 `routes/web/persona.py`） |
 | `sse.py` | `/api/sse` | 统一 SSE 事件流端点 `/api/sse/events` |
 | `training.py` | `/api/training` | LoRA 微调训练管理 |
 | `generate/voxcpm2/` | `/api/generate/voxcpm2` | VoxCPM2 生成路由（design/clone/script/streaming） |
 | `generate/indextts2/` | `/api/generate/indextts2` | IndexTTS2 生成路由（synthesize） |
+| `generate/generic/` | `/api/generate/generic` | 通用生成路由 |
 | `system/health.py` | `/api/system` | 健康检查、生成统计 |
 | `system/gpu.py` | `/api/system` | GPU 状态与显存信息 |
 | `system/logs.py` | `/api/system` | 操作日志查询 |
@@ -206,7 +227,7 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 
 ### 5.7 训练模块
 
-位于 `training/`，用于 VoxCPM LoRA 微调：
+位于 `bin/integrated_app/training/`，用于 VoxCPM LoRA 微调：
 
 | 子模块 | 职责 |
 |--------|------|
@@ -244,6 +265,7 @@ ui:            # UI 布局（侧边栏宽度等）
 - `test_config.py` / `test_config_models.py` — 配置解析
 - `test_generation.py` — 生成流程
 - `test_engine_interface.py` / `test_engine_switch.py` — 引擎接口与切换
+- `test_dotstts_engine.py` — dots.tts 引擎测试
 - `test_routes_htmx.py` — HTMX 路由
 - `test_gpu_utils.py` / `test_gpu_utilization_routes.py` — GPU 工具与路由
 - `test_history_db.py` — 历史记录数据库
@@ -258,6 +280,11 @@ ui:            # UI 布局（侧边栏宽度等）
 - `test_audio_processing.py` — 音频处理
 - `test_utils.py` — 通用工具
 - `test_bin_integration.py` / `test_bin_system_enhancements.py` — 集成测试
+- `test_hard_constraints.py` — 硬约束测试
+- `test_service_layer.py` / `test_service_layer_signal_taskqueue.py` — 服务层测试
+- `test_signal_handlers.py` — 信号处理器测试
+- `test_task_queue.py` — 任务队列测试
+- `test_page_switch.py` — 页面切换测试
 - `benchmarks/test_generation_bench.py` — 生成性能基准
 
 ---

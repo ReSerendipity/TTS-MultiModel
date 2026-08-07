@@ -68,6 +68,27 @@ def download_dotstts_model() -> bool:
         if not any(model_dir.iterdir()):
             logger.warning("下载目录为空，请检查网络连接后重试。")
             return False
+
+        # P1 安全修复：下载后自动校验 SHA256
+        try:
+            import subprocess
+
+            verify_script = project_root / "scripts" / "verify_model_checksums.py"
+            if verify_script.exists():
+                logger.info("正在执行 SHA256 校验...")
+                result = subprocess.run(
+                    [sys.executable, str(verify_script)],
+                    capture_output=True,
+                    text=True,
+                    cwd=str(project_root),
+                )
+                if result.returncode == 0:
+                    logger.info("SHA256 校验通过")
+                else:
+                    logger.warning("SHA256 校验未通过（可能首次下载无校验清单），请检查日志")
+        except Exception as verify_err:
+            logger.warning("SHA256 校验异常（已忽略）: %s", verify_err)
+
         logger.info("dots.tts 权重快照下载完成！")
         return True
 

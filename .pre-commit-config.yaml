@@ -64,6 +64,13 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
+      # P1 安全修复：禁止提交包含 PRIVATE KEY 标记的 .env 或其他文件
+      - id: forbid-private-key-in-env
+        name: Forbid PRIVATE KEY in .env files
+        entry: python -c "import sys; [sys.exit(1) for f in sys.argv[1:] if any(b'PRIVATE KEY' in open(f,'rb').read()[:4096] for _ in [0])]" 
+        language: system
+        files: \.env$
+        pass_filenames: true
 
 # Configuration
 default_language_version:

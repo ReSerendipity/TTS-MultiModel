@@ -1,5 +1,9 @@
 """LoRA 训练配置的加载 / 校验 / 持久化。
 
+# P2 法律注释：本训练模块仅用于 TTS_MultiModel 平台内的 VoxCPM LoRA 微调。
+# 使用本模块训练产生的 LoRA 权重应保留 origin 元数据字段，便于版权追溯。
+# 未经授权将训练权重用于商业闭源产品可能侵犯原作者权益。
+
 training/ 目录对应 WebUI 中 LoRA 微调 Tab 的训练任务；scripts/train_voxcpm_finetune.py
 作为训练入口会调用本模块：先通过 ``get_default_config`` 或 ``load_training_config``
 拿到一份类型安全的 ``TrainingConfig``，再传给 data / accelerator / state / tracker

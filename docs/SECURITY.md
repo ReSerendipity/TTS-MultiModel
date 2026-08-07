@@ -90,6 +90,23 @@ A: 在 `middleware/csrf.py` 中，对携带 `Authorization: Bearer` 头的请求
 - 密钥和证书文件不读取或修改
 - API Token 通过 `config.yaml` 或环境变量配置
 
+#### VAPID 密钥管理（P1 安全修复）
+
+> **废弃通知**：项目早期 `.env` 中的 VAPID 私钥已被视为**已污染并废弃**。
+> 任何克隆者如需使用 Web Push 通知功能，必须自行生成新的密钥对。
+
+生成新 VAPID 密钥对：
+
+```bash
+python -c "from py_vapid import Vapid; v = Vapid(); v.generate_keys(); v.save_key('vapid_private.pem'); v.save_public_key('vapid_public.pem')"
+```
+
+- **公钥**：可放入 `.env` 的 `VAPID_PUBLIC_KEY` 变量
+- **私钥**：应存放在安全的密钥管理系统中，**不要**直接放入 `.env`
+
+pre-commit 已配置 `detect-private-key` 和自定义 `forbid-private-key-in-env` hook，
+禁止提交包含 `BEGIN PRIVATE KEY` 等标记的文件。
+
 ### 异常处理
 
 - 所有异常通过 `middleware/error_handler.py` 统一捕获

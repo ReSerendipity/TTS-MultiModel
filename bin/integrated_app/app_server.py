@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 ReSerendipity
+# SPDX-License-Identifier: Apache-2.0
 """TTS_MultiModel FastAPI 应用核心入口模块。
 
 架构说明：
@@ -38,6 +40,7 @@ from .auth import APIAuthMiddleware
 from .exceptions import TTSError, ValidationError
 from .middleware.csrf import CSRFMiddleware
 from .middleware.error_handler import generic_error_handler, tts_error_handler, validation_error_handler
+from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.request_id import RequestIDLogFilter, RequestIDMiddleware
 from .model_registry import EngineName
 
@@ -496,7 +499,26 @@ def create_app() -> FastAPI:
         allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "HX-Request", "HX-Target", "HX-Trigger"],
     )
 
-    app.add_middleware(CSRFMiddleware)
+    # P2 安全修复：CSRF Cookie HMAC 签名 — 首次启动自动生成持久化密钥
+    # 启用后 CSRF token cookie 将携带 HMAC-SHA256 签名，防止 XSS 注入伪造
+    import secrets as _secrets
+
+    csrf_secret_path = os.path.join(_PROJECT_ROOT, "data", ".csrf_secret")
+    csrf_secret = ""
+    try:
+        os.makedirs(os.path.dirname(csrf_secret_path), exist_ok=True)
+        if os.path.exists(csrf_secret_path):
+            with open(csrf_secret_path, encoding="utf-8") as f:
+                csrf_secret = f.read().strip()
+        if not csrf_secret:
+            csrf_secret = _secrets.token_urlsafe(48)
+            with open(csrf_secret_path, "w", encoding="utf-8") as f:
+                f.write(csrf_secret)
+            logger.info("[create_app] 已生成新的 CSRF HMAC 密钥: %s", csrf_secret_path)
+    except OSError as csrf_err:
+        logger.warning("[create_app] CSRF 密钥初始化失败，回退到无签名模式: %s", csrf_err)
+
+    app.add_middleware(CSRFMiddleware, secret_key=csrf_secret)
 
     from .config import get_config
 
@@ -506,6 +528,9 @@ def create_app() -> FastAPI:
         enabled=api_auth.get("enabled", False),
         token=api_auth.get("token", ""),
     )
+
+    # P2 安全修复：API 速率限制 — 防止单 IP 狂发生成请求打爆 GPU
+    app.add_middleware(RateLimitMiddleware, enabled=True, requests_per_minute=10, burst=5)
 
     # --- 静态文件挂载：/static ---
     static_dir = os.path.join(_BASE_DIR, "static")
@@ -565,6 +590,7 @@ def create_app() -> FastAPI:
             "status": "ok",
             "timestamp": time.time(),
             "version": getattr(app.state, "version", "unknown"),
+            "attribution": "TTS_MultiModel © ReSerendipity, Apache 2.0",
         }
 
     @app.get("/api/health/ready")
@@ -642,6 +668,21 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
 
     force_load_config()
 
+    # P1 安全修复：非本地绑定且未启用 API Auth 时拒绝启动（安全网）
+    # 防止用户在 0.0.0.0 等对外地址上无认证暴露所有 /api/* 接口
+    _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+    if ip not in _LOCAL_HOSTS:
+        auth_cfg = get_config().api_auth_dict
+        if not auth_cfg.get("enabled") or not auth_cfg.get("token"):
+            logger.error(
+                "[run_server] 安全网拦截：监听地址 %s 为非本地绑定，"
+                "但 API 认证未启用（api_auth.enabled=false 或 token 为空）。"
+                "请在 config.yaml 中设置 api_auth.enabled=true 和一个安全的 token，"
+                "或仅使用 127.0.0.1 本地绑定。拒绝启动以防止未授权访问。",
+                ip,
+            )
+            raise SystemExit(1)
+
     app = create_app()
     models_ok, missing = check_models_available()
     app.state.models_ok = models_ok
@@ -654,5 +695,12 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
     if not models_ok:
         logger.warning(f"[run_server] 模型文件不完整: {missing}")
         logger.warning("[run_server] 应用正常启动，用户可通过界面加载模型")
+
+    # P1: 启动时输出归属信息（增加品牌化剥离成本）
+    logger.info(
+        "[run_server] TTS_MultiModel v%s © ReSerendipity, Apache 2.0 | "
+        "Official: https://github.com/ReSerendipity/TTS_MultiModel",
+        version,
+    )
 
     uvicorn.run(app, host=ip, port=int(port))

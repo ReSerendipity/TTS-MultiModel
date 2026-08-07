@@ -206,6 +206,7 @@ class HistoryDatabase:
         self._migrate_add_hidden_column()
         self._migrate_add_created_timestamp_column()
         self._migrate_add_file_missing_column()
+        self._migrate_add_hmac_columns()
         self._optimize_pragmas()
         self._ensure_indexes()
         self._ensure_fts()
@@ -573,6 +574,15 @@ class HistoryDatabase:
         """数据库迁移：添加 'file_missing' 列（1 表示磁盘文件不存在）。"""
         self._migrate_add_column("file_missing", "INTEGER NOT NULL DEFAULT 0")
 
+    def _migrate_add_hmac_columns(self) -> None:
+        """P2 安全修复：添加 HMAC 链防篡改列。
+
+        添加 prev_hash 和 record_hmac 列，用于构建记录间哈希链，
+        防止通过 DB Browser 等工具直接篡改历史记录。
+        """
+        self._migrate_add_column("prev_hash", "TEXT DEFAULT ''")
+        self._migrate_add_column("record_hmac", "TEXT DEFAULT ''")
+
     def _ensure_indexes(self) -> None:
         """创建常用查询模式所需的索引（如果不存在）。
 
@@ -805,7 +815,10 @@ class HistoryDatabase:
             try:
                 with self._transaction() as conn:
                     cursor = conn.execute(_INSERT_SQL, self._build_record_tuple(record))
-                    return cursor.lastrowid
+                    rowid = cursor.lastrowid
+                    # P2: HMAC 链防篡改 — 插入后计算并存储哈希链
+                    self._compute_and_store_hmac(conn, rowid, record)
+                    return rowid
             except sqlite3.OperationalError as e:
                 if "database is locked" in str(e):
                     last_exc = e
@@ -831,6 +844,108 @@ class HistoryDatabase:
             实际插入 / REPLACE 的记录总数（等于 len(records)，空列表返回 0）。
         """
         return self.insert_batch(records)
+
+    @staticmethod
+    def _get_hmac_secret() -> bytes:
+        """P2: 获取或生成历史记录 HMAC 密钥。
+
+        密钥持久化在 ``data/.history_hmac_key`` 文件中，首次调用时自动生成。
+
+        Returns:
+            HMAC 密钥字节串。
+        """
+        import hashlib
+
+        key_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", ".history_hmac_key"
+        )
+        try:
+            os.makedirs(os.path.dirname(key_path), exist_ok=True)
+            if os.path.exists(key_path):
+                with open(key_path, encoding="utf-8") as f:
+                    return f.read().strip().encode("utf-8")
+            import secrets
+
+            new_key = secrets.token_urlsafe(48)
+            with open(key_path, "w", encoding="utf-8") as f:
+                f.write(new_key)
+            return new_key.encode("utf-8")
+        except OSError:
+            # 回退到固定密钥（仅在文件系统不可用时）
+            return hashlib.sha256(b"tts-multimodel-history-fallback").digest()
+
+    def _compute_and_store_hmac(self, conn: Any, rowid: int, record: dict[str, Any]) -> None:
+        """P2: 计算并存储记录的 HMAC 链。
+
+        Args:
+            conn: 数据库连接（在当前事务内）。
+            rowid: 刚插入的记录 ID。
+            record: 记录字典。
+        """
+        import hashlib
+        import hmac as _hmac
+
+        try:
+            secret = self._get_hmac_secret()
+            # 获取上一条记录的 HMAC
+            cursor = conn.execute(
+                "SELECT record_hmac FROM generation_history WHERE id < ? ORDER BY id DESC LIMIT 1", (rowid,)
+            )
+            row = cursor.fetchone()
+            prev_hash = row[0] if row else ""
+
+            # 构建记录摘要（关键字段）
+            record_str = f"{record.get('filename', '')}|{record.get('filepath', '')}|{record.get('created_at', '')}|{record.get('engine', '')}|{record.get('text_preview', '')}"
+            record_hash = hashlib.sha256(record_str.encode("utf-8")).hexdigest()
+
+            # 计算 HMAC: HMAC(secret, prev_hash + record_hash)
+            hmac_value = _hmac.new(secret, f"{prev_hash}{record_hash}".encode(), hashlib.sha256).hexdigest()
+
+            conn.execute(
+                "UPDATE generation_history SET prev_hash = ?, record_hmac = ? WHERE id = ?",
+                (prev_hash, hmac_value, rowid),
+            )
+        except Exception as exc:
+            logger.warning("[history_db] HMAC 链计算失败（已忽略）: %s", exc)
+
+    def verify_chain_integrity(self) -> dict[str, Any]:
+        """P2: 验证历史记录 HMAC 链的完整性。
+
+        Returns:
+            包含 verified、total、tampered_count、first_tampered_id 的字典。
+        """
+        import hashlib
+        import hmac as _hmac
+
+        try:
+            secret = self._get_hmac_secret()
+        except Exception as exc:
+            return {"verified": False, "error": f"HMAC 密钥获取失败: {exc}"}
+
+        cursor = self._execute(
+            "SELECT id, filename, filepath, created_at, engine, text_preview, prev_hash, record_hmac FROM generation_history ORDER BY id ASC"
+        )
+        rows = cursor.fetchall()
+
+        prev_hash = ""
+        tampered: list[int] = []
+        for row in rows:
+            rowid, filename, filepath, created_at, engine, text_preview, stored_prev_hash, stored_hmac = row
+            record_str = f"{filename}|{filepath}|{created_at}|{engine}|{text_preview}"
+            record_hash = hashlib.sha256(record_str.encode("utf-8")).hexdigest()
+            expected_hmac = _hmac.new(secret, f"{prev_hash}{record_hash}".encode(), hashlib.sha256).hexdigest()
+
+            if stored_prev_hash != prev_hash or stored_hmac != expected_hmac:
+                tampered.append(rowid)
+
+            prev_hash = stored_hmac if stored_hmac else expected_hmac
+
+        return {
+            "verified": len(tampered) == 0,
+            "total": len(rows),
+            "tampered_count": len(tampered),
+            "first_tampered_id": tampered[0] if tampered else None,
+        }
 
     def insert_batch(self, records: list[dict[str, Any]]) -> int:
         """批量插入多条生成记录（INSERT OR REPLACE 语义）。

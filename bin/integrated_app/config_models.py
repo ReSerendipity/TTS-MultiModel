@@ -31,7 +31,6 @@
     Pydantic 静默丢弃，保证旧配置文件在新版本代码上仍可正常加载。
 """
 
-import os
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -524,6 +523,3 @@ def load_config_dict(yaml_data: Any) -> AppConfig:
         audio_player=yaml_data.get("audio_player", {}),
         ui=yaml_data.get("ui", {}),
     )
-
-
-

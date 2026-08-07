@@ -1,0 +1,28 @@
+# TTS_MultiModel — 模型权重 SHA256 校验清单
+#
+# P1 安全修复：防止模型权重在传输过程中被篡改（如中间人攻击、镜像站替换）。
+# 下载脚本在下载完成后自动比对此文件中的 SHA256 值。
+#
+# 格式：<SHA256哈希>  <相对路径>
+# 路径相对于 pretrained_models/ 目录
+#
+# 如何生成校验值（仅维护者执行）：
+#   cd pretrained_models
+#   find . -type f \( -name "*.pth" -o -name "*.pt" -o -name "*.safetensors" -o -name "*.bin" -o -name "*.model" -o -name "config.yaml" -o -name "configuration.json" \) -exec sha256sum {} \; > ../docs/SHA256SUMS.models
+#
+# 验证命令（用户执行）：
+#   python scripts/verify_model_checksums.py
+#
+# 注意：VoxCPM2 模型文件由 voxcpm 库内部管理，此清单主要覆盖 IndexTTS2 和 dots.tts。
+# VoxCPM2 的模型校验由 model_manager.py 在加载时通过文件大小预检实现。
+
+# === IndexTTS2 (pretrained_models/IndexTTS2/) ===
+# 下载来源: ModelScope IndexTeam/IndexTTS-2
+# 请在首次下载后运行 sha256sum 生成实际值并填入下方
+
+# === dots.tts (pretrained_models/dots.tts/) ===
+# 下载来源: ModelScope rednote-hilab/dots.tts-soar
+# 请在首次下载后运行 sha256sum 生成实际值并填入下方
+
+# === VoxCPM2 (pretrained_models/VoxCPM2/) ===
+# VoxCPM2 模型由 voxcpm 库管理，校验通过文件大小预检实现

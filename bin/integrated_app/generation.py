@@ -39,6 +39,10 @@ from .exceptions import AudioProcessingError, ValidationError
 
 logger = logging.getLogger("tts_multimodel")
 
+#: 水印来源标识符常量（代码常量，不可通过配置修改，防止篡改溯源）。
+#: 所有通过 TTS_MultiModel 生成的音频均嵌入此标识，用于内容来源追溯。
+WATERMARK_SOURCE_ID: str = "tts-multimodel"
+
 
 def save_audio(wav: np.ndarray, sr: int, prefix: str = "audio", format: str = "wav") -> tuple[str, str]:
     """保存音频文件到输出目录，自动附加时间戳文件名（原子写入）。
@@ -106,6 +110,21 @@ def save_audio(wav: np.ndarray, sr: int, prefix: str = "audio", format: str = "w
     try:
         # 确保父目录存在
         Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
+        # P0 安全修复：写盘前强制嵌入水印，用于生成内容来源追溯
+        try:
+            from .watermark import watermark_audio
+
+            wav, wm_meta = watermark_audio(
+                wav.astype(np.float32) if wav.dtype != np.float32 else wav,
+                sr,
+                enable=True,
+                source_id=WATERMARK_SOURCE_ID,
+            )
+            if not wm_meta.get("watermarked"):
+                logger.warning("水印嵌入失败: %s", file_path)
+        except Exception as wm_exc:
+            logger.warning("水印嵌入异常（已忽略）: %s", wm_exc)
 
         # 原子写入 WAV：先写临时文件，再 os.replace
         sf.write(temp_path, wav, sr)
@@ -879,6 +898,31 @@ def _save_wav_compatible(
     """
     if wav_data.max() > 1.0 or wav_data.min() < -1.0:
         wav_data = wav_data / max(abs(wav_data.max()), abs(wav_data.min()))
+
+    # P0 安全修复：写盘前强制嵌入水印，用于生成内容来源追溯。
+    # source_id 为代码常量（WATERMARK_SOURCE_ID），不可通过配置篡改。
+    # 水印失败时仅记录日志不阻塞生成（保证可用性），但会在日志中留下审计痕迹。
+    try:
+        from .watermark import watermark_audio
+
+        wav_data, wm_meta = watermark_audio(
+            wav_data.astype(np.float32),
+            sample_rate,
+            enable=True,
+            source_id=WATERMARK_SOURCE_ID,
+        )
+        if wm_meta.get("watermarked"):
+            logger.debug(
+                "水印嵌入成功: source=%s, snr=%.1fdB, hash=%s",
+                wm_meta.get("source_id", ""),
+                wm_meta.get("snr_db", 0.0),
+                wm_meta.get("content_hash", ""),
+            )
+        else:
+            logger.warning("水印嵌入失败，音频已写入但无来源标识: %s", out_path)
+    except Exception as wm_exc:
+        logger.warning("水印嵌入异常（已忽略，音频正常写入）: %s", wm_exc)
+
     wav_int16 = (wav_data * 32767).astype(np.int16)
 
     # 原子写入：先写临时文件再 os.replace 替换，防止进程中断导致文件损坏

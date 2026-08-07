@@ -119,7 +119,11 @@ def ping() -> dict[str, Any]:
     Returns:
         固定结构 ``{"status": "ok", "ts": <unix_ms>}``。
     """
-    return {"status": "ok", "ts": int(time.time() * 1000)}
+    return {
+        "status": "ok",
+        "ts": int(time.time() * 1000),
+        "attribution": "TTS_MultiModel © ReSerendipity, Apache 2.0",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +353,9 @@ async def get_health() -> dict[str, Any]:
             "session_start": _SESSION_START,
             "uptime_seconds": report.get("uptime_seconds", 0),
         },
+        # P1: 归属元数据 — 增加剥离成本，需同时改 3 处才能完全移除归属
+        "attribution": "TTS_MultiModel © ReSerendipity, Apache 2.0",
+        "provenance_url": "https://github.com/ReSerendipity/TTS_MultiModel",
     }
 
     # --- GPU 显存 ---
