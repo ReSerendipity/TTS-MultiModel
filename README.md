@@ -4,7 +4,7 @@
 
 **多模型语音合成平台 | Multi-Model Text-to-Speech Platform**
 
-基于 VoxCPM2 和 IndexTTS 2.0 的开源语音合成平台，支持声音克隆、声音设计、LoRA 微调与多角色剧本配音
+基于 VoxCPM2、IndexTTS 2.0 和 dots.tts 的开源语音合成平台，支持声音克隆、声音设计、LoRA 微调与多角色剧本配音
 
 A powerful open-source multi-model Text-to-Speech platform with voice cloning, voice design, LoRA fine-tuning, and multi-character script dubbing
 
@@ -15,7 +15,7 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 [![Docker](https://img.shields.io/badge/Docker-Supported-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![CI](https://github.com/ReSerendipity/TTS_MultiModel/actions/workflows/ci.yml/badge.svg)](https://github.com/ReSerendipity/TTS_MultiModel/actions/workflows/ci.yml)
 
-[English](#english) · [中文](#中文) · [Features](#-features) · [Quick Start](#-quick-start) · [Documentation](#-documentation) · [API](#-api-endpoints) · [Contributing](#-contributing)
+[English](#english) · [中文](#中文) · [Features](#-features) · [Quick Start](#-quick-start) · [Documentation](#-documentation) · [API](#-api-endpoints) · [Contributing]
 
 </div>
 
@@ -27,7 +27,7 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 
 | 优势 | 说明 |
 |------|------|
-| **一站式平台** | 集成 VoxCPM2 + IndexTTS2 双引擎，声音克隆、声音设计、剧本配音、LoRA 微调，无需在多个工具间切换 |
+| **一站式平台** | 集成 VoxCPM2 + IndexTTS2 + dots.tts 多引擎，声音克隆、声音设计、剧本配音、LoRA 微调，无需在多个工具间切换 |
 | **极低门槛** | 内置 WinPython + 一键安装脚本，Windows 用户开箱即用；Docker 部署仅需一行命令 |
 | **完整工具链** | 从数据准备到模型训练到推理部署，覆盖 TTS 全生命周期 |
 | **开源透明** | Apache 2.0 许可，可商用，可二次开发，社区驱动 |
@@ -67,7 +67,7 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 
 | 功能 | 描述 |
 |------|------|
-| **双引擎架构** | VoxCPM2 + IndexTTS 2.0 双 TTS 引擎，灵活切换 |
+| **多引擎架构** | VoxCPM2 + IndexTTS 2.0 + dots.tts 多 TTS 引擎，灵活切换 |
 | **声音克隆** | 仅需少量音频样本即可克隆声音（可控克隆 + 极致克隆） |
 | **声音设计** | 通过文字描述生成目标音色的语音 |
 | **剧本配音** | 多角色对话剧本自动分配说话人，批量生成配音 |
@@ -168,6 +168,12 @@ docker run -d --gpus all -p 7869:7869 \
 |------|------|----------|
 | IndexTTS2 | IndexTTS 2.0 TTS 模型 | `pretrained_models/IndexTTS2/` |
 
+### dots.tts 引擎所需模型
+
+| 模型 | 说明 | 存放目录 |
+|------|------|----------|
+| dots.tts | dots.tts TTS 引擎（第三方/开源实现） | `pretrained_models/dots_tts/` |
+
 从 [HuggingFace](https://huggingface.co/) 或 [ModelScope](https://modelscope.cn/) 下载。
 
 快捷下载脚本：
@@ -193,7 +199,7 @@ python scripts/download_indextts2.py
 |------|------|
 | Web 框架 | FastAPI + Uvicorn |
 | 前端 | HTMX + Jinja2 + Bootstrap |
-| TTS 引擎 | VoxCPM2 + IndexTTS 2.0 |
+| TTS 引擎 | VoxCPM2 + IndexTTS 2.0 + dots.tts |
 | ASR 引擎 | SenseVoiceSmall |
 | 音频处理 | speech_zipenhancer + FFmpeg + SoX |
 | 深度学习 | PyTorch + Transformers + FunASR |
@@ -202,7 +208,7 @@ python scripts/download_indextts2.py
 
 ## API 端点
 
-| 端点 | 方法 | 说明 |
+| 端点 | ���法 | 说明 |
 |------|------|------|
 | `/api/system/health` | GET | 健康检查 |
 | `/api/system/gpu` | GET | GPU 利用率信息 |
@@ -211,6 +217,7 @@ python scripts/download_indextts2.py
 | `/api/generate/voxcpm2/script` | POST | 剧本配音 (VoxCPM2) |
 | `/api/generate/voxcpm2/streaming_sse` | POST | 流式生成 (SSE) |
 | `/api/generate/indextts2/synthesize` | POST | TTS 合成 (IndexTTS 2.0) |
+| `/api/generate/dots/synthesize` | POST | TTS 合成 (dots.tts) |
 | `/api/model/load` | POST | 加载模型 |
 | `/api/model/unload` | POST | 卸载模型 |
 | `/api/history` | GET | 生成历史 |
@@ -224,11 +231,12 @@ TTS_MultiModel/
 ├── bin/                          # 应用程序代码
 │   ├── integrated_app/          # 主应用模块
 │   │   ├── routes/             # API 路由处理
-│   │   │   ├── generate/       # TTS 生成路由 (VoxCPM2, IndexTTS2)
+│   │   │   ├── generate/       # TTS 生成路由 (VoxCPM2, IndexTTS2, dots.tts)
 │   │   │   └── system/         # 系统路由 (健康检查，GPU, 设置)
 │   │   ├── engines/            # TTS 模型引擎
 │   │   │   ├── voxcpm2/       # VoxCPM2 引擎实现
 │   │   │   └── indextts2_engine.py  # IndexTTS 2.0 引擎
+│   │   │   └── dots_engine.py        # dots.tts 引擎实现（示例）
 │   │   ├── training/           # 模型训练模块
 │   │   ├── middleware/         # HTTP 中间件 (CSRF, 请求 ID)
 │   │   ├── templates/          # Jinja2 HTML 模板
@@ -286,7 +294,7 @@ Copyright (c) 2026 ReSerendipity
 - [项目架构](docs/PROJECT_ARCHITECTURE.md) - 系统架构概览
 - [参数调整](docs/ADJUSTABLE_PARAMETERS.md) - 配置参数参考
 - [UI 开发指南](docs/UI 开发指南_README.md) - Web UI 开发指南
-- [改进手册](docs/IMPROVEMENT_GUIDEBOOK.md) - 优化和改进建议
+- [改进手册](docs/IMPROVEMENT_GUIDBOOK.md) - 优化和改进建议
 
 ## 相关项目
 
@@ -306,6 +314,7 @@ Copyright (c) 2026 ReSerendipity
 
 - [VoxCPM2](https://github.com/OpenBMB/VoxCPM2) - OpenBMB 开源 TTS 模型
 - [IndexTTS2](https://github.com/IndexTeam/IndexTTS2) - IndexTeam 开源 TTS 模型
+- [dots.tts](https://github.com/dots-tts/dots) - dots.tts 引擎及实现
 - [FastAPI](https://fastapi.tiangolo.com/) 和 [HTMX](https://htmx.org/) - Web 框架
 - 所有开源贡献者
 
@@ -314,262 +323,5 @@ Copyright (c) 2026 ReSerendipity
 <div align="center">
 
 **如果这个项目对你有帮助，请给个 Star 支持一下！**
-
-</div>
-
----
-
-<a id="english"></a>
-
-## Why TTS MultiModel?
-
-| Advantage | Description |
-|-----------|-------------|
-| **All-in-One** | Dual-engine (VoxCPM2 + IndexTTS2), voice cloning, voice design, script dubbing, LoRA fine-tuning — no need to switch between tools |
-| **Zero Friction** | Bundled WinPython + one-click installer for Windows; Docker deployment in one command |
-| **Complete Toolchain** | From data preparation to model training to inference — covers the full TTS lifecycle |
-| **Open Source** | Apache 2.0 license, commercially usable, extensible, community-driven |
-| **Multilingual UI** | Chinese, English, Japanese, Korean — internationalization out of the box |
-
-## Demo
-
-<div align="center">
-
-| Voice Design | Voice Clone |
-|:------------:|:-----------:|
-| ![Voice Design](docs/screenshots/voxcpm2_01_voice_design_viewport.png) | ![Voice Clone](docs/screenshots/voxcpm2_02_voice_clone_viewport.png) |
-
-| Ultimate Clone | Script Workshop |
-|:--------------:|:---------------:|
-| ![Ultimate Clone](docs/screenshots/voxcpm2_03_ultimate_clone_viewport.png) | ![Script Workshop](docs/screenshots/voxcpm2_04_script_workshop_viewport.png) |
-
-| LoRA | Settings |
-|:----:|:--------:|
-| ![LoRA](docs/screenshots/voxcpm2_06_lora_viewport.png) | ![Settings](docs/screenshots/voxcpm2_08_settings_viewport.png) |
-
-</div>
-
-### Dark Theme
-
-<div align="center">
-
-| Voice Design (Dark) | History (Dark) |
-|:-------------------:|:--------------:|
-| ![Voice Design Dark](docs/screenshots/dark/voxcpm2_01_voice_design_dark_viewport.png) | ![History Dark](docs/screenshots/dark/voxcpm2_09_history_dark_viewport.png) |
-
-</div>
-
-> Share your experience in [Discussions](https://github.com/ReSerendipity/TTS_MultiModel/discussions)!
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Dual Engine** | VoxCPM2 + IndexTTS 2.0 dual TTS engine architecture |
-| **Voice Cloning** | Clone voices with minimal audio samples (controllable + ultimate clone) |
-| **Voice Design** | Generate speech from voice description text |
-| **Script Studio** | Multi-character dialogue generation with speaker mapping |
-| **Streaming** | Real-time audio streaming for long text (SSE) |
-| **LoRA Fine-tuning** | Fine-tune models with custom datasets |
-| **Web UI** | Modern responsive interface (FastAPI + HTMX + Jinja2) |
-| **Batch Processing** | Batch audio generation support |
-| **History** | SQLite-based history with search, filter, pagination |
-| **i18n** | UI in Chinese, English, Japanese, Korean |
-| **Multi-GPU** | NVIDIA CUDA / Apple MPS / CPU |
-| **Custom Voice Library** | Save and manage custom voice personas |
-
-## Quick Start
-
-### Prerequisites
-
-- **OS**: Windows 10/11 (64-bit) or Linux
-- **Python**: 3.12+ (bundled WinPython for Windows)
-- **GPU**: NVIDIA (CUDA) / Apple Silicon (MPS), 6.5GB+ VRAM recommended
-- **VC Redistributable** (Windows): Included in `VC 运行库/` folder
-
-### Windows
-
-```bash
-git clone https://github.com/ReSerendipity/TTS_MultiModel.git
-cd TTS_MultiModel
-install.bat    # Install dependencies
-# Download models (see Model Download section)
-start.bat      # Start the application
-```
-
-### Linux
-
-```bash
-git clone https://github.com/ReSerendipity/TTS_MultiModel.git
-cd TTS_MultiModel
-chmod +x install.sh && ./install.sh
-# Download models (see Model Download section)
-chmod +x start.sh && ./start.sh
-```
-
-### Docker
-
-```bash
-docker compose up -d
-# Access at http://localhost:7869
-```
-
-## Model Download
-
-Download models from [HuggingFace](https://huggingface.co/) or [ModelScope](https://modelscope.cn/) and place in `pretrained_models/`:
-
-| Model | Description | Directory |
-|-------|-------------|-----------|
-| VoxCPM2 | Main TTS model | `pretrained_models/VoxCPM2/` |
-| SenseVoiceSmall | ASR model | `pretrained_models/SenseVoiceSmall/` |
-| speech_zipenhancer | Audio denoiser | `pretrained_models/speech_zipenhancer/` |
-| IndexTTS2 | IndexTTS 2.0 model | `pretrained_models/IndexTTS2/` |
-
-Quick download: `python scripts/download_indextts2.py`
-
-See [Model Download Guide](docs/MODEL_DOWNLOAD_GUIDE.md) for details.
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Web Framework | FastAPI + Uvicorn |
-| Frontend | HTMX + Jinja2 + Bootstrap |
-| TTS Engine | VoxCPM2 + IndexTTS 2.0 |
-| ASR Engine | SenseVoiceSmall |
-| Audio Processing | speech_zipenhancer + FFmpeg + SoX |
-| Deep Learning | PyTorch + Transformers + FunASR |
-| Database | SQLite |
-| Containerization | Docker + Docker Compose |
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/system/health` | GET | Health check |
-| `/api/system/gpu` | GET | GPU utilization |
-| `/api/generate/voxcpm2/clone` | POST | Voice cloning (VoxCPM2) |
-| `/api/generate/voxcpm2/design` | POST | Voice design (VoxCPM2) |
-| `/api/generate/voxcpm2/script` | POST | Script generation (VoxCPM2) |
-| `/api/generate/voxcpm2/streaming_sse` | POST | Streaming generation (SSE) |
-| `/api/generate/indextts2/synthesize` | POST | TTS synthesis (IndexTTS 2.0) |
-| `/api/model/load` | POST | Load model |
-| `/api/model/unload` | POST | Unload model |
-| `/api/history` | GET | Generation history |
-
-## Development
-
-### Running Tests
-
-```bash
-# Run all tests
-pytest tests/ -v
-
-# Run unit tests only (skip GPU/integration tests)
-pytest tests/ -v -k "not gpu and not cuda and not vram" -m "not integration"
-
-# Run with coverage
-pytest tests/ -v --cov=bin/integrated_app --cov-report=term-missing
-```
-
-### Code Quality
-
-```bash
-# Lint
-ruff check bin/integrated_app/ scripts/
-
-# Format
-ruff format bin/integrated_app/ scripts/
-```
-
-### Code Structure
-
-- **bin/integrated_app/**: Main application
-  - `app_server.py`: Server entry point with background model loading
-  - `config.py` / `config_models.py`: Pydantic-validated configuration management
-  - `model_manager.py`: Model loading, unloading, engine switching with rollback
-  - `model_registry.py`: Centralized model state management with engine protocol
-  - `engine_interface.py`: TTSEngine Protocol definition for type-safe duck typing
-  - `routes/`: HTTP route handlers (auto-discovered)
-  - `engines/`: TTS engine implementations (VoxCPM2, IndexTTS 2.0)
-  - `training/`: LoRA fine-tuning functionality
-  - `cache.py`: Adaptive LRU cache with GPU-aware capacity management
-  - `history_db.py`: SQLite-based generation history with full-text search
-  - `gpu_backend.py`: Multi-backend GPU abstraction layer
-  - `gpu_utils.py`: GPU memory management and OOM detection
-
-For architecture details, see [Project Architecture](docs/PROJECT_ARCHITECTURE.md).
-
-## Troubleshooting
-
-### Common Issues
-
-1. **VC Redistributable Error** (Windows):
-   - Install `VC 运行库\VC_redist.x64.exe`
-
-2. **Model Not Found**:
-   - Ensure models are downloaded and placed in `pretrained_models/`
-   - Check directory structure matches expected layout
-
-3. **GPU Not Detected**:
-   - Install GPU-compatible PyTorch version (CUDA for NVIDIA)
-   - Verify GPU drivers are up to date
-   - Check `python -c "import torch; print(torch.cuda.is_available())"`
-
-4. **Port Already in Use**:
-   - The app will auto-select an available port
-   - Check console output for the actual URL
-
-5. **Docker GPU Access**:
-   - Ensure nvidia-docker runtime is installed
-   - Verify with `docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi`
-
-### Logs
-
-Check `logs/app.log` for detailed error messages.
-
-## Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. **Report Bugs** - Open an issue with detailed reproduction steps
-2. **Suggest Features** - Open an issue with the `enhancement` label
-3. **Submit Code** - Fork → Branch → Commit → Push → Pull Request
-4. **Improve Docs** - Fix typos, add examples, translate
-
-See [Contributing Guide](CONTRIBUTING.md) for details.
-
-## License
-
-This project is licensed under the [Apache License 2.0](LICENSE).
-
-Copyright (c) 2026 ReSerendipity
-
-## Related Projects
-
-The following open-source projects share high relevance in features, architecture, or technology with this project (detailed analysis in [GitHub Reference Repos Analysis](GITHUB_REFERENCE_REPOS_ANALYSIS.md)):
-
-| Project | Description | Stars |
-|---------|-------------|-------|
-| [VoxCPM](https://github.com/OpenBMB/VoxCPM) | OpenBMB multilingual TTS, upstream of our VoxCPM2 engine | ~29.6k |
-| [Fish Speech](https://github.com/fishaudio/fish-speech) | Fish Audio multilingual TTS, 80+ languages, RL alignment | ~70k+ |
-| [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Few-shot TTS with complete training toolchain | ~50k |
-| [ChatTTS](https://github.com/2noise/ChatTTS) | Dialogue-optimized TTS with fine-grained prosody control | ~37.5k |
-| [OpenVoice](https://github.com/myshell-ai/OpenVoice) | MyShell instant voice cloning with style control | ~25k+ |
-| [CosyVoice](https://github.com/FunAudioLLM/CosyVoice) | Alibaba multilingual TTS, Flow Matching + vLLM acceleration | ~18.6k |
-| [Chatterbox](https://github.com/resemble-ai/chatterbox) | Resemble AI low-latency TTS with model tiering | ~19.2k |
-
-## Acknowledgments
-
-- [VoxCPM2](https://github.com/OpenBMB/VoxCPM2) by OpenBMB
-- [IndexTTS2](https://github.com/IndexTeam/IndexTTS2) by IndexTeam
-- [FastAPI](https://fastapi.tiangolo.com/) and [HTMX](https://htmx.org/)
-- All open-source contributors
-
----
-
-<div align="center">
-
-**If you find this project helpful, please consider giving it a Star!**
 
 </div>
