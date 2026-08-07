@@ -91,6 +91,11 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 - **.py**：使用 UTF-8，头部保留编码声明。
 - **JSON/YAML**：统一使用 UTF-8 无 BOM。
 
+### 4.3 依赖管理
+- **主依赖**：`requirements.txt` 包含所有运行时依赖，`pyproject.toml` 定义项目元数据
+- **依赖同步**：使用 `scripts/sync_requirements.py` 检查依赖一致性
+- **离线安装**：先执行 `pip download -r requirements.txt -d ./offline_packages`，再用 `pip install --no-index --find-links=./offline_packages -r requirements.txt`
+
 ---
 
 ## 5. TTS_MultiModel 项目速查
@@ -103,6 +108,7 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 - **默认地址**：`127.0.0.1:7869`
 - **环境变量**：离线模式必须设置 `TRANSFORMERS_OFFLINE=1`、`HF_HUB_OFFLINE=1` 和 `MODELSCOPE_OFFLINE=1`
 - **自动加载**：`config.yaml` 中 `server.auto_load_model: true` 可启用启动时自动加载模型
+- **Docker 部署**：支持 NVIDIA CUDA 12.1 容器化部署，使用 `docker-compose.yml` 或 `Dockerfile` 构建
 
 ### 5.2 核心模块
 
@@ -195,7 +201,7 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 | `tabs.py` | `/tabs` | HTMX 标签页加载（voice_design/clone/ultimate/script/indextts2 等） |
 | `model.py` | `/api/model` | 模型状态、加载/卸载、预加载、引擎切换、LoRA 管理 |
 | `audio.py` | `/api/audio` | 音频文件服务（生成结果、Persona 音频、说话人样本） |
-| `persona.py` | `/api/persona` | 音色管理（已拆分为 `routes/api/persona.py` 和 `routes/web/persona.py`） |
+| `persona.py` | `/api/persona` | 音色管理（增删改查、参考音频下发） |
 | `sse.py` | `/api/sse` | 统一 SSE 事件流端点 `/api/sse/events` |
 | `training.py` | `/api/training` | LoRA 微调训练管理 |
 | `generate/voxcpm2/` | `/api/generate/voxcpm2` | VoxCPM2 生成路由（design/clone/script/streaming） |
@@ -218,7 +224,7 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 
 ### 5.6 国际化
 
-位于 `locales/`，支持 4 种语言：
+位于 `bin/integrated_app/locales/`，支持 4 种语言：
 - `zh.json` — 中文（默认）
 - `en.json` — 英文
 - `ja.json` — 日文
@@ -246,7 +252,7 @@ pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing -
 ```yaml
 version: "x.y.z"   # 以 config.yaml 实际值为准，勿硬编码
 server:        # 主机、端口、自动加载、SSL
-models:        # 模型路径（VoxCPM2 + IndexTTS2）
+models:        # 模型路径（VoxCPM2 + IndexTTS2 + dots.tts）
 generation:    # 生成默认参数（cfg、timesteps、重试策略等）
 cache:         # Persona 缓存策略
 environment:   # 离线环境变量
@@ -300,7 +306,7 @@ ui:            # UI 布局（侧边栏宽度等）
 
 ---
 
-## 6½. 实现陷阱（代码不可直接推断）
+## 6.1. 实现陷阱（代码不可直接推断）
 
 - **静态文件缓存陷阱**：自定义 StaticFiles 子类（如 `CachedStaticFiles`）曾为 CSS/JS 设置 `immutable` + 长期 `max-age`（1年/7天等），导致修改 CSS/JS 后刷新页面仍显示旧版。修改此类文件后务必：(1) 检查 `Cache-Control` 头是否含 `immutable`；(2) 检查 `base.html` 中 `?v=` 版本号是否需要递增；(3) 最稳妥方案是将 CSS/JS 的 Cache-Control 改为 `no-cache, must-revalidate`，使每次刷新都向服务器验证
 - GPU 后端支持 NVIDIA CUDA、Apple MPS 和 CPU，启动时自动检测

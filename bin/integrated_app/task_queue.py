@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import logging
 import time
 import traceback
@@ -92,7 +93,7 @@ async def _generation_worker() -> None:
                 wait_seconds = time.monotonic() - job.created_at
                 logger.debug("[TaskQueue] 跳过已取消的任务: %s (排队 %.2fs)", job.generation_id, wait_seconds)
                 # 安全关闭协程，防止资源泄漏
-                if not job.coro.cr_frame:
+                if inspect.getcoroutinestate(job.coro) == "CORO_CREATED":
                     job.coro.close()
                 _generation_queue.task_done()
                 continue
@@ -258,6 +259,30 @@ def get_queue_status() -> dict[str, Any]:
     }
 
 
+async def _drain_and_close_pending_coros() -> None:
+    """清空队列中尚未处理的 job 并关闭其协程，防止资源泄漏。
+
+    在强制重建队列（``init_queue(force=True)``）或关闭队列（``shutdown_queue``）
+    前调用：worker 被取消后，队列中可能残留从未启动的协程（例如排队中即被
+    取消、或 worker 未及取出的任务），若直接丢弃队列，这些协程永远不会被
+    await/close，产生 ``RuntimeWarning: coroutine was never awaited`` 且泄漏资源。
+    """
+    queue = _generation_queue
+    if queue is None:
+        return
+    while True:
+        try:
+            job = queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+        try:
+            # 仅关闭从未启动的协程；已启动的由 asyncio.Task 取消流程负责
+            if inspect.getcoroutinestate(job.coro) == "CORO_CREATED":
+                job.coro.close()
+        finally:
+            queue.task_done()
+
+
 async def init_queue(force: bool = False) -> None:
     """初始化生成队列并启动 worker。
 
@@ -280,6 +305,8 @@ async def init_queue(force: bool = False) -> None:
                 task.cancel()
         with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
             await asyncio.wait_for(_generation_worker_task, timeout=2.0)
+        # 关闭旧队列中残留的未处理协程，防止资源泄漏（never awaited 警告）
+        await _drain_and_close_pending_coros()
 
     _generation_queue = asyncio.Queue()
     _queued_generation_ids = set()
@@ -306,6 +333,9 @@ async def shutdown_queue() -> None:
         _generation_worker_task.cancel()
         with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
             await asyncio.wait_for(_generation_worker_task, timeout=2.0)
+
+    # 关闭队列中残留的未处理协程，防止资源泄漏（never awaited 警告）
+    await _drain_and_close_pending_coros()
 
     _generation_queue = None
     _generation_worker_task = None

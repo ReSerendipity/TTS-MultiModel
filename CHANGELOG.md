@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - vendor/tn/ 6 个 tn stub 文件
 - `docs/adr/README.md` ADR 索引
 
+### Fixed
+- `task_queue` 协程泄漏：`shutdown_queue()` / `init_queue(force=True)` 关闭队列时未关闭残留协程，产生 `coroutine was never awaited` 警告
+  - 修复 `_generation_worker` 取消任务路径的协程状态判断缺陷（`cr_frame` 对未启动协程非 None，改用 `inspect.getcoroutinestate`）
+  - 新增 `_drain_and_close_pending_coros()` 清理辅助函数
+  - 补充 `test_shutdown_closes_pending_coroutines` / `test_force_init_closes_pending_coroutines` 测试
+- `tests/test_csrf_integration.py` 消除 starlette TestClient per-request cookies 弃用警告（改为 client 实例设置 cookie）
+- `AGENTS.md` 文档与实际对齐（依赖管理小节、Docker 部署说明、persona/locales 路径、章节编号）
+
 ## [2.0.2] - 2026-07-24
 
 ### Added

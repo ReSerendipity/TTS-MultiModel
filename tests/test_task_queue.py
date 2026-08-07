@@ -467,6 +467,47 @@ class TestSerialProcessing:
         assert "A" in processed
         assert "B" not in processed
 
+    def test_shutdown_closes_pending_coroutines(self):
+        """shutdown 时应关闭队列中未处理协程，避免 never-awaited 警告与资源泄漏。"""
+        import inspect
+
+        from integrated_app import task_queue as tq
+
+        async def pending_coro():
+            await asyncio.sleep(60)
+
+        async def run():
+            coro = pending_coro()
+            # 模拟 worker 未及取出的排队任务
+            tq._generation_queue = asyncio.Queue()
+            await tq._generation_queue.put(tq.GenerationJob(generation_id="gen-pending", coro=coro))
+            await tq.shutdown_queue()
+            return coro
+
+        loop = asyncio.get_event_loop()
+        coro = loop.run_until_complete(run())
+        assert inspect.getcoroutinestate(coro) == "CORO_CLOSED"
+
+    def test_force_init_closes_pending_coroutines(self):
+        """强制重建队列时应关闭旧队列中未处理协程，避免资源泄漏。"""
+        import inspect
+
+        from integrated_app import task_queue as tq
+
+        async def pending_coro():
+            await asyncio.sleep(60)
+
+        async def run():
+            coro = pending_coro()
+            tq._generation_queue = asyncio.Queue()
+            await tq._generation_queue.put(tq.GenerationJob(generation_id="gen-pending", coro=coro))
+            await tq.init_queue(force=True)
+            return coro
+
+        loop = asyncio.get_event_loop()
+        coro = loop.run_until_complete(run())
+        assert inspect.getcoroutinestate(coro) == "CORO_CLOSED"
+
 
 # =====================================================================
 # _notify_generation_failed / _force_fail_if_active 测试

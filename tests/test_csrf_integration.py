@@ -56,11 +56,11 @@ class TestCSRFMiddleware:
         csrf_token = get_response.cookies.get("csrf_token")
         assert csrf_token is not None
 
-        # Then POST with the token
+        # Then POST with the token (cookie set on client instance)
+        client.cookies.set("csrf_token", csrf_token)
         response = client.post(
             "/api/submit",
             headers={"X-CSRF-Token": csrf_token},
-            cookies={"csrf_token": csrf_token},
         )
         assert response.status_code == 200
 
@@ -70,12 +70,12 @@ class TestCSRFMiddleware:
         # First GET to get the CSRF cookie
         get_response = client.get("/api/data")
         csrf_token = get_response.cookies.get("csrf_token")
+        client.cookies.set("csrf_token", csrf_token)
 
         # POST with wrong token
         response = client.post(
             "/api/submit",
             headers={"X-CSRF-Token": "wrong-token"},
-            cookies={"csrf_token": csrf_token},
         )
         assert response.status_code == 403
 
