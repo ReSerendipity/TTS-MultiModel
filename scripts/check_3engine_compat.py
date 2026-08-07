@@ -209,15 +209,14 @@ def run_all_checks() -> list[CheckResult]:
         )
     )
 
-    # 9. dots.tts 可 import（vendor stub 生效）
-    # dots_tts 包依赖 tn stub（bin/integrated_app/vendor/tn/）
-    # sys.path 已在模块顶部设置了 _VENDOR_DIR
+    # 9. dots.tts 可 import（可选引擎，未安装时仅提示、不阻断）
+    # dots_tts 包依赖 tn stub（bin/integrated_app/vendor/tn/），sys.path 已在模块顶部设置 _VENDOR_DIR
     try:
         importlib.import_module("dots_tts")
-        results.append(CheckResult("dotstts", "dots.tts", "OK", "import OK (vendor stub 生效)"))
+        results.append(CheckResult("dotstts", "dots.tts", "OK", "import OK"))
     except ImportError as e:
-        # dots_tts 可能未安装，这是可预期的（需要单独安装）
-        results.append(CheckResult("dotstts", "dots.tts", "FAIL", f"import 失败: {e}"))
+        # dots_tts 为可选依赖，未安装属可预期情况：记录 WARN 而非 FAIL
+        results.append(CheckResult("dotstts", "dots.tts", "WARN", f"未安装（可选依赖，可 pip install dots.tts）：{e}"))
     except Exception as e:
         results.append(CheckResult("dotstts", "dots.tts", "FAIL", f"import 异常 ({type(e).__name__}): {e}"))
 
@@ -247,7 +246,8 @@ def format_text_output(results: list[CheckResult]) -> str:
                 version_part = f"  {r.detail}"
             lines.append(f"{status_tag} {label_padded}{version_part}{detail_part}")
         elif r.status == "WARN":
-            lines.append(f"{status_tag} {label_padded}: {r.version}  ({r.detail})")
+            warn_version = f": {r.version}" if r.version else ""
+            lines.append(f"{status_tag} {label_padded}{warn_version}  ({r.detail})")
         else:
             lines.append(f"{status_tag} {label_padded}{version_part}  {r.detail}")
 

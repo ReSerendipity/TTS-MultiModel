@@ -17,6 +17,10 @@ Identified bugs in tts_multimodel_replica.html:
 
 import os
 import sys
+
+import pytest
+
+pytest.importorskip("playwright")  # Playwright 为可选（E2E）依赖，未安装时跳过本模块
 from playwright.sync_api import sync_playwright
 
 SCREENSHOT_DIR = r"c:\Users\HONOR\TTS_MultiModel\screenshots"
@@ -73,7 +77,9 @@ def main():
 
         # Capture console errors
         console_errors = []
-        page.on("console", lambda msg: console_errors.append(f"[{msg.type}] {msg.text}") if msg.type == "error" else None)
+        page.on(
+            "console", lambda msg: console_errors.append(f"[{msg.type}] {msg.text}") if msg.type == "error" else None
+        )
         page.on("pageerror", lambda exc: console_errors.append(f"[PAGEERROR] {exc}"))
 
         # 1. Open page
@@ -118,7 +124,9 @@ def main():
         btn.click()
         page.wait_for_timeout(300)
         # The page should NOT have switched (BUG-1)
-        active_after_click = page.evaluate("() => Array.from(document.querySelectorAll('.tab-page.active')).map(e => e.id)")
+        active_after_click = page.evaluate(
+            "() => Array.from(document.querySelectorAll('.tab-page.active')).map(e => e.id)"
+        )
         print(f"    点击后 active 页面: {active_after_click}")
         if "page-voice_clone" not in active_after_click:
             results.append(("侧边栏按钮点击-语音克隆", None, "FAIL: 页面未切换 (BUG-1 导致)"))
@@ -135,10 +143,14 @@ def main():
                 page.wait_for_timeout(300)
 
                 # Verify visibility
-                is_visible = page.evaluate(f"() => document.getElementById('{page_div_id}').classList.contains('active')")
-                has_active = page.evaluate(f"() => document.querySelector('button.sidebar-item[data-tab=\"{tab_id}\"]').classList.contains('active')")
+                is_visible = page.evaluate(
+                    f"() => document.getElementById('{page_div_id}').classList.contains('active')"
+                )
+                has_active = page.evaluate(
+                    f"() => document.querySelector('button.sidebar-item[data-tab=\"{tab_id}\"]').classList.contains('active')"
+                )
 
-                filename = f"{i+1:02d}_{tab_id}.png"
+                filename = f"{i + 1:02d}_{tab_id}.png"
                 path = os.path.join(SCREENSHOT_DIR, filename)
                 page.screenshot(path=path, full_page=False)
 
