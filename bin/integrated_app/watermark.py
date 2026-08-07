@@ -228,14 +228,18 @@ def embed_watermark(
     freq_high_bin = int(_WATERMARK_FREQ_HIGH * _WATERMARK_FRAME_SIZE / sample_rate)
     freq_high_bin = min(freq_high_bin, _WATERMARK_FRAME_SIZE // 2)
 
-    n_freq_bins = freq_high_bin - freq_low_bin
-    if n_freq_bins < _WATERMARK_BITS:
+    # 低采样率（<=32kHz）时 16-20kHz 频带超出 Nyquist，频点可能不足甚至为负
+    n_freq_bins = max(0, freq_high_bin - freq_low_bin)
+    effective_bits = min(_WATERMARK_BITS, n_freq_bins)
+    if effective_bits <= 0:
         logger.warning(
-            f"频点数量不足（{n_freq_bins}），无法容纳 {_WATERMARK_BITS} 个水印比特。将有效比特数降至 {n_freq_bins}。"
+            f"采样率 {sample_rate}Hz 无法容纳水印频点（16-20kHz 超出 Nyquist），跳过水印嵌入"
         )
-        effective_bits = min(_WATERMARK_BITS, n_freq_bins)
-    else:
-        effective_bits = _WATERMARK_BITS
+        return audio.astype(np.float32), WatermarkResult(
+            success=False,
+            message=f"采样率 {sample_rate}Hz 过低，无法嵌入水印",
+            payload=None,
+        )
 
     frame_size = _WATERMARK_FRAME_SIZE
     hop_size = frame_size // 2
@@ -258,7 +262,10 @@ def embed_watermark(
             for bit_idx in range(effective_bits):
                 freq_bin = freq_low_bin + bit_idx
                 if freq_bin < len(fft):
-                    modulation = payload_bits[bit_idx] * strength * np.exp(1j * carrier_phases[bit_idx])
+                    # BPSK 双极性调制：bit=1 -> +strength，bit=0 -> -strength
+                    # 确保每个比特都携带能量，检测端 sign 判定可靠（避免 bit=0 无信号导致的随机误码）
+                    bit_value = 1.0 if payload_bits[bit_idx] else -1.0
+                    modulation = bit_value * strength * np.exp(1j * carrier_phases[bit_idx])
                     fft[freq_bin] += modulation
                     mirror_bin = frame_size - freq_bin
                     if mirror_bin < len(fft):
@@ -340,8 +347,14 @@ def detect_watermark(
     freq_low_bin = int(_WATERMARK_FREQ_LOW * frame_size / sample_rate)
     freq_high_bin = int(_WATERMARK_FREQ_HIGH * frame_size / sample_rate)
     freq_high_bin = min(freq_high_bin, frame_size // 2)
-    n_freq_bins = freq_high_bin - freq_low_bin
+    n_freq_bins = max(0, freq_high_bin - freq_low_bin)
     effective_bits = min(_WATERMARK_BITS, n_freq_bins)
+    if effective_bits <= 0:
+        return WatermarkResult(
+            success=False,
+            message=f"采样率 {sample_rate}Hz 过低，无法检测水印",
+            payload=None,
+        )
 
     rng = np.random.RandomState(42)
     carrier_phases = rng.uniform(0, 2 * np.pi, size=effective_bits)

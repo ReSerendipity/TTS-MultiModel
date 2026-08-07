@@ -177,9 +177,9 @@ source = ["bin/integrated_app"]
 omit = ["*/tests/*", "*/templates/*", "*/static/*"]
 
 [tool.coverage.report]
-# 覆盖率门槛：当前实际覆盖率约 22.91%，设定 20% 留余量。
-# 待关键模块覆盖率提升后逐步调高至 50%。
-fail_under = 20
+# 覆盖率门槛：分阶段提升计划（随测试补充逐步调高）
+#   v1: 20%（基线）-> v2: 30%（当前实际 30.92%）-> v3: 40% -> v4: 50% -> v5: 60%
+fail_under = 30
 show_missing = true
 exclude_lines = [
     "pragma: no cover",

@@ -10,7 +10,7 @@
   "close": "닫기",
   "collapse_sidebar": "사이드바 접기",
   "expand_sidebar": "사이드바 펼치기",
-  "switch_lang": "언어 전환 (中/EN/日/한)",
+  "switch_lang": "언어 전환 (中/繁/EN/日/한)",
   "char_counter_segments": "{count}세그먼트",
   "char_counter_per_segment": "세그먼트당 {max}자",
   "top_bar_title": "음성 디자인",

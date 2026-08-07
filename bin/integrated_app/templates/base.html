@@ -208,7 +208,7 @@
                         <svg id="theme-icon-moon" class="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                     </button>
                     <button class="sidebar-toggle-btn" id="lang-toggle-btn" onclick="toggleLang()" title="{{ "switch_lang"|t(lang) }}" aria-label="Switch language">
-                        <span id="lang-current-label">{{ '中' if lang.startswith('zh') else ('EN' if lang == 'en' else ('日' if lang == 'ja' else '한')) }}</span>
+                        <span id="lang-current-label">{{ '繁' if (lang.startswith('zh-TW') or lang.startswith('zh-Hant')) else ('中' if lang.startswith('zh') else ('EN' if lang == 'en' else ('日' if lang == 'ja' else '한'))) }}</span>
                     </button>
                     <button class="sidebar-help-btn" onclick="toggleHelpDrawer()" title="{{ "help_with_shortcut"|t(lang) }}" aria-label="{{ "help"|t(lang) }}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -250,7 +250,7 @@
                             <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                         </button>
                         <button class="top-bar-icon-btn" id="top-lang-toggle-btn" onclick="toggleLang()" title="{{ "switch_lang"|t(lang) }}" aria-label="Switch language">
-                            <span id="top-lang-current-label">{{ '中' if lang.startswith('zh') else ('EN' if lang == 'en' else ('日' if lang == 'ja' else '한')) }}</span>
+                            <span id="top-lang-current-label">{{ '繁' if (lang.startswith('zh-TW') or lang.startswith('zh-Hant')) else ('中' if lang.startswith('zh') else ('EN' if lang == 'en' else ('日' if lang == 'ja' else '한'))) }}</span>
                         </button>
                     </div>
                     <span class="engine-status" id="engine-status" aria-live="polite">

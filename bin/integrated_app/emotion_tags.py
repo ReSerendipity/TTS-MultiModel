@@ -7,12 +7,11 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 
-from utils import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger("tts_multimodel")
 
 
 # ---------------------------------------------------------------------------

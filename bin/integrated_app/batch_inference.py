@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -15,9 +16,7 @@ from typing import Any
 
 import torch
 
-from utils import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger("tts_multimodel")
 
 
 @dataclass

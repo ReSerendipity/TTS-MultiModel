@@ -1,6 +1,6 @@
 """JSON 文件驱动的 i18n 国际化模块。
 
-支持四种语言（zh/en/ja/ko），翻译内容以 JSON 文件形式存储在
+支持五种语言（zh-CN/zh-TW/en/ja/ko），翻译内容以 JSON 文件形式存储在
 `locales/` 目录中。
 
 两层 fallback 链保障翻译永不显示空值：
@@ -21,6 +21,8 @@ _LANG_FILE_MAP: dict[str, str] = {
     "zh-CN": "zh.json",
     "zh-Hans": "zh.json",
     "zh": "zh.json",
+    "zh-TW": "zh-tw.json",
+    "zh-Hant": "zh-tw.json",
     "ja": "ja.json",
     "ko": "ko.json",
 }
@@ -168,7 +170,7 @@ def get_lang(request: Any) -> str:
         if lang:
             if lang in _LANG_FILE_MAP:
                 return lang
-            lang_map = {"zh": "zh-CN", "ja": "ja", "jp": "ja", "ko": "ko", "kr": "ko", "en": "en"}
+            lang_map = {"zh": "zh-CN", "zh-TW": "zh-TW", "zh-Hant": "zh-TW", "zh-tw": "zh-TW", "zhCN": "zh-CN", "zhTW": "zh-TW", "ja": "ja", "jp": "ja", "ko": "ko", "kr": "ko", "en": "en"}
             if lang in lang_map:
                 return lang_map[lang]
     except (AttributeError, Exception):
@@ -179,7 +181,7 @@ def get_lang(request: Any) -> str:
         if lang:
             if lang in _LANG_FILE_MAP:
                 return lang
-            lang_map = {"zh": "zh-CN", "ja": "ja", "jp": "ja", "ko": "ko", "kr": "ko", "en": "en"}
+            lang_map = {"zh": "zh-CN", "zh-TW": "zh-TW", "zh-Hant": "zh-TW", "zh-tw": "zh-TW", "zhCN": "zh-CN", "zhTW": "zh-TW", "ja": "ja", "jp": "ja", "ko": "ko", "kr": "ko", "en": "en"}
             if lang in lang_map:
                 return lang_map[lang]
     except AttributeError:
