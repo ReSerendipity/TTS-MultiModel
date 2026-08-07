@@ -36,12 +36,13 @@ import soundfile as sf
 
 from .config import SAVE_DIR
 from .exceptions import AudioProcessingError, ValidationError
+from .watermark import WATERMARK_SOURCE_ID
 
 logger = logging.getLogger("tts_multimodel")
 
-#: 水印来源标识符常量（代码常量，不可通过配置修改，防止篡改溯源）。
+#: 水印来源标识符常量从 watermark 模块导入（代码常量，不可通过配置修改）。
 #: 所有通过 TTS_MultiModel 生成的音频均嵌入此标识，用于内容来源追溯。
-WATERMARK_SOURCE_ID: str = "tts-multimodel"
+#: 详见 ``bin/integrated_app/watermark.py`` 中的 ``WATERMARK_SOURCE_ID`` 定义。
 
 
 def save_audio(wav: np.ndarray, sr: int, prefix: str = "audio", format: str = "wav") -> tuple[str, str]:

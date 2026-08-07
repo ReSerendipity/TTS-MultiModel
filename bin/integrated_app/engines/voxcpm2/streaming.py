@@ -159,13 +159,13 @@ def _wav_to_bytes(wav: np.ndarray, sample_rate: int) -> bytes:
     # P0 安全修复：序列化前强制嵌入水印，用于生成内容来源追溯。
     # source_id 为代码常量，不可通过配置篡改。
     try:
-        from ...watermark import watermark_audio
+        from ...watermark import WATERMARK_SOURCE_ID, watermark_audio
 
         wav_wm, wm_meta = watermark_audio(
             wav.astype(np.float32) if wav.dtype != np.float32 else wav,
             sample_rate,
             enable=True,
-            source_id="tts-multimodel",
+            source_id=WATERMARK_SOURCE_ID,
         )
         if wm_meta.get("watermarked"):
             logger.debug("[streaming] 水印嵌入成功: snr=%.1fdB", wm_meta.get("snr_db", 0.0))

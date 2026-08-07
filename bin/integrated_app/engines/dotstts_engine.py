@@ -325,13 +325,13 @@ class DotsTTSEngine(TTSEngine):
         try:
             import numpy as np
 
-            from ..watermark import watermark_audio
+            from ..watermark import WATERMARK_SOURCE_ID, watermark_audio
 
             audio_wm, wm_meta = watermark_audio(
                 np.asarray(audio, dtype=np.float32),
                 sample_rate,
                 enable=True,
-                source_id="tts-multimodel",
+                source_id=WATERMARK_SOURCE_ID,
             )
             if wm_meta.get("watermarked"):
                 logger.debug("[dots.tts] 水印嵌入成功: snr=%.1fdB", wm_meta.get("snr_db", 0.0))

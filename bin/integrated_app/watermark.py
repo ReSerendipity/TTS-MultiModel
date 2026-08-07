@@ -30,6 +30,11 @@ import numpy as np
 
 logger = logging.getLogger("tts_multimodel.watermark")
 
+#: 水印来源标识符常量（代码常量，不可通过配置修改，防止篡改溯源）。
+#: 所有通过 TTS_MultiModel 生成的音频均嵌入此标识，用于内容来源追溯。
+#: 此常量定义在 watermark 模块中，供 generation / dotstts / streaming 等写盘点统一引用。
+WATERMARK_SOURCE_ID: str = "tts-multimodel"
+
 # 水印参数
 _WATERMARK_VERSION = 1
 _WATERMARK_BITS = 64  # 水印载荷的比特数
