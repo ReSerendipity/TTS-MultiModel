@@ -181,7 +181,7 @@ docker run -d --gpus all -p 7869:7869 \
 python scripts/download_indextts2.py
 ```
 
-详细说明见 [模型下载指南](docs/MODEL_DOWNLOAD_GUIDE.md)。
+详细说明见 [模型下载指南](docs/MODEL_DOWNLOADS.md)。
 
 ## 配置
 
@@ -208,7 +208,7 @@ python scripts/download_indextts2.py
 
 ## API 端点
 
-| 端点 | ���法 | 说明 |
+| 端点 | 方法 | 说明 |
 |------|------|------|
 | `/api/system/health` | GET | 健康检查 |
 | `/api/system/gpu` | GET | GPU 利用率信息 |
@@ -240,8 +240,8 @@ TTS_MultiModel/
 │   │   ├── training/           # 模型训练模块
 │   │   ├── middleware/         # HTTP 中间件 (CSRF, 请求 ID)
 │   │   ├── templates/          # Jinja2 HTML 模板
-│   │   ├── locales/            # i18n 翻译文件 (zh, en, ja, ko)
-│   │   └── ui/                 # UI 组件
+│   │   │   ├── locales/            # i18n 翻译文件 (zh, en, ja, ko)
+│   │   │   └── ui/                 # UI 组件
 │   ├── clean_launch.py         # 清理启动脚本
 │   └── ffmpeg.exe / ffplay.exe # 音频工具
 ├── data/                        # 运行时数据
@@ -288,7 +288,7 @@ Copyright (c) 2026 ReSerendipity
 
 ## 文档
 
-- [模型下载指南](docs/MODEL_DOWNLOAD_GUIDE.md) - 模型下载与配置
+- [模型下载指南](docs/MODEL_DOWNLOADS.md) - 模型下载与配置
 - [模型扩展指南](docs/MODEL_EXTENSION_GUIDE.md) - 添加新 TTS 引擎
 - [IndexTTS2 集成指南](docs/INDEXTTS2_INTEGRATION_GUIDE.md) - IndexTTS 2.0 集成详情
 - [项目架构](docs/PROJECT_ARCHITECTURE.md) - 系统架构概览
@@ -312,7 +312,7 @@ Copyright (c) 2026 ReSerendipity
 
 ## 致谢
 
-- [VoxCPM2](https://github.com/OpenBMB/VoxCPM2) - OpenBMB 开源 TTS 模型
+- [VoxCPM2](https://github.com/OpenBMB/VoxCPM) - OpenBMB 开源 TTS 模型
 - [IndexTTS2](https://github.com/IndexTeam/IndexTTS2) - IndexTeam 开源 TTS 模型
 - [dots.tts](https://github.com/dots-tts/dots) - dots.tts 引擎及实现
 - [FastAPI](https://fastapi.tiangolo.com/) 和 [HTMX](https://htmx.org/) - Web 框架
