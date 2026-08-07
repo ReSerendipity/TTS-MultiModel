@@ -384,11 +384,12 @@ class GenerationTimeEstimator:
 
         durations = [s[1] for s in self._samples]
         chars_list = [s[0] for s in self._samples]
+        recent = list(self._samples)[-5:]  # deque 不支持切片，先转 list
         return {
             "sample_count": self._count,
             "slope": round(self._slope, 6),
             "intercept": round(self._intercept, 4),
-            "recent_samples": [(int(c), round(float(d), 3)) for c, d in self._samples[-5:]],
+            "recent_samples": [(int(c), round(float(d), 3)) for c, d in recent],
             "avg_duration": round(sum(durations) / len(durations), 2),
             "min_duration": round(min(durations), 2),
             "max_duration": round(max(durations), 2),

@@ -219,19 +219,24 @@ def log_operation(
         if resolved_level not in VALID_LEVELS:
             resolved_level = "INFO"
         extra_json = json.dumps(details or {}, ensure_ascii=False)
+        # 兜底：operation_type/message 为 None 时避免 NOT NULL IntegrityError
+        safe_operation = str(operation_type or "unknown")
+        safe_message = str(message or "")
         with db._transaction() as conn:
             conn.execute(
                 "INSERT INTO action_logs (ts_ms, level, action, message, extra_json) VALUES (?, ?, ?, ?, ?)",
                 (
                     int(time.time() * 1000),
                     resolved_level,
-                    operation_type,
-                    message,
+                    safe_operation,
+                    safe_message,
                     extra_json,
                 ),
             )
-    except (AttributeError, ImportError, sqlite3.OperationalError, OSError, RuntimeError):
-        # DB 不可用就当没发生过，内存路径已经记录
+    except sqlite3.Error:
+        # DB 不可用/约束冲突等都当没发生过，内存路径已经记录
+        return
+    except (AttributeError, ImportError, OSError, RuntimeError):
         return
 
 

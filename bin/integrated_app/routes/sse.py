@@ -272,10 +272,9 @@ class SSEEventBus:
             try:
                 self._loop = asyncio.get_running_loop()
             except RuntimeError:
-                try:
-                    self._loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    self._loop = None
+                # 无运行中的事件循环（例如后台线程调用）：
+                # Python 3.12 中 get_event_loop() 已弃用且可能抛异常，直接返回 None
+                self._loop = None
         return self._loop
 
     async def _heartbeat_task(self, queue: asyncio.Queue[SSEEvent | dict[str, Any]]) -> None:

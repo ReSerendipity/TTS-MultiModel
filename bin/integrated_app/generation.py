@@ -128,7 +128,9 @@ def save_audio(wav: np.ndarray, sr: int, prefix: str = "audio", format: str = "w
             logger.warning("水印嵌入异常（已忽略）: %s", wm_exc)
 
         # 原子写入 WAV：先写临时文件，再 os.replace
-        sf.write(temp_path, wav, sr)
+        # 注意：临时文件以 .tmp 结尾，soundfile 无法从扩展名推断格式，
+        # 必须显式指定 format，否则抛 "No format specified" TypeError
+        sf.write(temp_path, wav, sr, format="WAV")
         os.replace(temp_path, file_path)
     except (OSError, ValueError) as exc:
         # 清理临时文件
@@ -853,7 +855,9 @@ def preprocess_and_save_temp(
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir=dir_name) as ntf:
             tmp_p = ntf.name
         try:
-            sf.write(tmp_p, wav_p, sr)
+            # 临时文件路径带随机后缀，soundfile 无法从扩展名推断格式，需显式指定
+            _fmt_map = {".wav": "WAV", ".flac": "FLAC", ".ogg": "OGG", ".mp3": "MP3"}
+            sf.write(tmp_p, wav_p, sr, format=_fmt_map.get(suffix.lower(), "WAV"))
             os.replace(tmp_p, out_path)
             tmp_p = None  # 成功移交，不再需要清理
         except Exception:

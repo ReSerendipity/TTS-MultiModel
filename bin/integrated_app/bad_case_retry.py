@@ -158,6 +158,11 @@ class RetryResult:
     failure_reason: str = ""
 
 
+def _fmt_num(value: Any) -> str:
+    """安全格式化数值用于日志，非数值（如缺失参数回退的 N/A）直接返回字符串。"""
+    return f"{value:.2f}" if isinstance(value, (int, float)) else str(value)
+
+
 def detect_failure_type(
     wav: np.ndarray,
     sample_rate: int,
@@ -335,9 +340,9 @@ def adjust_params_for_retry(
 
     logger.info(
         f"[BadCaseRetry] 第 {attempt} 次重试参数调整: "
-        f"cfg={new_params.get('cfg_value', 'N/A'):.2f}, "
-        f"temp={new_params.get('temperature', 'N/A'):.2f}, "
-        f"top_p={new_params.get('top_p', 'N/A'):.2f}, "
+        f"cfg={_fmt_num(new_params.get('cfg_value', 'N/A'))}, "
+        f"temp={_fmt_num(new_params.get('temperature', 'N/A'))}, "
+        f"top_p={_fmt_num(new_params.get('top_p', 'N/A'))}, "
         f"seed={new_params.get('seed', 'N/A')}, "
         f"策略={[s.value for s in strategies_applied]}"
     )

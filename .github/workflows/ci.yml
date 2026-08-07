@@ -120,7 +120,7 @@ jobs:
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
         run: |
-          pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=30 \
+          pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=40 \
             -k "not gpu and not cuda and not vram" -m "not integration"
 
       - name: Run benchmark tests
