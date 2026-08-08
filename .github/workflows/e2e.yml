@@ -70,7 +70,8 @@ jobs:
         env:
           TTS_SERVER_URL: "http://127.0.0.1:7869"
         run: |
-          pytest tests/e2e/ -v --tb=short || true
+          pytest tests/e2e/ -v --tb=short
+        continue-on-error: true
 
       - name: Upload E2E screenshots
         if: always()

@@ -111,7 +111,7 @@ jobs:
           HF_HUB_OFFLINE: "1"
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
-        run: python scripts/check_3engine_compat.py || true
+        run: python scripts/check_3engine_compat.py
 
       - name: Run tests with coverage
         env:
@@ -120,8 +120,8 @@ jobs:
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
         run: |
-          pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=40 \
-            -k "not gpu and not cuda and not vram" -m "not integration"
+          pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=40 \
+            -m "not integration and not gpu and not cuda and not vram"
 
       - name: Run benchmark tests
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' && runner.os == 'Linux'
@@ -131,7 +131,7 @@ jobs:
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
         run: |
-          pytest tests/benchmarks/ -v --tb=short -m "benchmark" || true
+          pytest tests/benchmarks/ -v --tb=short -m "benchmark"
 
       - name: Run integration tests
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' && runner.os == 'Linux'
@@ -141,7 +141,7 @@ jobs:
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
         run: |
-          pytest tests/ -v --tb=short -m "integration" || true
+          pytest tests/ -v --tb=short -m "integration"
 
       - name: Upload coverage report
         if: always() && runner.os == 'Linux'
@@ -149,6 +149,15 @@ jobs:
         with:
           name: coverage-report-${{ matrix.python-version }}-${{ runner.os }}
           path: coverage.xml
+
+      - name: Upload coverage to Codecov
+        if: always() && runner.os == 'Linux' && matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: tts-multimodel-coverage
+          fail_ci_if_error: false
 
   build:
     name: Build (sdist/wheel)

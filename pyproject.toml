@@ -166,14 +166,18 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+asyncio_mode = "auto"
 markers = [
     "integration: integration tests requiring GPU",
     "benchmark: performance benchmark tests",
     "gpu: tests requiring a real GPU device",
+    "cuda: tests requiring CUDA GPU for inference",
+    "vram: tests for VRAM switching / memory management",
 ]
 
 [tool.coverage.run]
 source = ["bin/integrated_app"]
+branch = true
 omit = ["*/tests/*", "*/templates/*", "*/static/*"]
 
 [tool.coverage.report]

@@ -51,7 +51,7 @@ jobs:
             --benchmark-columns=rounds,iterations,mean,median,stddev,min,max \
             --benchmark-sort=mean \
             --benchmark-storage=output/benchmarks \
-            --benchmark-save=ci-${{ github.sha }} || true
+            --benchmark-save=ci-${{ github.sha }}
 
       - name: Compare benchmark results
         if: github.event_name == 'pull_request'
@@ -117,7 +117,7 @@ jobs:
             --benchmark-columns=rounds,iterations,mean,median,stddev,min,max \
             --benchmark-sort=mean \
             --benchmark-storage=output/gpu-benchmarks \
-            --benchmark-save=gpu-ci-${{ github.sha }} || true
+            --benchmark-save=gpu-ci-${{ github.sha }}
 
       - name: Upload GPU benchmark results
         if: always()
