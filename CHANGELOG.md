@@ -5,6 +5,27 @@ All notable changes to TTS MultiModel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.1.0...v2.2.0) (2026-08-08)
+
+
+### Features
+
+* **security:** complete security hardening based on assessment report ([d2a4e50](https://github.com/ReSerendipity/TTS_MultiModel/commit/d2a4e50fa554ee2e3b2890aef4fb09ec58d2a473))
+
+
+### Bug Fixes
+
+* resolve ruff lint & format issues to pass CI (Lint job) ([47a103a](https://github.com/ReSerendipity/TTS_MultiModel/commit/47a103ae4d9cf138f38b000db523cdc2e3aa1db7))
+* treat dots_tts as optional in compat check; skip playwright test when dep missing ([92e1998](https://github.com/ReSerendipity/TTS_MultiModel/commit/92e19983a9567db0ab95760ba83eaa0f633ecc03))
+* 修复 task_queue 协程泄漏并消除测试弃用警告 ([6b672b1](https://github.com/ReSerendipity/TTS_MultiModel/commit/6b672b1e057a7ccfcd9ef68dfa66f9ee7963303b))
+
+
+### Documentation
+
+* add model download & verification examples ([2f8acf3](https://github.com/ReSerendipity/TTS_MultiModel/commit/2f8acf3e7aa4677b8b43286023a01f341d9596d0))
+* link MODEL_DOWNLOADS.md from README ([6eb46c5](https://github.com/ReSerendipity/TTS_MultiModel/commit/6eb46c50c83527af1ada4905158be94fc8c1e91d))
+* update README to include dots.tts (three-model support) and API/dirs ([35fd58c](https://github.com/ReSerendipity/TTS_MultiModel/commit/35fd58c451f12767f6d3fdc1f7795055b84293b4))
+
 ## [Unreleased]
 
 ### Removed
