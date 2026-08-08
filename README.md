@@ -301,7 +301,7 @@ Copyright (c) 2026 ReSerendipity
 
 ## 相关项目
 
-以下开源项目在功能、架构或技术上与本项目有较高参考价值（详细分析见 [GitHub 参考仓库分析报告](GITHUB_REFERENCE_REPOS_ANALYSIS.md)）：
+以下开源项目在功能、架构或技术上与本项目有较高参考价值：
 
 | 项目 | 说明 | Stars |
 |------|------|-------|

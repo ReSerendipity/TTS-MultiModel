@@ -226,3 +226,20 @@ docs/reports/multi_page_style_report.md
 docs/reports/report.md
 docs/reports/responsive_report.md
 docs/reports/style_compare_report.md
+
+# ---------------------------------------------------------------------------
+# Reports / analyses / study notes (not part of the product)
+# ---------------------------------------------------------------------------
+CLEANUP_REPORT.md
+docs/CODEC_EVALUATION.md
+docs/COMMON_PARTS_ANALYSIS_REPORT_AI.md
+docs/COMPARISON_REPORT_OFFICIAL_VS_CUSTOM.md
+docs/DEEP_DIFF_ANALYSIS_REPORT.md
+docs/ENGINE_EVALUATION.md
+docs/GITHUB_REFERENCE_REPOS_ANALYSIS.md
+docs/ISSUE_ANALYSIS.md
+docs/STAGE_E_QUALITY_REPORT.md
+docs/TECHNICAL_ANALYSIS_REPORT.md
+docs/reports/
+docs/research/
+docs/reference_repos_*.md
