@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: write
@@ -22,7 +22,7 @@ jobs:
           # Use Conventional Commits
           include-component-in-tag: false
           # Don't release automatically; create PR for review
-          target-branch: main
+          target-branch: master
           # Release as draft for manual approval
           draft: false
           # PR labels

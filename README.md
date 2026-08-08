@@ -88,6 +88,9 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 | Python | 3.12+（Windows 内置 WinPython，也可自行安装） |
 | GPU | NVIDIA (CUDA) / Apple Silicon (MPS)，推荐 6.5GB+ VRAM |
 | VC 运行库 | Windows 需安装 Visual C++ Redistributable（项目内含） |
+| SoX（音频效果处理） | Windows 需下载 SoX 14.4.2 并解压到 `bin/sox-14.4.2-win32/sox-14.4.2/`（见下方说明） |
+
+> **SoX 下载（Windows）**：从 https://sourceforge.net/projects/sox/files/sox/14.4.2/ 下载 `sox-14.4.2-win32.zip`，解压后确保目录结构为 `bin/sox-14.4.2-win32/sox-14.4.2/sox.exe`（`clean_launch.py` 会自动将其加入 PATH）。Linux/macOS 可通过包管理器安装（`apt install sox` / `brew install sox`）。
 
 ## 快速开始
 
