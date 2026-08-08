@@ -215,3 +215,14 @@ docs/.stage_e_*_output.txt
 
 # Migration backups
 data/*.migrated
+
+# ---------------------------------------------------------------------------
+# Learning/study reports from other repos (not part of the product)
+# ---------------------------------------------------------------------------
+docs/reports/comprehensive_report.md
+docs/reports/FINAL_CONSISTENCY_REPORT.md
+docs/reports/interactive_report.md
+docs/reports/multi_page_style_report.md
+docs/reports/report.md
+docs/reports/responsive_report.md
+docs/reports/style_compare_report.md
