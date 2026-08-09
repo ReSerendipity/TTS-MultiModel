@@ -62,30 +62,20 @@ def test_cached_static_files():
     print("TEST 2: Static Resource Caching")
     print("=" * 60)
 
-    from integrated_app.app_server import CachedStaticFiles, _CACHE_MAX_AGE, _NO_CACHE_EXTENSIONS
-    import asyncio
+    from integrated_app.app_server import CachedStaticFiles, _NO_CACHE_EXTENSIONS
 
     # Verify cache configurations
     print(f"  [OK] CachedStaticFiles class defined")
-    print(f"  [OK] Cached file types: {len(_CACHE_MAX_AGE)} extensions")
-    print(f"  [OK] No-cache file types: {_NO_CACHE_EXTENSIONS}")
+    print(f"  [OK] No-cache file types: {len(_NO_CACHE_EXTENSIONS)} extensions")
 
-    # Test cache durations
-    tests = [
-        (".css", 86400 * 7, "7 days"),
-        (".js", 86400 * 7, "7 days"),
-        (".png", 86400 * 30, "30 days"),
-        (".svg", 86400 * 30, "30 days"),
-        (".woff2", 86400 * 30, "30 days"),
-    ]
-
+    # Test that no-cache extensions cover expected types
+    expected_no_cache = [".html", ".json", ".css", ".js", ".png", ".svg", ".woff2"]
     all_pass = True
-    for ext, expected_seconds, desc in tests:
-        actual = _CACHE_MAX_AGE.get(ext, 0)
-        if actual == expected_seconds:
-            print(f"  [PASS] {ext}: {desc} ({actual}s)")
+    for ext in expected_no_cache:
+        if ext in _NO_CACHE_EXTENSIONS:
+            print(f"  [PASS] {ext}: no-cache configured")
         else:
-            print(f"  [FAIL] {ext}: expected {expected_seconds}s, got {actual}s")
+            print(f"  [FAIL] {ext}: not in no-cache set")
             all_pass = False
 
     # Test that the class inherits from StaticFiles

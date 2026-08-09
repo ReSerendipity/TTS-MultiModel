@@ -1,4 +1,9 @@
 /**
+ * @deprecated Use scripts/capture_screenshots.py instead.
+ * This Node.js version is retained for backward compatibility but will be
+ * removed in a future release. The Python version provides the same
+ * functionality without requiring Node.js.
+ *
  * TTS MultiModel - Playwright screenshot capture
  *
  * Captures each VoxCPM2 tab in both light and dark themes, plus the
@@ -9,6 +14,7 @@
  * Usage:
  *   1. Start the UI-only test server: WPy64-312101\python\python.exe bin\start_ui_test.py
  *   2. From this repo: node tests/capture-screenshots.js
+ *   OR (preferred): python scripts/capture_screenshots.py
  */
 
 const { chromium } = require('playwright');

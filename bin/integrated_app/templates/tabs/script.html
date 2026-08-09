@@ -7,6 +7,7 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="script-form" hx-post="/api/generate/voxcpm_script" hx-target="#sc-result" hx-swap="innerHTML" hx-indicator="#sc-spinner" x-data="{}">
+                        {% include 'partials/output_format.html' %}
                 <input type="hidden" name="mode" value="voxcpm_script">
 
                 <!-- Card: 剧本工坊 -->

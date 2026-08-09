@@ -6,6 +6,7 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="pc-form" hx-post="/api/generate/voxcpm_prompt_continue" hx-target="#pc-result" hx-swap="innerHTML" hx-indicator="#pc-spinner" hx-encoding="multipart/form-data" x-data="{}">
+                        {% include 'partials/output_format.html' %}
                 <input type="hidden" name="mode" value="voxcpm_prompt_continue">
 
                 <!-- Card: 提示词前缀 -->

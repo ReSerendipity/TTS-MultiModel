@@ -129,8 +129,13 @@ class TestTabSwitching:
         # Click second sidebar item (if exists)
         if len(sidebar_items) > 1:
             sidebar_items[1].click()
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(500)
+            # Wait for HTMX swap to complete via networkidle + content change
+            page.wait_for_load_state("networkidle", timeout=10000)
+            page.wait_for_function(
+                "() => { const el = document.querySelector('#tab-content'); "
+                "return el && el.innerHTML.trim().length > 0; }",
+                timeout=5000,
+            )
 
             # Verify content changed (strong assertion)
             new_content = page.query_selector("#tab-content").inner_html()
@@ -183,9 +188,16 @@ class TestCollapseInteraction:
             collapse_body = page.query_selector(".collapse-body")
             initial_classes = collapse_body.get_attribute("class") or "" if collapse_body else ""
 
-            # Click to expand
+            # Click to expand — wait for class or visibility change
             collapse_header.click()
-            page.wait_for_timeout(300)
+            page.wait_for_function(
+                "() => { const el = document.querySelector('.collapse-body'); "
+                "if (!el) return false; "
+                "const cls = el.getAttribute('class') || ''; "
+                "return cls !== arguments[0] || el.checkVisibility(); }",
+                arg=initial_classes,
+                timeout=3000,
+            )
 
             # Verify state changed (strong assertion)
             collapse_body = page.query_selector(".collapse-body")
@@ -342,7 +354,11 @@ class TestBusinessFlow:
         theme_btn = page.query_selector("#theme-toggle-btn, .theme-toggle, [data-theme-toggle]")
         if theme_btn:
             theme_btn.click()
-            page.wait_for_timeout(200)
+            # Wait for class change on documentElement
+            page.wait_for_function(
+                f"() => document.documentElement.classList.contains('dark') === {str(not initial_dark).lower()}",
+                timeout=3000,
+            )
             new_dark = page.evaluate(
                 "() => document.documentElement.classList.contains('dark')"
             )

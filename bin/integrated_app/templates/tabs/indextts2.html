@@ -5,6 +5,7 @@
     </div>
     <div class="tts-card-desc">{{ "indextts2_desc"|t(lang) }}</div>
     <form id="it2-form" hx-post="/api/generate/indextts2" hx-target="#it2-result" hx-swap="innerHTML" hx-indicator="#it2-spinner">
+                        {% include 'partials/output_format.html' %}
         <input type="hidden" name="mode" value="indextts2">
         {% with prefix='it2', label='synthesis_text'|t(lang), placeholder='indextts2_default_text'|t(lang), max_chars=engine_max_total_chars, segment_max_chars=gen_split_max_chars, textarea_class='it2-auto-resize', textarea_rows=3 %}
         {% include 'partials/text_input.html' %}

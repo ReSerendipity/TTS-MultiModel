@@ -1,0 +1,9 @@
+{# 输出格式选择器 - 移入生成表单内部（随 htmx 表单提交，name=output_format 与后端参数兼容）
+   用法：在生成 tab 的 <form> 内、合成文本字段之前 include 本 partial #}
+<div class="format-selector format-selector-compact format-selector-inline">
+    <label><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> {{ "output_format"|t(lang) }}</label>
+    <div class="format-radio-group">
+        <label><input type="radio" name="output_format" value="wav" checked><span>wav</span></label>
+        <label><input type="radio" name="output_format" value="mp3"><span>mp3</span></label>
+    </div>
+</div>

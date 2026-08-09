@@ -71,8 +71,8 @@
             </div>
 
             <nav class="sidebar-nav" aria-label="{{ "main_navigation"|t(lang) }}" role="tablist">
-                <div class="sidebar-nav-section" data-section-model="voxcpm2">
-                    <div class="sidebar-nav-label">VoxCPM2 · {{ "core_section"|t(lang) }}</div>
+                <div class="sidebar-nav-section" data-section-model="voxcpm2" data-engine-name="VoxCPM2">
+                    <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "core_section"|t(lang) }}</span></div>
                     <!-- VoxCPM2 核心功能 -->
                     <button class="sidebar-item" data-tab="voice_design" data-model="voxcpm2"
                             hx-get="/tab/voice_design?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
@@ -96,8 +96,8 @@
                         <span class="sidebar-label-text">{{ "tab_ultimate_clone" | t(lang) }}</span>
                     </button>
                 </div>
-                <div class="sidebar-nav-section" data-section-model="voxcpm2">
-                    <div class="sidebar-nav-label">VoxCPM2 · {{ "advanced_section"|t(lang) }}</div>
+                <div class="sidebar-nav-section" data-section-model="voxcpm2" data-engine-name="VoxCPM2">
+                    <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "advanced_section"|t(lang) }}</span></div>
                     <!-- VoxCPM2 高级功能 -->
                     <button class="sidebar-item" data-tab="script" data-model="voxcpm2"
                             hx-get="/tab/script?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
@@ -130,8 +130,8 @@
                         <span class="sidebar-label-text">{{ "tab_lora_training" | t(lang) }}</span>
                     </button>
                 </div>
-                <div class="sidebar-nav-section" data-section-model="indextts2">
-                    <div class="sidebar-nav-label">IndexTTS 2.0 · {{ "indextts2_section"|t(lang) }}</div>
+                <div class="sidebar-nav-section" data-section-model="indextts2" data-engine-name="IndexTTS 2.0">
+                    <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "indextts2_section"|t(lang) }}</span></div>
                     <button class="sidebar-item" data-tab="indextts2_clone" data-model="indextts2"
                             hx-get="/tab/indextts2_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
@@ -155,8 +155,8 @@
                         <span class="sidebar-label-text">{{ "tab_indextts2_duration" | t(lang) }}</span>
                     </button>
                 </div>
-                <div class="sidebar-nav-section" data-section-model="dotstts">
-                    <div class="sidebar-nav-label">dots.tts · {{ "core_section"|t(lang) }}</div>
+                <div class="sidebar-nav-section" data-section-model="dotstts" data-engine-name="dots.tts">
+                    <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "core_section"|t(lang) }}</span></div>
                     <button class="sidebar-item" data-tab="dotstts_clone" data-model="dotstts"
                             hx-get="/tab/dotstts_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
@@ -259,23 +259,9 @@
                         <span class="engine-status-text" id="engine-status-text">{{ "model_none"|t(lang) }}</span>
                     </span>
                     <div class="mini-monitor" id="mini-monitor" onclick="openHealthPanel()" title="{{ "click_for_details"|t(lang) }}">
-                        <div class="mini-monitor-item">
-                            <svg class="mini-monitor-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg>
-                            <span class="mini-monitor-label">{{ "gpu_short"|t(lang) }}</span>
-                            <span class="mini-monitor-value" id="mini-gpu-util">--%</span>
-                        </div>
-                        <div class="mini-monitor-divider"></div>
-                        <div class="mini-monitor-item">
-                            <svg class="mini-monitor-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
-                            <span class="mini-monitor-label">{{ "vram_short"|t(lang) }}</span>
-                            <span class="mini-monitor-value" id="mini-vram-text">--/--</span>
-                        </div>
-                        <div class="mini-monitor-divider"></div>
-                        <div class="mini-monitor-item">
-                            <svg class="mini-monitor-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/></svg>
-                            <span class="mini-monitor-label">{{ "ram_short"|t(lang) }}</span>
-                            <span class="mini-monitor-value" id="mini-ram">--.--%</span>
-                        </div>
+                        <svg class="mini-monitor-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg>
+                        <span class="mini-monitor-label">{{ "system_status"|t(lang) }}</span>
+                        <span class="mini-status-dot ok" id="mini-status-dot"></span>
                     </div>
                 </div>
             </div>
@@ -322,14 +308,7 @@
                     </div>
                 </div>
 
-                <!-- Format Selector (compact, inline with tab content) -->
-                <div class="format-selector format-selector-compact">
-                    <label><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> {{ "output_format"|t(lang) }}</label>
-                    <div class="format-radio-group">
-                        <label><input type="radio" name="output_format" value="wav" checked><span>wav</span></label>
-                        <label><input type="radio" name="output_format" value="mp3"><span>mp3</span></label>
-                    </div>
-                </div>
+                <!-- 输出格式选择器已移入各生成 tab 的输入设置卡（partials/output_format.html） -->
 
                 <!-- Tab Content Area -->
                 <h1 class="tts-visually-hidden">{{ "app_title"|t(lang, default="TTS MultiModel 语音工坊") }}</h1>

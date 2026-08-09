@@ -348,7 +348,11 @@ def apply_voice_enhancement(audio: np.ndarray, sample_rate: int = 24000) -> np.n
     if audio.size == 0:
         return audio
 
-    from scipy.signal import butter, lfilter
+    try:
+        from scipy.signal import butter, lfilter
+    except ImportError:
+        logger.debug("apply_voice_enhancement: scipy 不可用，跳过增强处理")
+        return audio
 
     nyquist = sample_rate / 2.0
     cutoff = 80.0 / nyquist

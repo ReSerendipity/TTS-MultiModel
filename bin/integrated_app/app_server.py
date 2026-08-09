@@ -654,6 +654,15 @@ def create_app() -> FastAPI:
         if not already_mounted:
             app.include_router(r)
 
+    # OpenAI 兼容 API 路由挂载（/v1/* 端点）
+    try:
+        from .openai_api import openai_router
+
+        app.include_router(openai_router.router)
+        logger.info("[create_app] OpenAI 兼容 API 路由已挂载 (/v1/*)")
+    except Exception as e:
+        logger.warning(f"[create_app] OpenAI 兼容 API 路由挂载失败: {e}")
+
     return app
 
 

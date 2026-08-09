@@ -6,6 +6,7 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="it2c-form" hx-post="/api/generate/indextts2/clone" hx-target="#it2c-result" hx-swap="innerHTML" hx-indicator="#it2c-spinner" hx-encoding="multipart/form-data" x-data="{ durationMode: 'free' }">
+                        {% include 'partials/output_format.html' %}
                 <input type="hidden" name="mode" value="clone">
 
                 <!-- Card: 参考音频 -->

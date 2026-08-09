@@ -1,0 +1,666 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\Doro\TTS_MultiModel
+configfile: pyproject.toml
+plugins: anyio-4.14.2, Faker-40.36.0, hypothesis-6.165.2, asyncio-1.4.0, cov-7.1.0, timeout-2.4.0, xdist-3.8.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 244 items
+
+tests\integration\test_offline_integration_ext.py ...................... [  9%]
+............                                                             [ 13%]
+tests\test_middleware_ext.py ..........................................  [ 31%]
+tests\test_api_contract.py ..............                                [ 36%]
+tests\test_coverage_boost.py ..........................................F [ 54%]
+.............                                                            [ 59%]
+tests\test_coverage_boost_ext.py ........FFF............................ [ 75%]
+...................                                                      [ 83%]
+tests\test_verification_ci.py ....................                       [ 91%]
+tests\test_system_routes.py ............                                 [ 96%]
+tests\test_training_routes.py ........                                   [100%]
+
+================================== FAILURES ===================================
+_______ TestGenerationTimeEstimator.test_estimator_has_estimate_method ________
+tests\test_coverage_boost.py:276: in test_estimator_has_estimate_method
+    est = GenerationTimeEstimator()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: GenerationTimeEstimator.__init__() missing 1 required positional argument: 'data_file'
+_______________ TestAdaptiveLRUCache.test_create_adaptive_cache _______________
+tests\test_coverage_boost_ext.py:103: in test_create_adaptive_cache
+    cache = AdaptiveLRUCache(maxsize=10)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: AdaptiveLRUCache.__init__() got an unexpected keyword argument 'maxsize'
+_______________ TestAdaptiveLRUCache.test_adaptive_put_and_get ________________
+tests\test_coverage_boost_ext.py:108: in test_adaptive_put_and_get
+    cache = AdaptiveLRUCache(maxsize=10)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: AdaptiveLRUCache.__init__() got an unexpected keyword argument 'maxsize'
+__________________ TestAdaptiveLRUCache.test_adaptive_clear ___________________
+tests\test_coverage_boost_ext.py:114: in test_adaptive_clear
+    cache = AdaptiveLRUCache(maxsize=10)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: AdaptiveLRUCache.__init__() got an unexpected keyword argument 'maxsize'
+============================== warnings summary ===============================
+..\AppData\Roaming\Python\Python314\site-packages\fastapi\testclient.py:1
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/integration/test_offline_integration_ext.py::TestEngineSwitchModelManagerIntegration::test_engine_registry_register_and_get
+tests/integration/test_offline_integration_ext.py::TestEngineSwitchModelManagerIntegration::test_engine_registry_register_and_get
+tests/integration/test_offline_integration_ext.py::TestEngineSwitchModelManagerIntegration::test_engine_registry_register_and_get
+  C:\Users\Doro\TTS_MultiModel\bin\integrated_app\exceptions.py:468: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    if asyncio.iscoroutinefunction(func):
+
+tests/integration/test_offline_integration_ext.py::TestOpenAIAPIRegistryDeepIntegration::test_speech_endpoint_503_without_model
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\_pytest\fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID generic_clone_endpoint_api_generate_generic_clone_post for function generic_clone_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\generic\clone.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID generate_indextts2_api_generate_indextts2_post for function generate_indextts2 at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\indextts2\synthesize.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID generate_voxcpm_clone_api_generate_voxcpm_clone_post for function generate_voxcpm_clone at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\clone.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID generate_voxcpm_ultimate_api_generate_voxcpm_ultimate_post for function generate_voxcpm_ultimate at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\clone.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID generate_voxcpm_prompt_continue_api_generate_voxcpm_prompt_continue_post for function generate_voxcpm_prompt_continue at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\clone.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID generate_voxcpm_design_api_generate_voxcpm_design_post for function generate_voxcpm_design at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\design.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID generate_voxcpm_script_api_generate_voxcpm_script_post for function generate_voxcpm_script at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\script.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID streaming_sse_generation_api_generate_streaming_sse_post for function streaming_sse_generation at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\streaming.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID streaming_generation_api_generate_streaming_post for function streaming_generation at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\streaming.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID streaming_audio_generation_api_generate_streaming_audio_post for function streaming_audio_generation at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\streaming.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID post_process_audio_api_generate_post_process_post for function post_process_audio at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\streaming.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID cancel_generation_api_generate_cancel_post for function cancel_generation at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\generate\voxcpm2\streaming.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_generated_audio_api_audio__filename__get for function get_generated_audio at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_persona_audio_api_persona_audio__name__get for function get_persona_audio at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_speaker_sample_api_speaker_sample__key__get for function get_speaker_sample at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID upload_audio_api_upload_audio_post for function upload_audio at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID history_table_api_history_table_get for function history_table at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID batch_export_history_api_batch_export_history_post for function batch_export_history at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID batch_delete_history_api_batch_delete_history_post for function batch_delete_history at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID hide_history_records_api_history_hide_post for function hide_history_records at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID clear_all_history_api_history_clear_all_post for function clear_all_history at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID show_history_records_api_history_show_post for function show_history_records at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID show_all_history_api_history_show_all_post for function show_all_history at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID sync_history_api_history_sync_post for function sync_history at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\audio.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID model_status_api_model_status_get for function model_status at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID load_model_endpoint_api_model_load_post for function load_model_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID unload_model_endpoint_api_model_unload_post for function unload_model_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID preload_model_endpoint_api_model_preload_post for function preload_model_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID preload_status_endpoint_api_model_preload_status_get for function preload_status_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID switch_engine_endpoint_api_model_switch_post for function switch_engine_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID lora_load_endpoint_api_model_lora_load_post for function lora_load_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID lora_unload_endpoint_api_model_lora_unload_post for function lora_unload_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID lora_toggle_endpoint_api_model_lora_toggle_post for function lora_toggle_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID lora_state_endpoint_api_model_lora_state_get for function lora_state_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID lora_list_endpoint_api_model_lora_list_get for function lora_list_endpoint at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID model_download_hints_api_model_download_hints_get for function model_download_hints at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID cancel_generation_api_model_api_generate_cancel_post for function cancel_generation at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\model.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID index__get for function index at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\pages.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID persona_table_api_persona_table_get for function persona_table at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\persona.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID persona_delete_api_persona__name__delete for function persona_delete at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\persona.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID sse_events_api_sse_events_get for function sse_events at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\sse.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID ping_api_system_api_system_health_ping_get for function ping at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID ready_api_system_api_system_health_ready_get for function ready at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_stats_api_system_api_system_stats_get for function get_stats at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_queue_status_api_system_api_system_queue_get for function get_queue_status at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID gpu_leak_api_system_api_system_health_gpu_leak_get for function gpu_leak at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_health_api_system_api_system_health_get for function get_health at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID shutdown_server_api_system_api_system_shutdown_post for function shutdown_server at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID gpu_status_api_system_api_system_gpu_status_get for function gpu_status at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\gpu.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID gpu_history_api_system_api_system_gpu_history_get for function gpu_history at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\gpu.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID gpu_cleanup_api_system_api_system_gpu_cleanup_post for function gpu_cleanup at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\gpu.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_logs_api_system_api_system_logs_get for function get_logs at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\logs.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID clean_logs_api_system_api_system_logs_clean_delete for function clean_logs at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\logs.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_settings_api_system_api_system_settings_get for function get_settings at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID update_settings_api_system_api_system_settings_put for function update_settings at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID reset_settings_api_system_api_system_settings_reset_post for function reset_settings at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_advanced_params_api_system_api_system_advanced_params_get for function get_advanced_params at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID save_advanced_params_api_system_api_system_advanced_params_post for function save_advanced_params at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID save_general_settings_api_system_api_system_general_settings_post for function save_general_settings at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_generation_defaults_api_system_api_system_generation_defaults_get for function get_generation_defaults at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID save_generation_defaults_api_system_api_system_generation_defaults_post for function save_generation_defaults at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID gpu_status_api_system_gpu_status_get for function gpu_status at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\gpu.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID gpu_history_api_system_gpu_history_get for function gpu_history at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\gpu.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID gpu_cleanup_api_system_gpu_cleanup_post for function gpu_cleanup at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\gpu.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID ping_api_system_health_ping_get for function ping at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID ready_api_system_health_ready_get for function ready at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_stats_api_system_stats_get for function get_stats at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_queue_status_api_system_queue_get for function get_queue_status at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID gpu_leak_api_system_health_gpu_leak_get for function gpu_leak at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_health_api_system_health_get for function get_health at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID shutdown_server_api_system_shutdown_post for function shutdown_server at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\health.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_logs_api_system_logs_get for function get_logs at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\logs.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID clean_logs_api_system_logs_clean_delete for function clean_logs at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\logs.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_settings_api_system_settings_get for function get_settings at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID update_settings_api_system_settings_put for function update_settings at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID reset_settings_api_system_settings_reset_post for function reset_settings at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_advanced_params_api_system_advanced_params_get for function get_advanced_params at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID save_advanced_params_api_system_advanced_params_post for function save_advanced_params at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID save_general_settings_api_system_general_settings_post for function save_general_settings at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_generation_defaults_api_system_generation_defaults_get for function get_generation_defaults at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID save_generation_defaults_api_system_generation_defaults_post for function save_generation_defaults at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\system\settings.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID load_tab_tab__tab_name__get for function load_tab at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\tabs.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID start_training_api_training_start_post for function start_training at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\training.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID stop_training_api_training_stop_post for function stop_training at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\training.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_schema_available
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_paths
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_health_endpoints
+tests/test_api_contract.py::TestOpenAPISchema::test_openapi_has_model_endpoints
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:303: UserWarning: Duplicate Operation ID get_training_log_api_training_log_get for function get_training_log at C:\Users\Doro\TTS_MultiModel\bin\integrated_app\routes\training.py
+    warnings.warn(message, stacklevel=1)
+
+tests/test_coverage_boost_ext.py::TestSSERoutes::test_sse_endpoint_exists
+  C:\Users\Doro\AppData\Roaming\Python\Python314\site-packages\httpx\_client.py:1053: StarletteDeprecationWarning: You should not use the 'timeout' argument with the TestClient. See https://github.com/Kludex/starlette/issues/1108 for more information.
+    return self.request(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_coverage_boost.py::TestGenerationTimeEstimator::test_estimator_has_estimate_method
+FAILED tests/test_coverage_boost_ext.py::TestAdaptiveLRUCache::test_create_adaptive_cache
+FAILED tests/test_coverage_boost_ext.py::TestAdaptiveLRUCache::test_adaptive_put_and_get
+FAILED tests/test_coverage_boost_ext.py::TestAdaptiveLRUCache::test_adaptive_clear
+================ 4 failed, 240 passed, 346 warnings in 38.40s =================

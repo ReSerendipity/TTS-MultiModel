@@ -35,7 +35,6 @@ import time
 from pathlib import Path
 
 import soundfile as sf
-from voxcpm.core import VoxCPM
 
 logger = logging.getLogger("tts_multimodel.cli")
 
@@ -350,7 +349,7 @@ def validate_batch_args(args, parser):
 # -----------------------------
 
 
-def load_model(args) -> VoxCPM:
+def load_model(args):
     """加载 VoxCPM 模型，支持本地路径和 HuggingFace Hub 两种方式。
 
     加载流程：
@@ -369,6 +368,8 @@ def load_model(args) -> VoxCPM:
         SystemExit: 模型加载失败时通过 sys.exit(1) 终止程序并记录错误日志。
     """
     logger.info("正在加载 VoxCPM 模型...")
+
+    from voxcpm.core import VoxCPM
 
     zipenhancer_path = getattr(args, "zipenhancer_path", None) or os.environ.get("ZIPENHANCER_MODEL_PATH", None)
 

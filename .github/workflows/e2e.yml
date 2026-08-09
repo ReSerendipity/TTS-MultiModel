@@ -2,7 +2,7 @@ name: E2E (Playwright)
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     paths:
       - 'bin/integrated_app/templates/**'
       - 'bin/integrated_app/static/**'
@@ -10,7 +10,7 @@ on:
       - 'tests/e2e/**'
       - '.github/workflows/e2e.yml'
   pull_request:
-    branches: [main]
+    branches: [main, master]
     paths:
       - 'bin/integrated_app/templates/**'
       - 'bin/integrated_app/static/**'
@@ -66,12 +66,11 @@ jobs:
           done
           curl -s http://127.0.0.1:7869/ > /dev/null || (echo "Server failed to start" && exit 1)
 
-      - name: Run Playwright E2E tests
+      - name: Run Playwright E2E tests (required gate)
         env:
           TTS_SERVER_URL: "http://127.0.0.1:7869"
         run: |
           pytest tests/e2e/ -v --tb=short
-        continue-on-error: true
 
       - name: Upload E2E screenshots
         if: always()

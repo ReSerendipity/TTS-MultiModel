@@ -6,6 +6,7 @@
         <!-- ============ Form Column ============ -->
         <div class="col-form">
             <form id="dtc-form" hx-post="/api/generate/generic/clone" hx-target="#dtc-result" hx-swap="innerHTML" hx-indicator="#dtc-spinner" hx-encoding="multipart/form-data">
+                        {% include 'partials/output_format.html' %}
                 <input type="hidden" name="engine" value="dotstts">
 
                 <!-- Card: 参考音频 -->

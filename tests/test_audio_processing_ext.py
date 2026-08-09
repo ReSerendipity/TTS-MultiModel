@@ -10,7 +10,10 @@ from integrated_app.audio_processing import (
     adjust_tempo,
     apply_voice_enhancement,
     change_tempo,
+    denoise_audio,
+    enhance_audio,
     normalize_loudness,
+    reduce_noise,
     trim_silence_vad,
     trim_tts_output,
 )
@@ -150,3 +153,29 @@ class TestAudioEffectsProcessor:
         assert proc._build_effect("unknown_effect") is None
         # 已知效果名能创建实例（fake 类对象）
         assert proc._build_effect("gain") is not None
+
+
+class TestDenoise:
+    def test_denoise_without_enhancer(self, monkeypatch):
+        import integrated_app.audio_processing as ap
+
+        monkeypatch.setattr(ap, "_HAS_NOISEREDUCE", False)
+        audio = _sine()
+        out = denoise_audio(audio, 24000)
+        assert out.shape == audio.shape
+
+    def test_denoise_empty(self, monkeypatch):
+        import integrated_app.audio_processing as ap
+
+        monkeypatch.setattr(ap, "_HAS_NOISEREDUCE", False)
+        assert len(denoise_audio(np.array([], dtype=np.float32), 24000)) == 0
+
+    def test_reduce_noise_noop(self):
+        audio = _sine()
+        out = reduce_noise(audio, 24000)
+        assert out.shape == audio.shape
+
+    def test_enhance_audio_preserves_shape(self):
+        audio = _sine()
+        out = enhance_audio(audio, 24000)
+        assert out.shape == audio.shape

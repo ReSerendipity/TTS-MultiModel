@@ -1,0 +1,10 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\Doro\TTS_MultiModel
+configfile: pyproject.toml
+plugins: anyio-4.14.2, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1364 items / 14 deselected / 1350 selected
+
+tests\integration\test_offline_integration_ext.py ...................... [  1%]
+.....FFF.F..                                                             [  2%]
