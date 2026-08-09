@@ -35,7 +35,7 @@ import os
 import time
 from typing import Any
 
-from ..config import DOTSTTS_MODEL_PATH, SAVE_DIR
+from ..config import SAVE_DIR, get_dotstts_model_path
 from ..engine_interface import TTSEngine
 from ..exceptions import EngineLoadError, EngineNotLoadedError, GenerationError
 
@@ -63,7 +63,7 @@ class DotsTTSEngine(TTSEngine):
         """
         from ..gpu_backend import GPUBackend, GPUBackendManager
 
-        self.model_dir: str = model_dir or DOTSTTS_MODEL_PATH
+        self.model_dir: str = model_dir or get_dotstts_model_path()
         backend: GPUBackend = GPUBackendManager.detect_backend()
         # WHY bfloat16 仅在 CUDA：CPU/MPS 上 bf16 算子支持不完整且不会加速，
         # 统一回退 float32 保证可用性。

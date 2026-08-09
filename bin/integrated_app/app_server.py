@@ -61,14 +61,28 @@ def _set_event_loop(loop: asyncio.AbstractEventLoop | None) -> None:
     _event_loop = loop
 
 
-# --- Cache-aware StaticFiles ---
+# --- Cache-aware StaticFiles (P1-1: 差异化缓存策略，来源：Seedvr2) ---
 
+# CSS/JS：开发时经常改，不缓存
 _NO_CACHE_EXTENSIONS: set[str] = {
     ".html",
     ".json",
     ".css",
     ".js",
     ".map",
+}
+
+# 字体：几乎不变，缓存 30 天 (2592000 秒)
+_FONT_EXTENSIONS: set[str] = {
+    ".woff2",
+    ".woff",
+    ".ttf",
+    ".eot",
+    ".otf",
+}
+
+# 图片：缓存 1 天 (86400 秒)
+_IMAGE_EXTENSIONS: set[str] = {
     ".png",
     ".jpg",
     ".jpeg",
@@ -76,25 +90,28 @@ _NO_CACHE_EXTENSIONS: set[str] = {
     ".svg",
     ".ico",
     ".webp",
-    ".woff",
-    ".woff2",
-    ".ttf",
-    ".eot",
 }
 
 
 class CachedStaticFiles(StaticFiles):
-    """StaticFiles subclass that adds Cache-Control headers based on file type.
+    """StaticFiles subclass with differentiated Cache-Control headers (P1-1).
 
-    Strategy:
-    - All static assets: no-cache to ensure fresh content on every reload
-    - HTML/JSON: no-cache to ensure fresh content
+    Strategy (来源：Seedvr2 VersionedStaticFiles):
+    - CSS / JS / HTML / JSON: ``no-cache, must-revalidate`` (开发时经常改)
+    - Fonts (.woff2 / .woff / .ttf / .eot / .otf): ``public, max-age=2592000`` (缓存 30 天)
+    - Images (.png / .jpg / .jpeg / .gif / .svg / .ico / .webp): ``public, max-age=86400`` (缓存 1 天)
+    - Other: 保持默认（不加 Cache-Control 头）
     """
 
     async def get_response(self, path: str, scope: dict[str, Any]) -> Response:
-        """重写父类 StaticFiles.get_response，根据文件类型添加 Cache-Control 缓存头。
+        """重写父类 StaticFiles.get_response，根据文件类型添加差异化 Cache-Control 头。
 
-        所有静态资源均设置 no-cache，刷新即可获取最新版本。
+        Args:
+            path: 请求的静态文件路径。
+            scope: ASGI scope 字典。
+
+        Returns:
+            Response: 添加了差异化 Cache-Control 头的 HTTP 响应。
         """
         response = await super().get_response(path, scope)
         if hasattr(response, "headers") and response.status_code == 200:
@@ -102,6 +119,10 @@ class CachedStaticFiles(StaticFiles):
             if ext in _NO_CACHE_EXTENSIONS:
                 response.headers["Cache-Control"] = "no-cache, must-revalidate"
                 response.headers["Pragma"] = "no-cache"
+            elif ext in _FONT_EXTENSIONS:
+                response.headers["Cache-Control"] = "public, max-age=2592000"
+            elif ext in _IMAGE_EXTENSIONS:
+                response.headers["Cache-Control"] = "public, max-age=86400"
         return response
 
 
@@ -240,6 +261,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.model_loading = False
     app.state.model_load_progress = "等待手动加载模型"
 
+    # P0-3: 核心模块完整性自校验 (CWE-912 防御，来源：Seedvr2)
+    # 在 HistoryDB 初始化之前、config 加载之后执行
+    # 自检失败只告警不阻塞启动（避免误伤），用 ERROR 级日志 + 醒目分隔线
+    try:
+        from .security.integrity_selfcheck import run_startup_selfcheck
+
+        selfcheck = run_startup_selfcheck()
+        if selfcheck["failed"] > 0:
+            logger.error(
+                "=" * 60 + "\n"
+                "[SECURITY] ⚠️  启动时核心模块完整性自检失败！\n"
+                f"    失败文件: {', '.join(selfcheck['failed_files'])}\n"
+                "    请检查代码是否被篡改或重新生成清单。\n" + "=" * 60
+            )
+    except Exception as e:
+        logger.debug(f"核心模块完整性自检跳过: {e}")
+
     try:
         from .history_db import get_history_db
 
@@ -283,6 +321,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("[lifespan] 异步生成任务队列已初始化")
     except Exception as e:
         logger.debug(f"[lifespan] 任务队列初始化失败（将使用信号量机制）: {e}")
+
+    # P1-2: 断点续跑 — 启动时扫描未完成的 checkpoint（来源：Image_MultiModel）
+    try:
+        from .checkpoint import TaskCheckpoint
+        from .config import ROOT_DIR, get_config
+
+        runtime_task = get_config().pydantic_config.runtime.task
+        checkpoint_dir = os.path.join(ROOT_DIR, runtime_task.checkpoint_dir)
+        checkpoint_mgr = TaskCheckpoint(checkpoint_dir=checkpoint_dir)
+        pending = checkpoint_mgr.list_checkpoints()
+        if pending:
+            logger.info(f"[lifespan] 发现 {len(pending)} 个未完成的 checkpoint 可恢复")
+            for cp in pending:
+                logger.info(
+                    f"  - task_id={cp.get('task_id')}, "
+                    f"completed={cp.get('completed', 0)}/{cp.get('total', 0)}, "
+                    f"engine={cp.get('engine', '')}"
+                )
+        else:
+            logger.debug("[lifespan] 无未完成的 checkpoint")
+        app.state.checkpoint_mgr = checkpoint_mgr
+    except Exception as e:
+        logger.debug(f"[lifespan] Checkpoint 扫描跳过: {e}")
 
     auto_load = os.environ.get("TTS_AUTO_LOAD_MODEL", "0") == "1"
     if auto_load:

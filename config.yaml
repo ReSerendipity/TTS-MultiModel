@@ -11,6 +11,14 @@ server:
     keyfile: "bin/key.pem"
 
 models:
+  # P1-3: 模型路径模式（来源：Image_MultiModel）
+  # - portable（默认）：使用项目内 pretrained_models/ 目录，自包含
+  # - shared：使用 shared_models_root 指定的外部共享目录，
+  #   可与 Seedvr2 / Image_MultiModel 共享模型文件，节省磁盘
+  # 注意：shared 模式下路径结构须与 portable 一致：
+  #   {shared_root}/VoxCPM2/, {shared_root}/SenseVoiceSmall/, {shared_root}/IndexTTS2/ 等
+  model_source_mode: portable
+  shared_models_root: ""   # 例如：C:/AI_Shared_Models
   voxcpm2:
     model_path: "pretrained_models/VoxCPM2"
     asr_path: "pretrained_models/SenseVoiceSmall"
@@ -122,5 +130,16 @@ audio_player:
 ui:
   sidebar_width: 240
   sidebar_collapsed_width: 52
+
+# P1-2: 运行时任务队列与断点续跑配置（来源：Image_MultiModel）
+runtime:
+  task:
+    checkpoint_dir: "data/checkpoints"   # checkpoint 文件存储目录
+    checkpoint_every: 5                  # 每隔多少个子任务写一次 checkpoint
+    auto_recover: false                 # 启动时是否自动恢复未完成的批量任务
+
+# P2-1: 安全配置（来源：Image_MultiModel 水印思路）
+security:
+  audio_watermark_enabled: true   # 输出音频自动嵌入可溯源水印
 
 

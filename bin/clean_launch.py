@@ -324,11 +324,14 @@ def start_app():
     bin_dir = os.path.dirname(os.path.abspath(__file__))
     wpy_path = os.path.join(_root_dir, "WPy64-312101", "python")
     sox_dir = os.path.join(bin_dir, "sox-14.4.2-win32", "sox-14.4.2")
+    ffmpeg_dir = os.path.join(bin_dir, "ffmpeg")
     os.environ["PATH"] = (
         wpy_path + os.pathsep + os.path.join(wpy_path, "Scripts") + os.pathsep + os.environ.get("PATH", "")
     )
     if os.path.isdir(sox_dir):
         os.environ["PATH"] = sox_dir + os.pathsep + os.environ["PATH"]
+    if os.path.isdir(ffmpeg_dir):
+        os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ["PATH"]
 
     # Kill any leftover process on the target port before selecting
     _kill_port_occupant(int(port), ip)

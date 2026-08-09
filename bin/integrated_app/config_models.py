@@ -31,7 +31,7 @@
     Pydantic 静默丢弃，保证旧配置文件在新版本代码上仍可正常加载。
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
@@ -212,7 +212,16 @@ class EngineSpecConfig(BaseModel):
 class ModelConfig(BaseModel):
     """模型路径、显存需求与引擎注册表配置。
 
+    P1-3 改造（来源：Image_MultiModel）：新增 ``model_source_mode`` 和
+    ``shared_models_root`` 字段，支持 shared / portable 双模式模型路径解析。
+
     Attributes:
+        model_source_mode: 模型路径模式：
+            - ``portable``（默认）：使用项目内 ``pretrained_models/`` 目录，自包含
+            - ``shared``：使用 ``shared_models_root`` 指定的外部共享目录，
+              可与 Seedvr2 / Image_MultiModel 共享模型文件，节省磁盘
+        shared_models_root: shared 模式下的根目录绝对路径（如 ``C:/AI_Shared_Models``）。
+            为空时回退到 portable 模式。
         base_dir: 模型权重根目录名（相对于项目根目录）。
         voxcpm_vram: VoxCPM2 引擎的最低显存需求 (GB)，必须 > 0。
         indextts2_vram: IndexTTS 2.0 引擎的最低显存需求 (GB)，必须 > 0。
@@ -221,6 +230,14 @@ class ModelConfig(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+    model_source_mode: Literal["shared", "portable"] = Field(
+        default="portable",
+        description="模型路径模式: portable(项目内) 或 shared(外部共享目录)",
+    )
+    shared_models_root: str = Field(
+        default="",
+        description="shared 模式下的根目录，如 C:/AI_Shared_Models",
+    )
     base_dir: str = Field(default="models", description="Base directory for model weights")
     voxcpm_vram: float = Field(default=6.0, gt=0, description="VoxCPM2 VRAM requirement (GB)")
     indextts2_vram: float = Field(default=6.0, gt=0, description="IndexTTS 2.0 VRAM requirement (GB)")
@@ -310,6 +327,45 @@ class UIConfig(BaseModel):
     sidebar_collapsed_width: int = Field(default=52, description="侧边栏折叠宽度（px）")
 
 
+class RuntimeTaskConfig(BaseModel):
+    """运行时任务队列配置（P1-2: 断点续跑支持）。
+
+    Attributes:
+        checkpoint_dir: checkpoint 文件存储目录（相对于项目根目录）。
+        checkpoint_every: 每隔多少个子任务写一次 checkpoint。
+        auto_recover: 启动时是否自动恢复未完成的批量任务。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    checkpoint_dir: str = Field(
+        default="data/checkpoints",
+        description="Checkpoint 文件存储目录",
+    )
+    checkpoint_every: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+        description="每隔多少个子任务写一次 checkpoint",
+    )
+    auto_recover: bool = Field(
+        default=False,
+        description="启动时是否自动恢复未完成的批量任务",
+    )
+
+
+class RuntimeConfig(BaseModel):
+    """运行时配置。
+
+    Attributes:
+        task: 任务队列与断点续跑配置。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    task: RuntimeTaskConfig = Field(default_factory=RuntimeTaskConfig)
+
+
 class ApiAuthConfig(BaseModel):
     """API Bearer Token 认证配置。
 
@@ -390,6 +446,25 @@ class GenerationDefaultsConfig(BaseModel):
     split_max_chars: int = Field(default=200, ge=50, le=500, description="Max chars per split")
 
 
+class SecurityConfig(BaseModel):
+    """安全配置。
+
+    P2-1 改造：新增音频水印开关配置。
+
+    Attributes:
+        audio_watermark_enabled: 是否在输出音频中自动嵌入可溯源水印。
+            注意：底层水印嵌入由代码常量 ``WATERMARK_SOURCE_ID`` 强制启用，
+            此字段仅控制文件级水印的额外嵌入（用于批量后处理场景）。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    audio_watermark_enabled: bool = Field(
+        default=True,
+        description="输出音频自动嵌入可溯源水印",
+    )
+
+
 class AppConfig(BaseModel):
     """根应用配置模型 — 整个配置树的顶层容器。
 
@@ -407,6 +482,8 @@ class AppConfig(BaseModel):
         sse: SSEConfig — SSE 事件流参数。
         audio_player: AudioPlayerConfig — WebUI 播放器参数。
         ui: UIConfig — WebUI 布局参数。
+        runtime: RuntimeConfig — 运行时任务队列与断点续跑配置。
+        security: SecurityConfig — 安全配置（音频水印等）。
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -422,6 +499,8 @@ class AppConfig(BaseModel):
     sse: SSEConfig = Field(default_factory=SSEConfig)
     audio_player: AudioPlayerConfig = Field(default_factory=AudioPlayerConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
+    runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
 
     @field_validator("server")
     @classmethod
@@ -522,4 +601,6 @@ def load_config_dict(yaml_data: Any) -> AppConfig:
         sse=yaml_data.get("sse", {}),
         audio_player=yaml_data.get("audio_player", {}),
         ui=yaml_data.get("ui", {}),
+        runtime=yaml_data.get("runtime", {}),
+        security=yaml_data.get("security", {}),
     )

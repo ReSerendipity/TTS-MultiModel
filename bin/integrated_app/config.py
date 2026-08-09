@@ -3,10 +3,19 @@ Multi-engine configuration (VoxCPM2 + IndexTTS 2.0).
 
 Configuration is managed through the AppConfig class, accessible via get_config().
 Module-level deprecated variables have been removed; use get_config() instead.
+
+P0-1 改造：新增 ``save_config()`` 原子写入函数（来源：Seedvr2），
+使用 tempfile + os.replace 策略避免配置文件半写损坏。
+
+P0-2 改造：新增 ``load_config()`` 宽松接口（来源：Seedvr2），
+Pydantic 验证失败时回退到原始 YAML 加载，保证启动不被配置错误阻塞。
 """
 
+import contextlib
+import logging
 import os
 import re
+import tempfile
 
 from .config_models import (
     ApiAuthConfig,
@@ -16,6 +25,8 @@ from .config_models import (
 from .config_models import (
     AppConfig as _PydanticAppConfig,
 )
+
+logger = logging.getLogger("tts_multimodel")
 
 # ---------------------------------------------------------------------------
 # Environment setup
@@ -109,6 +120,58 @@ INDEXTTS2_MODEL_PATH = os.path.join(PRETRAINED_DIR, "IndexTTS2")
 DOTSTTS_MODEL_PATH = os.path.join(PRETRAINED_DIR, "dots.tts")
 
 
+# ---------------------------------------------------------------------------
+# P1-3: 模型路径 shared / portable 双模式（来源：Image_MultiModel）
+# ---------------------------------------------------------------------------
+
+
+def get_pretrained_dir() -> str:
+    """根据配置解析预训练模型根目录（P1-3 改造，来源：Image_MultiModel）。
+
+    - ``portable`` 模式（默认）：返回项目内 ``pretrained_models/`` 目录
+    - ``shared`` 模式：返回 ``config.yaml -> models.shared_models_root`` 指定的外部目录
+      若 ``shared_models_root`` 为空，回退到 portable 模式
+
+    Returns:
+        预训练模型根目录的绝对路径。
+    """
+    try:
+        cfg = get_config()
+        models_cfg = cfg.pydantic_config.models
+        if models_cfg.model_source_mode == "shared" and models_cfg.shared_models_root:
+            shared_root = models_cfg.shared_models_root
+            logger.info(f"[P1-3] 使用共享模型目录: {shared_root}")
+            return shared_root
+    except Exception as e:
+        logger.debug(f"[P1-3] 读取模型路径模式失败，回退到 portable: {e}")
+    return PRETRAINED_DIR
+
+
+def get_voxcpm2_model_path() -> str:
+    """获取 VoxCPM2 模型路径（考虑 shared/portable 模式）。"""
+    return os.path.join(get_pretrained_dir(), "VoxCPM2")
+
+
+def get_voxcpm2_asr_path() -> str:
+    """获取 SenseVoiceSmall ASR 模型路径（考虑 shared/portable 模式）。"""
+    return os.path.join(get_pretrained_dir(), "SenseVoiceSmall")
+
+
+def get_voxcpm2_denoiser_path() -> str:
+    """获取 speech_zipenhancer 去噪器路径（考虑 shared/portable 模式）。"""
+    return os.path.join(get_pretrained_dir(), "speech_zipenhancer")
+
+
+def get_indextts2_model_path() -> str:
+    """获取 IndexTTS 2.0 模型路径（考虑 shared/portable 模式）。"""
+    return os.path.join(get_pretrained_dir(), "IndexTTS2")
+
+
+def get_dotstts_model_path() -> str:
+    """获取 dots.tts 模型路径（考虑 shared/portable 模式）。"""
+    return os.path.join(get_pretrained_dir(), "dots.tts")
+
+
 def _ensure_dirs():
     """Create required directories."""
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -124,20 +187,12 @@ def _ensure_dirs():
 
 
 def _load_yaml_config() -> dict:
-    """Load config.yaml and return parsed dict, or empty dict on failure."""
-    config_path = os.path.join(ROOT_DIR, "config.yaml")
-    if not os.path.exists(config_path):
-        return {}
-    try:
-        import yaml
+    """Load config.yaml and return parsed dict, or empty dict on failure.
 
-        with open(config_path, encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
-    except Exception as e:
-        import logging
-
-        logging.getLogger("tts_multimodel").warning(f"Config load failed: {e}")
-        return {}
+    P0-2 改造：内部调用 ``load_config()`` 宽松接口，Pydantic 验证失败时
+    自动回退到原始 YAML 加载，保证启动不被配置错误阻塞。
+    """
+    return load_config(None)
 
 
 def _parse_version(yaml_config: dict) -> str:
@@ -235,7 +290,15 @@ class AppConfig:
         self._api_auth = _parse_api_auth(self._yaml_config)
 
         # Build validated Pydantic config
-        self._pydantic_config = load_config_dict(self._yaml_config or {})
+        # P0-2 改造：Pydantic 验证失败时回退到默认配置，保证启动不阻塞
+        try:
+            self._pydantic_config = load_config_dict(self._yaml_config or {})
+        except Exception as e:
+            logger.warning(
+                f"Pydantic 配置验证失败，使用默认配置。错误信息: {e}。"
+                "建议修复 config.yaml 中的错误字段后重新保存。"
+            )
+            self._pydantic_config = _PydanticAppConfig()
 
     # -- Raw section accessors ------------------------------------------------
 
@@ -302,6 +365,102 @@ def force_load_config() -> AppConfig:
 
 
 # ---------------------------------------------------------------------------
+# P0-1: 原子写入配置文件（来源：Seedvr2）
+# ---------------------------------------------------------------------------
+
+
+def save_config(config_dict: dict, config_path: str | None = None) -> None:
+    """原子写入保存配置到 YAML 文件（来源：Seedvr2 的 ``save_config`` 函数）。
+
+    使用临时文件 + 原子替换策略避免写入过程中断导致配置文件损坏：
+    1. 在目标目录创建隐藏临时文件（``.config_*.tmp``）
+    2. 写入配置内容到临时文件
+    3. 使用 ``os.replace`` 原子替换目标文件（同文件系统内是原子操作）
+    4. 失败时安全清理临时文件
+
+    Args:
+        config_dict: 要保存的配置字典。
+        config_path: 目标配置文件路径，为 None 时默认保存到项目根目录的 config.yaml。
+
+    Raises:
+        OSError: 目录创建、文件写入或替换失败时抛出（临时文件会被自动清理）。
+        yaml.YAMLError: YAML 序列化失败时抛出。
+    """
+    import yaml
+
+    if config_path is None:
+        config_path = os.path.join(ROOT_DIR, "config.yaml")
+
+    config_dir = os.path.dirname(config_path)
+    if config_dir:
+        os.makedirs(config_dir, exist_ok=True)
+
+    fd, tmp_path = tempfile.mkstemp(
+        dir=config_dir or None,
+        prefix=".config_",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.dump(config_dict, f, default_flow_style=False, allow_unicode=True)
+        os.replace(tmp_path, config_path)
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_path)
+        raise
+
+
+# ---------------------------------------------------------------------------
+# P0-2: 配置验证失败回退机制（来源：Seedvr2）
+# ---------------------------------------------------------------------------
+
+
+def load_config(config_path: str | None = None) -> dict:
+    """对外宽松接口：Pydantic 验证失败时回退到原始 YAML 加载，保证启动不阻塞。
+
+    内部先调用 ``load_config_dict`` 进行 Pydantic 严格验证，验证通过则返回
+    ``model_dump()`` 序列化后的字典；验证失败时捕获异常，回退到原始
+    ``yaml.safe_load`` 加载，并在日志中记录 warning 告知具体验证错误，
+    方便用户排查。
+
+    Args:
+        config_path: 配置文件路径，为 None 时默认使用项目根目录的 config.yaml。
+
+    Returns:
+        dict: 配置字典。配置文件不存在时返回空字典 ``{}``。
+    """
+    if config_path is None:
+        config_path = os.path.join(ROOT_DIR, "config.yaml")
+
+    # 尝试 Pydantic 严格验证
+    try:
+        import yaml
+
+        if not os.path.exists(config_path):
+            return {}
+        with open(config_path, encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+        validated = load_config_dict(raw)
+        return validated.model_dump()
+    except Exception as e:
+        # 验证失败，回退到原始 YAML 加载
+        logger.warning(
+            f"配置验证失败，已回退到原始 YAML 加载。错误信息: {e}。"
+            "部分字段可能使用默认值，建议修复 config.yaml 后重新保存以生成合法版本。"
+        )
+        if not os.path.exists(config_path):
+            return {}
+        try:
+            import yaml
+
+            with open(config_path, encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+        except Exception as e2:
+            logger.warning(f"原始 YAML 加载也失败: {e2}")
+            return {}
+
+
+# ---------------------------------------------------------------------------
 # Module-level variables (backward compatible, deprecated)
 #
 # New code should use get_config() instead.
@@ -342,36 +501,45 @@ def _has_model_weights(model_dir: str, min_size_mb: float = 10.0) -> bool:
 def check_models_available() -> tuple[bool, list[str]]:
     """Check if model files are complete and ready for loading.
 
+    P1-3 改造：使用 ``get_pretrained_dir()`` 动态解析模型路径，支持 shared/portable 双模式。
+
     Returns (all_ok, missing_list) where missing_list contains descriptive
     strings for each engine whose model weights are missing or incomplete.
     """
     missing = []
 
+    # P1-3: 动态获取模型路径（支持 shared/portable 双模式）
+    voxcpm2_path = get_voxcpm2_model_path()
+    indextts2_path = get_indextts2_model_path()
+
     # VoxCPM2: directory must exist and contain weight files
-    if not os.path.isdir(VOXCPM2_MODEL_PATH):
-        missing.append(f"VoxCPM2 ({VOXCPM2_MODEL_PATH} 目录不存在)")
-    elif not _has_model_weights(VOXCPM2_MODEL_PATH):
-        missing.append(f"VoxCPM2 ({VOXCPM2_MODEL_PATH} 缺少模型权重文件)")
+    if not os.path.isdir(voxcpm2_path):
+        missing.append(f"VoxCPM2 ({voxcpm2_path} 目录不存在)")
+    elif not _has_model_weights(voxcpm2_path):
+        missing.append(f"VoxCPM2 ({voxcpm2_path} 缺少模型权重文件)")
 
     # IndexTTS2: directory must exist and contain weight files
-    if not os.path.isdir(INDEXTTS2_MODEL_PATH):
-        missing.append(f"IndexTTS 2.0 ({INDEXTTS2_MODEL_PATH} 目录不存在)")
-    elif not _has_model_weights(INDEXTTS2_MODEL_PATH):
-        missing.append(f"IndexTTS 2.0 ({INDEXTTS2_MODEL_PATH} 缺少模型权重文件)")
+    if not os.path.isdir(indextts2_path):
+        missing.append(f"IndexTTS 2.0 ({indextts2_path} 目录不存在)")
+    elif not _has_model_weights(indextts2_path):
+        missing.append(f"IndexTTS 2.0 ({indextts2_path} 缺少模型权重文件)")
 
     return len(missing) == 0, missing
 
 
 def get_download_hints() -> dict[str, str]:
+    """获取模型下载提示（P1-3: 使用动态路径解析）。"""
     hints = {}
-    if not os.path.isdir(VOXCPM2_MODEL_PATH) or not _has_model_weights(VOXCPM2_MODEL_PATH):
+    voxcpm2_path = get_voxcpm2_model_path()
+    indextts2_path = get_indextts2_model_path()
+    if not os.path.isdir(voxcpm2_path) or not _has_model_weights(voxcpm2_path):
         hints["voxcpm2"] = (
             "VoxCPM2 模型未找到。下载命令:\n"
             "  pip install modelscope\n"
             "  python scripts/download_voxcpm2.py\n"
             "  或: modelscope download OpenBMB/VoxCPM2 --local_dir pretrained_models/VoxCPM2"
         )
-    if not os.path.isdir(INDEXTTS2_MODEL_PATH) or not _has_model_weights(INDEXTTS2_MODEL_PATH):
+    if not os.path.isdir(indextts2_path) or not _has_model_weights(indextts2_path):
         hints["indextts2"] = (
             "IndexTTS 2.0 模型未找到。下载命令:\n"
             "  pip install modelscope\n"

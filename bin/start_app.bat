@@ -19,6 +19,8 @@ echo.
 echo Starting application server...
 echo.
 
+set "PATH=%~dp0ffmpeg;%PATH%"
+
 python -c "from integrated_app.app_server import run_server; run_server()"
 
 if %errorlevel% neq 0 (

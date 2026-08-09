@@ -60,11 +60,11 @@ from typing import Any
 from .cache import AdaptiveLRUCache, LRUCache
 from .config import (
     DATA_DIR,
-    INDEXTTS2_MODEL_PATH,
     ROOT_DIR,
-    VOXCPM2_ASR_PATH,
-    VOXCPM2_DENOISER_PATH,
-    VOXCPM2_MODEL_PATH,
+    get_indextts2_model_path,
+    get_voxcpm2_asr_path,
+    get_voxcpm2_denoiser_path,
+    get_voxcpm2_model_path,
 )
 from .estimator import GenerationTimeEstimator
 from .exceptions import (
@@ -536,6 +536,14 @@ def _do_load_voxcpm2_internal(
     Raises:
         Exception: 清理半加载状态后重新抛出加载过程中的任何异常。
     """
+    # 注入 reference_repos/VoxCPM/src 到 sys.path，使 voxcpm 源码包可被发现
+    # (未 pip install 该包时的兼容路径)
+    import sys as _sys
+    _voxcpm_src = os.path.join(ROOT_DIR, "reference_repos", "VoxCPM", "src")
+    if os.path.isdir(_voxcpm_src) and _voxcpm_src not in _sys.path:
+        _sys.path.insert(0, _voxcpm_src)
+        logger.info(f"[VoxCPM2] 注入源码路径: {_voxcpm_src}")
+
     import voxcpm
     from funasr import AutoModel
 
@@ -554,11 +562,11 @@ def _do_load_voxcpm2_internal(
             local_files_only=True,
         )
         if include_denoiser:
-            kwargs["zipenhancer_model_id"] = VOXCPM2_DENOISER_PATH
+            kwargs["zipenhancer_model_id"] = get_voxcpm2_denoiser_path()
         else:
             kwargs["load_denoiser"] = False
 
-        new_model: Any = voxcpm.VoxCPM.from_pretrained(VOXCPM2_MODEL_PATH, **kwargs)
+        new_model: Any = voxcpm.VoxCPM.from_pretrained(get_voxcpm2_model_path(), **kwargs)
 
         # Move sub-components to GPU with granular progress
         if backend != GPUBackend.CPU and gpu_device is not None:
@@ -590,8 +598,9 @@ def _do_load_voxcpm2_internal(
         yield status_text, None, None, None
 
         new_asr: Any = AutoModel(
-            model=VOXCPM2_ASR_PATH,
+            model=get_voxcpm2_asr_path(),
             disable_pbar=True,
+            disable_update=True,  # 离线优先：跳过 funasr 版本更新检查
             device=device_string,
         )
         registry.set_voxcpm_loaded(new_model, asr=new_asr)
@@ -734,7 +743,7 @@ def load_indextts2(
     生成器产出格式（每条均为 ``(status_text, None, None, None)`` 四元组，
     兼容调用方 ``for status_text, _, _, _ in gen:`` 解包）：
         1. ``"正在检查系统资源..."``：
-           校验 ``INDEXTTS2_MODEL_PATH`` 是否存在并查询显存状态。
+           校验 ``get_indextts2_model_path()`` 是否存在并查询显存状态。
         2. ``"正在加载 IndexTTS 2.0 引擎..."``：
            构造 ``IndexTTS2Engine``，内部依次加载 VQ Encoder、
            Flow Matching 主干、HiFi-GAN Vocoder 等子模块。
@@ -766,9 +775,9 @@ def load_indextts2(
         backend: GPUBackend = GPUBackendManager.detect_backend()
 
         # Check if model files exist
-        if not os.path.exists(INDEXTTS2_MODEL_PATH):
+        if not os.path.exists(get_indextts2_model_path()):
             raise FileNotFoundError(
-                f"IndexTTS 2.0 模型文件不存在: {INDEXTTS2_MODEL_PATH}\n"
+                f"IndexTTS 2.0 模型文件不存在: {get_indextts2_model_path()}\n"
                 "请运行: python scripts/download_indextts2.py 下载模型"
             )
 
@@ -804,7 +813,7 @@ def load_indextts2(
         start_time: float = time.time()
 
         new_engine: Any = IndexTTS2Engine(
-            model_dir=INDEXTTS2_MODEL_PATH,
+            model_dir=get_indextts2_model_path(),
             use_fp16=(backend != GPUBackend.CPU),
         )
 
@@ -954,32 +963,32 @@ class PreloadService:
             try:
                 if engine == EngineName.VOXCPM2.value:
                     logger.info("[预加载] 开始预读 VoxCPM2 模型文件到系统内存...")
-                    if os.path.exists(VOXCPM2_MODEL_PATH):
+                    if os.path.exists(get_voxcpm2_model_path()):
                         try:
-                            self._read_files_to_cache(VOXCPM2_MODEL_PATH)
+                            self._read_files_to_cache(get_voxcpm2_model_path())
                             logger.info("[预加载] VoxCPM2 模型文件已预读到系统缓存")
                         except (OSError, PermissionError) as vox_err:
                             logger.warning(f"[预加载] VoxCPM2 主模型预读失败: {vox_err}")
                     else:
-                        logger.warning(f"[预加载] VoxCPM2 模型路径不存在: {VOXCPM2_MODEL_PATH}")
+                        logger.warning(f"[预加载] VoxCPM2 模型路径不存在: {get_voxcpm2_model_path()}")
 
-                    if os.path.exists(VOXCPM2_ASR_PATH):
+                    if os.path.exists(get_voxcpm2_asr_path()):
                         try:
-                            self._read_files_to_cache(VOXCPM2_ASR_PATH)
+                            self._read_files_to_cache(get_voxcpm2_asr_path())
                             logger.info("[预加载] VoxCPM2 ASR 模型文件已预读到系统缓存")
                         except (OSError, PermissionError) as asr_err:
                             logger.warning(f"[预加载] VoxCPM2 ASR 模型预读失败: {asr_err}")
 
                 elif engine == EngineName.INDEXTTS2.value:
                     logger.info("[预加载] 开始预读 IndexTTS 2.0 模型文件到系统内存...")
-                    if os.path.exists(INDEXTTS2_MODEL_PATH):
+                    if os.path.exists(get_indextts2_model_path()):
                         try:
-                            self._read_files_to_cache(INDEXTTS2_MODEL_PATH)
+                            self._read_files_to_cache(get_indextts2_model_path())
                             logger.info("[预加载] IndexTTS 2.0 模型文件已预读到系统缓存")
                         except (OSError, PermissionError) as idx_err:
                             logger.warning(f"[预加载] IndexTTS 2.0 模型预读失败: {idx_err}")
                     else:
-                        logger.warning(f"[预加载] IndexTTS 2.0 模型路径不存在: {INDEXTTS2_MODEL_PATH}")
+                        logger.warning(f"[预加载] IndexTTS 2.0 模型路径不存在: {get_indextts2_model_path()}")
 
                 with self._lock:
                     self._state["completed"] = True
@@ -1383,7 +1392,7 @@ def _rollback_engine(prev_state: dict[str, Any], error: Exception) -> None:
 
             backend = GPUBackendManager.detect_backend()
             new_engine: Any = IndexTTS2Engine(
-                model_dir=INDEXTTS2_MODEL_PATH,
+                model_dir=get_indextts2_model_path(),
                 use_fp16=(backend != GPUBackend.CPU),
             )
             registry.set_indextts2_loaded(new_engine)

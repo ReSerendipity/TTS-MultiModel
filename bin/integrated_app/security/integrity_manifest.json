@@ -1,0 +1,22 @@
+{
+  "description": "TTS_MultiModel 核心模块完整性清单 (自动生成)",
+  "algorithm": "sha256",
+  "files": {
+    "app_server.py": "3ceee834c9d8ee97874ccf439265773d3c1b9e30fa7f3756bf05799a2bd5041f",
+    "config.py": "3769f48befe121f55bffb7220d68913f6e6c92bab279a6d3ba7d19524c85ff67",
+    "config_models.py": "ab0a36ff00f59b719220048f7eceb014a57c2475f0fad3219ee7b8bb47104ef9",
+    "engine_interface.py": "0f7a64a9d7b8c20e66a63741a840a320563023342376e1cf3db309ccff219a86",
+    "model_manager.py": "f6cbd8b3b0d8ccd6cb9d9eb608666ae0d5b2b62fa26654750031b811128cd247",
+    "model_registry.py": "0b5be0c06010127c2f83a0d78fbe0a112e7b2a3f40dd4b11a9e2789ec6cc6cba",
+    "task_queue.py": "314fa277f9bf867905d650331ff7d9a1ca7602283fd0afdd5d1b339785366d36",
+    "history_db.py": "fbb1f03b912e4baf36dd298bb7ff549665caefcc25cba206ef363d6c7b2e2cfe",
+    "i18n.py": "2b06f28b70550a9b30270a14ed2538fd0b7e6ab2e1c8f9680fe2bac754907b5c",
+    "auth.py": "b65d79201ff1eb13c61d1c7991a6520fc9ab099b34347460dd318f9551458c9f",
+    "middleware/csrf.py": "fb5706f286a953ea03980b1ba01569b57f14f6ea0a07050d3ea7ab59af431873",
+    "middleware/error_handler.py": "f37ecd35ddbe07c5477fe821861254759f84f11dfa5c3328392fa92ba490b3e3",
+    "middleware/rate_limit.py": "4c2b9c48024e84771c5d784983c5ad0bab4b2a3c1111b03c3a3946fc0e196bb8",
+    "middleware/request_id.py": "a4426bf3ace27425227f2ed2bc89209895c1a0f2a57acbec47b63689417979f7",
+    "security/integrity_check.py": "ca84bebeb134217831510335bdf2c9eaa0a8f560d615851c3ae4895edbe0042e",
+    "security/integrity_selfcheck.py": "f58726bce1c2fd3a471572cf4264b22818cbefc8b92f01ed16e59c51c47ef42f"
+  }
+}

@@ -172,7 +172,6 @@ def warmup_model(
             wav = model.generate(
                 text=warmup_text,
                 max_len=100,  # 限制长度，快速完成
-                seed=42,  # 固定 seed，确定性预热
             )
             if wav is not None and len(wav) > 0:
                 duration = len(wav) / 48000 if hasattr(model, "generate") else 0
@@ -189,7 +188,6 @@ def warmup_model(
             wav = model.generate(
                 text=warmup_text,
                 max_len=100,
-                seed=42,
             )
             if wav is not None and len(wav) > 0:
                 elapsed = time.time() - start_time

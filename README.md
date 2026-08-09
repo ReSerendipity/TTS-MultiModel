@@ -85,7 +85,7 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 | 项目 | 要求 |
 |------|------|
 | 操作系统 | Windows 10/11 (64-bit) 或 Linux |
-| Python | 3.12+（Windows 内置 WinPython，也可自行安装） |
+| Python | **两种方式均可**：<br>• **推荐**：系统 Python 3.10+（3.12 最佳），需勾选 "Add Python to PATH"<br>• **备选**：Windows 内置 WinPython（`WPy64-312101/`），完全隔离无需系统 Python |
 | GPU | NVIDIA (CUDA) / Apple Silicon (MPS)，推荐 6.5GB+ VRAM |
 | VC 运行库 | Windows 需安装 Visual C++ Redistributable（项目内含） |
 | SoX（音频效果处理） | Windows 需下载 SoX 14.4.2 并解压到 `bin/sox-14.4.2-win32/sox-14.4.2/`（见下方说明） |
@@ -96,34 +96,56 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 
 ### Windows 安装
 
-**方式一：使用内置 WinPython（推荐）**
+**方式一：使用系统 Python（推荐，节省磁盘空间）**
 
 ```bash
 git clone https://github.com/ReSerendipity/TTS_MultiModel.git
 cd TTS_MultiModel
 
-# 安装 VC 运行库（首次运行）
-# 双击 VC 运行库\VC_redist.x64.exe
+# 1. 安装系统 Python 3.10+（推荐 3.12）
+#    下载：https://www.python.org/downloads/
+#    ⚠️  安装时一定要勾选 "Add Python to PATH"
+#    验证：打开 CMD，运行 `python --version` 应显示 3.10+
 
-# 安装依赖
+# 2. 一键安装依赖（会自动检测系统 Python）
 install.bat
 
-# 下载模型（见下方"模型下载"章节）
+# 3. 下载模型（见下方"模型下载"章节）
 
-# 启动应用
+# 4. 启动应用（会优先使用系统 Python）
 start.bat
 ```
 
-**方式二：使用自己的 Python 环境**
+> 💡 **优势**：多个项目（如 SeedVR2、TTS_MultiModel）共享一套 Python 和依赖，避免每个项目都有 1~2GB 的重复 WinPython 环境。
+
+---
+
+**方式二：使用内置 WinPython（完全隔离，无需系统 Python）**
 
 ```bash
 git clone https://github.com/ReSerendipity/TTS_MultiModel.git
 cd TTS_MultiModel
-pip install -r requirements.txt
 
-# 下载模型后启动
-python bin\clean_launch.py
+# 1. 下载 WinPython 并解压到项目根目录
+#    确保 WPy64-312101\python\python.exe 存在
+#    下载：https://github.com/winpython/winpython/releases
+
+# 2. 安装 VC 运行库（首次运行）
+# 双击 VC 运行库\VC_redist.x64.exe
+
+# 3. 安装依赖（检测不到系统 Python 时自动回退到 WinPython）
+install.bat
+
+# 4. 下载模型（见下方"模型下载"章节）
+
+# 5. 启动应用
+start.bat
 ```
+
+> 💡 **检测顺序说明**：`install.bat` 和 `start.bat` 会按以下优先级查找 Python：
+> 1. 常见系统安装路径（`C:\Python312\`、`C:\Program Files\Python312\`、用户目录下的 Python）
+> 2. 系统 PATH 中注册的 `python` 命令（排除 IDE/编辑器自带的 Python）
+> 3. 项目内的 WinPython（`WPy64-312101\`、`WinPython` 等目录）
 
 ### Linux 安装
 
@@ -193,8 +215,62 @@ python scripts/download_indextts2.py
 - **生成参数**: `cfg_value`（引导系数）、`inference_timesteps`（推理步数）、`normalize`（文本归一化）、`denoise`（降噪）
 - **服务设置**: 端口（默认 7869）、主机地址、GPU 设置
 - **API 认证**: `api_auth` 区域配置 token 认证
+- **模型路径模式**: `models.model_source_mode`（portable/shared 双模式，见下方说明）
+- **断点续跑**: `runtime.task.checkpoint_dir` 配置 checkpoint 存储目录
+- **音频水印**: `security.audio_watermark_enabled` 控制水印开关
 
 详见 [参数调整指南](docs/ADJUSTABLE_PARAMETERS.md)。
+
+## 安全与可靠性
+
+本项目从 Seedvr2 和 Image_MultiModel 两个项目借鉴了多项安全与可靠性改造：
+
+### 配置原子写入（来源：Seedvr2）
+
+`config.py` 中的 `save_config()` 使用 tempfile + `os.replace` 原子写入策略，避免写入过程中断（断电/杀进程/磁盘满）导致配置文件半写损坏。Settings 页保存配置时自动使用此机制。
+
+### 配置验证失败回退（来源：Seedvr2）
+
+`config.py` 中的 `load_config()` 宽松接口：Pydantic 验证失败时自动回退到原始 YAML 加载，保证应用不会因 config.yaml 格式错误而无法启动。回退时日志中记录 warning 告知具体验证错误。
+
+### 核心模块完整性自校验（来源：Seedvr2）
+
+启动时自动计算核心模块（`app_server.py`、`config.py`、`config_models.py`、`engine_interface.py`、`model_manager.py`、`middleware/*.py`、`security/*.py` 等 16 个文件）的 SHA-256 哈希值并与清单比对，检测代码是否被篡改（CWE-912 防御）。自检失败只告警不阻塞启动。
+
+- 哈希清单：`bin/integrated_app/security/integrity_manifest.json`
+- 重新生成清单：`python scripts/generate_integrity_manifest.py`
+
+### 模型路径 shared / portable 双模式（来源：Image_MultiModel）
+
+`config.yaml` 中 `models.model_source_mode` 支持两种模式：
+
+| 模式 | 说明 | 适用场景 |
+|------|------|----------|
+| `portable`（默认） | 使用项目内 `pretrained_models/` 目录 | 单独部署、自包含 |
+| `shared` | 使用 `shared_models_root` 指定的外部目录 | 多项目共享模型，节省磁盘 |
+
+shared 模式下，路径结构须与 portable 一致（`{shared_root}/VoxCPM2/`、`{shared_root}/SenseVoiceSmall/` 等）。
+
+### 断点续跑（来源：Image_MultiModel）
+
+批量剧本配音 / 批量克隆任务被中断时，checkpoint 机制记录已完成的子任务，重启后可跳过已完成的子任务继续执行。
+
+- checkpoint 存储目录：`data/checkpoints/`（可通过 `runtime.task.checkpoint_dir` 配置）
+- 启动时自动扫描未完成的 checkpoint 并记录日志
+
+### 输出音频水印可溯源（来源：Image_MultiModel DCT 水印思路）
+
+所有通过 TTS_MultiModel 生成的音频自动嵌入不可感知的 FFT 频域水印（16-20kHz 高频段），用于内容来源追溯。水印嵌入 source_id 为代码常量（`WATERMARK_SOURCE_ID`），不可通过配置篡改。
+
+- numpy 级水印：`bin/integrated_app/watermark.py`（`embed_watermark` / `detect_watermark`）
+- 文件级水印：`bin/integrated_app/audio_watermark.py`（`embed_watermark` / `extract_watermark`），支持 CRC32 + Base62 payload 校验
+
+### 差异化静态文件缓存（来源：Seedvr2）
+
+静态资源按类型设置差异化 `Cache-Control` 头：
+- CSS/JS/HTML/JSON：`no-cache, must-revalidate`（开发时经常改）
+- 字体（woff2/ttf 等）：`public, max-age=2592000`（缓存 30 天）
+- 图片（png/jpg/svg 等）：`public, max-age=86400`（缓存 1 天）
 
 ## 技术栈
 
