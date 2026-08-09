@@ -301,3 +301,13 @@ docs/screenshots/dark/*
 !docs/screenshots/voxcpm2_04_script_workshop_viewport.png
 !docs/screenshots/voxcpm2_06_lora_viewport.png
 !docs/screenshots/voxcpm2_08_settings_viewport.png
+
+# ===== 2026-08-09 审计补充（仓库瘦身防回归） =====
+# 误推高危：ffmpeg 自带运行时（211MB 单文件），必须忽略
+bin/ffmpeg/
+# 测试运行日志（曾误跟踪 4 个 *_results.txt）
+tests/*_results.txt
+# 开发期一次性脚本/文档（曾误跟踪）
+scripts/capture_screenshots.py
+scripts/optimize_ui.py
+docs/UI_RESTRUCTURE_IMPLEMENTATION.md
