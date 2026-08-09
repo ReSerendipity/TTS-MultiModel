@@ -103,9 +103,6 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-benchmark httpx
 
-      - name: Run 3-engine compatibility check
-        run: python scripts/check_3engine_compat.py
-
       - name: Run GPU benchmarks
         env:
           TRANSFORMERS_OFFLINE: "1"

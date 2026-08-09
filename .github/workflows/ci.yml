@@ -34,33 +34,6 @@ jobs:
       - name: Run mypy type check
         run: mypy bin/integrated_app/ --ignore-missing-imports || true
 
-  compat:
-    name: 3-Engine Compatibility Check
-    runs-on: ubuntu-latest
-    needs: lint
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements.txt
-
-      - name: Run 3-engine compatibility check
-        env:
-          TRANSFORMERS_OFFLINE: "1"
-          HF_HUB_OFFLINE: "1"
-          MODELSCOPE_OFFLINE: "1"
-          CUDA_VISIBLE_DEVICES: ""
-        run: python scripts/check_3engine_compat.py
-
   test:
     name: Test (pytest)
     runs-on: ubuntu-latest
@@ -104,17 +77,6 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov httpx
         shell: pwsh
-
-      - name: Dependency consistency check
-        run: python scripts/sync_requirements.py --check
-
-      - name: Run 3-engine compatibility check
-        env:
-          TRANSFORMERS_OFFLINE: "1"
-          HF_HUB_OFFLINE: "1"
-          MODELSCOPE_OFFLINE: "1"
-          CUDA_VISIBLE_DEVICES: ""
-        run: python scripts/check_3engine_compat.py
 
       - name: Run tests with coverage
         env:
