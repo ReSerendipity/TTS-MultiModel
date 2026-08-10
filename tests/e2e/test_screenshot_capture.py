@@ -92,6 +92,18 @@ def _click_tab(page, tab_name):
     button = page.locator(f".sidebar-item[data-tab='{tab_name}']")
     if button.count() == 0:
         return False
+    # 若按钮位于折叠分组（.sidebar-nav-section.section-collapsed）内，
+    # 先点击分组标题 .sidebar-nav-label 展开，否则 display:none 无法点击
+    page.evaluate("""(t) => {
+        const btn = document.querySelector(`.sidebar-item[data-tab="${t}"]`);
+        if (!btn) return;
+        const sec = btn.closest('.sidebar-nav-section');
+        if (sec && sec.classList.contains('section-collapsed')) {
+            const label = sec.querySelector('.sidebar-nav-label');
+            if (label) label.click();
+        }
+    }""", tab_name)
+    page.wait_for_timeout(400)
     button.first.click()
     page.wait_for_load_state("networkidle", timeout=15000)
     page.wait_for_timeout(1200)
