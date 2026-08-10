@@ -352,7 +352,7 @@ class TestTabRoutes:
 
     def test_nonexistent_tab_returns_404(self, client):
         resp = client.get("/tab/nonexistent_tab_xyz")
-        assert resp.status_code in (404, 200)
+        assert resp.status_code == 404
 
 
 # =====================================================================
@@ -365,7 +365,7 @@ class TestSystemSettingsRoutes:
 
     def test_settings_get(self, client):
         resp = client.get("/api/system/settings")
-        assert resp.status_code in (200, 405, 403)
+        assert resp.status_code in (200, 403)
 
     def test_logs_route(self, client):
         resp = client.get("/api/system/logs")

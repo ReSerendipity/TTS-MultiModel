@@ -1,6 +1,6 @@
 """视觉回归测试 — 基于 Playwright screenshot 对比。
 
-捕获核心页面的截图作为 baseline，后续运行时自动对比像素差异，
+捕获核心页面的截图，与 baseline 进行像素级差异对比，
 检测 UI 回归。
 
 首次运行（生成 baseline）::
@@ -14,9 +14,11 @@
 需要：
 - 服务器运行在 http://127.0.0.1:7869
 - Playwright chromium 已安装
+- numpy（已包含在项目依赖中）
 """
 
 import os
+import tempfile
 
 import pytest
 
@@ -26,6 +28,12 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+
 pytestmark = pytest.mark.skipif(
     not PLAYWRIGHT_AVAILABLE,
     reason="Playwright not installed. Install with: pip install playwright && playwright install",
@@ -33,6 +41,49 @@ pytestmark = pytest.mark.skipif(
 
 BASE_URL = os.environ.get("TTS_SERVER_URL", "http://127.0.0.1:7869")
 VIEWPORT = {"width": 1366, "height": 900}
+# 像素差异阈值：差异比例超过此值则判定为回归
+PIXEL_DIFF_THRESHOLD = 0.01  # 1%
+
+SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), "screenshots")
+
+
+def _load_image_as_array(filepath):
+    """使用 numpy 加载 PNG 图像为像素数组。"""
+    return np.asarray(
+        __import__("PIL").Image.open(filepath).convert("RGB")
+    ) if __import__("PIL").__version__ else None
+
+
+def _load_image_png(filepath):
+    """使用 numpy 加载 PNG 图像为像素数组（无需 PIL 的原始方式）。
+
+    利用 numpy 的 fromfile 读取原始字节并解析 PNG。
+    如果 Pillow 可用则优先使用 Pillow。
+    """
+    try:
+        from PIL import Image
+        img = Image.open(filepath).convert("RGB")
+        return np.asarray(img)
+    except ImportError:
+        pytest.skip("Pillow not installed. Install with: pip install Pillow")
+
+
+def _compare_images(baseline_path, current_path):
+    """对比两张图片的像素差异。
+
+    返回 (is_match, diff_ratio)。
+    """
+    baseline = _load_image_png(baseline_path)
+    current = _load_image_png(current_path)
+
+    if baseline.shape != current.shape:
+        return False, 1.0
+
+    diff = np.abs(baseline.astype(np.int16) - current.astype(np.int16))
+    # 像素级差异：任何通道差异 > 10 视为不同像素
+    pixel_diff = np.any(diff > 10, axis=2)
+    diff_ratio = np.mean(pixel_diff)
+    return diff_ratio <= PIXEL_DIFF_THRESHOLD, diff_ratio
 
 
 @pytest.fixture(scope="module")
@@ -55,6 +106,53 @@ def browser():
         browser.close()
 
 
+def _capture_and_compare(page, screenshots_dir, filename):
+    """捕获截图并与 baseline 对比。
+
+    如果 baseline 不存在或 --snapshot-update 标志设置，则保存为 baseline。
+    否则进行像素差异对比。
+    """
+    os.makedirs(screenshots_dir, exist_ok=True)
+    baseline_path = os.path.join(screenshots_dir, filename)
+
+    # 捕获到临时文件
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = tmp.name
+    page.screenshot(path=tmp_path)
+
+    # 检查是否需要更新或创建 baseline
+    # 支持环境变量 TTS_SNAPSHOT_UPDATE=1 或命令行 --snapshot-update
+    snapshot_update = os.environ.get("TTS_SNAPSHOT_UPDATE", "") == "1"
+
+    if not os.path.exists(baseline_path) or snapshot_update:
+        # 首次运行或更新 baseline
+        import shutil
+        shutil.move(tmp_path, baseline_path)
+        pytest.skip(f"Baseline created/updated: {filename}")
+    else:
+        # 对比
+        if not NUMPY_AVAILABLE:
+            # numpy 不可用时回退为文件大小对比
+            baseline_size = os.path.getsize(baseline_path)
+            current_size = os.path.getsize(tmp_path)
+            size_diff_ratio = abs(baseline_size - current_size) / max(baseline_size, 1)
+            os.unlink(tmp_path)
+            assert size_diff_ratio < 0.5, (
+                f"File size diff too large for {filename}: "
+                f"baseline={baseline_size}B, current={current_size}B, "
+                f"diff_ratio={size_diff_ratio:.2%}"
+            )
+        else:
+            try:
+                is_match, diff_ratio = _compare_images(baseline_path, tmp_path)
+            finally:
+                os.unlink(tmp_path)
+            assert is_match, (
+                f"Visual regression detected for {filename}: "
+                f"pixel diff ratio={diff_ratio:.2%} (threshold={PIXEL_DIFF_THRESHOLD:.2%})"
+            )
+
+
 class TestVisualRegression:
     """核心页面视觉回归测试。"""
 
@@ -64,9 +162,7 @@ class TestVisualRegression:
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
-        # Use expect screenshot for visual regression
-        # If no baseline exists, this will create one on first run with --snapshot-update
-        page.screenshot(path=os.path.join(os.path.dirname(__file__), "screenshots", "regression_home.png"))
+        _capture_and_compare(page, SCREENSHOTS_DIR, "regression_home.png")
         context.close()
 
     def test_voice_design_tab_visual(self, server_url, browser):
@@ -83,9 +179,7 @@ class TestVisualRegression:
             page.wait_for_load_state("domcontentloaded", timeout=15000)
             page.wait_for_selector("#tab-content", state="visible", timeout=5000)
 
-        screenshots_dir = os.path.join(os.path.dirname(__file__), "screenshots")
-        os.makedirs(screenshots_dir, exist_ok=True)
-        page.screenshot(path=os.path.join(screenshots_dir, "regression_voice_design.png"))
+        _capture_and_compare(page, SCREENSHOTS_DIR, "regression_voice_design.png")
         context.close()
 
     def test_voice_clone_tab_visual(self, server_url, browser):
@@ -101,9 +195,7 @@ class TestVisualRegression:
             page.wait_for_load_state("domcontentloaded", timeout=15000)
             page.wait_for_selector("#tab-content", state="visible", timeout=5000)
 
-        screenshots_dir = os.path.join(os.path.dirname(__file__), "screenshots")
-        os.makedirs(screenshots_dir, exist_ok=True)
-        page.screenshot(path=os.path.join(screenshots_dir, "regression_voice_clone.png"))
+        _capture_and_compare(page, SCREENSHOTS_DIR, "regression_voice_clone.png")
         context.close()
 
     def test_dark_theme_visual(self, server_url, browser):
@@ -125,9 +217,7 @@ class TestVisualRegression:
         """)
         page.wait_for_timeout(300)
 
-        screenshots_dir = os.path.join(os.path.dirname(__file__), "screenshots")
-        os.makedirs(screenshots_dir, exist_ok=True)
-        page.screenshot(path=os.path.join(screenshots_dir, "regression_dark_theme.png"))
+        _capture_and_compare(page, SCREENSHOTS_DIR, "regression_dark_theme.png")
         context.close()
 
     def test_mobile_layout_visual(self, server_url, browser):
@@ -140,7 +230,5 @@ class TestVisualRegression:
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
 
-        screenshots_dir = os.path.join(os.path.dirname(__file__), "screenshots")
-        os.makedirs(screenshots_dir, exist_ok=True)
-        page.screenshot(path=os.path.join(screenshots_dir, "regression_mobile.png"))
+        _capture_and_compare(page, SCREENSHOTS_DIR, "regression_mobile.png")
         context.close()

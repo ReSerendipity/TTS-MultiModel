@@ -23,8 +23,9 @@ import pytest
 pytest.importorskip("playwright")  # Playwright 为可选（E2E）依赖，未安装时跳过本模块
 from playwright.sync_api import sync_playwright
 
-SCREENSHOT_DIR = r"c:\Users\HONOR\TTS_MultiModel\screenshots"
-URL = "http://127.0.0.1:8765/tts_multimodel_replica.html"
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCREENSHOT_DIR = os.path.join(_REPO_ROOT, "screenshots")
+URL = os.environ.get("TTS_REPLICA_URL", "http://127.0.0.1:8765/tts_multimodel_replica.html")
 
 # Tabs with (sidebar data-tab value, page div id, display name)
 TABS = [

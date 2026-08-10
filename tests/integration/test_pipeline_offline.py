@@ -78,10 +78,11 @@ class TestSSEEventBusIntegration:
 
     def test_app_has_sse_endpoint(self, client):
         """The FastAPI app should expose /api/sse/events."""
-        # The endpoint should exist (even if it returns 400 without proper headers)
-        resp = client.get("/api/sse/events")
-        # SSE endpoints typically return 400 or 200 depending on Accept header
-        assert resp.status_code in (200, 400, 406, 404)
+        # SSE 端点是流式的，直接 GET 会导致 TestClient 无限等待。
+        # 通过 OpenAPI schema 验证端点已注册。
+        schema = client.get("/openapi.json").json()
+        paths = schema.get("paths", {})
+        assert "/api/sse/events" in paths, "SSE endpoint /api/sse/events should be registered"
 
 
 # ---------------------------------------------------------------------------
@@ -104,17 +105,17 @@ class TestTrackerStateTransitions:
         from integrated_app.tracker import GenerationTracker
 
         tracker = GenerationTracker()
-        if hasattr(tracker, "start_generation"):
-            gen_id = tracker.start_generation()
-            assert gen_id is not None
+        assert hasattr(tracker, "start_generation"), "GenerationTracker should have start_generation method"
+        gen_id = tracker.start_generation()
+        assert gen_id is not None
 
     def test_tracker_progress_update(self):
         """Test progress update propagation."""
         from integrated_app.tracker import GenerationTracker
 
         tracker = GenerationTracker()
-        if hasattr(tracker, "update_phase"):
-            tracker.update_phase("processing")
+        assert hasattr(tracker, "update_phase"), "GenerationTracker should have update_phase method"
+        tracker.update_phase("processing")
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +130,8 @@ class TestModelManagerFlow:
         """model_manager should be importable with core functions."""
         from integrated_app import model_manager
 
-        assert hasattr(model_manager, "load_voxcpm2") or hasattr(model_manager, "unload_model")
+        assert hasattr(model_manager, "load_voxcpm2") or hasattr(model_manager, "unload_model"), \
+            "model_manager should have load_voxcpm2 or unload_model function"
 
 
 # ---------------------------------------------------------------------------
