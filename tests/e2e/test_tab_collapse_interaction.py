@@ -181,6 +181,9 @@ class TestCollapseInteraction:
         page = browser.new_page()
         page.goto(f"{server_url}/?tab=dotstts_clone")
         page.wait_for_load_state("domcontentloaded")
+        # dismiss onboarding overlay (fresh CI context has no localStorage)
+        page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); const el=document.getElementById('onboarding-overlay'); if(el) el.remove(); }")
+        page.wait_for_timeout(300)
 
         collapse_header = page.query_selector(".collapse-header")
         if collapse_header:
@@ -344,6 +347,9 @@ class TestBusinessFlow:
         page = browser.new_page()
         page.goto(server_url)
         page.wait_for_load_state("domcontentloaded")
+        # dismiss onboarding overlay (fresh CI context has no localStorage)
+        page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); const el=document.getElementById('onboarding-overlay'); if(el) el.remove(); }")
+        page.wait_for_timeout(300)
 
         # Check initial theme
         initial_dark = page.evaluate(
