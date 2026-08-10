@@ -775,6 +775,7 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
 
     uvicorn.run(app, host=ip, port=int(port))
 
+
 if __name__ == "__main__":
     """python -m integrated_app.app_server --host 127.0.0.1 --port 7869"""
     import argparse
