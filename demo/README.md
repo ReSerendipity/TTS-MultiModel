@@ -19,3 +19,5 @@
 部署前需要在仓库 Settings → Pages 中把 Source 设置为 **GitHub Actions**（只需一次）。
 
 线上地址：`https://<owner>.github.io/<repo>/`
+
+> 部署触发记录：2026-08-10 23:52
