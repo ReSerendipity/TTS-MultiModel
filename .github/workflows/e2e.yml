@@ -78,6 +78,17 @@ jobs:
             exit 1
           fi
 
+      - name: Diagnose tab endpoint
+        run: |
+          echo "===== HX-Request /tab/voice_design ====="
+          curl -s -H "HX-Request: true" -o /tmp/tab.html -w "HTTP %{http_code} size %{size_download}\n" "http://127.0.0.1:7869/tab/voice_design?lang=zh-CN" || true
+          head -c 800 /tmp/tab.html || true
+          echo ""
+          echo "===== server.log (head) ====="
+          head -50 /tmp/server.log || true
+          echo "===== server.log (tail) ====="
+          tail -50 /tmp/server.log || true
+
       - name: Run Playwright E2E tests (required gate)
         env:
           TTS_SERVER_URL: "http://127.0.0.1:7869"
@@ -89,13 +100,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-screenshots
-          path: tests/e2e/screenshots/
+          path: |
+            tests/e2e/screenshots/
+            server-ci.log
           if-no-files-found: ignore
           retention-days: 7
 
       - name: Stop server
         if: always()
         run: |
+          cp /tmp/server.log ./server-ci.log 2>/dev/null || true
           if [ -f /tmp/server.pid ]; then
             kill $(cat /tmp/server.pid) || true
           fi
