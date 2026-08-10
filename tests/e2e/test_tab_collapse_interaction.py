@@ -144,7 +144,7 @@ class TestTabSwitching:
     def test_dotstts_tab_loads(self, server_url, browser):
         """测试 dots.tts 标签页加载，验证内容非空。"""
         page = browser.new_page()
-        page.goto(f"{server_url}/tabs/dotstts_clone")
+        page.goto(f"{server_url}/?tab=dotstts_clone")
         page.wait_for_load_state("networkidle")
         tab_content = page.query_selector("#tab-content")
         assert tab_content is not None
@@ -154,7 +154,7 @@ class TestTabSwitching:
     def test_voxcpm2_tab_loads(self, server_url, browser):
         """测试 VoxCPM2 标签页加载，验证有表单元素。"""
         page = browser.new_page()
-        page.goto(f"{server_url}/tabs/voice_clone")
+        page.goto(f"{server_url}/?tab=voice_clone")
         page.wait_for_load_state("networkidle")
         tab_content = page.query_selector("#tab-content")
         assert tab_content is not None
@@ -165,7 +165,7 @@ class TestTabSwitching:
     def test_indextts2_tab_loads(self, server_url, browser):
         """测试 IndexTTS2 标签页加载，验证有内容。"""
         page = browser.new_page()
-        page.goto(f"{server_url}/tabs/indextts2")
+        page.goto(f"{server_url}/?tab=indextts2")
         page.wait_for_load_state("networkidle")
         tab_content = page.query_selector("#tab-content")
         assert tab_content is not None
@@ -179,7 +179,7 @@ class TestCollapseInteraction:
     def test_collapse_toggle(self, server_url, browser):
         """测试折叠面板展开/折叠，验证 class 变化。"""
         page = browser.new_page()
-        page.goto(f"{server_url}/tabs/dotstts_clone")
+        page.goto(f"{server_url}/?tab=dotstts_clone")
         page.wait_for_load_state("networkidle")
 
         collapse_header = page.query_selector(".collapse-header")
@@ -191,7 +191,7 @@ class TestCollapseInteraction:
             # Click to expand — wait for class or visibility change
             collapse_header.click()
             page.wait_for_function(
-                "() => { const el = document.querySelector('.collapse-body'); "
+                "function() { const el = document.querySelector('.collapse-body'); "
                 "if (!el) return false; "
                 "const cls = el.getAttribute('class') || ''; "
                 "return cls !== arguments[0] || el.checkVisibility(); }",
@@ -301,7 +301,7 @@ class TestBusinessFlow:
     def test_persona_tab_loads(self, server_url, browser):
         """测试音色库 tab 加载，验证有 persona 相关元素。"""
         page = browser.new_page()
-        page.goto(f"{server_url}/tabs/persona")
+        page.goto(f"{server_url}/?tab=persona")
         page.wait_for_load_state("networkidle")
         tab_content = page.query_selector("#tab-content")
         assert tab_content is not None
@@ -329,7 +329,7 @@ class TestBusinessFlow:
     def test_generation_form_exists(self, server_url, browser):
         """测试生成表单存在 — 检查文本输入和生成按钮。"""
         page = browser.new_page()
-        page.goto(f"{server_url}/tabs/voice_design")
+        page.goto(f"{server_url}/?tab=voice_design")
         page.wait_for_load_state("networkidle")
         # Look for textarea or input elements
         textareas = page.query_selector_all("textarea")

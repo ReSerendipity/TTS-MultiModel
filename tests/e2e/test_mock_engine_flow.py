@@ -108,7 +108,7 @@ class TestMockEngineBusinessFlow:
         """测试 UI 页面加载并包含生成表单。"""
         context = browser.new_context(viewport={"width": 1366, "height": 900})
         page = context.new_page()
-        page.goto(f"{BASE_URL}/tabs/voice_design", wait_until="domcontentloaded", timeout=30000)
+        page.goto(f"{BASE_URL}/?tab=voice_design", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("networkidle", timeout=15000)
         page.wait_for_selector("#tab-content", state="visible", timeout=5000)
 
