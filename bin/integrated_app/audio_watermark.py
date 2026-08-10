@@ -39,7 +39,8 @@ from typing import Any
 import numpy as np
 import soundfile as sf
 
-from .watermark import WATERMARK_SOURCE_ID, detect_watermark, embed_watermark as _embed_np
+from .watermark import WATERMARK_SOURCE_ID, detect_watermark
+from .watermark import embed_watermark as _embed_np
 
 logger = logging.getLogger("tts_multimodel")
 
