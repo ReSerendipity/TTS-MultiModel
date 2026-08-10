@@ -171,29 +171,30 @@ docker run -d --gpus all -p 7869:7869 \
 
 ### VoxCPM2 引擎所需模型
 
-| 模型 | 说明 | 存放目录 |
-|------|------|----------|
-| VoxCPM2 | 主 TTS 模型 | `pretrained_models/VoxCPM2/` |
-| SenseVoiceSmall | ASR 语音识别模型 | `pretrained_models/SenseVoiceSmall/` |
-| speech_zipenhancer | 音频降噪模型 | `pretrained_models/speech_zipenhancer/` |
+| 模型 | 说明 | 存放目录 | 下载源 |
+|------|------|----------|--------|
+| VoxCPM2 | 主 TTS 模型（2B，30 语言，48kHz） | `pretrained_models/VoxCPM2/` | [HuggingFace: openbmb/VoxCPM2](https://huggingface.co/openbmb/VoxCPM2) |
+| SenseVoiceSmall | ASR 语音识别模型 | `pretrained_models/SenseVoiceSmall/` | [ModelScope: iic/SenseVoiceSmall](https://www.modelscope.cn/models/iic/SenseVoiceSmall) / [HuggingFace: FunAudioLLM/SenseVoiceSmall](https://huggingface.co/FunAudioLLM/SenseVoiceSmall) |
+| speech_zipenhancer | 音频降噪模型 | `pretrained_models/speech_zipenhancer/` | [ModelScope 搜索 speech_zipenhancer](https://modelscope.cn/search?q=speech_zipenhancer) |
 
 ### IndexTTS 2.0 引擎所需模型
 
-| 模型 | 说明 | 存放目录 |
-|------|------|----------|
-| IndexTTS2 | IndexTTS 2.0 TTS 模型 | `pretrained_models/IndexTTS2/` |
+| 模型 | 说明 | 存放目录 | 下载源 |
+|------|------|----------|--------|
+| IndexTTS2 | IndexTTS 2.0 TTS 模型 | `pretrained_models/IndexTTS2/` | [ModelScope: IndexTeam/IndexTTS-2](https://modelscope.cn/models/IndexTeam/IndexTTS-2) |
 
 ### dots.tts 引擎所需模型
 
-| 模型 | 说明 | 存放目录 |
-|------|------|----------|
-| dots.tts | dots.tts TTS 引擎（第三方/开源实现） | `pretrained_models/dots_tts/` |
+| 模型 | 说明 | 存放目录 | 下载源 |
+|------|------|----------|--------|
+| dots.tts | dots.tts TTS 引擎（第三方/开源实现） | `pretrained_models/dots_tts/` | [GitHub: dots-tts](https://github.com/teleprint-me/dots-tts) |
 
-从 [HuggingFace](https://huggingface.co/) 或 [ModelScope](https://modelscope.cn/) 下载。
+从 [HuggingFace](https://huggingface.co/) 或 [ModelScope](https://modelscope.cn/) 下载，也可以使用项目内置的快捷下载脚本：
 
-快捷下载脚本：
 ```bash
-python scripts/download_indextts2.py
+python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.0（IndexTeam/IndexTTS-2）
+python scripts/download_dotstts.py     # dots.tts
+```
 ```
 
 详细说明见 [模型下载指南](docs/MODEL_DOWNLOADS.md)。
