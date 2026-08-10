@@ -59,7 +59,7 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov httpx
+          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -67,7 +67,7 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov httpx
+          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -75,7 +75,7 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov httpx
+          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
         shell: pwsh
 
       - name: Run tests with coverage
@@ -85,7 +85,7 @@ jobs:
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
         run: |
-          pytest tests/ -v --tb=short --cov=bin/integrated_app --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov --cov-fail-under=40 \
+          pytest tests/ -v --tb=short --timeout=180 --cov=bin/integrated_app --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov --cov-fail-under=40 \
             -m "not integration and not gpu and not cuda and not vram"
 
       - name: Run benchmark tests
