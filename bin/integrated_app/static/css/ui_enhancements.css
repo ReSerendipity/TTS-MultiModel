@@ -1,0 +1,740 @@
+/* UI/UX Enhancements for TTS MultiModel */
+
+/* 1. Layout Improvements */
+.pv-theme .two-col { gap: 16px !important; align-items: flex-start; }
+.pv-theme .two-col .col-form { flex: 0 0 68%; max-width: 68%; }
+.pv-theme .two-col .col-result { flex: 0 0 calc(32% - 16px); max-width: calc(32% - 16px); position: sticky; top: 64px; max-height: calc(100vh - 140px); overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+
+/* 2. Card Visual Refinements */
+.pv-theme .card { border-radius: 12px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.04),0 1px 2px rgba(0,0,0,0.03) !important; transition: box-shadow .2s ease,transform .2s ease; }
+.pv-theme .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06),0 2px 4px rgba(0,0,0,0.04) !important; }
+.pv-theme .card-body { padding: 16px !important; }
+.pv-theme .card-hdr { padding: 12px 16px !important; }
+
+/* 3. Form Elements */
+.pv-theme .fi:focus,.pv-theme .fs:focus,.pv-theme .ft:focus { box-shadow: 0 0 0 3px rgba(124,92,191,0.12),0 1px 2px rgba(124,92,191,0.08) !important; }
+.pv-theme .fi:hover:not(:focus),.pv-theme .fs:hover:not(:focus),.pv-theme .ft:hover:not(:focus) { border-color: #d1d5db !important; }
+
+/* 4. Buttons */
+.pv-theme .btn-generate { padding: 14px 20px !important; border-radius: 12px !important; box-shadow: 0 4px 14px rgba(99,68,163,0.2),0 2px 4px rgba(99,68,163,0.12),inset 0 1px 0 rgba(255,255,255,0.1) !important; transition: all .2s ease !important; }
+.pv-theme .btn-generate:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,68,163,0.28),0 3px 8px rgba(99,68,163,0.18),inset 0 1px 0 rgba(255,255,255,0.15) !important; filter: brightness(1.05); }
+.pv-theme .btn-generate:active { transform: translateY(0); }
+.pv-theme .btn-o { border-radius: 8px !important; padding: 8px 14px !important; transition: all .15s ease !important; }
+.pv-theme .btn-o:hover { transform: translateY(-1px); }
+
+/* 5. Tags */
+.pv-theme .tag { padding: 7px 16px 7px 28px !important; border-radius: 9999px !important; font-weight: 500 !important; border-width: 1.5px !important; transition: all .2s ease !important; }
+.pv-theme .tag:hover { transform: translateY(-1px); }
+.pv-theme .tag.active { box-shadow: 0 3px 10px rgba(124,92,191,0.25),0 1px 2px rgba(124,92,191,0.15) !important; transform: translateY(-1px); }
+
+/* 6. Subtabs */
+.pv-theme .stabs { background: var(--bg-tertiary,#f3f4f6); padding: 4px !important; border-radius: 8px !important; gap: 4px !important; margin-bottom: 16px !important; border-bottom: none !important; }
+.pv-theme .stab { padding: 8px 16px !important; border-radius: 6px !important; border: none !important; transition: all .2s ease !important; }
+.pv-theme .stab:hover { background: var(--bg-card,#fff); }
+.pv-theme .stab.active { background: var(--bg-card,#fff) !important; box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important; border-bottom: none !important; }
+
+/* 7. Collapsible */
+.pv-theme .collapse-body.open { padding: 14px !important; background: var(--bg-tertiary,#f3f4f6); border-radius: 0 0 8px 8px; border: 1px solid var(--border-subtle,#e5e7eb); border-top: none; }
+
+/* 8. Empty State */
+.pv-theme .empty-state { padding: 40px 20px !important; background: linear-gradient(180deg,var(--bg-tertiary,#f3f4f6) 0%,transparent 100%); border-radius: 12px; border: 2px dashed var(--border-subtle,#e5e7eb); margin: 8px 0; }
+.pv-theme .empty-state svg { width: 72px !important; height: 44px !important; margin-bottom: 16px !important; opacity: .3 !important; }
+
+/* 9. Progress */
+.pv-theme .progress-bar { height: 6px !important; border-radius: 3px !important; }
+.pv-theme .progress-fill { border-radius: 3px !important; transition: width .4s cubic-bezier(0.4,0,0.2,1); position: relative; overflow: hidden; }
+.pv-theme .progress-fill::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent); animation: progressShine 2s infinite; }
+@keyframes progressShine { 0%{transform:translateX(-100%)}100%{transform:translateX(100%)} }
+
+/* 10. Hint Text */
+.pv-theme .hint-text { border-left: 3px solid var(--accent-primary,#7c5cbf); padding: 10px 14px !important; line-height: 1.6; }
+
+/* 11. Responsive */
+@media (max-width:1200px){
+.pv-theme .two-col .col-form { flex: 0 0 60%; max-width: 60%; }
+.pv-theme .two-col .col-result { flex: 0 0 calc(40% - 16px); max-width: calc(40% - 16px); position:static; max-height:none; }
+}
+@media (max-width:900px){
+.pv-theme .two-col { flex-direction:column !important; }
+.pv-theme .two-col .col-form,.pv-theme .two-col .col-result { flex:1 1 100% !important; max-width:100% !important; position:static !important; max-height:none !important; }
+.pv-theme .form-row { grid-template-columns:1fr !important; }
+}
+@media (max-width:600px){
+.pv-theme .card-body { padding:12px !important; }
+.pv-theme .card-hdr { padding:10px 12px !important; }
+}
+
+/* 12. Glass Effect */
+.top-bar { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+/* 13. Micro-interactions */
+.pv-theme .card { animation: cardSlideIn .3s ease; }
+@keyframes cardSlideIn { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
+
+/* 14. Dark Mode */
+html.dark .pv-theme .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.3),0 2px 4px rgba(0,0,0,0.2) !important; }
+html.dark .pv-theme .btn-generate { box-shadow: 0 4px 14px rgba(155,128,212,0.18),0 2px 4px rgba(0,0,0,0.25),inset 0 1px 0 rgba(255,255,255,0.08) !important; }
+
+/* 15. Focus */
+*:focus-visible { outline: 2px solid var(--accent-primary,#7c5cbf); outline-offset: 2px; }
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline: 2px solid var(--accent-primary,#7c5cbf); outline-offset: 1px; }
+
+/* 16. Spacing */
+.pv-theme .fg { margin-bottom: 16px !important; }
+
+/* 17. Selection */
+::selection { background: rgba(124,92,191,0.2); }
+
+/* ============================================================
+   18. Tag Pills - Modern Capsule Style (remove radio dot)
+   ============================================================ */
+.pv-theme .tag {
+    padding: 7px 16px !important;
+    border-radius: 9999px !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    border: 1.5px solid var(--border, #e5e7eb) !important;
+    background: var(--bg-secondary, #f9fafb) !important;
+    color: var(--text-secondary, #4b5563) !important;
+    cursor: pointer !important;
+    transition: all .2s cubic-bezier(0.4,0,0.2,1) !important;
+    position: relative !important;
+    user-select: none;
+    letter-spacing: 0.01em;
+}
+.pv-theme .tag::before {
+    display: none !important;
+}
+.pv-theme .tag:hover {
+    border-color: var(--accent-primary, #7c5cbf) !important;
+    color: var(--accent-primary, #7c5cbf) !important;
+    background: rgba(124,92,191,0.06) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(124,92,191,0.12);
+}
+.pv-theme .tag:active {
+    transform: translateY(0) scale(0.97);
+}
+.pv-theme .tag.active {
+    border-color: var(--accent-primary, #7c5cbf) !important;
+    background: linear-gradient(135deg, var(--accent-primary, #7C5CBF), var(--accent-secondary, #9333EA)) !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 8px rgba(124,92,191,0.3),
+                0 1px 2px rgba(124,92,191,0.2),
+                inset 0 1px 0 rgba(255,255,255,0.15) !important;
+    transform: translateY(-1px);
+}
+.pv-theme .tags {
+    gap: 8px !important;
+    margin: 8px 0 !important;
+}
+
+/* TTS preset tags (IndexTTS2 emotion buttons) */
+.pv-theme .tts-preset-tag {
+    padding: 6px 14px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1.5px solid var(--border, #e5e7eb);
+    background: var(--bg-secondary, #f9fafb);
+    color: var(--text-secondary, #4b5563);
+    cursor: pointer;
+    transition: all .2s cubic-bezier(0.4,0,0.2,1);
+    user-select: none;
+}
+.pv-theme .tts-preset-tag:hover {
+    border-color: var(--accent-primary, #7c5cbf);
+    color: var(--accent-primary, #7c5cbf);
+    background: rgba(124,92,191,0.06);
+    transform: translateY(-1px);
+}
+.pv-theme .tts-preset-tag.active {
+    border-color: var(--accent-primary, #7c5cbf);
+    background: linear-gradient(135deg, var(--accent-primary, #7C5CBF), var(--accent-secondary, #9333EA));
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(124,92,191,0.3);
+}
+
+/* ============================================================
+   19. Empty State - Enhanced with Guide Icon & Text
+   ============================================================ */
+.pv-theme .empty-state {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 48px 24px !important;
+    background: linear-gradient(180deg, var(--bg-tertiary, #f3f4f6) 0%, var(--bg-secondary, #f9fafb) 100%) !important;
+    border-radius: 16px !important;
+    border: 2px dashed var(--border-subtle, #e5e7eb) !important;
+    margin: 12px 0 !important;
+    text-align: center !important;
+    transition: all .3s ease;
+    position: relative;
+    overflow: hidden;
+}
+.pv-theme .empty-state::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at center, rgba(124,92,191,0.03) 0%, transparent 70%);
+    pointer-events: none;
+}
+.pv-theme .empty-state svg {
+    width: 64px !important;
+    height: 64px !important;
+    margin-bottom: 16px !important;
+    opacity: 0.25 !important;
+    color: var(--accent-primary, #7c5cbf) !important;
+    stroke-width: 1.2 !important;
+    animation: emptyFloat 3s ease-in-out infinite;
+}
+@keyframes emptyFloat {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+.pv-theme .empty-state p {
+    margin: 0 !important;
+    position: relative;
+    z-index: 1;
+}
+.pv-theme .empty-state .empty-state-title,
+.pv-theme .empty-state p:first-of-type {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: var(--text-primary, #111827) !important;
+    margin-bottom: 6px !important;
+}
+.pv-theme .empty-state .empty-state-desc,
+.pv-theme .empty-state p:last-of-type {
+    font-size: 12px !important;
+    color: var(--text-muted, #9ca3af) !important;
+    line-height: 1.6 !important;
+    max-width: 280px;
+}
+.pv-theme .empty-state .btn-empty-sample {
+    margin-top: 16px;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border, #e5e7eb);
+    background: var(--bg-card, #fff);
+    color: var(--text-secondary, #4b5563);
+    cursor: pointer;
+    transition: all .2s ease;
+    position: relative;
+    z-index: 1;
+}
+.pv-theme .empty-state .btn-empty-sample:hover {
+    border-color: var(--accent-primary, #7c5cbf);
+    color: var(--accent-primary, #7c5cbf);
+    background: rgba(124,92,191,0.06);
+    transform: translateY(-1px);
+}
+
+/* Empty state for result cards */
+.pv-theme .col-result .card-body .empty-state {
+    min-height: 200px;
+}
+
+/* History/Persona empty states */
+.pv-theme #history-empty-state .empty-state,
+.pv-theme #persona-empty-state .empty-state,
+.pv-theme #lora-empty-state {
+    background: var(--bg-card, #fff) !important;
+    border: 2px dashed var(--border-subtle, #e5e7eb) !important;
+    border-radius: 16px !important;
+}
+
+/* ============================================================
+   20. Theme Transition - Smooth Dark/Light Switch
+   ============================================================ */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+    transition: background-color .3s ease,
+                color .3s ease,
+                border-color .3s ease,
+                box-shadow .3s ease,
+                fill .3s ease,
+                stroke .3s ease !important;
+}
+html.theme-transitioning .card,
+html.theme-transitioning .sidebar,
+html.theme-transitioning .top-bar,
+html.theme-transitioning .main-content {
+    transition: background-color .3s ease,
+                backdrop-filter .3s ease !important;
+}
+/* Disable transform/opacity transitions during theme switch to prevent glitches */
+html.theme-transitioning * {
+    transition-timing-function: ease !important;
+}
+html.theme-transitioning .btn-generate,
+html.theme-transitioning .tag,
+html.theme-transitioning .btn,
+html.theme-transitioning .stab {
+    transition: background-color .3s ease,
+                color .3s ease,
+                border-color .3s ease,
+                box-shadow .3s ease !important;
+}
+
+/* ============================================================
+   21. Skeleton Loading Screens
+   ============================================================ */
+.skeleton {
+    background: linear-gradient(90deg,
+        var(--bg-tertiary, #f3f4f6) 25%,
+        var(--bg-secondary, #e5e7eb) 50%,
+        var(--bg-tertiary, #f3f4f6) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.5s infinite ease-in-out;
+    border-radius: 6px;
+    border: none !important;
+}
+@keyframes skeletonShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.skeleton-text {
+    height: 14px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+.skeleton-text:last-child {
+    width: 60%;
+    margin-bottom: 0;
+}
+.skeleton-title {
+    height: 20px;
+    width: 40%;
+    margin-bottom: 16px;
+    border-radius: 6px;
+}
+.skeleton-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+.skeleton-card {
+    padding: 20px;
+    border-radius: 12px;
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-subtle, #e5e7eb);
+}
+.skeleton-btn {
+    height: 40px;
+    border-radius: 10px;
+    width: 120px;
+}
+.skeleton-input {
+    height: 38px;
+    border-radius: 8px;
+}
+.skeleton-audio {
+    height: 60px;
+    border-radius: 10px;
+    margin: 12px 0;
+}
+.skeleton-waveform {
+    height: 80px;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    margin: 12px 0;
+}
+.skeleton-waveform::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(90deg,
+        transparent 0px, transparent 4px,
+        var(--bg-tertiary, #f3f4f6) 4px, var(--bg-tertiary, #f3f4f6) 6px,
+        transparent 6px, transparent 12px);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+}
+
+/* HTMX indicator skeleton */
+.htmx-request .skeleton-on-load {
+    display: block !important;
+}
+.htmx-request .content-on-load {
+    display: none !important;
+}
+
+/* Dark mode skeleton */
+html.dark .skeleton {
+    background: linear-gradient(90deg,
+        var(--bg-tertiary, #1f2937) 25%,
+        var(--bg-secondary, #374151) 50%,
+        var(--bg-tertiary, #1f2937) 75%);
+    background-size: 200% 100%;
+}
+
+/* ============================================================
+   22. Responsive Enhancements - Tablet & Mobile
+   ============================================================ */
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+    .pv-theme .two-col .col-form { flex: 0 0 58%; max-width: 58%; }
+    .pv-theme .two-col .col-result { flex: 0 0 calc(42% - 12px); max-width: calc(42% - 12px); }
+    .pv-theme .card-body { padding: 14px !important; }
+    .pv-theme .card-hdr { padding: 10px 14px !important; }
+}
+
+/* Large mobile / Small tablet (< 900px) */
+@media (max-width: 900px) {
+    .pv-theme .two-col { flex-direction: column !important; gap: 12px !important; }
+    .pv-theme .two-col .col-form,
+    .pv-theme .two-col .col-result {
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
+        position: static !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    .pv-theme .form-row { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+    .pv-theme .stabs { flex-wrap: wrap !important; }
+    .pv-theme .stab { font-size: 12px !important; padding: 7px 12px !important; }
+    .pv-theme .btn-generate { padding: 12px 18px !important; font-size: 14px !important; }
+}
+
+/* Mobile (< 768px) */
+@media (max-width: 768px) {
+    .pv-theme .card-body { padding: 12px !important; }
+    .pv-theme .card-hdr { padding: 10px 12px !important; font-size: 13px !important; }
+    .pv-theme .form-row { grid-template-columns: 1fr !important; gap: 8px !important; }
+    .pv-theme .fi, .pv-theme .fs, .pv-theme .ft {
+        font-size: 16px !important; /* Prevent iOS zoom on focus */
+        padding: 10px 12px !important;
+    }
+    .pv-theme .fl { font-size: 12px !important; }
+    .pv-theme .tag { font-size: 12px !important; padding: 6px 12px !important; }
+    .pv-theme .tags { gap: 6px !important; }
+    .pv-theme .btn-generate { width: 100% !important; padding: 14px !important; }
+    .pv-theme .empty-state { padding: 32px 16px !important; }
+    .pv-theme .empty-state svg { width: 48px !important; height: 48px !important; }
+    .pv-theme .hint-text { font-size: 11px !important; padding: 8px 12px !important; }
+    .pv-theme .btn-generate { padding: 12px !important; font-size: 13px !important; }
+    /* Reduce card gaps */
+    .pv-theme .two-col { gap: 10px !important; }
+    .pv-theme .fg { margin-bottom: 12px !important; }
+}
+
+/* Small mobile (< 480px) */
+@media (max-width: 480px) {
+    .pv-theme .card-body { padding: 10px !important; }
+    .pv-theme .card-hdr { padding: 8px 10px !important; }
+    .pv-theme .stabs { padding: 3px !important; gap: 2px !important; margin-bottom: 12px !important; }
+    .pv-theme .stab { padding: 6px 10px !important; font-size: 11px !important; }
+    .pv-theme .tag { font-size: 11px !important; padding: 5px 10px !important; }
+    .pv-theme .voice-name-row { flex-direction: column !important; gap: 8px !important; }
+    .pv-theme .voice-name-row .btn { width: 100% !important; justify-content: center; }
+}
+
+/* Sidebar mobile polish (main.css handles base layout at 1200px) */
+@media (max-width: 1200px) {
+    .sidebar.open {
+        box-shadow: 4px 0 24px rgba(0,0,0,0.18) !important;
+    }
+    .sidebar-overlay.visible,
+    .sidebar-overlay.active {
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+    }
+}
+
+/* ============================================================
+   23. Additional Micro-interactions & Polish
+   ============================================================ */
+
+/* Audio player polish */
+.pv-theme audio {
+    width: 100% !important;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+/* Status message polish */
+.pv-theme .status-message {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin: 8px 0;
+}
+
+/* Scrollbar for result area */
+.pv-theme .col-result::-webkit-scrollbar {
+    width: 5px;
+}
+.pv-theme .col-result::-webkit-scrollbar-track {
+    background: transparent;
+}
+.pv-theme .col-result::-webkit-scrollbar-thumb {
+    background: var(--border, #d1d5db);
+    border-radius: 3px;
+}
+.pv-theme .col-result::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted, #9ca3af);
+}
+html.dark .pv-theme .col-result::-webkit-scrollbar-thumb {
+    background: var(--border, #4b5563);
+}
+
+/* Smooth tab content transitions */
+.pv-theme .tab-panel {
+    animation: fadeInUp .25s ease;
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .pv-theme .tag,
+    .pv-theme .btn,
+    .pv-theme .btn-generate,
+    .pv-theme .card,
+    .pv-theme .stab,
+    .pv-theme .tab-panel,
+    .skeleton,
+    .pv-theme .empty-state svg {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+    html.theme-transitioning,
+    html.theme-transitioning * {
+        transition: none !important;
+    }
+}
+
+/* ============================================================
+   UI/UX Optimization Enhancements (P0 + P1) - Global Scope
+   ============================================================ */
+
+/* 1. Sidebar Active State - Enhanced Visual Affordance (P0-01) */
+.sidebar-item {
+    position: relative !important;
+    transition: all var(--duration-normal, 250ms) var(--ease-standard, cubic-bezier(0.22, 1, 0.36, 1)) !important;
+}
+.sidebar-item.active {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent-primary, #7c5cbf) 10%, var(--bg-secondary, #f9fafb)), var(--bg-secondary, #f9fafb)) !important;
+    color: var(--accent-primary, #7c5cbf) !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary, #7c5cbf) 15%, transparent),
+                inset 0 1px 0 color-mix(in srgb, var(--accent-primary, #7c5cbf) 20%, transparent) !important;
+    transform: translateX(2px) !important;
+    border-left: none !important;
+    padding-left: calc(12px + 8px) !important;
+}
+.sidebar-item.active::before {
+    content: '' !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 6px !important;
+    bottom: 6px !important;
+    width: 4px !important;
+    height: auto !important;
+    border-radius: 0 4px 4px 0 !important;
+    background: linear-gradient(180deg, var(--accent-primary, #7c5cbf), color-mix(in srgb, var(--accent-primary, #7c5cbf) 70%, transparent)) !important;
+    box-shadow: 0 0 8px var(--accent-primary, #7c5cbf), 0 0 16px color-mix(in srgb, var(--accent-primary, #7c5cbf) 50%, transparent) !important;
+    transform: none !important;
+}
+.sidebar-item.active .sidebar-icon {
+    color: var(--accent-primary, #7c5cbf) !important;
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent-primary, #7c5cbf) 40%, transparent)) !important;
+    stroke-width: 2.25 !important;
+    transform: scale(1.05) !important;
+}
+html.dark .sidebar-item.active {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent-primary, #9b80d4) 15%, var(--bg-secondary, #1a1d26)), var(--bg-secondary, #1a1d26)) !important;
+    color: var(--accent-primary, #9b80d4) !important;
+}
+html.dark .sidebar-item.active::before {
+    background: linear-gradient(180deg, var(--accent-primary, #9b80d4), color-mix(in srgb, var(--accent-primary, #9b80d4) 70%, transparent)) !important;
+    box-shadow: 0 0 8px var(--accent-primary, #9b80d4), 0 0 16px color-mix(in srgb, var(--accent-primary, #9b80d4) 50%, transparent) !important;
+}
+
+/* 2. Sidebar Nav Section - Enhanced Group Hierarchy (P1-01) */
+.sidebar-nav-label {
+    transition: color var(--duration-fast, 150ms) var(--ease-standard, cubic-bezier(0.22, 1, 0.36, 1)) !important;
+}
+.sidebar-nav-label:hover {
+    color: var(--text-secondary, #4b5563) !important;
+}
+.section-collapse-chevron {
+    opacity: 0.5 !important;
+    transition: transform var(--duration-normal, 250ms) var(--ease-standard, cubic-bezier(0.22, 1, 0.36, 1)),
+                opacity var(--duration-fast, 150ms) var(--ease-standard, cubic-bezier(0.22, 1, 0.36, 1)) !important;
+}
+.sidebar-nav-label:hover .section-collapse-chevron {
+    opacity: 1 !important;
+}
+.sidebar-nav-section.section-collapsed .section-collapse-chevron {
+    transform: rotate(-90deg) !important;
+}
+.sidebar-nav-section.section-collapsed .sidebar-item:not(.active) {
+    max-height: 0 !important;
+    opacity: 0 !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
+    transition: max-height var(--duration-normal, 250ms) var(--ease-standard, cubic-bezier(0.22, 1, 0.36, 1)),
+                opacity var(--duration-fast, 150ms) var(--ease-standard, cubic-bezier(0.22, 1, 0.36, 1)),
+                padding var(--duration-normal, 250ms) var(--ease-standard, cubic-bezier(0.22, 1, 0.36, 1)),
+                margin var(--duration-normal, 250ms) var(--ease-standard, cubic-bezier(0.22, 1, 0.36, 1)) !important;
+}
+
+/* 3. Tab Content - Anchor Scroll Offset Compensation (P0-02) */
+#tab-content {
+    scroll-padding-top: calc(var(--top-bar-height, 56px) + var(--space-4, 16px)) !important;
+    scroll-behavior: smooth !important;
+}
+
+/* 4. Progress Bar - Smooth Transition (P0-03) */
+.tts-progress-fill {
+    transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+    will-change: width !important;
+}
+
+/* 5. General Button/Control Hover Polish */
+.sidebar-toggle-btn:hover,
+.sidebar-help-btn:hover {
+    transform: translateY(-1px) !important;
+}
+.simple-nav .nav-control-btn:hover {
+    transform: translateY(-1px) !important;
+}
+
+/* ============================================================
+   Top Bar Quick Controls (theme/lang buttons for mobile/tablet)
+   ============================================================ */
+.top-bar-quick-controls {
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+
+.top-bar-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--border-medium, var(--border));
+    background: var(--bg-tertiary, transparent);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 0;
+    min-width: 34px;
+    min-height: 34px;
+}
+
+.top-bar-icon-btn:hover {
+    border-color: var(--accent-primary, #7c5cbf);
+    color: var(--accent-primary, #7c5cbf);
+    background: color-mix(in srgb, var(--accent-primary, #7c5cbf) 8%, transparent);
+    transform: translateY(-1px);
+}
+
+.top-bar-icon-btn:active {
+    transform: translateY(0);
+}
+
+.top-bar-icon-btn .theme-icon-sun,
+.top-bar-icon-btn .theme-icon-moon {
+    width: 16px;
+    height: 16px;
+}
+
+/* Show quick controls on tablet/mobile (≤1200px, same as sidebar overlay mode) */
+@media (max-width: 1200px) {
+    .top-bar-quick-controls {
+        display: flex;
+    }
+}
+
+/* On very small screens, shrink mini-monitor to save space */
+@media (max-width: 768px) {
+    .top-bar-icon-btn {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        font-size: 11px;
+    }
+    .mini-monitor {
+        gap: 4px !important;
+    }
+}
+
+/* ============================================================
+   Disabled Generate Button Hint Tooltip
+   ============================================================ */
+.btn-hint-tooltip {
+    background: var(--bg-tertiary, #1f2937);
+    color: var(--text-primary, #f9fafb);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    pointer-events: none;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    white-space: nowrap;
+    max-width: 240px;
+    text-align: center;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.1));
+    z-index: 9999;
+}
+
+/* Dark mode tooltip */
+html.light .btn-hint-tooltip {
+    background: #1f2937;
+    color: #f9fafb;
+    border-color: rgba(255,255,255,0.08);
+}
+
+html.dark .btn-hint-tooltip {
+    background: #374151;
+    color: #f9fafb;
+    border-color: rgba(255,255,255,0.08);
+}
+
+/* Disabled generate button visual state */
+.btn-generate:disabled,
+.generate-btn:disabled,
+.btn-generate[aria-disabled="true"],
+.generate-btn[aria-disabled="true"] {
+    cursor: not-allowed !important;
+    opacity: 0.55 !important;
+    filter: grayscale(0.2);
+}
+
+.btn-generate:disabled:hover,
+.generate-btn:disabled:hover,
+.btn-generate[aria-disabled="true"]:hover,
+.generate-btn[aria-disabled="true"]:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}

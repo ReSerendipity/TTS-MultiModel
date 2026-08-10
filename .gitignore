@@ -16,7 +16,8 @@ get-pip.py
 .uploads/
 
 # Static generated files
-static/
+# Static generated files (root-level only; bin/integrated_app/static/ must stay tracked)
+/static/
 
 # IDE
 .vscode/

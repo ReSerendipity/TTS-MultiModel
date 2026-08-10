@@ -1,0 +1,856 @@
+/* === Card Header Icon === */
+.card-header-icon {
+    color: var(--primary);
+}
+
+/* === Unified Component Styles === */
+/* Quality Badge */
+.micro-quality-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+}
+.micro-quality-high {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+}
+.micro-quality-medium {
+    background: color-mix(in srgb, var(--status-warning-bg) 70%, transparent);
+    color: color-mix(in srgb, var(--accent-warning) 75%, var(--text-secondary));
+    border: 1px solid var(--status-warning-border);
+}
+.micro-quality-low {
+    background: var(--status-error-bg);
+    color: var(--accent-error);
+    border: 1px solid var(--status-error-border);
+    font-weight: 600;
+}
+
+/* Character Counter - unified neutral colors (no green bars) */
+.micro-counter-ok {
+    color: var(--text-secondary);
+}
+.micro-counter-warn {
+    color: var(--accent-warning);
+}
+.micro-counter-danger {
+    color: var(--accent-error);
+}
+.micro-counter-empty {
+    color: var(--text-tertiary);
+}
+
+/* Char Counter Container (legacy) */
+.char-counter-container {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 12px;
+    margin-top: var(--space-1);
+}
+.char-counter-text {
+    font-variant-numeric: tabular-nums;
+}
+.char-counter-segments {
+    color: var(--text-tertiary);
+    font-size: 11px;
+}
+
+/* === Unified Character Counter === */
+.tts-char-counter {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: var(--space-1);
+    margin-bottom: 2px;
+    padding: 0 var(--space-1);
+    background: transparent;
+    border-radius: 0;
+    white-space: nowrap;
+}
+.tts-char-counter.warning {
+    color: var(--accent-warning);
+    font-weight: 600;
+}
+.tts-char-counter .counter-main {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+.tts-char-counter .counter-segments {
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+.tts-char-counter .counter-detail {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.tts-char-counter.micro-counter-ok {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+}
+.tts-char-counter.micro-counter-warn {
+    background: transparent;
+    color: var(--accent-warning);
+    border: none;
+}
+.tts-char-counter.micro-counter-danger {
+    background: transparent;
+    color: var(--accent-error);
+    border: none;
+}
+.tts-char-counter.micro-counter-empty {
+    background: transparent;
+    color: var(--text-tertiary);
+    border: none;
+}
+.micro-counter-check {
+    display: inline-flex;
+    align-items: center;
+    margin-left: var(--space-1);
+}
+.micro-counter-check svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* === Unified Quality Badge (tab-level, pill-shaped) === */
+.tts-quality-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-2xl);
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: var(--space-1);
+}
+.tts-quality-badge svg {
+    width: 14px;
+    height: 14px;
+}
+.tts-quality-high {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+}
+.tts-quality-medium {
+    background: color-mix(in srgb, var(--status-warning-bg) 70%, transparent);
+    color: color-mix(in srgb, var(--accent-warning) 75%, var(--text-secondary));
+    border: 1px solid var(--status-warning-border);
+}
+.tts-quality-low {
+    background: var(--status-error-bg);
+    color: var(--accent-error);
+    border: 1px solid var(--status-error-border);
+    font-weight: 600;
+}
+
+/* === Shared File Upload Area === */
+.tts-file-upload {
+    border: 2px dashed var(--primary-glow-strong);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-5);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--duration-normal) var(--ease-standard);
+    background: var(--primary-bg);
+    position: relative;
+}
+.tts-file-upload:hover {
+    border-color: var(--accent-primary);
+    background: var(--primary-glow);
+}
+.tts-file-upload.drag-active {
+    border-color: var(--accent-primary);
+    background: var(--primary-bg, rgba(99,68,163,0.08));
+    transform: scale(1.01);
+}
+.tts-file-upload.drag-over {
+    border-style: solid;
+    border-width: 2px;
+    box-shadow: 0 0 0 4px var(--primary-ring, rgba(99,68,163,0.25));
+    animation: micro-badge-appear 0.3s ease;
+}
+.tts-file-upload.uploading {
+    pointer-events: none;
+    opacity: 0.7;
+    position: relative;
+    overflow: hidden;
+}
+.tts-file-upload.uploading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--accent-primary) 15%, transparent) 50%,
+        transparent 100%);
+    background-size: 200% 100%;
+    animation: beauty-skeleton-wave 1.5s infinite linear;
+}
+.tts-file-upload.upload-success {
+    border-color: var(--accent-success);
+    background: var(--status-success-bg);
+}
+.tts-file-upload.upload-error {
+    border-color: var(--accent-error);
+    background: var(--status-error-bg);
+    animation: micro-shake 400ms ease;
+}
+.tts-file-upload input[type="file"] {
+    display: none;
+}
+.tts-file-upload svg {
+    width: 32px;
+    height: 32px;
+    margin: 0 auto var(--space-2);
+    color: var(--accent-primary);
+    opacity: 0.7;
+}
+.tts-file-name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: var(--space-1);
+    word-break: break-all;
+}
+
+/* === Toggle Switch Component === */
+.settings-toggle {
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    position: relative;
+    cursor: pointer;
+    overflow: visible;
+    flex-shrink: 0;
+    vertical-align: middle;
+    margin: 0;
+    padding: 0;
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: inherit;
+    font-weight: normal;
+    color: inherit;
+    text-align: left;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    min-height: auto;
+    line-height: normal;
+    max-width: 44px;
+}
+.settings-toggle input[type="checkbox"] {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    pointer-events: auto;
+    clip: rect(0, 0, 0, 0);
+}
+.settings-toggle .toggle-track {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 44px;
+    height: 24px;
+    background-color: var(--toggle-off-bg);
+    border-radius: 24px;
+    border: 2px solid var(--toggle-border);
+    box-shadow: 0 1px 3px var(--toggle-track-shadow);
+    transition: background-color var(--duration-normal) var(--ease-standard);
+    pointer-events: none;
+}
+.settings-toggle .toggle-knob {
+    display: block;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    background-color: var(--toggle-knob-bg);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px var(--toggle-knob-shadow);
+    transition: transform var(--duration-normal) var(--ease-standard);
+    pointer-events: none;
+}
+.settings-toggle input[type="checkbox"]:checked + .toggle-track {
+    background-color: var(--toggle-on-bg);
+}
+.settings-toggle input[type="checkbox"]:checked + .toggle-track + .toggle-knob {
+    transform: translateX(20px);
+}
+.settings-toggle:focus-within .toggle-track {
+    box-shadow: 0 0 0 3px var(--primary-ring), 0 1px 3px var(--toggle-track-shadow);
+}
+.settings-toggle input[type="checkbox"]:focus-visible ~ .toggle-track {
+    box-shadow: 0 0 0 2px var(--bg-primary),
+                0 0 0 4px var(--accent-primary),
+                0 1px 3px var(--toggle-track-shadow);
+    border-color: var(--accent-primary);
+    outline: none;
+}
+.settings-toggle input[type="checkbox"]:focus-visible:not(:checked) ~ .toggle-track {
+    box-shadow: 0 0 0 2px var(--bg-primary),
+                0 0 0 4px var(--border-focus, var(--accent-primary)),
+                0 1px 3px var(--toggle-track-shadow);
+}
+
+/* ============================================================
+   Phase 1 Redesign: Unified TTS Component Classes
+   ============================================================ */
+
+/* === Utility visibility helpers === */
+.tts-hidden {
+    display: none;
+}
+
+.tts-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* === Theme icon visibility (CSS-driven, no inline styles) === */
+.theme-icon-sun {
+    display: none;
+}
+.theme-icon-moon {
+    display: block;
+}
+html.dark .theme-icon-sun {
+    display: block;
+}
+html.dark .theme-icon-moon {
+    display: none;
+}
+
+/* === Help popup visibility (class-driven) === */
+.help-popup-overlay,
+.help-popup {
+    display: none;
+}
+.help-popup-overlay.visible,
+.help-popup.visible {
+    display: block;
+}
+
+/* Fix: override body > * position:relative from beautify.css */
+.help-popup-overlay.visible {
+    position: fixed;
+    z-index: 999;
+}
+.help-popup.visible {
+    position: fixed;
+    z-index: 1000;
+}
+.shortcut-help-overlay.visible {
+    position: fixed;
+    z-index: 999;
+}
+
+/* === HTMX tab loading indicator - collapse when idle === */
+.tts-tab-loading.htmx-indicator:not(.htmx-request) {
+    display: none;
+}
+.tts-tab-loading.htmx-request {
+    position: relative;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 40px 24px;
+    background: var(--bg-glass-light);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: var(--radius-lg, 12px);
+    border: 1px solid var(--border-subtle);
+    margin: 12px 0;
+    z-index: 5;
+}
+.tts-tab-loading .tts-tab-loading-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border-medium);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: tts-spin 0.8s linear infinite;
+}
+.tts-tab-loading .tts-tab-loading-text {
+    font-size: var(--font-size-sm, 13px);
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+.tts-tab-loading .tts-tab-loading-sub {
+    font-size: var(--font-size-xs, 12px);
+    color: var(--text-muted);
+    margin-top: -8px;
+}
+.sidebar-item.htmx-request {
+    opacity: 0.7;
+    pointer-events: none;
+}
+.sidebar-item.htmx-request .sidebar-icon {
+    animation: tts-spin 1s linear infinite;
+}
+.tts-tab-loading.is-long .tts-tab-loading-sub::after {
+    content: "（首次加载模型约需 20-40 秒，此等待仅发生一次）";
+    display: block;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* === Card === */
+.tts-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    box-shadow: var(--shadow-card);
+    transition: all var(--duration-normal) var(--ease-standard);
+}
+.tts-card:hover {
+    border-color: var(--border-medium);
+    box-shadow: var(--shadow-elevated);
+}
+.tts-card.tts-card-accent:hover {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-elevated), var(--glow-xs);
+}
+
+/* === Buttons === */
+.tts-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    height: 38px;
+    padding: 0 var(--space-5);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-primary);
+    transition: all var(--duration-normal) var(--ease-standard);
+    white-space: nowrap;
+}
+.tts-btn:disabled,
+.tts-btn[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.tts-btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+.tts-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+}
+.tts-btn.btn-loading,
+.tts-btn[aria-busy="true"] {
+    cursor: wait;
+    pointer-events: none;
+}
+
+.tts-btn-primary {
+    background: var(--accent-primary);
+    color: var(--text-on-primary);
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 85%, #000);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1),
+                0 1px 0 color-mix(in srgb, var(--accent-primary) 50%, #fff) inset;
+}
+.tts-btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent-primary) 90%, #000);
+    border-color: color-mix(in srgb, var(--accent-primary) 78%, #000);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12),
+                0 1px 0 color-mix(in srgb, var(--accent-primary) 50%, #fff) inset;
+    transform: translateY(-1px);
+}
+.tts-btn-primary:active:not(:disabled) {
+    background: color-mix(in srgb, var(--accent-primary) 82%, #000);
+    border-color: color-mix(in srgb, var(--accent-primary) 70%, #000);
+    transform: translateY(1px) scale(0.99);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12) inset;
+}
+.tts-btn-primary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg-primary),
+                0 0 0 4px var(--accent-primary);
+}
+
+.tts-btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-subtle);
+}
+.tts-btn-secondary:hover:not(:disabled) {
+    background: var(--btn-secondary-hover);
+    border-color: var(--border-medium);
+    transform: translateY(-1px);
+}
+.tts-btn-secondary:active:not(:disabled) {
+    background: var(--btn-secondary-hover);
+    border-color: var(--border-medium);
+    transform: translateY(0) scale(0.98);
+}
+.tts-btn-secondary:focus-visible {
+    box-shadow: var(--shadow-focus);
+}
+
+.tts-btn-danger {
+    background: var(--btn-danger-bg);
+    color: var(--text-on-primary);
+    border-color: var(--btn-danger-bg);
+}
+.tts-btn-danger:hover:not(:disabled) {
+    background: var(--btn-danger-hover);
+    border-color: var(--btn-danger-hover);
+}
+.tts-btn-danger:active:not(:disabled) {
+    background: var(--btn-danger-hover);
+    border-color: var(--btn-danger-hover);
+    filter: brightness(0.92);
+}
+.tts-btn-danger:focus-visible {
+    box-shadow: var(--shadow-focus-danger);
+}
+
+@media (max-width: 768px) {
+    .tts-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* === Inputs / Textarea === */
+.tts-input,
+.tts-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-base);
+    line-height: var(--leading-normal);
+    transition: border-color var(--duration-normal) var(--ease-standard),
+                box-shadow var(--duration-normal) var(--ease-standard),
+                background-color var(--duration-normal) var(--ease-standard);
+}
+.tts-input::placeholder,
+.tts-textarea::placeholder {
+    color: var(--bg-placeholder);
+}
+.tts-input:hover,
+.tts-textarea:hover {
+    border-color: var(--border-medium);
+}
+.tts-input:focus,
+.tts-textarea:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    background: var(--bg-input-focus);
+    box-shadow: 0 0 0 3px var(--primary-ring);
+}
+.tts-input:disabled,
+.tts-textarea:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--bg-tertiary);
+    color: var(--text-disabled);
+}
+.tts-input:disabled::placeholder,
+.tts-textarea:disabled::placeholder {
+    color: var(--text-disabled);
+}
+.tts-input.tts-input-error,
+.tts-textarea.tts-input-error,
+.tts-input[aria-invalid="true"],
+.tts-textarea[aria-invalid="true"] {
+    border-color: var(--accent-error);
+    background: var(--status-error-bg);
+}
+.tts-input.tts-input-error:focus,
+.tts-textarea.tts-input-error:focus,
+.tts-input[aria-invalid="true"]:focus,
+.tts-textarea[aria-invalid="true"]:focus,
+.tts-input.tts-input-error:focus-visible,
+.tts-textarea.tts-input-error:focus-visible,
+.tts-input[aria-invalid="true"]:focus-visible,
+.tts-textarea[aria-invalid="true"]:focus-visible {
+    border-color: var(--accent-error);
+    box-shadow: 0 0 0 3px var(--status-error-bg);
+}
+
+/* Form field wrapper with helper / error text */
+.tts-form-field {
+    margin-bottom: var(--space-4);
+}
+.tts-input-help {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-1);
+    line-height: var(--leading-normal);
+}
+.tts-input-error-message {
+    font-size: var(--font-size-xs);
+    color: var(--accent-error);
+    margin-top: var(--space-1);
+    line-height: var(--leading-normal);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+.tts-input-error-message:empty {
+    display: none;
+}
+
+.tts-input {
+    height: 36px;
+    padding: 0 var(--space-3);
+}
+
+.tts-textarea {
+    min-height: 80px;
+    padding: var(--space-3);
+    resize: vertical;
+}
+
+.tts-input-file {
+    width: 100%;
+    padding: var(--space-2) 0;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+/* Text muted helper */
+.tts-text-muted {
+    color: var(--text-muted);
+}
+
+/* Help icon helper */
+.tts-help-icon {
+    cursor: help;
+    color: var(--text-muted);
+    vertical-align: -2px;
+}
+
+/* IndexTTS2 seed row */
+.it2-seed-row {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+}
+.it2-seed-input {
+    flex: 1;
+}
+
+/* === Table === */
+.tts-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+.tts-table thead th {
+    text-align: left;
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-tertiary);
+}
+.tts-table tbody td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+}
+.tts-table tbody tr {
+    transition: background-color var(--duration-normal) var(--ease-standard);
+}
+.tts-table tbody tr:hover {
+    background: var(--bg-tertiary);
+}
+.tts-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* === Result spinner (HTMX indicator) === */
+.tts-result-spinner {
+    display: none;
+    text-align: center;
+    padding: var(--space-6);
+}
+.tts-result-spinner.htmx-request,
+.htmx-request .tts-result-spinner,
+.tts-result-spinner.is-visible {
+    display: block;
+}
+.tts-result-spinner .tts-spinner-icon {
+    margin: 0 auto var(--space-2);
+}
+
+/* === Error block === */
+.tts-error-block {
+    padding: var(--space-4);
+    background: var(--status-error-bg);
+    border: 1px solid var(--status-error-border);
+    border-left-width: 3px;
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+}
+.tts-error-block .error-title {
+    font-weight: 600;
+    color: var(--accent-error);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+.tts-error-block .error-message {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: var(--leading-normal);
+}
+
+/* === Loading spinner === */
+.tts-loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border-subtle);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: tts-spin 0.8s linear infinite;
+}
+
+@keyframes tts-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   P3-4 P-07: Toast notification 3-tier visual hierarchy
+   Usage examples:
+     <div class="toast toast-info">低优先级确认</div>
+     <div class="toast toast-warning">中优先级警告</div>
+     <div class="toast toast-error toast-critical">高优先级紧急</div>
+   ============================================================ */
+.toast {
+    --toast-radius: var(--radius-lg, 12px);
+    --toast-padding: 12px 16px;
+    --toast-font: var(--font-size-sm, 13px);
+    border-radius: var(--toast-radius);
+    padding: var(--toast-padding);
+    font-size: var(--toast-font);
+    line-height: 1.5;
+    max-width: 380px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: micro-slide-in-up 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,0.2));
+}
+/* Tier 3 — Low priority: user-initiated success / info confirmation */
+.toast.toast-info,
+.toast.toast-success-minor {
+    background: var(--bg-glass, rgba(255,255,255,0.85));
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+}
+/* Tier 2 — Medium priority: warning */
+.toast.toast-warning {
+    background: linear-gradient(180deg, var(--status-warning-bg), var(--bg-card, #fff));
+    border-left: 4px solid var(--accent-warning);
+    color: var(--text-primary);
+}
+/* Tier 1 — High priority: error / critical (shake attention) */
+.toast.toast-error,
+.toast.toast-critical {
+    background: var(--status-error-bg);
+    color: var(--accent-error);
+    border-left: 4px solid var(--accent-error);
+    box-shadow: 0 4px 20px color-mix(in srgb, var(--accent-error) 40%, transparent),
+                var(--shadow-md);
+    animation: micro-shake 400ms ease,
+               micro-slide-in-up 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Auto-dismiss timing hints (set via animation-delay style or JS) */
+.toast[data-autoclose="2000"] { animation-duration: 280ms; } /* low: 2s */
+.toast[data-autoclose="4000"] { animation-duration: 280ms; } /* medium: 4s */
+.toast[data-autoclose="8000"] { /* critical: 8s, manual dismiss */ }
+
+/* Keyframe fallbacks (in case not defined in beautify.css) */
+@keyframes micro-slide-in-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes micro-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-2px); }
+    80% { transform: translateX(2px); }
+}
+@keyframes micro-badge-appear {
+    0% { transform: scale(0.97); opacity: 0.85; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* P2-7 P-03: Skeleton layered loaders */
+.beauty-skeleton-layer-0 { }
+.beauty-skeleton-layer-1 {
+    background: none !important;
+    animation: none !important;
+}
+.beauty-skeleton-layer-1 .skeleton-percent {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.beauty-skeleton-layer-2 {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    font-style: italic;
+}
+.beauty-skeleton-layer-2::after {
+    content: "首次加载模型需要约30秒，请耐心等待，后续加载将快10倍";
+}
+@media (prefers-reduced-motion: reduce) {
+    .beauty-skeleton-layer-0 { background: var(--bg-tertiary) !important; animation: none !important; }
+}
+
+/* P2-5 X-03: settings modified visual marker */
+.srow--modified {
+    background: var(--warning-bg, rgba(217,119,6,0.08));
+    border-left: 3px solid var(--accent-warning, #D97706);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    padding-left: calc(var(--space-3, 12px) - 3px + var(--space-2, 8px));
+    transition: background-color 150ms ease;
+}
+#settings-modified-counter:not([style*="display:none"]):not([style*="display: none"]) + * { }

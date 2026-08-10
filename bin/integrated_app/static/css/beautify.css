@@ -1,0 +1,3087 @@
+/* ==========================================================================
+   TTS MultiModel - Beautify Override Layer
+   ==========================================================================
+   This file enhances and overrides existing styles defined in styles.css.
+   It uses CSS custom properties from the existing theme and acts as a
+   self-contained visual polish layer. Load AFTER styles.css.
+   ========================================================================== */
+
+/* ==========================================================================
+   0. KEYFRAMES & ANIMATION DEFINITIONS
+   ========================================================================== */
+
+@keyframes beauty-breathe {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+/* spin keyframe removed - duplicate of main.css @layer components definition */
+
+@keyframes beauty-skeleton-wave {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+
+@keyframes beauty-spin-gradient {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes beauty-scale-entrance {
+    0% { opacity: 0; transform: scale(0.92) translateY(10px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes beauty-checkmark-pop {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+@keyframes micro-success-pop {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes micro-slide-in-up {
+    0% { opacity: 0; transform: translateY(12px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes micro-fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes micro-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+}
+
+@keyframes micro-progress-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes micro-badge-appear {
+    0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+    60% { transform: scale(1.15) rotate(5deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+
+/* ==========================================================================
+   1. FORM ELEMENTS - Select & Placeholder
+   ========================================================================== */
+
+/* Select dropdown - CSS gradient arrow indicator (no SVG, theme-aware) */
+.tts-input-dropdown select,
+#tab-content form select,
+#tab-content .card select,
+select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+        linear-gradient(135deg, var(--text-muted) 50%, transparent 50%) !important;
+    background-position:
+        calc(100% - 21px) calc(50% - 2px),
+        calc(100% - 15px) calc(50% - 2px) !important;
+    background-size: 6px 6px !important;
+    background-repeat: no-repeat !important;
+    padding-right: 36px !important;
+    cursor: pointer !important;
+}
+
+.tts-input-dropdown select:hover,
+#tab-content form select:hover,
+#tab-content .card select:hover,
+select:hover {
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--accent-primary) 50%),
+        linear-gradient(135deg, var(--accent-primary) 50%, transparent 50%) !important;
+    background-position:
+        calc(100% - 21px) calc(50% - 2px),
+        calc(100% - 15px) calc(50% - 2px) !important;
+    background-size: 6px 6px !important;
+    background-repeat: no-repeat !important;
+}
+
+
+
+/* Better placeholder text styling */
+.tts-input-textbox input::placeholder,
+.tts-input-textarea textarea::placeholder,
+input::placeholder,
+textarea::placeholder,
+select:invalid {
+    color: var(--bg-placeholder) !important;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+
+/* ==========================================================================
+   2. TAG/CHIP SYSTEM
+   ========================================================================== */
+
+/* Preset voice tags */
+#tab-content .preset-tag,
+.preset-tag,
+[class*="preset-tag"],
+[class*="voice-tag"],
+[class*="chip"] {
+    padding: 6px 14px !important;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--duration-normal) var(--ease-standard) !important;
+}
+
+/* Simple hover color change (no shimmer) */
+#tab-content .preset-tag:hover,
+.preset-tag:hover {
+    background: var(--primary-bg) !important;
+}
+
+/* Selected state with checkmark indicator */
+#tab-content .preset-tag.selected,
+.preset-tag.selected,
+[class*="preset-tag"].selected,
+[class*="chip"].selected {
+    background: var(--primary-bg) !important;
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+    box-shadow: 0 0 0 1px var(--primary-ring);
+}
+
+#tab-content .preset-tag.selected::after,
+.preset-tag.selected::after {
+    content: '\2713';
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-left: 2px;
+    animation: beauty-checkmark-pop var(--duration-normal) var(--ease-decelerate);
+}
+
+
+/* ==========================================================================
+   3. PROGRESS BAR ENHANCEMENT
+   ========================================================================== */
+
+/* More vivid gradient for progress fill */
+.tts-progress-fill {
+    background: linear-gradient(
+        90deg,
+        var(--primary) 0%,
+        var(--primary-light) 30%,
+        var(--primary-light) 50%,
+        var(--primary-light) 70%,
+        var(--primary) 100%
+    ) !important;
+    box-shadow: inset 0 1px 0 var(--glass-white-20);
+}
+
+/* Progress bar - no traveling dot */
+.tts-progress-bar {
+    position: relative;
+    overflow: visible;
+}
+
+.tts-progress-bar::after {
+    display: none !important;
+}
+
+/* Completion state with simple color change */
+.tts-progress-fill.tts-progress-complete {
+    background: var(--accent-success) !important;
+    box-shadow: inset 0 1px 0 var(--glass-white-20) !important;
+}
+
+.tts-progress-bar:has(.tts-progress-complete)::after {
+    display: none !important;
+}
+
+/* Error state with red color change */
+.tts-progress-fill.tts-progress-error {
+    background: var(--color-error) !important;
+    box-shadow: inset 0 1px 0 var(--glass-white-20) !important;
+}
+
+.tts-progress-bar:has(.tts-progress-error)::after {
+    display: none !important;
+}
+
+
+/* ==========================================================================
+   4. STATUS BAR POLISH
+   ========================================================================== */
+
+/* Glassmorphism effect */
+.status-bar-container {
+    background: var(--bg-glass) !important;
+    backdrop-filter: blur(20px) saturate(1.5) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(1.5) !important;
+    border: 1px solid var(--primary-ring) !important;
+    box-shadow:
+        var(--shadow-md),
+        inset 0 1px 0 var(--border-subtle) !important;
+}
+
+/* Subtle border glow when active */
+.status-bar-container:has(.status-pulse:not(.error)) {
+    border-color: var(--primary-glow-strong) !important;
+    box-shadow:
+        var(--shadow-md),
+        0 0 12px var(--primary-bg),
+        inset 0 1px 0 var(--border-subtle) !important;
+}
+
+/* Better status dot breathing effect - simplified slow opacity pulse */
+.status-pulse {
+    animation: beauty-breathe var(--duration-breathe) var(--ease-standard) infinite !important;
+}
+
+.status-pulse.busy {
+    animation: beauty-breathe var(--duration-breathe) var(--ease-standard) infinite !important;
+}
+
+.status-pulse.error {
+    animation: none !important;
+}
+
+
+/* ==========================================================================
+   5. TYPOGRAPHY REFINEMENT
+   ========================================================================== */
+
+/* Better label styling */
+label,
+.form-group-label,
+.form-label,
+legend,
+.gradio-container legend,
+.gradio-container label,
+#tab-content form label,
+#tab-content .card label {
+    letter-spacing: 0.04em !important;
+    font-size: var(--font-size-sm) !important;
+    font-weight: 600 !important;
+    color: var(--text-muted) !important;
+}
+
+/* Clean heading hierarchy without decorative glows */
+h1, h2, h3 {
+    text-shadow: none !important;
+}
+
+/* Light theme: keep text shadows disabled for cleaner look */
+html.light h1,
+html.light h2,
+html.light h3 {
+    text-shadow: none !important;
+}
+
+/* Better code/mono text styling */
+code,
+pre,
+.mono,
+.font-mono,
+kbd,
+.gradio-container code,
+.gradio-container pre {
+    font-family: var(--font-mono) !important;
+    background: var(--code-bg) !important;
+    border: 1px solid var(--code-border) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 2px 6px !important;
+    font-size: 0.9em !important;
+    color: var(--code-color) !important;
+    box-shadow: inset 0 1px 2px var(--glass-black-15) !important;
+}
+
+pre,
+.gradio-container pre {
+    padding: var(--space-4) !important;
+    border-radius: var(--radius-md) !important;
+    line-height: var(--leading-relaxed) !important;
+    overflow-x: auto;
+}
+
+kbd {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-medium) !important;
+    border-bottom: 2px solid var(--border-medium) !important;
+    padding: 1px 6px !important;
+    font-size: 11px !important;
+    color: var(--text-secondary) !important;
+    box-shadow: 0 1px 1px var(--glass-black-15) !important;
+}
+
+
+/* ==========================================================================
+   6. AUDIO PLAYER ENHANCEMENT
+   ========================================================================== */
+
+/* Custom styled audio player container */
+.tts-audio-player,
+.gradio-container .component.audio,
+.gradio-container .wrap.audio,
+.gradio-audio > div,
+.component.audio > div,
+.purple-audio {
+    background: linear-gradient(
+        135deg,
+        var(--bg-secondary) 0%,
+        var(--bg-tertiary) 100%
+    ) !important;
+    border: 1px solid var(--border-medium) !important;
+    border-radius: var(--radius-xl) !important;
+    padding: var(--space-4) var(--space-5) !important;
+    box-shadow:
+        var(--shadow-card),
+        inset 0 1px 0 var(--border-subtle) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Better waveform visualization area */
+.tts-audio-player audio,
+.gradio-container audio {
+    border-radius: var(--radius-md) !important;
+    filter: drop-shadow(0 2px 4px var(--glass-black-10));
+}
+
+#gap-wave-container {
+    position: relative;
+    height: 64px;
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+    transition: all var(--duration-fast) var(--ease-standard);
+}
+
+#gap-wave-container:hover {
+    border-color: var(--border-medium);
+    box-shadow: 0 2px 8px var(--primary-glow-subtle, transparent);
+}
+
+html.dark #gap-wave-container {
+    background: linear-gradient(180deg, rgba(139, 123, 178, 0.03) 0%, rgba(139, 123, 178, 0.06) 100%);
+    border-color: var(--border-subtle);
+}
+
+html.dark #gap-wave-container:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 2px 12px rgba(139, 123, 178, 0.1);
+}
+
+#gap-waveform {
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+}
+
+#gap-wave-tooltip {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    padding: 4px 8px;
+    font-size: 11px;
+    font-family: var(--font-mono, 'SF Mono', 'Fira Code', monospace);
+    color: var(--text-primary);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--duration-fast);
+    z-index: 10;
+    box-shadow: var(--shadow-md);
+}
+
+#gap-wave-tooltip.visible {
+    opacity: 1;
+}
+
+/* Waveform live animation indicator */
+#gap-wave-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+    animation: wave-scan 3s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes wave-scan {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+#gap-wave-container.playing::before {
+    animation-duration: 1.5s;
+}
+
+/* Download button styling */
+.tts-audio-player a[download],
+.audio-download-btn,
+.gradio-container .component.audio a,
+.gradio-container audio + a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-3);
+    background: var(--primary-bg);
+    border: 1px solid var(--primary-ring);
+    border-radius: var(--radius-md);
+    color: var(--primary);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    text-decoration: none;
+    transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.tts-audio-player a[download]:hover,
+.audio-download-btn:hover,
+.gradio-container .component.audio a:hover {
+    background: var(--primary-bg);
+    border-color: var(--primary);
+}
+
+
+/* ==========================================================================
+   7. TABLE ENHANCEMENT
+   ========================================================================== */
+
+/* History table row hover with slide-in highlight */
+.history-table tbody tr {
+    position: relative;
+    overflow: hidden;
+    transition: all var(--duration-fast) var(--ease-standard);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.history-table tbody tr::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, var(--primary-glow-subtle, rgba(93, 74, 124, 0.04)), transparent);
+    transition: left var(--duration-normal) var(--ease-standard);
+    pointer-events: none;
+}
+
+.history-table tbody tr:hover {
+    background: var(--bg-tertiary);
+    transform: translateX(2px);
+}
+
+.history-table tbody tr:hover::before {
+    left: 100%;
+}
+
+html.dark .history-table tbody tr::before {
+    background: linear-gradient(90deg, transparent, rgba(139, 123, 178, 0.06), transparent);
+}
+
+/* Table row actions appear on hover */
+.history-table tbody tr .row-actions {
+    opacity: 0;
+    transition: opacity var(--duration-fast);
+}
+
+.history-table tbody tr:hover .row-actions {
+    opacity: 1;
+}
+
+/* Striped rows for better readability */
+.history-table tbody tr:nth-child(even) {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+html.dark .history-table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Checkbox styling */
+.history-table tbody tr input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-primary);
+}
+
+/* Quick action buttons */
+.history-table .quick-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--duration-fast);
+}
+
+.history-table .quick-action-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.history-table .quick-action-btn.btn-danger:hover {
+    background: var(--danger-bg);
+    border-color: var(--danger-border);
+    color: var(--danger-text);
+}
+
+/* ==========================================================================
+   8. PROGRESS VISUALIZATION ENHANCEMENT
+   ========================================================================== */
+
+/* Enhanced progress bar with gradient fill and animation */
+.generation-progress {
+    position: relative;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+}
+
+.generation-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    border-radius: var(--radius-full);
+    transition: width var(--duration-normal) var(--ease-standard);
+    position: relative;
+    overflow: hidden;
+}
+
+.generation-progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: progress-shine 2s linear infinite;
+}
+
+@keyframes progress-shine {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+html.dark .generation-progress-bar {
+    background: linear-gradient(90deg, var(--accent-primary) 0%, #6F5E93 100%);
+}
+
+/* Progress percentage text */
+.generation-progress-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.generation-progress-value {
+    font-family: var(--font-mono, 'SF Mono', 'Fira Code', monospace);
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+
+/* Spinner enhancement */
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border-subtle);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Loading skeleton animation */
+.skeleton-loading {
+    background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Generation status badge */
+.generation-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--primary-bg);
+    border: 1px solid var(--primary-ring);
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--primary);
+}
+
+.generation-status-badge .status-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+/* ==========================================================================
+   9. VOICE DESCRIPTION STRUCTURED LAYOUT
+   ========================================================================== */
+
+/* Voice description card with structured metadata */
+.voice-description-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.voice-description-card:hover {
+    border-color: var(--border-medium);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.voice-description-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.voice-description-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--primary-bg);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-primary);
+    flex-shrink: 0;
+}
+
+.voice-description-title {
+    flex: 1;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: var(--leading-tight);
+}
+
+.voice-description-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.voice-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all var(--duration-fast);
+}
+
+.voice-tag:hover {
+    background: var(--primary-bg);
+    border-color: var(--primary-ring);
+    color: var(--primary);
+}
+
+.voice-tag-icon {
+    width: 12px;
+    height: 12px;
+}
+
+/* Structured attribute grid */
+.voice-attributes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.voice-attribute-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.voice-attribute-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.voice-attribute-value {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    font-weight: 500;
+    line-height: var(--leading-tight);
+}
+
+/* ==========================================================================
+   10. PERSONA CARD PERSONALIZATION
+   ========================================================================== */
+
+/* Persona card with gradient border and hover effects */
+.persona-card {
+    position: relative;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    overflow: hidden;
+    transition: all var(--duration-normal) var(--ease-standard);
+    cursor: pointer;
+}
+
+.persona-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--primary-bg, rgba(93, 74, 124, 0.06)) 0%, transparent 50%, var(--secondary-bg, rgba(168, 85, 247, 0.06)) 100%);
+    opacity: 0;
+    transition: opacity var(--duration-normal);
+    pointer-events: none;
+}
+
+.persona-card:hover::before {
+    opacity: 1;
+}
+
+.persona-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px var(--primary-glow, rgba(93, 74, 124, 0.15));
+}
+
+html.dark .persona-card:hover {
+    box-shadow: 0 8px 24px rgba(139, 123, 178, 0.2);
+}
+
+.persona-card.active {
+    border-color: var(--accent-primary);
+    background: var(--primary-bg, rgba(93, 74, 124, 0.08));
+}
+
+html.dark .persona-card.active {
+    background: rgba(139, 123, 178, 0.1);
+}
+
+.persona-card-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: var(--space-3);
+    position: relative;
+    overflow: hidden;
+}
+
+.persona-card-avatar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.2) 100%);
+}
+
+.persona-card-name {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-1);
+}
+
+.persona-card-desc {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    line-height: var(--leading-normal);
+    margin-bottom: var(--space-3);
+}
+
+.persona-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.persona-tag {
+    padding: 3px 8px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+}
+
+.persona-card-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all var(--duration-normal);
+}
+
+.persona-card:hover .persona-card-actions {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ==========================================================================
+   11. ADVANCED PARAMETER GROUPING & COLLAPSIBLE SECTIONS
+   ========================================================================== */
+
+/* Collapsible parameter section */
+.param-section {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-4);
+    overflow: hidden;
+    background: var(--bg-secondary);
+    transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.param-section:hover {
+    border-color: var(--border-medium);
+}
+
+.param-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: all var(--duration-fast);
+}
+
+.param-section-header:hover {
+    background: var(--bg-elevated);
+}
+
+.param-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.param-section-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--accent-primary);
+}
+
+.param-section-toggle {
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+    transition: transform var(--duration-fast);
+}
+
+.param-section.collapsed .param-section-toggle {
+    transform: rotate(-90deg);
+}
+
+.param-section-body {
+    padding: var(--space-4);
+}
+
+.param-section.collapsed .param-section-body {
+    display: none;
+}
+
+/* ==========================================================================
+   12. TAG SYSTEM COLOR SPECIFICATION
+   ========================================================================== */
+
+/* Tag color variants */
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid transparent;
+}
+
+.tag-primary {
+    background: var(--primary-bg);
+    color: var(--primary);
+    border-color: var(--primary-ring);
+}
+
+.tag-secondary {
+    background: var(--secondary-bg);
+    color: var(--secondary);
+    border-color: var(--secondary-ring);
+}
+
+.tag-success {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: var(--success-border);
+}
+
+.tag-warning {
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border-color: var(--warning-border);
+}
+
+.tag-danger {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-color: var(--danger-border);
+}
+
+.tag-info {
+    background: var(--info-bg);
+    color: var(--info-text);
+    border-color: var(--info-border);
+}
+
+.tag-neutral {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border-color: var(--border-subtle);
+}
+
+/* Dark theme tag adjustments */
+html.dark .tag-primary {
+    background: rgba(139, 123, 178, 0.12);
+    color: #8B7BB2;
+    border-color: rgba(139, 123, 178, 0.3);
+}
+
+html.dark .tag-secondary {
+    background: rgba(168, 85, 247, 0.12);
+    color: #A855F7;
+    border-color: rgba(168, 85, 247, 0.3);
+}
+
+/* Better row hover with slide-in highlight */
+.gradio-container table tr,
+table tr {
+    position: relative;
+    overflow: hidden;
+    transition: background-color var(--duration-normal) var(--ease-standard) !important;
+}
+
+.gradio-container table tr:hover,
+table tr:hover {
+    background-color: var(--primary-bg) !important;
+}
+
+.gradio-container table tr:hover td:first-child,
+table tr:hover td:first-child {
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+
+/* Alternating row colors */
+.gradio-container table tbody tr:nth-child(odd),
+table tbody tr:nth-child(odd) {
+    background: var(--bg-tertiary);
+}
+
+.gradio-container table tbody tr:nth-child(even),
+table tbody tr:nth-child(even) {
+    background: transparent;
+}
+
+/* Better header styling with sticky positioning */
+.gradio-container thead,
+table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.gradio-container th,
+table th {
+    background: var(--bg-tertiary) !important;
+    border-bottom: 2px solid var(--primary-ring) !important;
+    font-weight: 600 !important;
+    font-size: var(--text-xs) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: var(--text-secondary) !important;
+    padding: var(--space-3) var(--space-4) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+}
+
+.gradio-container td,
+table td {
+    padding: var(--space-3) var(--space-4) !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+    transition: all var(--duration-fast) var(--ease-standard) !important;
+}
+
+
+/* ==========================================================================
+   8. MODAL/DIALOG POLISH
+   ========================================================================== */
+
+/* Better backdrop blur */
+.modal-backdrop,
+.gradio-container .modal-backdrop,
+[class*="modal-backdrop"],
+[class*="overlay"] {
+    backdrop-filter: blur(12px) saturate(0.8) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(0.8) !important;
+    background: var(--overlay-bg) !important;
+}
+
+/* Smoother entrance animation (scale + fade) */
+.modal,
+.modal-content,
+.gradio-container .modal,
+.gradio-container .modal-content,
+[class*="dialog"],
+[class*="Modal"] {
+    animation: beauty-scale-entrance var(--duration-slow) var(--ease-decelerate) !important;
+}
+
+/* Better close button styling */
+.modal .close-btn,
+.modal button[aria-label="Close"],
+.modal button.close,
+.gradio-container .modal button[aria-label="Close"],
+[class*="modal"] button[aria-label="Close"],
+[class*="dialog"] button[aria-label="Close"] {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-standard);
+    font-size: 16px;
+    line-height: 1;
+}
+
+.modal .close-btn:hover,
+.modal button[aria-label="Close"]:hover,
+.gradio-container .modal button[aria-label="Close"]:hover {
+    background: var(--btn-danger-bg);
+    color: var(--text-on-primary);
+    border-color: var(--btn-danger-bg);
+}
+
+
+/* ==========================================================================
+   9. EMPTY STATE ENHANCEMENT
+   ========================================================================== */
+
+/* Better centered layout */
+.output-empty-state,
+.empty-state,
+[class*="empty-state"],
+[class*="EmptyState"] {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 48px 24px !important;
+    text-align: center !important;
+    min-height: 200px !important;
+}
+
+/* Larger icon - static, no floating animation */
+.output-empty-state .empty-icon,
+.output-empty-state svg,
+.output-empty-state .empty-wave,
+.empty-state .empty-icon,
+[class*="empty-state"] svg,
+[class*="empty-state"] .icon {
+    font-size: 48px !important;
+    width: 64px !important;
+    height: 64px !important;
+    margin-bottom: var(--space-5) !important;
+    opacity: 0.5 !important;
+    color: var(--text-muted) !important;
+}
+
+/* Better action button in empty state */
+.output-empty-state button,
+.output-empty-state .btn,
+.empty-state button,
+.empty-state .btn,
+[class*="empty-state"] button {
+    margin-top: var(--space-5) !important;
+    padding: var(--space-3) var(--space-6) !important;
+    background: var(--primary-bg) !important;
+    border: 1px dashed var(--primary-ring) !important;
+    border-radius: var(--radius-lg) !important;
+    color: var(--primary) !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all var(--duration-normal) var(--ease-standard) !important;
+}
+
+.output-empty-state button:hover,
+.output-empty-state .btn:hover,
+.empty-state button:hover,
+.empty-state .btn:hover,
+[class*="empty-state"] button:hover {
+    background: var(--primary-bg) !important;
+    border-style: solid !important;
+    border-color: var(--primary) !important;
+}
+
+/* Empty state sub-components */
+.empty-state-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: var(--space-4);
+    opacity: 0.4;
+    color: var(--text-muted);
+}
+
+.empty-state-title {
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-2);
+}
+
+.empty-state-desc {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    margin-bottom: var(--space-6);
+    max-width: 320px;
+    line-height: var(--leading-normal);
+}
+
+
+/* ==========================================================================
+   10. LOADING STATES
+   ========================================================================== */
+
+/* Sophisticated skeleton loading with gradient animation */
+.skeleton,
+[class*="skeleton"],
+.gradio-container [class*="skeleton"],
+.gr-loading,
+.gradio-container .gr-loading {
+    background: linear-gradient(
+        90deg,
+        var(--bg-tertiary) 0%,
+        var(--bg-elevated) 40%,
+        var(--bg-tertiary) 80%
+    ) !important;
+    background-size: 800px 100% !important;
+    animation: beauty-skeleton-wave var(--duration-skeleton) var(--ease-standard) infinite !important;
+    border-radius: var(--radius-md) !important;
+}
+
+/* Staggered animation for skeleton items */
+.skeleton + .skeleton,
+[class*="skeleton"] + [class*="skeleton"] {
+    animation-delay: 0.1s !important;
+}
+
+.skeleton + .skeleton + .skeleton,
+[class*="skeleton"] + [class*="skeleton"] + [class*="skeleton"] {
+    animation-delay: 0.2s !important;
+}
+
+.skeleton + .skeleton + .skeleton + .skeleton,
+[class*="skeleton"] + [class*="skeleton"] + [class*="skeleton"] + [class*="skeleton"] {
+    animation-delay: 0.3s !important;
+}
+
+/* Better spinner with gradient border */
+.tts-loading-spinner,
+.gradio-container .loading-spinner,
+[class*="spinner"] {
+    border: 3px solid var(--border-subtle) !important;
+    border-top-color: var(--accent-primary) !important;
+    border-right-color: var(--accent-primary) !important;
+    border-radius: 50% !important;
+    animation: beauty-spin-gradient var(--duration-spin) linear infinite !important;
+    width: 28px !important;
+    height: 28px !important;
+}
+
+
+/* ==========================================================================
+   11. MICRO-INTERACTIONS
+   ========================================================================== */
+
+/* Smooth color transitions on all interactive elements */
+a,
+button,
+input,
+select,
+textarea,
+[role="button"],
+[tabindex] {
+    transition-property: color, background-color, border-color, box-shadow, transform, opacity !important;
+    transition-duration: var(--duration-normal) !important;
+    transition-timing-function: var(--ease-standard) !important;
+}
+
+/* Better tooltip styling */
+[title] {
+    position: relative;
+}
+
+[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 12px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-medium);
+    box-shadow: var(--shadow-elevated);
+    white-space: nowrap;
+    z-index: 9999;
+    pointer-events: none;
+    animation: micro-fade-in var(--duration-normal) var(--ease-decelerate);
+}
+
+/* Tab button micro-interaction */
+.tab-btn,
+.enhanced-tabs .tab-btn,
+.tabitem,
+.tab-nav button {
+    transition: all var(--duration-normal) var(--ease-standard) !important;
+}
+
+.tab-btn:hover,
+.enhanced-tabs .tab-btn:hover,
+.tab-nav button:hover {
+    transform: translateY(-1px);
+}
+
+.tab-btn:active,
+.enhanced-tabs .tab-btn:active,
+.tab-nav button:active {
+    transform: translateY(0) scale(0.98);
+}
+
+
+/* ==========================================================================
+   12. OVERALL POLISH
+   ========================================================================== */
+
+/* Vignette effect - DISABLED for Trae Solo style */
+body::before,
+.gradio-container::before {
+    display: none !important;
+}
+
+/* Ensure content stays above vignette (exclude fixed overlays) */
+body > *:not(.help-popup):not(.help-popup-overlay):not(.shortcut-help-overlay),
+.gradio-container > * {
+    position: relative;
+    z-index: 1;
+}
+
+
+
+/* Smooth scroll behavior */
+html {
+    scroll-behavior: smooth !important;
+}
+
+/* Reduce motion for accessibility - disable non-essential animations/transitions */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    /* Explicitly disable decorative looping animations */
+    .status-pulse,
+    .tts-loading-spinner,
+    .micro-progress-ring,
+    .micro-progress-ring-lg,
+    .skeleton,
+    .skeleton-block,
+    .skeleton-block::after {
+        animation: none !important;
+    }
+
+    /* Disable hover transforms on tab buttons */
+    .tab-btn:hover,
+    .enhanced-tabs .tab-btn:hover,
+    .tab-nav button:hover {
+        transform: none !important;
+    }
+}
+
+/* ==========================================================================
+   RESPONSIVE ADJUSTMENTS FOR BEAUTIFY LAYER
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    /* Disable tooltip on touch devices */
+    [title]:hover::after {
+        display: none;
+    }
+}
+
+@media (min-width: 1200px) {
+    /* Enhanced effects on larger screens */
+    .card:hover {
+        transform: translateY(-3px);
+    }
+}
+
+/* ==========================================================================
+   13. COMPONENT-SPECIFIC CLASSES
+   ========================================================================== */
+
+/* --- Character counter (legacy Gradio class - kept for backwards compat) --- */
+/* Unified counter styles are in components.css (.tts-char-counter, .micro-counter-*) */
+
+/* --- Voice design specific classes --- */
+.vd-full-width,
+.vc-full-width {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.vd-full-width-btn,
+.vc-submit-btn {
+    width: 100% !important;
+}
+
+.vd-flex-row,
+.vc-save-row {
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+}
+
+.vd-save-name-input,
+.vc-save-input {
+    flex: 3 !important;
+}
+
+.vd-save-btn,
+.vc-save-btn {
+    flex: 1 !important;
+}
+
+.vd-persona-desc,
+.vc-persona-desc {
+    margin-top: 8px !important;
+    font-size: var(--text-sm) !important;
+    color: var(--text-secondary) !important;
+}
+
+.vd-shortcut-hint {
+    text-align: center !important;
+    margin-top: -4px !important;
+    margin-bottom: 8px !important;
+    font-size: 11px !important;
+    color: var(--text-muted) !important;
+}
+
+.vd-spinner-centered {
+    margin: 0 auto 8px !important;
+}
+
+.vd-audio-hidden,
+.vc-hidden {
+    display: none !important;
+}
+
+/* --- Voice clone specific classes --- */
+.vc-spacer-top-sm {
+    margin-top: 8px !important;
+}
+
+.vc-file-input {
+    width: 100% !important;
+    margin-bottom: 8px !important;
+}
+
+.advanced-params {
+    margin-top: 12px !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--radius-md, 8px) !important;
+    overflow: hidden !important;
+}
+
+.advanced-params summary {
+    padding: 10px 14px !important;
+    cursor: pointer;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--text-secondary) !important;
+    background: var(--bg-tertiary) !important;
+    border-bottom: 1px solid var(--primary-ring) !important;
+    list-style: none !important;
+    transition: all var(--duration-normal) var(--ease-standard) !important;
+}
+
+.advanced-params summary:hover {
+    color: var(--primary-light) !important;
+    background: var(--primary-bg) !important;
+}
+
+.advanced-params summary::-webkit-details-marker {
+    display: none;
+}
+
+.advanced-params-body {
+    padding: 14px !important;
+}
+
+/* --- Persona page classes --- */
+.persona-toolbar {
+    display: flex !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+    align-items: center !important;
+}
+
+.persona-search-input {
+    flex: 4 !important;
+    min-width: 200px !important;
+}
+
+.persona-card-view {
+    display: none !important;
+}
+
+.empty-state-hint {
+    font-size: 13px !important;
+    color: var(--text-muted) !important;
+    margin-bottom: 16px !important;
+    line-height: 1.5 !important;
+}
+
+/* --- History page classes --- */
+.history-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+}
+
+.history-table thead th {
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: var(--text-muted) !important;
+    border-bottom: 1px solid var(--border-medium) !important;
+    text-align: left !important;
+    white-space: nowrap;
+}
+
+.history-table thead th:nth-child(1) {
+    width: 40px !important;
+    text-align: center !important;
+}
+
+.history-table tbody td {
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+    color: var(--text-secondary) !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+    transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.history-table tbody td:nth-child(1) {
+    text-align: center !important;
+}
+
+.history-table tbody tr {
+    transition: all var(--duration-fast) var(--ease-standard) !important;
+}
+
+.history-table tbody tr:hover {
+    background: var(--primary-bg) !important;
+}
+
+.history-table tbody tr:hover td {
+    color: var(--text-primary) !important;
+}
+
+.history-duration {
+    display: inline-block !important;
+    padding: 2px 8px !important;
+    border-radius: 6px !important;
+    background: var(--primary-bg) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: var(--primary-light) !important;
+}
+
+.history-search-bar {
+    display: flex !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+    align-items: center !important;
+}
+
+.history-search-input {
+    flex: 1 !important;
+}
+
+.history-search-actions {
+    display: flex !important;
+    gap: 6px !important;
+}
+
+.history-search-btn {
+    padding: 6px 12px !important;
+    border-radius: var(--radius-md, 8px) !important;
+    border: 1px solid var(--border-medium) !important;
+    background: var(--bg-secondary) !important;
+    color: var(--text-secondary) !important;
+    cursor: pointer;
+    font-size: 12px !important;
+    transition: all var(--duration-fast) var(--ease-standard) !important;
+}
+
+.history-search-btn:hover {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+    background: var(--primary-bg) !important;
+}
+
+.history-batch-bar {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 14px !important;
+    margin-top: 12px !important;
+    border-radius: 10px !important;
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-subtle) !important;
+}
+
+.batch-btn {
+    padding: 6px 14px !important;
+    border-radius: var(--radius-md, 8px) !important;
+    border: 1px solid var(--border-medium) !important;
+    background: var(--bg-secondary) !important;
+    color: var(--text-secondary) !important;
+    cursor: pointer;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    transition: all var(--duration-fast) var(--ease-standard) !important;
+}
+
+.batch-btn:hover {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+}
+
+.batch-btn.danger:hover {
+    border-color: var(--btn-danger-hover) !important;
+    color: var(--text-on-primary) !important;
+    background: var(--btn-danger-hover) !important;
+}
+
+/* --- Skeleton stagger animations --- */
+.skeleton-stagger-1 { animation-delay: 0s !important; }
+.skeleton-stagger-2 { animation-delay: 0.08s !important; }
+.skeleton-stagger-3 { animation-delay: 0.16s !important; }
+.skeleton-stagger-4 { animation-delay: 0.24s !important; }
+.skeleton-stagger-5 { animation-delay: 0.32s !important; }
+.skeleton-stagger-6 { animation-delay: 0.4s !important; }
+.skeleton-stagger-7 { animation-delay: 0.48s !important; }
+
+.skeleton-col-check { width: 40px !important; }
+.skeleton-col-name { flex: 3 !important; }
+.skeleton-block-fill { flex: 1 !important; }
+
+
+
+/* --- Persona selection area --- */
+.persona-selection-area {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+    padding: 12px !important;
+    border-radius: 10px !important;
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-subtle) !important;
+}
+
+.persona-bottom-actions {
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+}
+
+
+
+/* --- Status bar glassmorphism --- */
+.status-bar {
+    backdrop-filter: blur(8px) !important;
+    background: var(--bg-glass) !important;
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    border: 1px solid var(--border-subtle) !important;
+}
+
+
+
+/* --- Format selector pills --- */
+.format-radio-group label {
+    padding: 5px 14px !important;
+    border-radius: 999px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    transition: all var(--duration-normal) var(--ease-standard) !important;
+}
+
+.format-radio-group label:has(input:checked) {
+    box-shadow: none !important;
+}
+
+/* --- Output panel / result card --- */
+.output-panel,
+.output-result {
+    border-radius: 14px !important;
+    border: 1px solid var(--border-subtle) !important;
+    background: var(--bg-secondary) !important;
+}
+
+
+
+/* ==========================================================================
+   14. MISSING CSS CLASSES - Fix undefined classes in templates
+   ========================================================================== */
+
+/* --- grid-2col: Two-column grid layout --- */
+.grid-2col {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+}
+
+@media (max-width: 768px) {
+    .grid-2col {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* --- param-slider: Slider + value display container --- */
+.param-slider,
+.vc-param-slider {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+    margin-top: 4px !important;
+}
+
+.param-slider input[type="range"],
+.vc-param-slider input[type="range"] {
+    flex: 1 !important;
+    min-width: 0 !important;
+    height: 6px !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    background: var(--bg-tertiary) !important;
+    border-radius: var(--radius-full) !important;
+    outline: none !important;
+    cursor: pointer;
+}
+
+.param-slider input[type="range"]::-webkit-slider-thumb,
+.vc-param-slider input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 50% !important;
+    background: var(--accent-primary) !important;
+    border: 3px solid var(--bg-secondary) !important;
+    box-shadow: var(--glow-sm) !important;
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-standard) !important;
+}
+
+.param-slider input[type="range"]::-webkit-slider-thumb:hover,
+.vc-param-slider input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: var(--glow-md) !important;
+}
+
+.param-slider input[type="range"]::-moz-range-thumb,
+.vc-param-slider input[type="range"]::-moz-range-thumb {
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 50% !important;
+    background: var(--accent-primary) !important;
+    border: 3px solid var(--bg-secondary) !important;
+    box-shadow: var(--glow-sm) !important;
+    cursor: pointer;
+}
+
+/* --- param-value / vc-param-value: Numeric value display next to slider --- */
+.param-value,
+.vc-param-value {
+    min-width: 40px !important;
+    text-align: center !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: var(--accent-primary) !important;
+    background: var(--primary-bg) !important;
+    padding: 3px 10px !important;
+    border-radius: var(--radius-md) !important;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    border: 1px solid var(--primary-ring) !important;
+}
+
+/* ==========================================================================
+   15. MICRO-INTERACTIONS & PERCEPTIBLE UX ENHANCEMENTS
+   ========================================================================== */
+
+/* --- Generate Button: Simple hover shadow (no breathing glow) --- */
+.primary-btn.generate-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 24px var(--primary-glow-strong) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* --- Generate Button: Success state --- */
+.primary-btn.generate-btn.micro-btn-success {
+    background: var(--btn-success-bg) !important;
+    animation: micro-success-pop var(--duration-slow) var(--ease-decelerate) !important;
+}
+
+.primary-btn.generate-btn.micro-btn-success::after {
+    display: none !important;
+}
+
+/* --- Success badge --- */
+.micro-success-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--status-success-bg);
+    border: 1px solid var(--status-success-border);
+    color: var(--accent-success);
+    font-size: 13px;
+    font-weight: 600;
+    animation: micro-badge-appear var(--duration-slow) var(--ease-bounce);
+    margin-top: 8px;
+}
+
+.micro-success-badge svg {
+    width: 16px;
+    height: 16px;
+    animation: micro-success-pop var(--duration-slow) var(--ease-decelerate) var(--duration-fast) both;
+}
+
+/* --- Quick action buttons after generation --- */
+.micro-quick-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    animation: micro-slide-in-up var(--duration-normal) var(--ease-decelerate) var(--duration-fast) both;
+}
+
+.micro-quick-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-medium);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--duration-normal) var(--ease-standard);
+}
+
+.micro-quick-action-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-bg);
+    transform: translateY(-1px);
+}
+
+.micro-quick-action-btn:active {
+    transform: translateY(0) scale(0.97);
+}
+
+.micro-quick-action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* --- Character counter enhancement --- */
+.vd-char-counter,
+.it2-char-counter {
+    transition: all var(--duration-slow) var(--ease-standard) !important;
+}
+
+.vd-char-counter.micro-counter-ok,
+.it2-char-counter.micro-counter-ok {
+    color: var(--text-secondary) !important;
+    background: transparent !important;
+}
+
+.vd-char-counter.micro-counter-warn,
+.it2-char-counter.micro-counter-warn {
+    color: var(--accent-warning) !important;
+    background: transparent !important;
+}
+
+.vd-char-counter.micro-counter-danger,
+.it2-char-counter.micro-counter-danger {
+    color: var(--accent-error) !important;
+    background: transparent !important;
+    animation: micro-shake var(--duration-slow) var(--ease-standard);
+}
+
+.micro-counter-check {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    animation: micro-success-pop var(--duration-normal) var(--ease-decelerate);
+}
+
+.micro-counter-check svg {
+    width: 12px;
+    height: 12px;
+    stroke: var(--accent-success);
+}
+
+/* --- Quality estimation badge --- */
+.micro-quality-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    animation: micro-fade-in var(--duration-normal) var(--ease-decelerate);
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.micro-quality-badge.micro-quality-high {
+    background: var(--status-success-bg);
+    border: 1px solid var(--status-success-border);
+    color: var(--accent-success);
+}
+
+.micro-quality-badge.micro-quality-medium {
+    background: var(--status-warning-bg);
+    border: 1px solid var(--status-warning-border);
+    color: var(--accent-warning);
+}
+
+.micro-quality-badge.micro-quality-low {
+    background: var(--status-error-bg);
+    border: 1px solid var(--status-error-border);
+    color: var(--accent-error);
+}
+
+.micro-quality-badge svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* --- Voice description format hint --- */
+.micro-format-hint {
+    margin-top: 6px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--primary-bg);
+    border: 1px dashed var(--primary-ring);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    animation: micro-slide-in-up var(--duration-normal) var(--ease-decelerate);
+}
+
+.micro-format-hint .micro-hint-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--primary-light);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.micro-format-hint .micro-hint-label svg {
+    width: 14px;
+    height: 14px;
+}
+
+.micro-format-hint .micro-hint-example {
+    display: block;
+    margin-top: 4px;
+    padding: 4px 8px;
+    background: var(--primary-bg);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* --- Voice tag search/filter --- */
+.micro-tag-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-medium);
+    background: var(--bg-input);
+    transition: all var(--duration-normal) var(--ease-standard);
+}
+
+.micro-tag-search:focus-within {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.micro-tag-search svg {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.micro-tag-search input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 12px;
+    outline: none;
+}
+
+.micro-tag-search input::placeholder {
+    color: var(--bg-placeholder);
+}
+
+/* --- Section block visual separation --- */
+.micro-section-block {
+    padding: 16px;
+    margin: 12px 0;
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-tertiary);
+    transition: all var(--duration-normal) var(--ease-standard);
+}
+
+.micro-section-block:hover {
+    border-color: var(--primary-ring);
+    background: var(--bg-tertiary);
+}
+
+.micro-section-block + .micro-section-block {
+    margin-top: 8px;
+}
+
+.micro-section-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.micro-section-label svg {
+    width: 14px;
+    height: 14px;
+    color: var(--primary);
+}
+
+/* --- Tooltip enhancement for buttons --- */
+.micro-tooltip {
+    position: relative;
+}
+
+.micro-tooltip::before {
+    content: attr(data-micro-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    padding: 6px 12px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 6px;
+    border: 1px solid var(--border-medium);
+    box-shadow: var(--shadow-elevated);
+    white-space: nowrap;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+    transition: all var(--duration-normal) var(--ease-standard);
+}
+
+.micro-tooltip:hover::before {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+}
+
+/* --- Progress ring for generating state --- */
+.micro-progress-ring {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-subtle);
+    border-top-color: var(--text-primary);
+    border-radius: 50%;
+    animation: micro-progress-spin var(--duration-spin) linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+/* --- Card entrance animation --- */
+.card {
+    animation: micro-slide-in-up var(--duration-normal) var(--ease-decelerate);
+}
+
+.card + .card {
+    animation-delay: 0.05s;
+}
+
+/* Active/Selected card - slightly elevated */
+.tts-card.card-active {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-card), 0 0 0 1px var(--accent-primary), var(--shadow-glow);
+}
+
+/* Important/Result card - stronger presence */
+.tts-card.card-elevated {
+    box-shadow: var(--shadow-elevated);
+    border-color: var(--border-medium);
+}
+
+/* --- Input validation shake --- */
+.micro-input-error {
+    animation: micro-shake var(--duration-slow) var(--ease-standard) !important;
+    border-color: var(--accent-error) !important;
+    box-shadow: 0 0 0 3px var(--status-error-bg) !important;
+}
+
+/* --- Voice preset tag: active state (no pulse ring) --- */
+.voice-preset-tag.preset-tag-active,
+.it2-emotion-preset.it2-preset-active,
+.it2-voice-preset.it2-voice-active {
+    animation: none !important;
+}
+
+/* --- Smooth tab content transition --- */
+.inner-tab-panel {
+    animation: micro-fade-in var(--duration-fast) var(--ease-decelerate);
+}
+
+/* Tab content entrance animation */
+@keyframes tab-content-enter {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#tab-content.htmx-settling {
+    animation: tab-content-enter var(--duration-slow) var(--ease-decelerate);
+}
+
+/* --- Loading spinner with progress text --- */
+.micro-loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 24px;
+    animation: micro-fade-in var(--duration-normal) var(--ease-decelerate);
+}
+
+.micro-loading-state .micro-progress-ring-lg {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--primary-ring);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: micro-progress-spin var(--duration-spin) linear infinite;
+}
+
+.micro-loading-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    animation: micro-fade-in var(--duration-normal) var(--ease-decelerate);
+}
+
+/* ==========================================================================
+   16. VOICE TAG COLOR CODING
+   ========================================================================== */
+
+/* Voice tag color variants */
+.voice-tag[data-tag="sweet"] { --tag-color: #EC4899; }
+.voice-tag[data-tag="mature"] { --tag-color: #F43F5E; }
+.voice-tag[data-tag="magnetic"] { --tag-color: #3B82F6; }
+.voice-tag[data-tag="deep"] { --tag-color: #6366F1; }
+.voice-tag[data-tag="energetic"] { --tag-color: #F59E0B; }
+.voice-tag[data-tag="japanese"] { --tag-color: #A78BFA; }
+
+.voice-tag {
+    border: 1px solid color-mix(in srgb, var(--tag-color, var(--accent-primary)) 40%, transparent);
+    background: color-mix(in srgb, var(--tag-color, var(--accent-primary)) 8%, transparent);
+    color: var(--tag-color, var(--accent-primary));
+}
+
+.voice-tag:hover {
+    background: color-mix(in srgb, var(--tag-color, var(--accent-primary)) 15%, transparent);
+}
+
+.voice-tag.active {
+    background: color-mix(in srgb, var(--tag-color, var(--accent-primary)) 20%, transparent);
+    border-color: var(--tag-color, var(--accent-primary));
+}
+
+/* ==========================================================================
+   17. THEME SWITCH ANIMATION ENHANCEMENT
+   ========================================================================== */
+
+/* Theme transition with subtle scale */
+.theme-transitioning .app-shell {
+    transition: background-color 350ms var(--ease-standard), color 350ms var(--ease-standard);
+}
+
+.theme-transitioning .app-shell > * {
+    animation: theme-switch-pulse 350ms var(--ease-standard);
+}
+
+@keyframes theme-switch-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.998); }
+    100% { transform: scale(1); }
+}
+
+/* ============================================================
+   Command Palette (Ctrl+K)
+   ============================================================ */
+.command-palette-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 15vh;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--duration-normal), visibility var(--duration-normal);
+}
+
+.command-palette-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.command-palette {
+    width: 520px;
+    max-width: 90vw;
+    max-height: 400px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-modal);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform: scale(0.96) translateY(-8px);
+    transition: transform var(--duration-normal) var(--ease-decelerate);
+}
+
+.command-palette-overlay.active .command-palette {
+    transform: scale(1) translateY(0);
+}
+
+.command-palette-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.command-palette-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
+    font-family: inherit;
+}
+
+.command-palette-input::placeholder {
+    color: var(--text-muted);
+}
+
+.command-palette-kbd {
+    font-size: 11px;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.command-palette-results {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    max-height: 360px;
+}
+
+/* 搜索框分类标签 */
+.command-palette-group {
+    margin-bottom: 4px;
+}
+
+.command-palette-group:last-child {
+    margin-bottom: 0;
+}
+
+.command-palette-group-label {
+    padding: 4px 12px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.command-palette-group-items {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.command-palette-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background var(--duration-fast);
+}
+
+.command-palette-item:hover,
+.command-palette-item.active {
+    background: var(--bg-tertiary);
+}
+
+.command-palette-item.active {
+    background: var(--primary-bg, rgba(93, 74, 124, 0.08));
+    border-left: 2px solid var(--accent-primary);
+}
+
+html.dark .command-palette-item.active {
+    background: var(--primary-bg, rgba(139, 123, 178, 0.1));
+    border-left: 2px solid var(--accent-primary);
+}
+
+.command-palette-item-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--text-secondary);
+}
+
+.command-palette-item.active .command-palette-item-icon {
+    color: var(--accent-primary);
+}
+
+.command-palette-item-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.command-palette-item-label {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    font-weight: 500;
+    line-height: var(--leading-tight);
+}
+
+.command-palette-item-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: var(--leading-tight);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.command-palette-item-category {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    padding: 2px 8px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+}
+
+/* 搜索框快捷键 */
+.command-palette-kbd-shortcut {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-family: var(--font-mono, 'SF Mono', 'Fira Code', monospace);
+}
+
+/* 空状态 */
+.command-palette-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: 48px 24px;
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.command-palette .command-palette-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+.command-palette-footer-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.command-palette-footer-hint kbd {
+    font-size: 10px;
+    padding: 1px 5px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono, 'SF Mono', 'Fira Code', monospace);
+    margin: 0 2px;
+}
+
+.command-palette-footer-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 搜索图标 */
+.command-palette-search-icon {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+/* 搜索框聚焦样式 */
+.command-palette-input-wrap:focus-within {
+    border-bottom-color: var(--accent-primary);
+}
+
+.command-palette-input-wrap:focus-within .command-palette-search-icon {
+    color: var(--accent-primary);
+}
+
+/* 暗色适配 */
+html.dark .command-palette {
+    border-color: var(--border-medium);
+}
+
+html.dark .command-palette-item.active {
+    background: var(--primary-bg, rgba(139, 123, 178, 0.1));
+}
+
+/* ==========================================================================
+   18. BRAND IDENTITY ENHANCEMENT
+   ========================================================================== */
+
+/* Brand identity enhancement */
+.sidebar-brand-icon {
+    width: 36px !important;
+    height: 36px !important;
+    position: relative;
+}
+
+.sidebar-brand-icon::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: calc(var(--radius-lg) + 2px);
+    background: linear-gradient(135deg, var(--accent-primary), var(--primitive-cyan-300), var(--accent-primary));
+    background-size: 200% 200%;
+    animation: brand-glow 4s ease-in-out infinite;
+    z-index: -1;
+    opacity: 0.5;
+}
+
+@keyframes brand-glow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+html.dark .sidebar-brand-icon::after {
+    opacity: 0.3;
+}
+
+/* ============================================================
+   Generate Button Enhancement
+   Larger size, gradient background, glow effect
+   ============================================================ */
+.generate-btn {
+    height: 42px !important;
+    padding: 0 24px !important;
+    font-size: var(--font-size-md) !important;
+    font-weight: 600 !important;
+    background: linear-gradient(135deg, var(--accent-primary), var(--primitive-cyan-400)) !important;
+    border: none !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 2px 8px rgba(93, 74, 124, 0.3), 0 0 0 0 rgba(93, 74, 124, 0) !important;
+    transition: all var(--duration-normal) var(--ease-standard) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.generate-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    opacity: 0;
+    transition: opacity var(--duration-normal);
+}
+
+.generate-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 16px rgba(93, 74, 124, 0.4), 0 0 20px rgba(93, 74, 124, 0.15) !important;
+}
+
+.generate-btn:hover::before {
+    opacity: 1;
+}
+
+.generate-btn:active {
+    transform: translateY(0) scale(0.98) !important;
+    box-shadow: 0 2px 8px rgba(93, 74, 124, 0.3) !important;
+}
+
+.generate-btn:disabled {
+    opacity: 0.6 !important;
+    transform: none !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
+}
+
+/* Generate button success state */
+.generate-btn.btn-success {
+    background: linear-gradient(135deg, var(--accent-success), var(--primitive-green-400)) !important;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3) !important;
+}
+
+.generate-btn.btn-success:hover {
+    box-shadow: 0 4px 16px rgba(5, 150, 105, 0.4), 0 0 20px rgba(5, 150, 105, 0.15) !important;
+}
+
+/* Generate button loading state */
+.generate-btn.btn-loading {
+    pointer-events: none;
+}
+
+.generate-btn.btn-loading .btn-text {
+    visibility: hidden;
+}
+
+.generate-btn.btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #FFFFFF;
+    border-radius: 50%;
+    animation: beauty-spin-gradient 800ms linear infinite;
+}
+
+/* Dark theme adjustments for generate button */
+html.dark .generate-btn {
+    background: linear-gradient(135deg, var(--primitive-cyan-500), var(--primitive-cyan-300)) !important;
+    box-shadow: 0 2px 8px rgba(139, 123, 178, 0.25), 0 0 0 0 rgba(139, 123, 178, 0) !important;
+}
+
+html.dark .generate-btn:hover {
+    box-shadow: 0 4px 16px rgba(139, 123, 178, 0.35), 0 0 24px rgba(139, 123, 178, 0.12) !important;
+}
+
+/* ============================================================
+   Settings Collapsible Sections
+   ============================================================ */
+.settings-section-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.settings-section-header:hover {
+    background: var(--bg-tertiary);
+}
+
+.settings-section-chevron {
+    transition: transform var(--duration-normal) var(--ease-standard);
+    flex-shrink: 0;
+}
+
+.settings-section-header.collapsed .settings-section-chevron {
+    transform: rotate(-90deg);
+}
+
+.settings-section-body {
+    overflow: hidden;
+    transition: max-height var(--duration-slow) var(--ease-standard), opacity var(--duration-normal);
+}
+
+.settings-section-body.collapsed {
+    max-height: 0 !important;
+    opacity: 0;
+    padding-top: 0 !important;
+}
+
+/* ========================================
+   Phase 2: 情感控制可视化反馈
+   ======================================== */
+.emotion-visual-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  background: var(--bg-tertiary, #F3F4F6);
+  border-radius: var(--radius-md, 6px);
+  margin-top: var(--space-2, 8px);
+  overflow: hidden;
+}
+
+.emotion-visual-bar-label {
+  font-size: var(--font-size-xs, 12px);
+  font-weight: 500;
+  color: var(--text-secondary, #4B5563);
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.emotion-visual-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-primary, #FAFBFC);
+  border-radius: var(--radius-full, 9999px);
+  overflow: hidden;
+  display: flex;
+}
+
+.emotion-visual-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full, 9999px);
+  transition: width var(--duration-normal, 200ms) var(--ease-standard, ease);
+  min-width: 0;
+}
+
+.emotion-visual-bar-fill[data-emotion="happy"] { background: linear-gradient(90deg, #FBBF24, #F59E0B); }
+.emotion-visual-bar-fill[data-emotion="angry"] { background: linear-gradient(90deg, #EF4444, #DC2626); }
+.emotion-visual-bar-fill[data-emotion="sad"] { background: linear-gradient(90deg, #60A5FA, #3B82F6); }
+.emotion-visual-bar-fill[data-emotion="fear"] { background: linear-gradient(90deg, #A78BFA, #7C3AED); }
+.emotion-visual-bar-fill[data-emotion="disgust"] { background: linear-gradient(90deg, #34D399, #059669); }
+.emotion-visual-bar-fill[data-emotion="surprise"] { background: linear-gradient(90deg, #FB923C, #EA580C); }
+.emotion-visual-bar-fill[data-emotion="neutral"] { background: linear-gradient(90deg, #9CA3AF, #6B7280); }
+
+.emotion-visual-bar-value {
+  font-size: var(--font-size-xs, 12px);
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.emotion-radar-container {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3, 12px);
+}
+
+.emotion-radar-canvas {
+  max-width: 200px;
+  max-height: 200px;
+}
+
+html.dark .emotion-visual-bar {
+  background: var(--bg-tertiary, #1A1E24);
+}
+
+html.dark .emotion-visual-bar-track {
+  background: var(--bg-secondary, #13161B);
+}
+
+html.dark .emotion-visual-bar-label {
+  color: var(--text-secondary, #B0B8C4);
+}
+
+html.dark .emotion-visual-bar-value {
+  color: var(--text-primary, #F0F2F5);
+}
+
+/* ========================================
+   Phase 1: 统一空状态组件 .tts-empty-state
+   ======================================== */
+.tts-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8, 32px) var(--space-4, 16px);
+  text-align: center;
+  color: var(--text-muted, #9CA3AF);
+  border: 2px dashed var(--border-subtle, #E5E7EB);
+  border-radius: var(--radius-lg, 8px);
+  background: var(--bg-secondary, #FFFFFF);
+  min-height: 120px;
+  gap: var(--space-2, 8px);
+  transition: border-color var(--duration-normal, 200ms) var(--ease-standard, ease);
+}
+
+.tts-empty-state:hover {
+  border-color: var(--border-medium, #D1D5DB);
+}
+
+.tts-empty-state .empty-state-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--space-1, 4px);
+  opacity: 0.4;
+  color: var(--text-tertiary, #6B7280);
+}
+
+.tts-empty-state .empty-state-title {
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  color: var(--text-secondary, #4B5563);
+  margin: 0;
+}
+
+.tts-empty-state .empty-state-desc {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--text-muted, #9CA3AF);
+  margin: 0;
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+.tts-empty-state .empty-state-action {
+  margin-top: var(--space-2, 8px);
+}
+
+html.dark .tts-empty-state {
+  border-color: var(--border-subtle, #2A2F36);
+  background: var(--bg-secondary, #13161B);
+}
+
+html.dark .tts-empty-state:hover {
+  border-color: var(--border-medium, #374151);
+}
+
+html.dark .tts-empty-state .empty-state-title {
+  color: var(--text-secondary, #B0B8C4);
+}
+
+/* ========================================
+   Phase 1: 设置页面分组折叠
+   ======================================== */
+.settings-collapsible {
+  border: 1px solid var(--border-subtle, #E5E7EB);
+  border-radius: var(--radius-lg, 8px);
+  overflow: hidden;
+  margin-bottom: var(--space-3, 12px);
+  background: var(--bg-secondary, #FFFFFF);
+  transition: box-shadow var(--duration-normal, 200ms) var(--ease-standard, ease);
+}
+
+.settings-collapsible:hover {
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+}
+
+.settings-collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--duration-fast, 120ms) var(--ease-standard, ease);
+  gap: var(--space-2, 8px);
+}
+
+.settings-collapsible-header:hover {
+  background: var(--bg-tertiary, #F3F4F6);
+}
+
+.settings-collapsible-header:focus-visible {
+  outline: 2px solid var(--accent-primary, #5D4A7C);
+  outline-offset: -2px;
+}
+
+.settings-collapsible-title {
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.settings-collapsible-summary {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--text-muted, #9CA3AF);
+  font-weight: 400;
+}
+
+.settings-collapsible-arrow {
+  width: 20px;
+  height: 20px;
+  transition: transform var(--duration-normal, 200ms) var(--ease-standard, ease);
+  color: var(--text-muted, #9CA3AF);
+  flex-shrink: 0;
+}
+
+.settings-collapsible.open .settings-collapsible-arrow {
+  transform: rotate(180deg);
+}
+
+.settings-collapsible-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--duration-slow, 300ms) var(--ease-standard, ease),
+              padding var(--duration-slow, 300ms) var(--ease-standard, ease);
+  padding: 0 var(--space-4, 16px);
+}
+
+.settings-collapsible.open .settings-collapsible-body {
+  max-height: 2000px;
+  padding: 0 var(--space-4, 16px) var(--space-4, 16px);
+}
+
+html.dark .settings-collapsible {
+  border-color: var(--border-subtle, #2A2F36);
+  background: var(--bg-secondary, #13161B);
+}
+
+html.dark .settings-collapsible-header:hover {
+  background: var(--bg-tertiary, #1A1E24);
+}
+
+html.dark .settings-collapsible-title {
+  color: var(--text-primary, #F0F2F5);
+}
+
+/* ========================================
+   Phase 2: 品牌标识增强
+   ======================================== */
+.brand-icon {
+  width: 36px !important;
+  height: 36px !important;
+  position: relative;
+  border-radius: var(--radius-md, 6px);
+  background: linear-gradient(135deg, var(--accent-primary, #5D4A7C), var(--primitive-cyan-400, #8B7BB2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--duration-normal, 200ms) var(--ease-bounce, ease),
+              box-shadow var(--duration-normal, 200ms) var(--ease-standard, ease);
+}
+
+.brand-icon::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: calc(var(--radius-md, 6px) + 2px);
+  background: linear-gradient(135deg, var(--accent-primary, #5D4A7C), var(--primitive-cyan-400, #8B7BB2), var(--primitive-purple-400, #A78BFA));
+  z-index: -1;
+  opacity: 0;
+  transition: opacity var(--duration-normal, 200ms) var(--ease-standard, ease);
+  animation: brand-gradient-rotate 3s linear infinite;
+  background-size: 200% 200%;
+}
+
+.brand-icon:hover::before {
+  opacity: 1;
+}
+
+.brand-icon:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 16px rgba(93, 74, 124, 0.3);
+}
+
+.brand-icon svg {
+  width: 20px;
+  height: 20px;
+  color: white;
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes brand-gradient-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+html.dark .brand-icon {
+  background: linear-gradient(135deg, var(--primitive-cyan-500, #6F5E93), var(--primitive-cyan-300, #AEA3CC));
+}
+
+html.dark .brand-icon::before {
+  background: linear-gradient(135deg, var(--primitive-cyan-400, #8B7BB2), var(--primitive-cyan-300, #AEA3CC), var(--primitive-purple-400, #A78BFA));
+}
+
+html.dark .brand-icon:hover {
+  box-shadow: 0 0 20px rgba(139, 123, 178, 0.4);
+}
+
+/* ==========================================================================
+   GLOBAL MICRO-INTERACTIONS & PAGE ENTRANCE ANIMATIONS (2026 Refresh)
+   ========================================================================== */
+
+/* --- Tab content smooth entrance --- */
+#tab-content > * {
+    animation: page-fade-in var(--duration-slow) var(--ease-decelerate);
+}
+@keyframes page-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Card staggered entrance --- */
+.tts-card {
+    animation: card-enter var(--duration-slow) var(--ease-decelerate) both;
+}
+.tts-card:nth-child(2) { animation-delay: 40ms; }
+.tts-card:nth-child(3) { animation-delay: 80ms; }
+.tts-card:nth-child(4) { animation-delay: 120ms; }
+.tts-card:nth-child(5) { animation-delay: 160ms; }
+@keyframes card-enter {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Smooth focus ring for all interactive elements --- */
+a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"]) {
+    transition: outline-color var(--duration-fast) var(--ease-standard),
+                outline-offset var(--duration-fast) var(--ease-standard),
+                box-shadow var(--duration-fast) var(--ease-standard);
+}
+a:focus-visible, button:focus-visible, [role="button"]:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* --- Selection highlight --- */
+::selection {
+    background: var(--primary-glow-strong);
+    color: var(--text-on-primary);
+}
+
+/* --- Scrollbar styling (modern thin scrollbar) --- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border-medium);
+    border-radius: var(--radius-full);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+/* --- Subtle ripple-ish press effect for primary buttons --- */
+.tts-btn-primary {
+    position: relative;
+    overflow: hidden;
+}
+.tts-btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,255,255,0.3) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-standard);
+    pointer-events: none;
+}
+.tts-btn-primary:active::after {
+    opacity: 1;
+    transition: opacity 0s;
+}
+
+/* --- Skeleton/loading shimmer for loading states --- */
+.htmx-request #tab-content::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+    background-size: 200% 100%;
+    animation: loading-bar 1.2s linear infinite;
+    z-index: 10;
+}
+@keyframes loading-bar {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* --- Input focus lift --- */
+.tts-input:focus,
+.tts-textarea:focus {
+    transform: translateY(-1px);
+}
+
+/* --- Disable animations for users who prefer reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

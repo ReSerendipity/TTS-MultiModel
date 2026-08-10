@@ -1,0 +1,788 @@
+/* Inter font - local offline files (variable font with weight 100-900) */
+@font-face {
+    font-family: 'Inter';
+    src: url('/static/fonts/InterVariable.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Inter';
+    src: url('/static/fonts/InterVariable-Italic.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: italic;
+    font-display: swap;
+}
+
+/* ============================================================
+   CSS Variables - Central Design Token Management
+   Phase 1 redesign: :root = Light Lab, html.dark = Audio Workstation.
+
+   Three-layer color architecture:
+     1. Primitive Colors  — Base palette (DO NOT use directly)
+     2. Semantic Colors   — Meaning-based tokens (bg-*, text-*, accent-*, etc.)
+     3. Component Colors  — UI-element tokens (btn-*, role-tag-*, etc.)
+   ============================================================ */
+
+/* ============================================================
+   Light Theme (default / :root)
+   ============================================================ */
+:root {
+    /* ============================================================
+       Primitive Colors - Base color palette
+       DO NOT use these directly in components; use Semantic tokens instead.
+       ============================================================ */
+    /* === Warm Print Design System Primitive Palette (P2 V-01 Step 1) ===
+       Non-breaking introduction. Activate via `.theme-warm-print` scope later
+       Moss (苔绿) · Terracotta (陶土) · Gold (金) · Paper (暖纸) · Ink (暖墨) */
+    --primitive-moss-700: #4A5E4D;
+    --primitive-moss-600: #56705A;
+    --primitive-moss-500: #6B8A70;
+    --primitive-moss-400: #86A78B;
+    --primitive-moss-300: #A8C4AD;
+    --primitive-terracotta-600: #8F6540;
+    --primitive-terracotta-500: #A67C52;
+    --primitive-terracotta-400: #C39971;
+    --primitive-terracotta-300: #DCB998;
+    --primitive-gold-500: #B89A57;
+    --primitive-gold-400: #C9A962;
+    --primitive-gold-300: #DCBE80;
+    --primitive-paper-50: #FAF6F0;
+    --primitive-paper-100: #F4EFE6;
+    --primitive-paper-200: #E9E1D2;
+    --primitive-paper-300: #DCD0B8;
+    --primitive-ink-900: #2C2620;
+    --primitive-ink-800: #3A332C;
+    --primitive-ink-700: #4A4139;
+    --primitive-ink-500: #6B6158;
+    --primitive-ink-300: #958A7F;
+    --primitive-ink-200: #B5AA9E;
+    --primitive-ink-100: #D4CCBF;
+
+    /* Dusk Purple (Brand) — 饱和度提升，向科技感蓝紫靠拢 */
+    --primitive-purple-700: #4C3D80;
+    --primitive-purple-600: #6344A3;
+    --primitive-purple-500: #7C5CBF;
+    --primitive-purple-400: #9B80D4;
+    --primitive-purple-300: #BDA6E6;
+    --primitive-purple-200: #DDD0F0;
+
+    --primitive-cyan-700: var(--primitive-purple-700);
+    --primitive-cyan-600: var(--primitive-purple-600);
+    --primitive-cyan-500: var(--primitive-purple-500);
+    --primitive-cyan-400: var(--primitive-purple-400);
+    --primitive-cyan-300: var(--primitive-purple-300);
+    --primitive-cyan-200: var(--primitive-purple-200);
+
+    /* Green (Success) */
+    --primitive-green-600: #059669;
+    --primitive-green-500: #10B981;
+    --primitive-green-400: #34D399;
+    --primitive-green-300: #6EE7B7;
+    --primitive-green-200: #A7F3D0;
+
+    /* Amber (Warning) */
+    --primitive-amber-600: #D97706;
+    --primitive-amber-500: #F59E0B;
+    --primitive-amber-400: #FBBF24;
+    --primitive-amber-300: #FCD34D;
+
+    /* Red (Error) */
+    --primitive-red-600: #DC2626;
+    --primitive-red-500: #EF4444;
+    --primitive-red-400: #F87171;
+    --primitive-red-300: #FCA5A5;
+
+    /* Blue (Info) */
+    --primitive-blue-600: #2563EB;
+    --primitive-blue-500: #3B82F6;
+    --primitive-blue-400: #60A5FA;
+    --primitive-blue-300: #93C5FD;
+
+    /* Purple (Accent) */
+    --primitive-purple-600: #7C3AED;
+    --primitive-purple-500: #8B5CF6;
+    --primitive-purple-400: #A78BFA;
+
+    /* Gray (Neutral) — 微冷色调倾向，减少纯灰沉闷感 */
+    --primitive-gray-50: #F8F9FC;
+    --primitive-gray-100: #F0F1F5;
+    --primitive-gray-200: #E2E4EB;
+    --primitive-gray-300: #CED1DA;
+    --primitive-gray-400: #9BA1B0;
+    --primitive-gray-500: #6B7280;
+    --primitive-gray-600: #4B5563;
+    --primitive-gray-700: #374151;
+    --primitive-gray-800: #1F2937;
+    --primitive-gray-900: #111827;
+
+    /* Dark surface (for dark theme) */
+    --primitive-dark-50: #F0F2F5;
+    --primitive-dark-100: #D1D5DB;
+    --primitive-dark-200: #9CA3AF;
+    --primitive-dark-300: #6B7280;
+    --primitive-dark-400: #374151;
+    --primitive-dark-500: #1F2937;
+    --primitive-dark-600: #232738;
+    --primitive-dark-700: #1A1E24;
+    --primitive-dark-800: #13161B;
+    --primitive-dark-900: #0B0D10;
+
+    /* ============================================================
+       Semantic Colors - Meaning-based tokens
+       ============================================================ */
+
+    /* Core surface tokens */
+    --bg-primary: var(--primitive-gray-50);
+    --bg-secondary: #FFFFFF;
+    --bg-tertiary: var(--primitive-gray-100);
+    --bg-elevated: var(--primitive-gray-200);
+    --bg-input: #FFFFFF;
+    --bg-input-focus: var(--primitive-gray-100);
+    --bg-card: #FFFFFF;
+    --bg-placeholder: var(--primitive-gray-100);
+    --bg-glass: rgba(255, 255, 255, 0.85);
+    --bg-glass-light: rgba(250, 251, 252, 0.75);
+
+    /* Core text tokens */
+    --text-primary: var(--primitive-gray-900);
+    --text-secondary: var(--primitive-gray-600);
+    --text-muted: var(--primitive-gray-400);
+    --text-tertiary: var(--primitive-gray-500);
+    --text-disabled: var(--primitive-gray-300);
+    --text-on-primary: #FFFFFF;
+    --text-on-accent: #FFFFFF;
+    --text-on-warning: #000000;
+
+    /* Core border tokens */
+    --border-subtle: var(--primitive-gray-200);
+    --border-medium: var(--primitive-gray-300);
+    --border-default: var(--border-medium);
+    --border-focus: var(--primitive-cyan-600);
+    --border-error: var(--primitive-red-600);
+
+    /* Accent / functional tokens */
+    --accent-primary: var(--primitive-cyan-600);
+    --accent-warning: var(--primitive-amber-600);
+    --accent-error: var(--primitive-red-600);
+    --accent-destructive: var(--accent-error);
+    --accent-success: var(--primitive-green-600);
+    --accent-info: var(--primitive-blue-600);
+
+    /* DEPRECATED: Primary alias (legacy compatibility, maps to accent-primary) — use --accent-primary */
+    --primary: var(--accent-primary);
+    /* DEPRECATED: use --accent-primary-hover */
+    --primary-hover: #4C3D80;
+    /* DEPRECATED: use semantic token instead */
+    --primary-light: #BDA6E6;
+    /* DEPRECATED: use semantic token instead */
+    --primary-bg: rgba(99, 68, 163, 0.08);
+    /* DEPRECATED: use semantic token instead */
+    --primary-ring: rgba(99, 68, 163, 0.25);
+    /* DEPRECATED: use semantic token instead */
+    --primary-glow: rgba(99, 68, 163, 0.04);
+    /* DEPRECATED: use semantic token instead */
+    --primary-glow-strong: rgba(99, 68, 163, 0.08);
+    --primary-glow-subtle: rgba(99, 68, 163, 0.02);
+    --primitive-blue-400-rgb: 96, 165, 250;
+
+    /* ============================================================
+       Component Colors - UI-element tokens
+       ============================================================ */
+
+    /* Button hierarchy */
+    --btn-primary-bg: var(--accent-primary);
+    --btn-primary-hover: var(--primary-hover);
+    --btn-secondary-bg: transparent;
+    --btn-secondary-hover: var(--bg-tertiary);
+    --btn-danger-bg: var(--accent-error);
+    --btn-danger-hover: #B91C1C;
+    --btn-success-bg: var(--accent-success);
+    --btn-success-hover: #047857;
+
+    /* Semantic color aliases */
+    --color-success: var(--accent-success);
+    --color-success-light: #10B981;
+    --color-warning: var(--accent-warning);
+    --color-warning-light: #FCD34D;
+    --color-error: var(--accent-error);
+    --color-error-light: #FCA5A5;
+    --color-info: var(--accent-info);
+    --color-info-light: #93C5FD;
+
+    --success-bg: rgba(5, 150, 105, 0.08);
+    --warning-bg: rgba(217, 119, 6, 0.08);
+    --warning-border: rgba(217, 119, 6, 0.25);
+    --warning-text: var(--accent-warning);
+    --error-bg: rgba(220, 38, 38, 0.08);
+    --info-bg: rgba(37, 99, 235, 0.08);
+
+    /* Soft status borders (toasts, badges) */
+    --success-border-soft: rgba(52, 211, 153, 0.3);
+    --warning-border-soft: rgba(251, 191, 36, 0.3);
+    --error-border-soft: rgba(248, 113, 113, 0.3);
+    --info-border-soft: rgba(96, 165, 250, 0.3);
+
+    /* Neutral status backgrounds (idle/inactive states) */
+    --status-neutral-bg: rgba(107, 114, 128, 0.08);
+    --status-neutral-border: rgba(107, 114, 128, 0.2);
+    --status-neutral-dot: var(--text-tertiary);
+
+    /* Status indicator backgrounds */
+    --status-success-bg: rgba(34, 197, 94, 0.15);
+    --status-info-bg: rgba(59, 130, 246, 0.15);
+    --status-error-bg: rgba(239, 68, 68, 0.15);
+    --status-warning-bg: rgba(245, 158, 11, 0.15);
+    --status-none-bg: rgba(107, 114, 128, 0.08);
+    --status-none-text: var(--text-tertiary);
+    --status-none-border: rgba(107, 114, 128, 0.2);
+
+    /* Role tag colors */
+    --role-tag-default-bg: rgba(107, 114, 128, 0.12);
+    --role-tag-default-border: rgba(107, 114, 128, 0.25);
+    --role-tag-default-text: var(--text-muted);
+    --role-tag-pink-bg: rgba(236, 72, 153, 0.12);
+    --role-tag-pink-border: rgba(236, 72, 153, 0.25);
+    --role-tag-pink-text: #F472B6;
+    --role-tag-rose-bg: rgba(244, 114, 182, 0.12);
+    --role-tag-rose-border: rgba(244, 114, 182, 0.25);
+    --role-tag-rose-text: #F9A8D4;
+    --role-tag-blue-bg: rgba(59, 130, 246, 0.12);
+    --role-tag-blue-border: rgba(59, 130, 246, 0.25);
+    --role-tag-blue-text: #60A5FA;
+    --role-tag-purple-bg: rgba(139, 92, 246, 0.12);
+    --role-tag-purple-border: rgba(139, 92, 246, 0.25);
+    --role-tag-purple-text: #A78BFA;
+    --role-tag-green-bg: rgba(34, 197, 94, 0.12);
+    --role-tag-green-border: rgba(34, 197, 94, 0.25);
+    --role-tag-green-text: #4ADE80;
+    --role-tag-red-bg: rgba(239, 68, 68, 0.12);
+    --role-tag-red-border: rgba(239, 68, 68, 0.25);
+    --role-tag-red-text: #F87171;
+    --role-tag-orange-bg: rgba(251, 146, 60, 0.12);
+    --role-tag-orange-border: rgba(251, 146, 60, 0.25);
+    --role-tag-orange-text: #FB923C;
+
+    /* Icon stroke colors */
+    --icon-success: #22C55E;
+    --icon-warning: #F59E0B;
+    --icon-info: #3B82F6;
+
+    /* Brand colors (GPU / hardware) */
+    --brand-nvidia: #76b900;
+    --brand-amd: #ed1c24;
+    --brand-intel: #0071c5;
+    --brand-apple: #a2aaad;
+
+    /* Overlays */
+    --overlay-bg: rgba(0, 0, 0, 0.4);
+    --overlay-bg-strong: rgba(0, 0, 0, 0.5);
+
+    /* Translucents */
+    --glass-white-04: rgba(255, 255, 255, 0.04);
+    --glass-white-06: rgba(255, 255, 255, 0.06);
+    --glass-white-08: rgba(255, 255, 255, 0.08);
+    --glass-white-10: rgba(255, 255, 255, 0.10);
+    --glass-white-12: rgba(255, 255, 255, 0.12);
+    --glass-white-15: rgba(255, 255, 255, 0.15);
+    --glass-white-20: rgba(255, 255, 255, 0.20);
+    --glass-white-25: rgba(255, 255, 255, 0.25);
+    --glass-white-30: rgba(255, 255, 255, 0.30);
+    --glass-white-40: rgba(255, 255, 255, 0.40);
+    --glass-white-50: rgba(255, 255, 255, 0.50);
+    --glass-white-95: rgba(255, 255, 255, 0.95);
+    --glass-black-04: rgba(0, 0, 0, 0.04);
+    --glass-black-05: rgba(0, 0, 0, 0.05);
+    --glass-black-06: rgba(0, 0, 0, 0.06);
+    --glass-black-08: rgba(0, 0, 0, 0.08);
+    --glass-black-10: rgba(0, 0, 0, 0.10);
+    --glass-black-12: rgba(0, 0, 0, 0.12);
+    --glass-black-15: rgba(0, 0, 0, 0.15);
+    --glass-black-20: rgba(0, 0, 0, 0.20);
+    --glass-black-25: rgba(0, 0, 0, 0.25);
+    --glass-black-30: rgba(0, 0, 0, 0.30);
+    --glass-black-35: rgba(0, 0, 0, 0.35);
+    --glass-black-40: rgba(0, 0, 0, 0.40);
+    --glass-black-50: rgba(0, 0, 0, 0.50);
+    --glass-black-60: rgba(0, 0, 0, 0.60);
+    --glass-black-70: rgba(0, 0, 0, 0.70);
+    --glass-black-80: rgba(0, 0, 0, 0.80);
+    --glass-black-90: rgba(0, 0, 0, 0.90);
+    --glass-black-95: rgba(0, 0, 0, 0.95);
+
+    /* P1-8 L-01: Modular Scale 4px-base Spacing Tokens — full range */
+    --space-0: 0;
+    --space-0-5: 2px;
+    --space-1: 4px;
+    --space-1-5: 6px;
+    --space-2: 8px;
+    --space-2-5: 10px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-7: 28px;
+    --space-8: 32px;
+    --space-9: 36px;
+    --space-10: 40px;
+    --space-11: 44px;
+    --space-12: 48px;
+    --space-14: 56px;
+    --space-16: 64px;
+    --space-20: 80px;
+    --space-24: 96px;
+
+    /* Semantic spacing aliases — 2nd layer of dual-token system */
+    --spacing-xs: var(--space-1);
+    --spacing-sm: var(--space-2);
+    --spacing-md: var(--space-4);
+    --spacing-lg: var(--space-6);
+    --spacing-xl: var(--space-8);
+    --spacing-2xl: var(--space-12);
+    --spacing-3xl: var(--space-16);
+
+    /* Form spacing — now unified with spacing tokens */
+    --spacing-form-group: var(--space-5);
+    --spacing-form-item: var(--space-2);
+
+    /* Layout dimensions */
+    --sidebar-width: 240px;
+    --sidebar-collapsed-width: 60px;
+    --top-bar-height: var(--space-14);          /* 56px */
+    --main-content-padding: var(--space-5) var(--space-6);
+    --audio-player-height: var(--space-16);     /* 64px */
+    --touch-target-min: var(--space-9);         /* 36px */
+
+    /* Scroll anchor offset for sticky top bar (UX fix: L-02) */
+    --scroll-offset: calc(var(--top-bar-height) + var(--space-6));
+
+    /* Focus ring */
+    --shadow-focus: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent-primary);
+    --shadow-focus-danger: 0 0 0 2px var(--bg-primary), 0 0 0 4px rgba(239, 68, 68, 0.35);
+    --shadow-focus-error: 0 0 0 1px var(--bg-primary), 0 0 0 3px rgba(220, 38, 38, 0.35);
+
+    /* Radius */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+    --radius-full: 9999px;
+
+    /* Shadows - 多层阴影表达深度 */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+    --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+    --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-glow: 0 0 16px var(--primary-glow);
+    --shadow-glow-strong: 0 0 24px var(--primary-glow-strong);
+
+    /* Glow effects - 大幅降低发光强度，减少视觉疲劳 */
+    --glow-xs: rgba(99, 68, 163, 0.02);
+    --glow-sm: rgba(99, 68, 163, 0.03);
+    --glow-md: rgba(99, 68, 163, 0.045);
+    --glow-lg: rgba(99, 68, 163, 0.06);
+    --glow-text: transparent;
+
+    /* Easing & Duration */
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+    --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+    --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --duration-fast: 120ms;
+    --duration-normal: 150ms;
+    --duration-slow: 250ms;
+    --duration-entrance: 180ms;
+
+    /* Looping / decorative animation durations */
+    --duration-spin: 800ms;
+    --duration-spin-fast: 600ms;
+    --duration-pulse: 1500ms;
+    --duration-breathe: 2000ms;
+    --duration-skeleton: 1800ms;
+
+    /* Font families */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --font-display: var(--font-sans);
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+    /* Font sizes */
+    --font-size-xs: 0.75rem;     /* 12px - unchanged */
+    --font-size-sm: 0.8125rem;   /* 13px - unchanged */
+    --font-size-base: 0.875rem;  /* 14px - was 0.875rem OK */
+    --font-size-md: 1rem;        /* 16px - was 1rem OK */
+    --font-size-lg: 1.125rem;    /* 18px - was 1.125rem (20px→18px), 修正 */
+    --font-size-xl: 1.25rem;     /* 20px OK */
+    --font-size-2xl: 1.375rem;   /* 22px - NEW level */
+    --font-size-4xl: 1.5rem;     /* 24px - h1 */
+
+    /* Typography scale - semantic font hierarchy (优化层级更和谐) */
+    --font-h1: 1.125rem;     /* 18px */
+    --font-h1-weight: 700;
+    --font-h2: 0.9375rem;    /* 15px */
+    --font-h2-weight: 600;
+    --font-h3: 0.875rem;     /* 14px */
+    --font-h3-weight: 600;
+    --font-body: 0.8125rem;    /* 13px */
+    --font-body-weight: 400;
+    --font-small: 0.75rem;      /* 12px */
+    --font-small-weight: 400;
+    --font-micro: 0.6875rem;   /* 11px */
+    --font-micro-weight: 400;
+
+    /* Legacy font-size aliases (kept for compatibility) */
+    --text-xs: var(--font-size-xs);
+    --text-sm: var(--font-size-sm);
+    --text-base: var(--font-size-base);
+    --text-md: var(--font-size-md);
+    --text-lg: var(--font-size-lg);
+    --text-xl: var(--font-size-xl);
+    --text-2xl: var(--font-size-2xl);
+    --text-3xl: 1.75rem;
+    --text-4xl: var(--font-size-4xl);
+    --text-5xl: 2.25rem;
+
+    /* Line height */
+    --leading-tight: 1.3;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.6;
+    --leading-loose: 1.7;
+
+    /* Icon sizes */
+    --icon-sm: 14px;
+    --icon-md: 18px;
+    --icon-lg: 22px;
+    --icon-xl: 28px;
+
+    /* Blur */
+    --blur-sm: 8px;
+    --blur-md: 12px;
+    --blur-lg: 16px;
+    --blur-xl: 20px;
+    --blur-surface: 16px;
+
+    /* Scrollbar */
+    --scrollbar-thumb: rgba(107, 114, 128, 0.28);
+    --scrollbar-thumb-hover: rgba(107, 114, 128, 0.45);
+    --scrollbar-width: 10px;
+
+    /* Selection */
+    --selection-bg: rgba(99, 68, 163, 0.2);
+    --selection-text: inherit;
+
+    /* Code block */
+    --code-bg: #F3F4F6;
+    --code-border: var(--border-subtle);
+    --code-color: var(--accent-primary);
+
+    /* Toggle switch */
+    --toggle-off-bg: var(--border-subtle);
+    --toggle-on-bg: var(--accent-primary);
+    --toggle-knob-bg: #FFFFFF;
+    --toggle-border: var(--border-medium);
+    --toggle-knob-shadow: rgba(0, 0, 0, 0.2);
+    --toggle-track-shadow: rgba(0, 0, 0, 0.1);
+
+    /* Audio player accents */
+    --audio-border: rgba(99, 68, 163, 0.15);
+    --audio-note-color: var(--accent-primary);
+
+    /* Gradient tokens — 提升饱和度与层次感 */
+    --gradient-primary: linear-gradient(135deg, #6344A3, #7C5CBF);
+    --gradient-primary-hover: linear-gradient(135deg, #4C3D80, #6344A3);
+    --gradient-primary-active: linear-gradient(135deg, #9B80D4, #6344A3);
+    --gradient-tag-border: linear-gradient(135deg, rgba(99, 68, 163, 0.5), rgba(124, 92, 191, 0.5));
+
+    /* Waveform colors (for Canvas drawing) — 更新品牌色 */
+    --waveform-static-fill: rgba(99, 68, 163, 0.5);
+    --waveform-bg-bar: rgba(99, 68, 163, 0.15);
+    --waveform-gradient-start: rgba(99, 68, 163, 0.9);
+    --waveform-gradient-mid: rgba(124, 92, 191, 0.8);
+    --waveform-gradient-end: rgba(99, 68, 163, 0.9);
+    --waveform-playhead: #FFFFFF;
+    --clip-region-fill: rgba(5, 150, 105, 0.2);
+    --clip-region-stroke: #059669;
+
+    /* Toast notification colors */
+    --toast-success-bg: #10B981;
+    --toast-error-bg: #EF4444;
+    --toast-warning-bg: #F59E0B;
+    --toast-info-bg: #3B82F6;
+    --toast-text: #FFFFFF;
+
+    /* ============================================================
+       DEPRECATED TOKENS - Scheduled for removal
+       These tokens are legacy aliases. Use the replacement tokens listed below.
+       --primary → --accent-primary
+       --primary-hover → --accent-primary with darken
+       --primary-light → --primitive-cyan-300
+       --primary-bg → rgba(93,74,124,0.08) or var(--accent-primary) with opacity
+       --primary-ring → rgba(93,74,124,0.25)
+       --primary-glow → rgba(93,74,124,0.08)
+       --primary-glow-strong → rgba(93,74,124,0.15)
+       ============================================================ */
+}
+
+/* ============================================================
+   Dark Theme (html.dark)
+   ============================================================ */
+html.dark {
+    /* ============================================================
+       Semantic Colors - Meaning-based tokens (Dark overrides)
+       ============================================================ */
+
+    /* Core surface tokens — 微调背景色减少纯黑刺眼感 */
+    --bg-primary: #0F1117;
+    --bg-secondary: var(--primitive-dark-800);
+    --bg-tertiary: var(--primitive-dark-700);
+    --bg-elevated: var(--primitive-dark-600);
+    --bg-input: var(--primitive-dark-700);
+    --bg-input-focus: var(--primitive-dark-600);
+    --bg-card: var(--primitive-dark-800);
+    --bg-placeholder: var(--primitive-dark-700);
+    --bg-glass: rgba(19, 22, 27, 0.88);
+    --bg-glass-light: rgba(26, 30, 36, 0.8);
+
+    /* Core text tokens — 优化对比度舒适度，达到 WCAG 2.1 AA 标准
+       --text-primary: ≈ 7:1 (满足 AAA 正常文本)
+       --text-secondary: ≈ 5.5:1 (满足 AA 正常文本)
+       --text-muted: ≈ 4.2:1 (辅助文本，接近 AA) */
+    --text-primary: #C9D1D9;
+    --text-secondary: #A8B0BC;
+    --text-muted: #96A0B0;
+    --text-tertiary: #94A0B0;
+    --text-disabled: var(--primitive-dark-400);
+    --text-on-primary: #0B0D10;
+    --text-on-accent: #0B0D10;
+    --text-on-warning: #0B0D10;
+
+    /* Core border tokens */
+    --border-subtle: #2A2F38;
+    --border-medium: #3F4750;
+    --border-default: var(--border-medium);
+    --border-focus: var(--primitive-cyan-400);
+    --border-error: var(--primitive-red-500);
+
+    /* Accent / functional tokens */
+    --accent-primary: var(--primitive-cyan-400);
+    --accent-warning: var(--primitive-amber-500);
+    --accent-error: var(--primitive-red-500);
+    --accent-destructive: var(--accent-error);
+    --accent-success: var(--primitive-green-400);
+    --accent-info: var(--primitive-blue-400);
+
+    /* DEPRECATED: Primary alias (legacy compatibility, maps to accent-primary) — use --accent-primary */
+    --primary: var(--accent-primary);
+    /* DEPRECATED: use --accent-primary-hover */
+    --primary-hover: #BDA6E6;
+    /* DEPRECATED: use semantic token instead */
+    --primary-light: #DDD0F0;
+    /* DEPRECATED: use semantic token instead */
+    --primary-bg: rgba(155, 128, 212, 0.1);
+    /* DEPRECATED: use semantic token instead */
+    --primary-ring: rgba(155, 128, 212, 0.25);
+    /* DEPRECATED: use semantic token instead */
+    --primary-glow: rgba(155, 128, 212, 0.05);
+    /* DEPRECATED: use semantic token instead */
+    --primary-glow-strong: rgba(155, 128, 212, 0.08);
+    --primary-glow-subtle: rgba(155, 128, 212, 0.02);
+    --primitive-blue-400-rgb: 96, 165, 250;
+
+    /* ============================================================
+       Component Colors - UI-element tokens (Dark overrides)
+       ============================================================ */
+
+    /* Button hierarchy */
+    --btn-primary-bg: var(--accent-primary);
+    --btn-primary-hover: var(--primary-hover);
+    --btn-secondary-bg: transparent;
+    --btn-secondary-hover: var(--bg-tertiary);
+    --btn-danger-bg: var(--accent-error);
+    --btn-danger-hover: #F87171;
+    --btn-success-bg: var(--accent-success);
+    --btn-success-hover: #34D399;
+
+    /* Semantic color aliases */
+    --color-success: var(--accent-success);
+    --color-success-light: #6EE7B7;
+    --color-warning: var(--accent-warning);
+    --color-warning-light: #FDE68A;
+    --color-error: var(--accent-error);
+    --color-error-light: #FCA5A5;
+    --color-info: var(--accent-info);
+    --color-info-light: #93C5FD;
+
+    --success-bg: rgba(52, 211, 153, 0.1);
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --warning-border: rgba(245, 158, 11, 0.25);
+    --warning-text: var(--accent-warning);
+    --error-bg: rgba(239, 68, 68, 0.1);
+    --info-bg: rgba(96, 165, 250, 0.1);
+
+    /* Soft status borders (toasts, badges) */
+    --success-border-soft: rgba(52, 211, 153, 0.35);
+    --warning-border-soft: rgba(251, 191, 36, 0.35);
+    --error-border-soft: rgba(248, 113, 113, 0.35);
+    --info-border-soft: rgba(96, 165, 250, 0.35);
+
+    /* Neutral status backgrounds (idle/inactive states) */
+    --status-neutral-bg: rgba(107, 114, 128, 0.1);
+    --status-neutral-border: rgba(107, 114, 128, 0.25);
+    --status-neutral-dot: var(--text-tertiary);
+
+    /* Status indicator backgrounds */
+    --status-success-bg: rgba(52, 211, 153, 0.15);
+    --status-info-bg: rgba(96, 165, 250, 0.15);
+    --status-error-bg: rgba(248, 113, 113, 0.15);
+    --status-warning-bg: rgba(251, 191, 36, 0.15);
+    --status-none-bg: rgba(107, 114, 128, 0.1);
+    --status-none-text: var(--text-tertiary);
+    --status-none-border: rgba(107, 114, 128, 0.25);
+
+    /* Status indicator borders */
+    --status-success-border: var(--success-border-soft);
+    --status-warning-border: var(--warning-border-soft);
+    --status-error-border: var(--error-border-soft);
+    --status-info-border: var(--info-border-soft);
+
+    /* Role tag colors */
+    --role-tag-default-bg: rgba(107, 114, 128, 0.12);
+    --role-tag-default-border: rgba(107, 114, 128, 0.25);
+    --role-tag-default-text: var(--text-muted);
+    --role-tag-pink-bg: rgba(236, 72, 153, 0.15);
+    --role-tag-pink-border: rgba(236, 72, 153, 0.3);
+    --role-tag-pink-text: #F472B6;
+    --role-tag-rose-bg: rgba(244, 114, 182, 0.15);
+    --role-tag-rose-border: rgba(244, 114, 182, 0.3);
+    --role-tag-rose-text: #F9A8D4;
+    --role-tag-blue-bg: rgba(59, 130, 246, 0.15);
+    --role-tag-blue-border: rgba(59, 130, 246, 0.3);
+    --role-tag-blue-text: #60A5FA;
+    --role-tag-purple-bg: rgba(139, 92, 246, 0.15);
+    --role-tag-purple-border: rgba(139, 92, 246, 0.3);
+    --role-tag-purple-text: #A78BFA;
+    --role-tag-green-bg: rgba(34, 197, 94, 0.15);
+    --role-tag-green-border: rgba(34, 197, 94, 0.3);
+    --role-tag-green-text: #4ADE80;
+    --role-tag-red-bg: rgba(239, 68, 68, 0.15);
+    --role-tag-red-border: rgba(239, 68, 68, 0.3);
+    --role-tag-red-text: #F87171;
+    --role-tag-orange-bg: rgba(251, 146, 60, 0.15);
+    --role-tag-orange-border: rgba(251, 146, 60, 0.3);
+    --role-tag-orange-text: #FB923C;
+
+    /* Icon stroke colors */
+    --icon-success: #34D399;
+    --icon-warning: #FBBF24;
+    --icon-info: #60A5FA;
+
+    /* Brand colors (GPU / hardware) */
+    --brand-nvidia: #76b900;
+    --brand-amd: #ed1c24;
+    --brand-intel: #0071c5;
+    --brand-apple: #a2aaad;
+
+    /* Overlays */
+    --overlay-bg: rgba(0, 0, 0, 0.6);
+    --overlay-bg-strong: rgba(0, 0, 0, 0.7);
+
+    /* Translucents */
+    --glass-white-04: rgba(255, 255, 255, 0.02);
+    --glass-white-06: rgba(255, 255, 255, 0.04);
+    --glass-white-08: rgba(255, 255, 255, 0.05);
+    --glass-white-10: rgba(255, 255, 255, 0.06);
+    --glass-white-12: rgba(255, 255, 255, 0.07);
+    --glass-white-15: rgba(255, 255, 255, 0.10);
+    --glass-white-20: rgba(255, 255, 255, 0.12);
+    --glass-white-25: rgba(255, 255, 255, 0.15);
+    --glass-white-30: rgba(255, 255, 255, 0.18);
+    --glass-white-40: rgba(255, 255, 255, 0.22);
+    --glass-white-50: rgba(255, 255, 255, 0.25);
+    --glass-white-95: rgba(255, 255, 255, 0.05);
+    --glass-black-04: rgba(0, 0, 0, 0.10);
+    --glass-black-05: rgba(0, 0, 0, 0.12);
+    --glass-black-06: rgba(0, 0, 0, 0.15);
+    --glass-black-08: rgba(0, 0, 0, 0.20);
+    --glass-black-10: rgba(0, 0, 0, 0.25);
+    --glass-black-12: rgba(0, 0, 0, 0.30);
+    --glass-black-15: rgba(0, 0, 0, 0.35);
+    --glass-black-20: rgba(0, 0, 0, 0.40);
+    --glass-black-25: rgba(0, 0, 0, 0.45);
+    --glass-black-30: rgba(0, 0, 0, 0.50);
+    --glass-black-35: rgba(0, 0, 0, 0.55);
+    --glass-black-40: rgba(0, 0, 0, 0.60);
+    --glass-black-50: rgba(0, 0, 0, 0.70);
+    --glass-black-60: rgba(0, 0, 0, 0.75);
+    --glass-black-70: rgba(0, 0, 0, 0.80);
+    --glass-black-80: rgba(0, 0, 0, 0.85);
+    --glass-black-90: rgba(0, 0, 0, 0.92);
+    --glass-black-95: rgba(0, 0, 0, 0.98);
+
+    /* Focus ring */
+    --shadow-focus: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent-primary);
+
+    /* Shadows (enhanced for dark theme depth perception) */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.02) inset;
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+    --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.25), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    --shadow-elevated: 0 6px 20px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+    --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-glow: 0 0 12px rgba(155, 128, 212, 0.04);
+    --shadow-glow-strong: 0 0 18px rgba(155, 128, 212, 0.06);
+
+    /* Glow effects - dark theme: 大幅降低发光强度，减少视觉疲劳 */
+    --glow-xs: rgba(155, 128, 212, 0.02);
+    --glow-sm: rgba(155, 128, 212, 0.03);
+    --glow-md: rgba(155, 128, 212, 0.045);
+    --glow-lg: rgba(155, 128, 212, 0.06);
+    --glow-text: transparent;
+
+    /* Scrollbar */
+    --scrollbar-thumb: rgba(168, 176, 188, 0.25);
+    --scrollbar-thumb-hover: rgba(168, 176, 188, 0.45);
+
+    /* Selection */
+    --selection-bg: rgba(155, 128, 212, 0.25);
+    --selection-text: var(--text-primary);
+
+    /* Code block */
+    --code-bg: #1A1E24;
+    --code-border: var(--border-subtle);
+    --code-color: var(--accent-primary);
+
+    /* Toggle switch */
+    --toggle-off-bg: var(--border-subtle);
+    --toggle-on-bg: var(--accent-primary);
+    --toggle-knob-bg: #FFFFFF;
+    --toggle-border: var(--border-medium);
+    --toggle-knob-shadow: rgba(0, 0, 0, 0.3);
+    --toggle-track-shadow: rgba(0, 0, 0, 0.2);
+
+    /* Audio player accents */
+    --audio-border: rgba(155, 128, 212, 0.15);
+    --audio-note-color: var(--accent-primary);
+
+    /* Gradient tokens */
+    --gradient-primary: linear-gradient(135deg, #9B80D4, #7C5CBF);
+    --gradient-primary-hover: linear-gradient(135deg, #BDA6E6, #9B80D4);
+    --gradient-primary-active: linear-gradient(135deg, #DDD0F0, #9B80D4);
+    --gradient-tag-border: linear-gradient(135deg, rgba(155, 128, 212, 0.5), rgba(124, 92, 191, 0.5));
+
+    /* Waveform colors (for Canvas drawing) */
+    --waveform-static-fill: rgba(155, 128, 212, 0.5);
+    --waveform-bg-bar: rgba(155, 128, 212, 0.15);
+    --waveform-gradient-start: rgba(155, 128, 212, 0.9);
+    --waveform-gradient-mid: rgba(124, 92, 191, 0.8);
+    --waveform-gradient-end: rgba(155, 128, 212, 0.9);
+    --waveform-playhead: #FFFFFF;
+    --clip-region-fill: rgba(52, 211, 153, 0.2);
+    --clip-region-stroke: #34D399;
+
+    /* Toast notification colors */
+    --toast-success-bg: #34D399;
+    --toast-error-bg: #EF4444;
+    --toast-warning-bg: #FBBF24;
+    --toast-info-bg: #60A5FA;
+    --toast-text: #0B0D10;
+}

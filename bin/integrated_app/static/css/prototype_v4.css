@@ -1,0 +1,2578 @@
+/* ============================================================
+   Prototype V4 Theme - TTS MultiModel
+   ------------------------------------------------------------
+   将 prototype-v4-complete.html 的视觉设计令牌和组件样式
+   集成到项目中。所有样式作用域限定在 `.pv-theme` 包装器内，
+   避免与项目现有 CSS（main.css / styles.css / components.css
+   / beautify.css / tabs.css）发生冲突。
+
+   使用方式：
+     <div class="pv-theme">
+       <div class="card">...</div>
+       <button class="btn btn-p">...</button>
+     </div>
+
+   CSS 变量在 .pv-theme 上声明，所有后代元素继承使用。
+   ============================================================ */
+
+/* ============================================================
+   1. CSS Variables - 设计令牌
+   ------------------------------------------------------------
+   统一引用全局语义化变量 (variables.css)，
+   避免重复定义导致的色彩不一致和暗色模式 Bug。
+   ============================================================ */
+
+/* Light Theme (default) - 全部引用全局语义化变量 */
+.pv-theme {
+    /* Layout dimensions - 引用全局 */
+    --pv-radius: var(--radius-md);
+    --pv-radius-sm: var(--radius-sm);
+
+    /* Typography - 引用全局 */
+    --font: var(--font-sans);
+    --mono: var(--font-mono);
+
+    /* Brand color ramp - 引用全局原始色（向后兼容） */
+    --p50: var(--primitive-purple-50, #F5F3FA);
+    --p100: var(--primitive-purple-200, #E8E4F0);
+    --p200: var(--primitive-purple-200, #D0C9E3);
+    --p300: var(--primitive-purple-300, #B8ADD6);
+    --p400: var(--primitive-purple-400, #9B8EC4);
+    --p500: var(--accent-primary);
+    --p600: var(--primitive-purple-600, #6B5B9E);
+    --p700: var(--primitive-purple-700, #5A4A8A);
+    --p800: var(--primitive-purple-700, #463762);
+
+    /* Surface tokens - 引用全局语义化变量 */
+    --bg: var(--bg-primary);
+    --bg2: var(--bg-card);
+    --bg3: var(--bg-tertiary);
+    --bg-input: var(--bg-input);
+    --bg-hover: var(--bg-tertiary);
+    --bg-active: var(--primary-bg);
+
+    /* Text tokens - 引用全局语义化变量 */
+    --t1: var(--text-primary);
+    --t2: var(--text-secondary);
+    --t3: var(--text-muted);
+    --t-brand: var(--accent-primary);
+
+    /* Border & shadow - 引用全局 */
+    --border: var(--border-default);
+    --border-lt: var(--border-subtle);
+    --shadow: var(--shadow-sm);
+    --shadow2: var(--shadow-md);
+
+    /* Status colors - 引用全局 */
+    --green: var(--accent-success);
+    --red: var(--accent-error);
+    --orange: var(--accent-warning);
+}
+
+/* Dark Theme - 全局 html.dark 已覆盖变量，此处只需确保继承正确 */
+html.dark .pv-theme,
+.pv-theme.dark {
+    /* 所有变量自动从 html.dark 的全局变量继承，无需重复定义 */
+}
+
+/* ============================================================
+   2. Base Typography (scoped)
+   ============================================================ */
+
+.pv-theme {
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--t1);
+    background: var(--bg);
+}
+
+.pv-theme input,
+.pv-theme select,
+.pv-theme textarea,
+.pv-theme button {
+    font-family: var(--font);
+    font-size: 13px;
+}
+
+.pv-theme .fl,
+.pv-theme label {
+    color: var(--t2);
+}
+
+/* ============================================================
+   3. Layout Containers
+   ============================================================ */
+
+.pv-theme .two-col {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.pv-theme .two-col .col-form {
+    flex: 3;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 2px;
+}
+
+.pv-theme .two-col .col-result {
+    flex: 2;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pv-theme .full-width {
+    width: 100%;
+}
+
+.pv-theme .page {
+    padding: 0;
+    min-height: 100%;
+}
+
+/* ============================================================
+   4. Cards
+   ============================================================ */
+
+.pv-theme .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 12px);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .04), 0 1px 2px rgba(0, 0, 0, .03);
+    transition: box-shadow .2s ease, transform .2s ease;
+}
+
+.pv-theme .card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .06), 0 2px 4px rgba(0, 0, 0, .04);
+}
+
+.pv-theme .card-hdr {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-lt);
+    font-weight: var(--font-h2-weight, 600);
+    font-size: var(--font-h2, 1rem);
+    color: var(--t1);
+}
+
+.pv-theme .card-hdr .ico {
+    color: var(--p500);
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.pv-theme .card-body {
+    padding: 12px 14px;
+}
+
+/* ============================================================
+   5. Form Elements
+   ============================================================ */
+
+.pv-theme .fg {
+    margin-bottom: var(--spacing-form-group, 20px);
+    line-height: 1.6;
+}
+
+.pv-theme .fg:last-child {
+    margin-bottom: 0;
+}
+
+.pv-theme .fl {
+    display: block;
+    font-size: var(--font-small, 0.75rem);
+    font-weight: var(--font-h3-weight, 600);
+    color: var(--t2);
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.pv-theme .fh {
+    font-size: 11px;
+    color: var(--t3);
+    margin-top: 2px;
+    line-height: 1.5;
+}
+
+.pv-theme .fi,
+.pv-theme .fs,
+.pv-theme .ft {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--border-medium, var(--border));
+    border-radius: var(--radius-md, 8px);
+    background: var(--bg-input);
+    color: var(--t1);
+    outline: 0;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.pv-theme .fi:focus,
+.pv-theme .fs:focus,
+.pv-theme .ft:focus {
+    border-color: var(--accent-primary, var(--p600));
+    box-shadow: 0 0 0 3px rgba(99, 68, 163, 0.1);
+}
+
+.pv-theme .ft {
+    resize: vertical;
+    min-height: 70px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.pv-theme .fs {
+    appearance: auto;
+    cursor: pointer;
+}
+
+.pv-theme .cc {
+    font-size: 11px;
+    color: var(--t3);
+    margin-top: 3px;
+    text-align: right;
+}
+
+.pv-theme .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.pv-theme .form-col {
+    /* grid column container */
+}
+
+/* ============================================================
+   6. Sub Tabs
+   ============================================================ */
+
+.pv-theme .stabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-lt);
+    position: relative;
+}
+
+.pv-theme .stab {
+    padding: 7px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--t2);
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+    transition: color .2s ease, border-color .2s ease, transform .2s ease;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    position: relative;
+    line-height: 1.4;
+}
+
+.pv-theme .stab:hover {
+    color: var(--t1);
+}
+
+.pv-theme .stab.active {
+    color: var(--t-brand);
+    border-bottom-color: var(--p600);
+    font-weight: 600;
+}
+
+/* ============================================================
+   7. Tag Pills
+   ============================================================ */
+
+.pv-theme .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0;
+}
+
+.pv-theme .tag {
+    position: relative;
+    padding: 6px 14px 6px 26px !important;
+    border-radius: var(--radius-full, 9999px) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    border: 1.5px solid var(--border) !important;
+    background: var(--bg2) !important;
+    cursor: pointer !important;
+    color: var(--t2) !important;
+    transition: all 0.15s ease !important;
+}
+
+.pv-theme .tag::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid var(--border-medium);
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.pv-theme .tag:hover {
+    border-color: var(--accent-primary) !important;
+    color: var(--accent-primary) !important;
+    background: var(--primary-bg) !important;
+}
+
+.pv-theme .tag:hover::before {
+    border-color: var(--accent-primary);
+}
+
+.pv-theme .tag.active {
+    border-color: var(--accent-primary) !important;
+    background: linear-gradient(135deg, var(--accent-primary, #7C5CBF), var(--color-accent-secondary, #9333EA)) !important;
+    color: var(--text-on-primary, #fff) !important;
+    font-weight: 600 !important;
+    box-shadow: 0 0 0 2px rgba(124, 92, 191, .15),
+                0 3px 10px rgba(124, 92, 191, .25),
+                inset 0 1px 0 rgba(255, 255, 255, .12) !important;
+    transform: translateY(-1px);
+    animation: tagPulse 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes tagPulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05) translateY(-1px);
+    }
+    100% {
+        transform: scale(1) translateY(-1px);
+    }
+}
+
+.pv-theme .tag.active::before {
+    border-color: var(--text-on-primary, #fff);
+    background: var(--text-on-primary, #fff);
+    box-shadow: inset 0 0 0 2px var(--accent-primary);
+    width: 10px;
+    height: 10px;
+}
+
+/* ============================================================
+   8. Buttons
+   ============================================================ */
+
+.pv-theme .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border-radius: var(--radius-md, 8px);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all .15s;
+    white-space: nowrap;
+}
+
+.pv-theme .btn-p {
+    background: linear-gradient(135deg, var(--p700), var(--p500));
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(90, 74, 138, .25);
+}
+
+.pv-theme .btn-p:hover {
+    box-shadow: 0 3px 10px rgba(90, 74, 138, .35);
+    transform: translateY(-1px);
+}
+
+.pv-theme .btn-p:active {
+    transform: translateY(0);
+}
+
+.pv-theme .btn-full {
+    width: 100%;
+}
+
+.pv-theme .btn-o {
+    background: var(--bg2);
+    color: var(--t2);
+    border-color: var(--border);
+}
+
+.pv-theme .btn-o:hover {
+    border-color: var(--p300);
+    color: var(--t-brand);
+}
+
+.pv-theme .btn-sm {
+    padding: 4px 10px;
+    font-size: 11px;
+}
+
+.pv-theme .btn-generate {
+    width: 100%;
+    padding: 14px 20px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    background: var(--gradient-primary, linear-gradient(135deg, var(--p600, #7C5CBF), var(--p500, #9B80D4))) !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: var(--radius-lg, 12px) !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 14px rgba(124, 92, 191, 0.22),
+                0 2px 4px rgba(124, 92, 191, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.02em;
+}
+
+.pv-theme .btn-generate::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+    transition: left 0.6s ease;
+    pointer-events: none;
+}
+
+.pv-theme .btn-generate:hover {
+    box-shadow: 0 8px 28px rgba(124, 92, 191, 0.45),
+                0 4px 12px rgba(124, 92, 191, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    transform: translateY(-2px);
+    filter: brightness(1.08);
+}
+
+.pv-theme .btn-generate:hover::before {
+    left: 100%;
+}
+
+.pv-theme .btn-generate:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 12px rgba(124, 92, 191, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    filter: brightness(0.97);
+}
+
+.pv-theme .btn-generate:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    filter: none;
+}
+
+.pv-theme .btn-generate.success {
+    background: linear-gradient(135deg, var(--accent-success, #059669), var(--color-success-light, #10B981));
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.pv-theme .btn-generate.success::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: btn-shimmer 0.6s ease-out;
+    pointer-events: none;
+}
+
+@keyframes btn-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.pv-theme .gen-hint {
+    text-align: center;
+    font-size: 10px;
+    color: var(--t3);
+    margin-top: 3px;
+}
+
+/* ============================================================
+   9. Collapsible Sections - 折叠面板
+   ============================================================ */
+
+.pv-theme .collapse-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 12px 14px;
+    color: var(--text-secondary, #6B7280);
+    font-size: 13px;
+    font-weight: 600;
+    user-select: none;
+    background: var(--bg-tertiary, #F3F4F6);
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--border-subtle, #E5E7EB);
+    transition: all 0.2s ease;
+    margin: 8px 0;
+}
+
+.pv-theme .collapse-header:hover {
+    color: var(--text-primary, #111827);
+    background: var(--bg-hover, #E5E7EB);
+    border-color: var(--border-default, #D1D5DB);
+}
+
+.pv-theme .collapse-header:active {
+    transform: scale(0.99);
+}
+
+.pv-theme .collapse-header svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.pv-theme .collapse-header.open svg {
+    transform: rotate(180deg);
+}
+
+.pv-theme .collapse-header.open {
+    background: var(--bg-secondary, #F9FAFB);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    margin-bottom: 0;
+}
+
+.pv-theme .collapse-body {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease;
+}
+
+.pv-theme .collapse-body.open {
+    max-height: 1000px;
+    opacity: 1;
+    padding-top: 12px;
+}
+
+/* 暗色模式折叠面板 */
+html.dark .pv-theme .collapse-header {
+    background: var(--bg-tertiary, #1F2330);
+    border-color: var(--border-subtle, #2A2F3E);
+}
+
+html.dark .pv-theme .collapse-header:hover {
+    background: var(--bg-hover, #2A2F3E);
+    border-color: var(--border-default, #374151);
+}
+
+html.dark .pv-theme .collapse-header.open {
+    background: var(--bg-secondary, #232735);
+}
+
+/* ============================================================
+   10. Toggle Switch
+   ============================================================ */
+
+.pv-theme .toggle {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--border);
+    cursor: pointer;
+    position: relative;
+    transition: background .2s;
+    flex-shrink: 0;
+    border: none;
+}
+
+.pv-theme .toggle.on {
+    background: var(--p500);
+}
+
+.pv-theme .toggle::after {
+    content: '';
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: left .2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+}
+
+.pv-theme .toggle.on::after {
+    left: 18px;
+}
+
+.pv-theme .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    gap: 12px;
+}
+
+.pv-theme .toggle-row label {
+    margin-bottom: 0;
+}
+
+.pv-theme .toggle-row .fl {
+    margin-bottom: 0;
+}
+
+/* ============================================================
+   11. Result Cards
+   ============================================================ */
+
+.pv-theme .rcard {
+    background: var(--bg3);
+    border-radius: var(--pv-radius-sm);
+    padding: 8px;
+    margin-bottom: 6px;
+}
+
+.pv-theme .rcard:last-child {
+    margin-bottom: 0;
+}
+
+.pv-theme .rhdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px;
+}
+
+.pv-theme .rtitle {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--t1);
+}
+
+.pv-theme .rbadge {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--green);
+    color: #fff;
+}
+
+.pv-theme .rwave {
+    height: 32px;
+    background: var(--bg2);
+    border-radius: 4px;
+    display: flex;
+    align-items: flex-end;
+    padding: 3px 5px;
+    gap: 1px;
+    margin-bottom: 5px;
+}
+
+.pv-theme .wbar {
+    width: 2px;
+    background: var(--p400);
+    border-radius: 1px;
+}
+
+.pv-theme .racts {
+    display: flex;
+    gap: 4px;
+}
+
+.pv-theme .racts .btn {
+    flex: 1;
+    padding: 3px 6px;
+    font-size: 10px;
+}
+
+/* ============================================================
+   12. Settings Rows
+   ============================================================ */
+
+.pv-theme .srow {
+    display: flex;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border-lt);
+}
+
+.pv-theme .srow:last-child {
+    border-bottom: 0;
+}
+
+.pv-theme .sinfo {
+    flex: 1;
+}
+
+.pv-theme .sname {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--t1);
+}
+
+.pv-theme .sdesc {
+    font-size: 10px;
+    color: var(--t3);
+    margin-top: 1px;
+}
+
+.pv-theme .sctrl {
+    margin-left: 10px;
+    flex-shrink: 0;
+}
+
+.pv-theme .sinput {
+    width: 72px;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius-sm);
+    background: var(--bg-input);
+    color: var(--t1);
+    text-align: right;
+    font-size: 11px;
+    font-family: var(--mono);
+}
+
+.pv-theme .quick-nav {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.pv-theme .quick-nav a {
+    padding: 4px 12px;
+    border-radius: 14px;
+    font-size: 12px;
+    background: var(--bg3);
+    color: var(--t2);
+    border: 1px solid var(--border);
+    transition: all .15s;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.pv-theme .quick-nav a:hover {
+    border-color: var(--p300);
+    color: var(--t-brand);
+    text-decoration: none;
+}
+
+.pv-theme .settings-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-lt);
+    margin-top: 16px;
+    gap: 8px;
+}
+
+.pv-theme .progress-bar {
+    height: 8px;
+    background: var(--bg3);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.pv-theme .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--p500), var(--p400));
+    border-radius: 4px;
+    transition: width .3s ease;
+}
+
+.pv-theme .gen-progress-wrap {
+    padding: 4px 0;
+}
+
+.pv-theme .gen-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+.pv-theme .gen-progress-phase {
+    font-weight: 600;
+    color: var(--t1);
+}
+
+.pv-theme .gen-progress-pct {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--p500);
+    font-weight: 600;
+}
+
+.pv-theme .gen-progress-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-lt);
+}
+
+.pv-theme .gen-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    position: relative;
+}
+
+.pv-theme .gen-step-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 2px solid var(--border);
+    transition: all .3s ease;
+}
+
+.pv-theme .gen-step span {
+    font-size: 11px;
+    color: var(--t3);
+    white-space: nowrap;
+    transition: color .3s ease;
+}
+
+.pv-theme .gen-step.gen-step-active .gen-step-dot {
+    background: var(--p500);
+    border-color: var(--p500);
+    box-shadow: 0 0 0 4px rgba(99, 68, 163, 0.12);
+}
+
+.pv-theme .gen-step.gen-step-active span {
+    color: var(--t1);
+    font-weight: 500;
+}
+
+.pv-theme .gen-step.gen-step-done .gen-step-dot {
+    background: var(--success-500);
+    border-color: var(--success-500);
+}
+
+.pv-theme .gen-step.gen-step-done span {
+    color: var(--success-600);
+}
+
+/* ============================================================
+   13. File Upload Zone
+   ============================================================ */
+
+.pv-theme .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--pv-radius);
+    padding: 24px;
+    text-align: center;
+    color: var(--t3);
+    cursor: pointer;
+    transition: all .15s;
+}
+
+.pv-theme .upload-zone:hover {
+    border-color: var(--p400);
+    background: var(--p50);
+}
+
+.pv-theme .upload-zone.dragover {
+    border-color: var(--p500);
+    background: var(--p50);
+}
+
+.pv-theme .upload-zone svg {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 8px;
+    opacity: .4;
+}
+
+/* ============================================================
+   14. Emotion Controls (IndexTTS2)
+   ============================================================ */
+
+.pv-theme .emotion-presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 8px 0;
+}
+
+.pv-theme .emotion-pill {
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 11px;
+    cursor: pointer;
+    background: var(--bg3);
+    color: var(--t2);
+    border: 1px solid var(--border);
+    transition: all .15s;
+}
+
+.pv-theme .emotion-pill:hover {
+    border-color: var(--p300);
+    color: var(--t-brand);
+}
+
+.pv-theme .emotion-pill.active {
+    background: var(--p50);
+    border-color: var(--p400);
+    color: var(--p700);
+}
+
+.pv-theme .emotion-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.pv-theme .emotion-slider-row label {
+    width: 72px;
+    font-size: 11px;
+    margin-bottom: 0;
+    text-align: right;
+    color: var(--t2);
+}
+
+.pv-theme .emotion-slider-row input[type="range"] {
+    flex: 1;
+    height: 4px;
+    accent-color: var(--p500);
+}
+
+.pv-theme .emotion-slider-row .val {
+    width: 32px;
+    font-size: 11px;
+    color: var(--t3);
+    text-align: center;
+    font-family: var(--mono);
+}
+
+/* ============================================================
+   15. Mode Pills (Segmented Control)
+   ============================================================ */
+
+.pv-theme .mode-pills {
+    display: flex;
+    gap: 0;
+    margin-bottom: 14px;
+    background: var(--bg3);
+    border-radius: var(--pv-radius);
+    padding: 2px;
+}
+
+.pv-theme .mode-pill {
+    flex: 1;
+    padding: 7px 10px;
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: var(--pv-radius-sm);
+    color: var(--t2);
+    transition: all .15s;
+    border: none;
+    background: none;
+}
+
+.pv-theme .mode-pill:hover {
+    color: var(--t1);
+}
+
+.pv-theme .mode-pill.active {
+    background: var(--bg2);
+    color: var(--t-brand);
+    font-weight: 500;
+    box-shadow: var(--shadow);
+}
+
+.pv-theme .mode-panel {
+    display: none;
+}
+
+.pv-theme .mode-panel.active {
+    display: block;
+}
+
+/* ============================================================
+   16. Persona Grid
+   ============================================================ */
+
+.pv-theme .persona-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.pv-theme .persona-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius);
+    padding: 14px;
+    box-shadow: var(--shadow);
+    transition: box-shadow .15s, border-color .15s;
+}
+
+.pv-theme .persona-card:hover {
+    box-shadow: var(--shadow2);
+}
+
+.pv-theme .persona-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--t1);
+    margin-bottom: 2px;
+}
+
+.pv-theme .persona-card-desc {
+    font-size: 12px;
+    color: var(--t2);
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.pv-theme .persona-card-tags {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.pv-theme .persona-card-tags span {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--p50);
+    color: var(--p700);
+    border: 1px solid var(--p200);
+}
+
+.pv-theme .persona-card-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.pv-theme .btn-icon {
+    padding: 5px;
+    background: none;
+    border: none;
+    color: var(--t3);
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pv-theme .btn-icon:hover {
+    background: var(--bg-hover);
+    color: var(--t1);
+}
+
+/* ============================================================
+   17. Voice Name Row
+   ============================================================ */
+
+.pv-theme .voice-name-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    margin-top: 12px;
+}
+
+.pv-theme .voice-name-row > div:first-child {
+    flex: 1;
+}
+
+/* ============================================================
+   18. Hint Text & Empty State
+   ============================================================ */
+
+.pv-theme .hint-text {
+    font-size: 11px;
+    color: var(--t3);
+    line-height: 1.6;
+    margin: 4px 0;
+    padding: 10px 12px;
+    background: var(--bg3);
+    border-radius: var(--radius-sm, 6px);
+}
+
+.pv-theme .hint-example {
+    font-size: 11px;
+    color: var(--p500);
+    font-style: italic;
+    margin-bottom: 8px;
+}
+
+.pv-theme .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 0;
+    color: var(--t3);
+    text-align: center;
+}
+
+.pv-theme .empty-state svg {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 10px;
+    opacity: .25;
+}
+
+.pv-theme .empty-state p {
+    font-size: 12px;
+}
+
+/* ============================================================
+   19. Stats Bar (for History / LoRA / Persona pages)
+   ============================================================ */
+
+.pv-theme .stats-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.pv-theme .stat-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius);
+    padding: 10px 14px;
+    flex: 1;
+    min-width: 120px;
+}
+
+.pv-theme .stat-label {
+    font-size: 10px;
+    color: var(--t3);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+}
+
+.pv-theme .stat-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--t1);
+    font-family: var(--mono);
+}
+
+.pv-theme .stat-value .unit {
+    font-size: 11px;
+    color: var(--t3);
+    font-weight: 400;
+    margin-left: 2px;
+}
+
+/* ============================================================
+   20. Filter / Search Bar
+   ============================================================ */
+
+.pv-theme .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.pv-theme .filter-bar .search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 7px 10px 7px 30px;
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius-sm);
+    background: var(--bg-input);
+    color: var(--t1);
+    font-size: 12px;
+    position: relative;
+}
+
+.pv-theme .filter-bar .search-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+}
+
+.pv-theme .filter-bar .search-wrapper svg {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    color: var(--t3);
+    pointer-events: none;
+}
+
+.pv-theme .filter-bar .search-wrapper input {
+    width: 100%;
+    padding: 7px 10px 7px 30px;
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius-sm);
+    background: var(--bg-input);
+    color: var(--t1);
+    font-size: 12px;
+    outline: 0;
+    transition: border-color .15s;
+}
+
+.pv-theme .filter-bar .search-wrapper input:focus {
+    border-color: var(--p400);
+    box-shadow: 0 0 0 2px rgba(126, 111, 178, .1);
+}
+
+.pv-theme .filter-bar select {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius-sm);
+    background: var(--bg-input);
+    color: var(--t1);
+    font-size: 12px;
+    cursor: pointer;
+    outline: 0;
+}
+
+/* ============================================================
+   21. Data Table
+   ============================================================ */
+
+.pv-theme .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius);
+    overflow: hidden;
+}
+
+.pv-theme .data-table thead {
+    background: var(--bg3);
+}
+
+.pv-theme .data-table th {
+    padding: 9px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--t2);
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    border-bottom: 1px solid var(--border);
+}
+
+.pv-theme .data-table td {
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--t1);
+    border-bottom: 1px solid var(--border-lt);
+}
+
+.pv-theme .data-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.pv-theme .data-table tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+.pv-theme .data-table .row-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+.pv-theme .data-table .row-actions .btn-icon {
+    padding: 4px;
+}
+
+.pv-theme .data-table .engine-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: var(--p50);
+    color: var(--p700);
+    border: 1px solid var(--p200);
+    display: inline-block;
+}
+
+/* ============================================================
+   22. Pagination
+   ============================================================ */
+
+.pv-theme .pagination {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 14px;
+}
+
+.pv-theme .pagination .page-btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    color: var(--t2);
+    border-radius: var(--pv-radius-sm);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s;
+}
+
+.pv-theme .pagination .page-btn:hover {
+    border-color: var(--p300);
+    color: var(--t-brand);
+}
+
+.pv-theme .pagination .page-btn.active {
+    background: var(--p700);
+    color: #fff;
+    border-color: var(--p700);
+}
+
+.pv-theme .pagination .page-btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.pv-theme .pagination .page-info {
+    font-size: 11px;
+    color: var(--t3);
+    margin: 0 8px;
+}
+
+/* ============================================================
+   23. View Toggle (Card/List view switch)
+   ============================================================ */
+
+.pv-theme .view-toggle {
+    display: flex;
+    background: var(--bg3);
+    border-radius: var(--pv-radius-sm);
+    padding: 2px;
+    gap: 1px;
+}
+
+.pv-theme .view-toggle .view-btn {
+    padding: 4px 10px;
+    border: none;
+    background: none;
+    color: var(--t2);
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all .15s;
+}
+
+.pv-theme .view-toggle .view-btn.active {
+    background: var(--bg2);
+    color: var(--t-brand);
+    font-weight: 500;
+    box-shadow: var(--shadow);
+}
+
+/* ============================================================
+   24. LoRA Card
+   ============================================================ */
+
+.pv-theme .lora-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius);
+    padding: 14px;
+    box-shadow: var(--shadow);
+    transition: all .15s;
+}
+
+.pv-theme .lora-card:hover {
+    box-shadow: var(--shadow2);
+}
+
+.pv-theme .lora-card.enabled {
+    border-color: var(--p400);
+    box-shadow: 0 0 0 1px var(--p50), var(--shadow);
+}
+
+.pv-theme .lora-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.pv-theme .lora-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--t1);
+}
+
+.pv-theme .lora-card-status {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: var(--green);
+    color: #fff;
+}
+
+.pv-theme .lora-card-status.disabled {
+    background: var(--bg3);
+    color: var(--t3);
+}
+
+.pv-theme .lora-card-desc {
+    font-size: 12px;
+    color: var(--t2);
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.pv-theme .lora-card-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.pv-theme .lora-card-meta span {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: var(--bg3);
+    color: var(--t2);
+    border: 1px solid var(--border-lt);
+    font-family: var(--mono);
+}
+
+.pv-theme .lora-card-path {
+    font-size: 10px;
+    color: var(--t3);
+    font-family: var(--mono);
+    margin-bottom: 10px;
+    word-break: break-all;
+    padding: 4px 6px;
+    background: var(--bg3);
+    border-radius: 4px;
+}
+
+.pv-theme .lora-card-actions {
+    display: flex;
+    gap: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-lt);
+}
+
+/* ============================================================
+   25. Script Editor (Multi-speaker dialogue)
+   ============================================================ */
+
+.pv-theme .script-line {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+}
+
+.pv-theme .script-line .speaker-select {
+    flex: 0 0 140px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius-sm);
+    background: var(--bg-input);
+    color: var(--t1);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.pv-theme .script-line .line-text {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--pv-radius-sm);
+    background: var(--bg-input);
+    color: var(--t1);
+    font-size: 12px;
+    resize: vertical;
+    min-height: 32px;
+    outline: 0;
+}
+
+.pv-theme .script-line .line-text:focus {
+    border-color: var(--p400);
+    box-shadow: 0 0 0 2px rgba(126, 111, 178, .1);
+}
+
+.pv-theme .script-line .btn-icon {
+    flex-shrink: 0;
+    padding: 6px;
+}
+
+/* ============================================================
+   26. Top Bar Layout (Reorganized)
+   ============================================================ */
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.top-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 0 0 auto;
+}
+
+.top-bar-left .top-bar-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-left: 4px;
+    color: var(--text-primary);
+}
+
+.top-bar-center {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    position: relative;
+}
+
+.top-bar-center::before {
+    content: '';
+    position: absolute;
+    left: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 24px;
+    background: var(--border-subtle, var(--border));
+}
+
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 0 0 auto;
+}
+
+@media (max-width: 1200px) {
+    .top-bar-center::before {
+        display: none;
+    }
+}
+
+/* ============================================================
+   27. Button States (Generate Button)
+   ============================================================ */
+
+.pv-theme .btn-generate {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.pv-theme .btn-generate .btn-spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: btn-spin 0.8s linear infinite;
+}
+
+.pv-theme .btn-generate.loading .btn-spinner {
+    display: inline-block;
+}
+
+.pv-theme .btn-generate.loading .btn-text {
+    opacity: 0.9;
+}
+
+.pv-theme .btn-generate.success {
+    background: linear-gradient(135deg, #059669, #10b981);
+    box-shadow: 0 3px 12px rgba(16, 185, 129, .3);
+}
+
+@keyframes btn-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   28. Advanced Params Quick Entry
+   ============================================================ */
+
+.pv-theme .advanced-quick-entry {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--t2);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+}
+
+.pv-theme .advanced-quick-entry:hover {
+    border-color: var(--p300);
+    color: var(--t-brand);
+    background: var(--p50);
+}
+
+.pv-theme .generate-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.pv-theme .generate-row .btn-generate {
+    flex: 1;
+    margin-top: 0;
+}
+
+/* ============================================================
+   29. Help Icon Tooltip
+   ============================================================ */
+
+.pv-theme .help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--t3);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    cursor: help;
+    position: relative;
+    vertical-align: middle;
+    transition: all .15s;
+}
+
+.pv-theme .help-icon:hover {
+    color: var(--t-brand);
+    border-color: var(--p300);
+    background: var(--p50);
+}
+
+.pv-theme .help-icon::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #fff;
+    background: rgba(26, 29, 35, 0.95);
+    border-radius: 6px;
+    white-space: normal;
+    min-width: 180px;
+    max-width: 280px;
+    text-align: left;
+    opacity: 0;
+    visibility: hidden;
+    transition: all .15s;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.pv-theme .help-icon::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 1px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(26, 29, 35, 0.95);
+    opacity: 0;
+    visibility: hidden;
+    transition: all .15s;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.pv-theme .help-icon:hover::after,
+.pv-theme .help-icon:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+html.dark .pv-theme .help-icon::after {
+    background: rgba(232, 234, 240, 0.95);
+    color: #1A1D23;
+}
+
+html.dark .pv-theme .help-icon::before {
+    border-top-color: rgba(232, 234, 240, 0.95);
+}
+
+/* ============================================================
+   30. Tag Selected Count
+   ============================================================ */
+
+.pv-theme .tag-count-hint {
+    font-size: 11px;
+    color: var(--t3);
+    margin-bottom: 4px;
+}
+
+.pv-theme .tag-count-hint .count-num {
+    font-weight: 600;
+    color: var(--p500);
+}
+
+/* ============================================================
+   31. Empty State Enhanced
+   ============================================================ */
+
+.pv-theme .empty-state .empty-state-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--t2);
+    margin-bottom: 4px;
+}
+
+.pv-theme .empty-state .empty-state-desc {
+    font-size: 12px;
+    color: var(--t3);
+    margin-bottom: 12px;
+}
+
+.pv-theme .empty-state .btn-empty-sample {
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--p600);
+    background: var(--p50);
+    border: 1px solid var(--p200);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all .15s;
+}
+
+.pv-theme .empty-state .btn-empty-sample:hover {
+    background: var(--p100);
+    border-color: var(--p300);
+}
+
+/* ============================================================
+   32. Responsive
+   ============================================================ */
+
+@media (max-width: 1100px) {
+    .pv-theme .two-col .col-form {
+        flex: 3;
+    }
+
+    .pv-theme .two-col .col-result {
+        flex: 2;
+    }
+}
+
+@media (max-width: 900px) {
+    .pv-theme .two-col {
+        flex-direction: column;
+    }
+
+    .pv-theme .two-col .col-form {
+        flex: 1 1 100%;
+        max-width: 100%;
+        padding-right: 0;
+    }
+
+    .pv-theme .two-col .col-result {
+        flex: 1 1 100%;
+        max-width: 100%;
+    }
+
+    .pv-theme .persona-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .pv-theme .stats-bar .stat-item {
+        min-width: calc(50% - 6px);
+    }
+}
+
+@media (max-width: 600px) {
+    .pv-theme .persona-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pv-theme .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .pv-theme .stats-bar .stat-item {
+        min-width: 100%;
+    }
+
+    .pv-theme .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pv-theme .filter-bar .search-wrapper,
+    .pv-theme .filter-bar select,
+    .pv-theme .filter-bar .btn {
+        width: 100%;
+    }
+
+    .pv-theme .data-table {
+        font-size: 11px;
+    }
+
+    .pv-theme .data-table th,
+    .pv-theme .data-table td {
+        padding: 6px 8px;
+    }
+}
+
+/* ============================================================
+   33. UX/UI Deep Optimization (2025)
+   ============================================================ */
+
+/* --- 双栏布局响应式优化 --- */
+.pv-theme .two-col {
+    gap: var(--space-5, 20px);
+}
+
+.pv-theme .two-col .col-form {
+    padding-right: 0;
+}
+
+@media (min-width: 1400px) {
+    .pv-theme .two-col .col-form {
+        flex: 1.2;
+    }
+    .pv-theme .two-col .col-result {
+        flex: 1;
+    }
+}
+
+/* --- 顶栏高度优化（高优先级覆盖） --- */
+.pv-theme .top-bar {
+    min-height: var(--top-bar-height, 56px) !important;
+    height: var(--top-bar-height, 56px) !important;
+    padding: 0 20px;
+    gap: 16px;
+}
+
+.pv-theme .top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* --- 侧边栏视觉风格优化 ---
+   注意: sidebar 与 pv-theme 是兄弟关系 (都在 app-shell 下)
+   所以使用 body 或更高层级的选择器来作用域 */
+.sidebar {
+    background: var(--bg-sidebar, var(--bg-secondary, #F9FAFB));
+    border-right: 1px solid var(--border-subtle, #E5E7EB);
+}
+
+.sidebar-item {
+    position: relative;
+    padding: 10px 14px;
+    margin: 2px 8px;
+    border-radius: var(--radius-md, 8px);
+    color: var(--text-secondary, #6B7280);
+    font-weight: 500;
+    font-size: 13px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.sidebar-item:hover {
+    background: var(--bg-hover, #F3F4F6);
+    color: var(--text-primary, #111827);
+}
+
+.sidebar-item:active {
+    transform: scale(0.98);
+}
+
+.sidebar-item.active {
+    background: linear-gradient(135deg, var(--accent-primary, #7C5CBF), var(--color-accent-secondary, #9333EA));
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(124, 92, 191, 0.25);
+}
+
+.sidebar-item.active::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background: var(--accent-primary, #7C5CBF);
+    border-radius: 0 2px 2px 0;
+}
+
+.sidebar-item svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.sidebar-nav-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #9CA3AF);
+    padding: 16px 20px 8px;
+}
+
+/* 暗色模式侧边栏 */
+html.dark .sidebar {
+    background: var(--bg-sidebar, var(--bg-secondary, #1A1D26));
+    border-right-color: var(--border-subtle, #2A2F3E);
+}
+
+html.dark .sidebar-item:hover {
+    background: var(--bg-hover, #2A2F3E);
+}
+
+html.dark .sidebar-item.active {
+    box-shadow: 0 4px 16px rgba(124, 92, 191, 0.35);
+}
+
+html.dark .sidebar-item.active::before {
+    background: var(--color-accent-light, #9B80D4);
+}
+
+/* --- 引擎状态多色区分 --- */
+.pv-theme .engine-status {
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 0.01em;
+}
+
+.pv-theme .engine-status::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+    flex-shrink: 0;
+}
+
+.pv-theme .engine-status.status-loaded {
+    background: var(--color-success-bg, #ECFDF5);
+    color: var(--accent-success, #059669);
+}
+
+.pv-theme .engine-status.status-loading {
+    background: var(--color-warning-bg, #FFFBEB);
+    color: var(--accent-warning, #D97706);
+}
+
+.pv-theme .engine-status.status-error {
+    background: var(--color-error-bg, #FEF2F2);
+    color: var(--accent-error, #DC2626);
+}
+
+html.dark .pv-theme .engine-status.status-loaded {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--color-success-light, #10B981);
+}
+
+html.dark .pv-theme .engine-status.status-loading {
+    background: rgba(217, 119, 6, 0.15);
+    color: var(--color-warning-light, #F59E0B);
+}
+
+html.dark .pv-theme .engine-status.status-error {
+    background: rgba(220, 38, 38, 0.15);
+    color: var(--color-error-light, #EF4444);
+}
+
+/* --- 迷你监控器样式重构 --- */
+.pv-theme .mini-monitor {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 4px 8px;
+    background: var(--bg-tertiary, #F3F4F6);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    font-size: 11px;
+}
+
+.pv-theme .mini-monitor-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    transition: background 0.15s ease;
+}
+
+.pv-theme .mini-monitor-item:hover {
+    background: var(--bg-hover, #E5E7EB);
+}
+
+.pv-theme .mini-monitor-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.pv-theme .mini-monitor-label {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+}
+
+.pv-theme .mini-monitor-value {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    min-width: 48px;
+    text-align: right;
+}
+
+.pv-theme .mini-monitor-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border-subtle);
+    margin: 0 2px;
+}
+
+.pv-theme .mini-monitor-value.warn {
+    color: var(--accent-warning, #D97706);
+}
+
+.pv-theme .mini-monitor-value.danger {
+    color: var(--accent-error, #DC2626);
+}
+
+html.dark .pv-theme .mini-monitor {
+    background: var(--bg-tertiary, #1F2330);
+}
+
+html.dark .pv-theme .mini-monitor-item:hover {
+    background: var(--bg-hover, #2A2F3E);
+}
+
+/* --- 卡片间距节奏统一 --- */
+.pv-theme .card {
+    margin-bottom: var(--space-4, 16px);
+}
+
+.pv-theme .card-header {
+    padding-bottom: var(--space-3, 12px);
+    margin-bottom: var(--space-3, 12px);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.pv-theme .card-body {
+    padding-top: 0;
+}
+
+/* --- 空状态引导优化 --- */
+.pv-theme .empty-state {
+    padding: 64px 32px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+.pv-theme .empty-state .empty-icon {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--bg-tertiary, #F3F4F6), var(--bg-secondary, #F9FAFB));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: var(--text-muted, #9CA3AF);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    position: relative;
+}
+
+.pv-theme .empty-state .empty-icon::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124, 92, 191, 0.08), transparent 70%);
+    z-index: -1;
+}
+
+.pv-theme .empty-state .empty-state-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    margin-bottom: 8px;
+}
+
+.pv-theme .empty-state .empty-state-desc {
+    font-size: 13px;
+    color: var(--text-secondary, #6B7280);
+    max-width: 320px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.pv-theme .empty-state .btn-empty-sample {
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--bg-tertiary, #F3F4F6);
+    color: var(--text-secondary, #6B7280);
+    border: 1px solid var(--border-subtle, #E5E7EB);
+    border-radius: var(--radius-md, 8px);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pv-theme .empty-state .btn-empty-sample:hover {
+    background: var(--accent-primary, #7C5CBF);
+    color: #fff;
+    border-color: var(--accent-primary, #7C5CBF);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124, 92, 191, 0.25);
+}
+
+/* 暗色模式空状态 */
+html.dark .pv-theme .empty-state .empty-icon {
+    background: linear-gradient(135deg, var(--bg-tertiary, #1F2330), var(--bg-secondary, #232735));
+    color: var(--text-muted, #6B7280);
+}
+
+html.dark .pv-theme .empty-state .empty-state-title {
+    color: var(--text-primary, #E5E7EB);
+}
+
+html.dark .pv-theme .empty-state .empty-state-desc {
+    color: var(--text-secondary, #9CA3AF);
+}
+
+html.dark .pv-theme .empty-state .btn-empty-sample {
+    background: var(--bg-tertiary, #1F2330);
+    color: var(--text-secondary, #9CA3AF);
+    border-color: var(--border-subtle, #2A2F3E);
+}
+
+/* --- 帮助系统体验统一 --- */
+.pv-theme .help-icon,
+.pv-theme .tooltip-trigger {
+    cursor: help;
+    color: var(--text-tertiary);
+    transition: color 0.15s ease;
+}
+
+.pv-theme .help-icon:hover,
+.pv-theme .tooltip-trigger:hover {
+    color: var(--accent-primary);
+}
+
+/* --- 圆角半径规范统一 --- */
+.pv-theme {
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+}
+
+.pv-theme .card {
+    border-radius: var(--radius-lg);
+}
+
+.pv-theme input,
+.pv-theme select,
+.pv-theme textarea {
+    border-radius: var(--radius-md);
+}
+
+.pv-theme .btn {
+    border-radius: var(--radius-md);
+}
+
+.pv-theme .tag {
+    border-radius: var(--radius-full);
+}
+
+/* --- 核心按钮与输入区视觉关联 --- */
+.pv-theme .generate-section {
+    margin-top: var(--space-5, 20px);
+    padding-top: var(--space-4, 16px);
+    border-top: 1px dashed var(--border-subtle);
+}
+
+/* --- 响应式顶栏高度调整 --- */
+@media (max-width: 768px) {
+    .pv-theme .top-bar {
+        min-height: 48px;
+        height: 48px;
+        padding: 0 12px;
+    }
+
+    .pv-theme #tab-content {
+        padding: 16px;
+    }
+}
+
+/* ============================================================
+   9. Compatibility Shield - 旧系统样式保护盾
+   ------------------------------------------------------------
+   重置 styles.css 中广谱隐藏规则对 pv-theme 的破坏
+   ============================================================ */
+
+/* 恢复被广谱选择器隐藏的 SVG 图标 */
+.pv-theme svg[width="12"][height="12"],
+.pv-theme svg[width="10"][height="10"],
+.pv-theme svg[width="16"][height="16"] {
+    display: inline-block !important;
+}
+
+/* 恢复 .card 内的 SVG 图标 */
+.pv-theme .card svg:not([master]):not([width="120"]):not([height="120"]) {
+    display: inline-block !important;
+}
+
+/* 恢复伪元素边框色（用于箭头、分隔线等） */
+.pv-theme div::before,
+.pv-theme div::after,
+.pv-theme span::before,
+.pv-theme span::after,
+.pv-theme i::before,
+.pv-theme i::after {
+    border-color: initial;
+}
+
+/* 恢复 collapse/expand/toggle/arrow/chevron 类名元素 */
+.pv-theme [class*="collapse"],
+.pv-theme [class*="expand"],
+.pv-theme [class*="toggle"],
+.pv-theme [class*="arrow"],
+.pv-theme [class*="chevron"] {
+    display: initial !important;
+}
+
+/* 恢复内联 border 样式（用于三角形装饰） */
+.pv-theme div[style*="border-top"],
+.pv-theme div[style*="border-left"],
+.pv-theme span[style*="border-top"],
+.pv-theme span[style*="border-left"] {
+    border-color: initial;
+}
+
+/* ============================================================
+   10. Form Controls - 表单控件增强
+   ============================================================ */
+
+/* 下拉框自定义箭头 - 覆盖 beautify.css 和 styles.css 的广谱样式
+   使用高特异性选择器确保在 #tab-content .pv-theme 内也能生效
+   DOM 结构: #tab-content > .pv-theme > ... > select */
+.pv-theme select,
+.pv-theme .card select,
+#tab-content .pv-theme select,
+#tab-content .pv-theme .card select,
+.pv-theme .tts-input-dropdown select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    background-size: 16px !important;
+    padding-right: 36px !important;
+    cursor: pointer !important;
+}
+
+.pv-theme select:hover {
+    border-color: var(--p400, #9B8EC4);
+}
+
+.pv-theme select:focus {
+    outline: none;
+    border-color: var(--p500, var(--accent-primary));
+    box-shadow: 0 0 0 3px var(--p100, #E8E4F0);
+}
+
+/* 暗色模式下拉框箭头颜色 */
+html.dark .pv-theme select,
+html.dark .pv-theme .card select,
+html.dark #tab-content .pv-theme select,
+html.dark #tab-content .pv-theme .card select,
+html.dark .pv-theme .tts-input-dropdown select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+}
+
+/* ============================================================
+    11. Utility Classes - 工具类（内联样式治理第一阶段）
+    ------------------------------------------------------------
+    用于替代 HTML 中的 style="..." 内联样式
+    命名规范：{属性}-{值}，如 gap-2 = gap: 8px
+    ============================================================ */
+
+/* --- Display --- */
+.pv-theme .flex { display: flex; }
+.pv-theme .inline-flex { display: inline-flex; }
+.pv-theme .grid { display: grid; }
+.pv-theme .block { display: block; }
+.pv-theme .hidden { display: none; }
+
+/* --- Flex Direction --- */
+.pv-theme .flex-col { flex-direction: column; }
+.pv-theme .flex-row { flex-direction: row; }
+.pv-theme .flex-wrap { flex-wrap: wrap; }
+.pv-theme .flex-nowrap { flex-wrap: nowrap; }
+
+/* --- Justify Content --- */
+.pv-theme .justify-start { justify-content: flex-start; }
+.pv-theme .justify-center { justify-content: center; }
+.pv-theme .justify-end { justify-content: flex-end; }
+.pv-theme .justify-between { justify-content: space-between; }
+.pv-theme .justify-around { justify-content: space-around; }
+
+/* --- Align Items --- */
+.pv-theme .items-start { align-items: flex-start; }
+.pv-theme .items-center { align-items: center; }
+.pv-theme .items-end { align-items: flex-end; }
+.pv-theme .items-stretch { align-items: stretch; }
+
+/* --- Gap (基于 4px 基准) --- */
+.pv-theme .gap-1 { gap: 4px; }
+.pv-theme .gap-2 { gap: 8px; }
+.pv-theme .gap-3 { gap: 12px; }
+.pv-theme .gap-4 { gap: 16px; }
+.pv-theme .gap-5 { gap: 20px; }
+.pv-theme .gap-6 { gap: 24px; }
+
+/* --- Margin --- */
+.pv-theme .m-0 { margin: 0; }
+.pv-theme .m-1 { margin: 4px; }
+.pv-theme .m-2 { margin: 8px; }
+.pv-theme .m-3 { margin: 12px; }
+.pv-theme .m-4 { margin: 16px; }
+
+.pv-theme .mt-0 { margin-top: 0; }
+.pv-theme .mt-1 { margin-top: 4px; }
+.pv-theme .mt-2 { margin-top: 8px; }
+.pv-theme .mt-3 { margin-top: 12px; }
+.pv-theme .mt-4 { margin-top: 16px; }
+.pv-theme .mt-5 { margin-top: 20px; }
+.pv-theme .mt-6 { margin-top: 24px; }
+
+.pv-theme .mb-0 { margin-bottom: 0; }
+.pv-theme .mb-1 { margin-bottom: 4px; }
+.pv-theme .mb-2 { margin-bottom: 8px; }
+.pv-theme .mb-3 { margin-bottom: 12px; }
+.pv-theme .mb-4 { margin-bottom: 16px; }
+.pv-theme .mb-5 { margin-bottom: 20px; }
+.pv-theme .mb-6 { margin-bottom: 24px; }
+
+.pv-theme .ml-auto { margin-left: auto; }
+.pv-theme .mr-auto { margin-right: auto; }
+
+/* --- Padding --- */
+.pv-theme .p-0 { padding: 0; }
+.pv-theme .p-1 { padding: 4px; }
+.pv-theme .p-2 { padding: 8px; }
+.pv-theme .p-3 { padding: 12px; }
+.pv-theme .p-4 { padding: 16px; }
+.pv-theme .p-5 { padding: 20px; }
+.pv-theme .p-6 { padding: 24px; }
+
+.pv-theme .px-2 { padding-left: 8px; padding-right: 8px; }
+.pv-theme .px-3 { padding-left: 12px; padding-right: 12px; }
+.pv-theme .px-4 { padding-left: 16px; padding-right: 16px; }
+
+.pv-theme .py-2 { padding-top: 8px; padding-bottom: 8px; }
+.pv-theme .py-3 { padding-top: 12px; padding-bottom: 12px; }
+.pv-theme .py-4 { padding-top: 16px; padding-bottom: 16px; }
+
+/* --- Text --- */
+.pv-theme .text-center { text-align: center; }
+.pv-theme .text-left { text-align: left; }
+.pv-theme .text-right { text-align: right; }
+
+.pv-theme .text-xs { font-size: 11px; }
+.pv-theme .text-sm { font-size: 12px; }
+.pv-theme .text-base { font-size: 14px; }
+.pv-theme .text-lg { font-size: 16px; }
+.pv-theme .text-xl { font-size: 18px; }
+
+.pv-theme .font-normal { font-weight: 400; }
+.pv-theme .font-medium { font-weight: 500; }
+.pv-theme .font-semibold { font-weight: 600; }
+.pv-theme .font-bold { font-weight: 700; }
+
+/* --- Width --- */
+.pv-theme .w-full { width: 100%; }
+.pv-theme .w-auto { width: auto; }
+.pv-theme .min-w-\[200px\] { min-width: 200px; }
+
+/* --- Flex Grow --- */
+.pv-theme .flex-1 { flex: 1 1 0%; }
+.pv-theme .flex-none { flex: none; }
+
+/* --- Overflow --- */
+.pv-theme .overflow-auto { overflow: auto; }
+.pv-theme .overflow-x-auto { overflow-x: auto; }
+.pv-theme .overflow-hidden { overflow: hidden; }
+
+/* --- Border Radius --- */
+.pv-theme .rounded-none { border-radius: 0; }
+.pv-theme .rounded-sm { border-radius: var(--pv-radius-sm, 6px); }
+.pv-theme .rounded-md { border-radius: var(--pv-radius, 8px); }
+.pv-theme .rounded-lg { border-radius: 12px; }
+.pv-theme .rounded-full { border-radius: 9999px; }
+
+/* UI/UX Enhancements */
+.pv-theme .two-col { gap: 16px !important; align-items: flex-start; }
+.pv-theme .two-col .col-form { flex: 0 0 62%; max-width: 62%; }
+.pv-theme .two-col .col-result { flex: 0 0 calc(38% - 16px); max-width: calc(38% - 16px); position: sticky; top: 64px; max-height: calc(100vh - 140px); overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+.pv-theme .btn-generate:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.pv-theme .btn-generate:active { transform: translateY(0); }
+.pv-theme .btn-o { transition: all .15s ease !important; }
+.pv-theme .btn-o:hover { transform: translateY(-1px); }
+.pv-theme .tag { transition: all .2s ease !important; }
+.pv-theme .tag:hover:not(.active) { transform: translateY(-1px); }
+.pv-theme .tag.active { transform: translateY(-1px); }
+.pv-theme .stabs { background: var(--bg-tertiary, #f3f4f6) !important; padding: 4px !important; border-radius: 8px !important; gap: 4px !important; border-bottom: none !important; margin-bottom: 16px !important; }
+.pv-theme .stab { padding: 8px 16px !important; border-radius: 6px !important; border: none !important; transition: all .2s ease !important; }
+.pv-theme .stab:hover { background: var(--bg-card, #fff); }
+.pv-theme .stab.active { background: var(--bg-card, #fff) !important; box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important; border-bottom: none !important; }
+.pv-theme .collapse-body.open { padding: 14px !important; background: var(--bg-tertiary, #f3f4f6); border-radius: 0 0 8px 8px; border: 1px solid var(--border-subtle, #e5e7eb); border-top: none; }
+.pv-theme .empty-state { padding: 40px 20px !important; background: linear-gradient(180deg, var(--bg-tertiary, #f3f4f6) 0%, transparent 100%); border-radius: 12px; border: 2px dashed var(--border-subtle, #e5e7eb); margin: 8px 0; }
+.pv-theme .empty-state svg { width: 72px !important; height: 44px !important; margin-bottom: 16px !important; opacity: .3 !important; }
+.pv-theme .progress-bar { height: 6px !important; border-radius: 3px !important; }
+.pv-theme .progress-fill { border-radius: 3px !important; transition: width .4s cubic-bezier(0.4,0,0.2,1); position: relative; overflow: hidden; }
+.pv-theme .progress-fill::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: progressShine 2s infinite; }
+@keyframes progressShine { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.pv-theme .hint-text { border-left: 3px solid var(--accent-primary, #7c5cbf); padding: 10px 14px !important; line-height: 1.6; }
+.pv-theme .fi:focus, .pv-theme .fs:focus, .pv-theme .ft:focus { box-shadow: 0 0 0 3px rgba(124,92,191,0.12), 0 1px 2px rgba(124,92,191,0.08) !important; }
+.pv-theme .card-body { padding: 16px !important; }
+.pv-theme .card-hdr { padding: 12px 16px !important; }
+.pv-theme .fg { margin-bottom: 16px !important; }
+.top-bar { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.pv-theme .card { animation: cardSlideIn .3s ease; }
+@keyframes cardSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+html.dark .pv-theme .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2) !important; }
+html.dark .pv-theme .stabs { background: var(--bg-tertiary, #1f2330) !important; }
+html.dark .pv-theme .collapse-body.open { background: var(--bg-tertiary, #1f2330); }
+html.dark .pv-theme .empty-state { background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%); }
+@media (max-width: 1200px) { .pv-theme .two-col .col-form { flex: 0 0 58%; max-width: 58%; } .pv-theme .two-col .col-result { flex: 0 0 calc(42% - 16px); max-width: calc(42% - 16px); position: static; max-height: none; } }
+@media (max-width: 900px) { .pv-theme .two-col { flex-direction: column !important; } .pv-theme .two-col .col-form, .pv-theme .two-col .col-result { flex: 1 1 100% !important; max-width: 100% !important; position: static !important; max-height: none !important; } .pv-theme .form-row { grid-template-columns: 1fr !important; } }
+@media (max-width: 600px) { .pv-theme .card-body { padding: 12px !important; } .pv-theme .card-hdr { padding: 10px 12px !important; } }
+*:focus-visible { outline: 2px solid var(--accent-primary, #7c5cbf); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent-primary, #7c5cbf); outline-offset: 1px; }
+::selection { background: rgba(124,92,191,0.2); }
+
+/* === D5：右栏结果区卡片组一体化 ===
+   结果音频 / 后处理 / 快速操作视觉合并为单一卡片（DOM 级合并以 voice_design 为基准，其余 tab 后续迭代） */
+.pv-theme .two-col .col-result {
+    gap: 0;
+}
+.pv-theme .col-result > .card {
+    border-radius: var(--radius-md, 8px);
+}
+.pv-theme .col-result > .card + .card {
+    border-top: none;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    margin-top: -1px;
+    box-shadow: none;
+}
+.pv-theme .col-result > .card:first-child {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+/* 后处理折叠子区标题（结果卡内 details summary） */
+.pv-theme .pp-summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 0 6px;
+    color: var(--text-secondary, #6B7280);
+}
+.pv-theme .pp-summary::marker { color: var(--accent-primary, #7c5cbf); }
+
+/* 快速操作工具条（结果卡内） */
+.pv-theme .result-toolbar { grid-template-columns: 1fr 1fr; gap: 5px; }
+
+/* === D6：左栏提示可收起 === */
+.pv-theme .hint-text.tip-dismissible { position: relative; padding-right: 30px; }
+.pv-theme .tip-close {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: var(--text-muted, #9CA3AF);
+}
+.pv-theme .tip-close:hover { color: var(--accent-primary, #7c5cbf); background: var(--bg-hover, #F3F4F6); }
