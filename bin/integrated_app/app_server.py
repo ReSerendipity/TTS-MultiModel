@@ -774,3 +774,13 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
     )
 
     uvicorn.run(app, host=ip, port=int(port))
+
+if __name__ == "__main__":
+    """python -m integrated_app.app_server --host 127.0.0.1 --port 7869"""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="TTS MultiModel server")
+    parser.add_argument("--host", default="127.0.0.1", help="监听地址")
+    parser.add_argument("--port", type=int, default=7869, help="监听端口")
+    args = parser.parse_args()
+    run_server(ip=args.host, port=args.port)
