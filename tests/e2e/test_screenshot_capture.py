@@ -105,7 +105,7 @@ def _click_tab(page, tab_name):
     }""", tab_name)
     page.wait_for_timeout(400)
     button.first.click()
-    page.wait_for_load_state("networkidle", timeout=15000)
+    page.wait_for_load_state("domcontentloaded", timeout=15000)
     page.wait_for_timeout(1200)
     return True
 
@@ -119,7 +119,7 @@ class TestScreenshotCapture:
         context = browser.new_context(viewport=VIEWPORT)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
         page.wait_for_timeout(800)
         _set_theme(page, "light")
 
@@ -134,7 +134,7 @@ class TestScreenshotCapture:
         context = browser.new_context(viewport=VIEWPORT)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
         page.wait_for_timeout(800)
         _set_theme(page, "dark")
 
@@ -150,7 +150,7 @@ class TestScreenshotCapture:
         context = browser.new_context(viewport=VIEWPORT)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
         page.wait_for_timeout(800)
         _set_theme(page, "light")
 
@@ -172,7 +172,7 @@ class TestScreenshotCapture:
         context = browser.new_context(viewport=VIEWPORT)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
         page.wait_for_timeout(800)
         _set_theme(page, "dark")
 

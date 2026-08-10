@@ -289,7 +289,7 @@ def _go_home(page: Page, theme: str) -> None:
     # networkidle can stall indefinitely when SSE/event-stream keeps connections
     # open; treat it as best-effort and fall back to a fixed settle time.
     try:
-        page.wait_for_load_state("networkidle", timeout=5000)
+        page.wait_for_load_state("domcontentloaded", timeout=5000)
     except Exception:
         page.wait_for_timeout(1500)
     page.wait_for_timeout(800)
@@ -315,7 +315,7 @@ def _click_tab(page: Page, tab_name: str) -> bool:
     page.wait_for_timeout(400)
     button.first.click()
     try:
-        page.wait_for_load_state("networkidle", timeout=5000)
+        page.wait_for_load_state("domcontentloaded", timeout=5000)
     except Exception:
         page.wait_for_timeout(1500)
     page.wait_for_timeout(1200)

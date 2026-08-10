@@ -63,7 +63,7 @@ class TestVisualRegression:
         context = browser.new_context(viewport=VIEWPORT)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
         # Use expect screenshot for visual regression
         # If no baseline exists, this will create one on first run with --snapshot-update
         page.screenshot(path=os.path.join(os.path.dirname(__file__), "screenshots", "regression_home.png"))
@@ -74,13 +74,13 @@ class TestVisualRegression:
         context = browser.new_context(viewport=VIEWPORT)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
 
         # Navigate to voice_design tab
         button = page.locator(".sidebar-item[data-tab='voice_design']")
         if button.count() > 0:
             button.first.click()
-            page.wait_for_load_state("networkidle", timeout=15000)
+            page.wait_for_load_state("domcontentloaded", timeout=15000)
             page.wait_for_selector("#tab-content", state="visible", timeout=5000)
 
         screenshots_dir = os.path.join(os.path.dirname(__file__), "screenshots")
@@ -93,12 +93,12 @@ class TestVisualRegression:
         context = browser.new_context(viewport=VIEWPORT)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
 
         button = page.locator(".sidebar-item[data-tab='voice_clone']")
         if button.count() > 0:
             button.first.click()
-            page.wait_for_load_state("networkidle", timeout=15000)
+            page.wait_for_load_state("domcontentloaded", timeout=15000)
             page.wait_for_selector("#tab-content", state="visible", timeout=5000)
 
         screenshots_dir = os.path.join(os.path.dirname(__file__), "screenshots")
@@ -111,7 +111,7 @@ class TestVisualRegression:
         context = browser.new_context(viewport=VIEWPORT)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
 
         # Set dark theme
         page.evaluate("""
@@ -138,7 +138,7 @@ class TestVisualRegression:
         )
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
 
         screenshots_dir = os.path.join(os.path.dirname(__file__), "screenshots")
         os.makedirs(screenshots_dir, exist_ok=True)

@@ -69,7 +69,7 @@ class TestPageLoad:
         """测试首页可以正常加载，标题不为空且包含 TTS 关键字。"""
         page = browser.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         title = page.title()
         assert title != ""
         assert len(title) > 0
@@ -78,7 +78,7 @@ class TestPageLoad:
         """测试首页有侧边栏，且侧边栏可见。"""
         page = browser.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         sidebar = page.query_selector(".sidebar")
         assert sidebar is not None, "Sidebar element not found on page"
         assert sidebar.is_visible(), "Sidebar should be visible on desktop viewport"
@@ -87,7 +87,7 @@ class TestPageLoad:
         """测试首页有标签内容区域，且不为空。"""
         page = browser.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         tab_content = page.query_selector("#tab-content")
         assert tab_content is not None, "#tab-content element not found"
         # The tab content should have child elements (not empty)
@@ -98,7 +98,7 @@ class TestPageLoad:
         """测试 CSS 已加载（检查 computed style）。"""
         page = browser.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         body_bg = page.evaluate("() => getComputedStyle(document.body).backgroundColor")
         assert body_bg != "", "Body should have a computed background color"
 
@@ -106,7 +106,7 @@ class TestPageLoad:
         """测试 JavaScript 已加载（检查 window 对象属性）。"""
         page = browser.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         has_js = page.evaluate("() => typeof window !== 'undefined'")
         assert has_js is True
 
@@ -118,7 +118,7 @@ class TestTabSwitching:
         """测试标签页导航：点击侧边栏项后内容区域更新。"""
         page = browser.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
 
         sidebar_items = page.query_selector_all(".sidebar-item")
         assert len(sidebar_items) > 0, "At least one sidebar item should exist"
@@ -130,7 +130,7 @@ class TestTabSwitching:
         if len(sidebar_items) > 1:
             sidebar_items[1].click()
             # Wait for HTMX swap to complete via networkidle + content change
-            page.wait_for_load_state("networkidle", timeout=10000)
+            page.wait_for_load_state("domcontentloaded", timeout=10000)
             page.wait_for_function(
                 "() => { const el = document.querySelector('#tab-content'); "
                 "return el && el.innerHTML.trim().length > 0; }",
@@ -145,7 +145,7 @@ class TestTabSwitching:
         """测试 dots.tts 标签页加载，验证内容非空。"""
         page = browser.new_page()
         page.goto(f"{server_url}/?tab=dotstts_clone")
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         tab_content = page.query_selector("#tab-content")
         assert tab_content is not None
         content = tab_content.inner_html()
@@ -155,7 +155,7 @@ class TestTabSwitching:
         """测试 VoxCPM2 标签页加载，验证有表单元素。"""
         page = browser.new_page()
         page.goto(f"{server_url}/?tab=voice_clone")
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         tab_content = page.query_selector("#tab-content")
         assert tab_content is not None
         # Voice clone tab should have some form elements
@@ -166,7 +166,7 @@ class TestTabSwitching:
         """测试 IndexTTS2 标签页加载，验证有内容。"""
         page = browser.new_page()
         page.goto(f"{server_url}/?tab=indextts2")
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         tab_content = page.query_selector("#tab-content")
         assert tab_content is not None
         content = tab_content.inner_html()
@@ -180,7 +180,7 @@ class TestCollapseInteraction:
         """测试折叠面板展开/折叠，验证 class 变化。"""
         page = browser.new_page()
         page.goto(f"{server_url}/?tab=dotstts_clone")
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
 
         collapse_header = page.query_selector(".collapse-header")
         if collapse_header:
@@ -227,7 +227,7 @@ class TestResponsiveLayout:
     def test_mobile_sidebar_hidden(self, server_url, mobile_browser):
         """测试移动端侧边栏默认隐藏 — 检查 computed transform。"""
         mobile_browser.goto(server_url)
-        mobile_browser.wait_for_load_state("networkidle")
+        mobile_browser.wait_for_load_state("domcontentloaded")
 
         sidebar = mobile_browser.query_selector(".sidebar")
         if sidebar:
@@ -255,7 +255,7 @@ class TestResponsiveLayout:
     def test_mobile_hamburger_visible(self, server_url, mobile_browser):
         """测试移动端汉堡菜单可见 — 强断言。"""
         mobile_browser.goto(server_url)
-        mobile_browser.wait_for_load_state("networkidle")
+        mobile_browser.wait_for_load_state("domcontentloaded")
 
         toggle = mobile_browser.query_selector(".top-bar-mobile-toggle")
         if toggle:
@@ -264,7 +264,7 @@ class TestResponsiveLayout:
     def test_mobile_content_full_width(self, server_url, mobile_browser):
         """测试移动端内容区域占满宽度 — 检查 computed margin。"""
         mobile_browser.goto(server_url)
-        mobile_browser.wait_for_load_state("networkidle")
+        mobile_browser.wait_for_load_state("domcontentloaded")
 
         main_content = mobile_browser.query_selector(".main-content")
         if main_content:
@@ -286,7 +286,7 @@ class TestResponsiveLayout:
         )
         page = context.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         title = page.title()
         assert title != ""
         # On tablet, sidebar should still be visible
@@ -302,7 +302,7 @@ class TestBusinessFlow:
         """测试音色库 tab 加载，验证有 persona 相关元素。"""
         page = browser.new_page()
         page.goto(f"{server_url}/?tab=persona")
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         tab_content = page.query_selector("#tab-content")
         assert tab_content is not None
         content = tab_content.inner_html()
@@ -312,7 +312,7 @@ class TestBusinessFlow:
         """测试模型状态 API 可达。"""
         page = browser.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         # Check that the model status API is reachable from the frontend
         result = page.evaluate("""
             async () => {
@@ -330,7 +330,7 @@ class TestBusinessFlow:
         """测试生成表单存在 — 检查文本输入和生成按钮。"""
         page = browser.new_page()
         page.goto(f"{server_url}/?tab=voice_design")
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
         # Look for textarea or input elements
         textareas = page.query_selector_all("textarea")
         inputs = page.query_selector_all("input[type='text'], input[type='search']")
@@ -343,7 +343,7 @@ class TestBusinessFlow:
         """测试主题切换功能。"""
         page = browser.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
 
         # Check initial theme
         initial_dark = page.evaluate(
@@ -368,7 +368,7 @@ class TestBusinessFlow:
         """测试侧边栏导航完整性 — 所有核心 tab 可达。"""
         page = browser.new_page()
         page.goto(server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("domcontentloaded")
 
         sidebar_items = page.query_selector_all(".sidebar-item")
         # Should have at least 3 items for core navigation

@@ -109,7 +109,7 @@ class TestMockEngineBusinessFlow:
         context = browser.new_context(viewport={"width": 1366, "height": 900})
         page = context.new_page()
         page.goto(f"{BASE_URL}/?tab=voice_design", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
         page.wait_for_selector("#tab-content", state="visible", timeout=5000)
 
         # Check for form elements
@@ -125,13 +125,13 @@ class TestMockEngineBusinessFlow:
         context = browser.new_context(viewport={"width": 1366, "height": 900})
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
 
         # Switch to voice_clone
         btn = page.locator(".sidebar-item[data-tab='voice_clone']")
         if btn.count() > 0:
             btn.first.click()
-            page.wait_for_load_state("networkidle", timeout=10000)
+            page.wait_for_load_state("domcontentloaded", timeout=10000)
             page.wait_for_selector("#tab-content", state="visible", timeout=5000)
             content = page.query_selector("#tab-content").inner_html()
             assert len(content.strip()) > 0
@@ -140,7 +140,7 @@ class TestMockEngineBusinessFlow:
         btn = page.locator(".sidebar-item[data-tab='settings']")
         if btn.count() > 0:
             btn.first.click()
-            page.wait_for_load_state("networkidle", timeout=10000)
+            page.wait_for_load_state("domcontentloaded", timeout=10000)
             page.wait_for_selector("#tab-content", state="visible", timeout=5000)
             content = page.query_selector("#tab-content").inner_html()
             assert len(content.strip()) > 0
