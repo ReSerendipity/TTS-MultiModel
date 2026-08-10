@@ -432,7 +432,9 @@ def _open_health_panel(page: Page) -> None:
 def _switch_model_tab(page: Page, model: str) -> None:
     loc = page.locator(f".model-tab[data-model='{model}']")
     if loc.count() > 0:
-        loc.first.click()
+        # 顶部引擎 tab 在 headless 下会被 #model-tabs 容器拦截真实指针
+        # 事件（布局/动画差异），使用 JS click 触发相同的切换逻辑
+        loc.first.evaluate("(el) => el.click()")
         page.wait_for_timeout(350)
 
 
