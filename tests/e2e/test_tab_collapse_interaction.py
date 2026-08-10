@@ -181,9 +181,13 @@ class TestCollapseInteraction:
         page = browser.new_page()
         page.goto(f"{server_url}/?tab=dotstts_clone")
         page.wait_for_load_state("domcontentloaded")
-        # dismiss onboarding overlay (fresh CI context has no localStorage)
+        # dismiss onboarding overlay: set flag before navigation, then
+        # wait for the scheduled setTimeout(boot, 2000) in onboarding.js
+        # and do a second sweep to remove any late-spawned overlay DOM
+        page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); }")
+        page.wait_for_timeout(2200)
         page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); const el=document.getElementById('onboarding-overlay'); if(el) el.remove(); }")
-        page.wait_for_timeout(300)
+        page.wait_for_timeout(120)
 
         collapse_header = page.query_selector(".collapse-header")
         if collapse_header:
@@ -347,9 +351,13 @@ class TestBusinessFlow:
         page = browser.new_page()
         page.goto(server_url)
         page.wait_for_load_state("domcontentloaded")
-        # dismiss onboarding overlay (fresh CI context has no localStorage)
+        # dismiss onboarding overlay: set flag before navigation, then
+        # wait for the scheduled setTimeout(boot, 2000) in onboarding.js
+        # and do a second sweep to remove any late-spawned overlay DOM
+        page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); }")
+        page.wait_for_timeout(2200)
         page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); const el=document.getElementById('onboarding-overlay'); if(el) el.remove(); }")
-        page.wait_for_timeout(300)
+        page.wait_for_timeout(120)
 
         # Check initial theme
         initial_dark = page.evaluate(
