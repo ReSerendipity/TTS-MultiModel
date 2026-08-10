@@ -22,7 +22,7 @@ const path = require('path');
 const fs = require('fs');
 
 const BASE_URL = 'http://127.0.0.1:7869';
-const REPO_ROOT = path.join(__dirname, '..', '..');
+const REPO_ROOT = path.join(__dirname, '..');
 const OUTPUT_DIR = path.join(REPO_ROOT, 'docs', 'screenshots');
 const DARK_DIR = path.join(OUTPUT_DIR, 'dark');
 
@@ -69,7 +69,18 @@ async function clickTab(page, tabName) {
   if ((await button.count()) === 0) {
     throw new Error(`Tab button not found: data-tab="${tabName}"`);
   }
-  await button.first().click();
+  // 若按钮位于折叠分组（.sidebar-nav-section.section-collapsed）内，先点击
+  // 分组标题 .sidebar-nav-label 展开，否则按钮 display:none 无法点击。
+  await page.evaluate((t) => {
+    const btn = document.querySelector(`.sidebar-item[data-tab="${t}"]`);
+    if (!btn) return;
+    const sec = btn.closest('.sidebar-nav-section');
+    if (sec && sec.classList.contains('section-collapsed')) {
+      const label = sec.querySelector('.sidebar-nav-label');
+      if (label) label.click();
+    }
+  }, tabName);
+  await page.waitForTimeout(400);  await button.first().click();
   // Wait for HTMX swap to finish
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(1200);
@@ -172,3 +183,4 @@ async function captureHomePage(page, theme, viewportName) {
     await browser.close();
   }
 })();
+

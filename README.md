@@ -51,16 +51,6 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 
 </div>
 
-### 暗色主题 / Dark Theme
-
-<div align="center">
-
-| 声音设计 (暗) | 历史记录 (暗) |
-|:-------------:|:-------------:|
-| ![Voice Design Dark](docs/screenshots/dark/voxcpm2_01_voice_design_dark_viewport.png) | ![History Dark](docs/screenshots/dark/voxcpm2_09_history_dark_viewport.png) |
-
-</div>
-
 > 欢迎在 [Discussions](https://github.com/ReSerendipity/TTS_MultiModel/discussions) 中分享你的使用体验！
 
 ## 功能亮点
