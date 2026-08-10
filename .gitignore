@@ -248,9 +248,7 @@ docs/reference_repos_*.md
 # ---------------------------------------------------------------------------
 # Dev-only content (not needed to clone-and-run the app)
 # ---------------------------------------------------------------------------
-AGENTS.md
 GITIGNORE_UPDATE.md
-.pre-commit-config.yaml
 history_scan.sh
 remove_tracked_sample_ttsmultimodel.sh
 docs/ADR/
@@ -298,6 +296,13 @@ docs/screenshots/*
 !docs/screenshots/voxcpm2_04_script_workshop_viewport.png
 !docs/screenshots/voxcpm2_06_lora_viewport.png
 !docs/screenshots/voxcpm2_08_settings_viewport.png
+
+# ---------------------------------------------------------------------------
+# Performance monitoring results (generated artifacts, keep directory tracked)
+# ---------------------------------------------------------------------------
+perf/results/*.json
+perf/results/*.html
+!perf/results/.gitkeep
 
 # ===== 2026-08-09 审计补充（仓库瘦身防回归） =====
 # 误推高危：ffmpeg 自带运行时（211MB 单文件），必须忽略

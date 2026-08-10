@@ -1,0 +1,3 @@
+# This file ensures perf/results/ directory is tracked by git.
+# Actual performance result files (*.json, *.html) are gitignored as generated artifacts.
+# Run `python perf/report_generator.py` to regenerate the HTML report.
