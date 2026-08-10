@@ -53,18 +53,30 @@ jobs:
           TTS_AUTO_LOAD_MODEL: "0"
         run: |
           cd bin
-          python -m integrated_app.app_server --host 127.0.0.1 --port 7869 &
+          # -u 无缓冲输出；stdout/stderr 落盘，便于失败时诊断
+          python -u -m integrated_app.app_server --host 127.0.0.1 --port 7869 > /tmp/server.log 2>&1 &
           echo $! > /tmp/server.pid
-          # Wait for server to be ready
-          for i in $(seq 1 30); do
+          # Wait for server to be ready (max 150s)
+          READY=0
+          for i in $(seq 1 75); do
             if curl -s http://127.0.0.1:7869/ > /dev/null 2>&1; then
               echo "Server is ready"
+              READY=1
               break
             fi
-            echo "Waiting for server... ($i/30)"
+            if ! kill -0 $(cat /tmp/server.pid) 2>/dev/null; then
+              echo "Server process exited early (iteration $i)"
+              break
+            fi
+            echo "Waiting for server... ($i/75)"
             sleep 2
           done
-          curl -s http://127.0.0.1:7869/ > /dev/null || (echo "Server failed to start" && exit 1)
+          if [ "$READY" != "1" ]; then
+            echo "===== server.log (tail) ====="
+            tail -100 /tmp/server.log || true
+            echo "Server failed to start"
+            exit 1
+          fi
 
       - name: Run Playwright E2E tests (required gate)
         env:
