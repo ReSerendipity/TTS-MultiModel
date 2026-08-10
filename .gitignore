@@ -291,10 +291,6 @@ scripts/test_sse.py
 
 # Screenshots: keep only the ones referenced by README
 docs/screenshots/*
-!docs/screenshots/dark/
-docs/screenshots/dark/*
-!docs/screenshots/dark/voxcpm2_01_voice_design_dark_viewport.png
-!docs/screenshots/dark/voxcpm2_09_history_dark_viewport.png
 !docs/screenshots/voxcpm2_01_voice_design_viewport.png
 !docs/screenshots/voxcpm2_02_voice_clone_viewport.png
 !docs/screenshots/voxcpm2_03_ultimate_clone_viewport.png

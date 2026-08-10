@@ -295,8 +295,7 @@ class AppConfig:
             self._pydantic_config = load_config_dict(self._yaml_config or {})
         except Exception as e:
             logger.warning(
-                f"Pydantic 配置验证失败，使用默认配置。错误信息: {e}。"
-                "建议修复 config.yaml 中的错误字段后重新保存。"
+                f"Pydantic 配置验证失败，使用默认配置。错误信息: {e}。建议修复 config.yaml 中的错误字段后重新保存。"
             )
             self._pydantic_config = _PydanticAppConfig()
 

@@ -232,9 +232,7 @@ def embed_watermark(
     n_freq_bins = max(0, freq_high_bin - freq_low_bin)
     effective_bits = min(_WATERMARK_BITS, n_freq_bins)
     if effective_bits <= 0:
-        logger.warning(
-            f"采样率 {sample_rate}Hz 无法容纳水印频点（16-20kHz 超出 Nyquist），跳过水印嵌入"
-        )
+        logger.warning(f"采样率 {sample_rate}Hz 无法容纳水印频点（16-20kHz 超出 Nyquist），跳过水印嵌入")
         return audio.astype(np.float32), WatermarkResult(
             success=False,
             message=f"采样率 {sample_rate}Hz 过低，无法嵌入水印",

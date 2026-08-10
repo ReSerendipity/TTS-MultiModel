@@ -81,9 +81,7 @@ class TaskCheckpoint:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             os.replace(tmp_path, str(path))
-            logger.debug(
-                f"[Checkpoint] 已保存: {task_id} ({data['completed']}/{data['total']})"
-            )
+            logger.debug(f"[Checkpoint] 已保存: {task_id} ({data['completed']}/{data['total']})")
         except Exception as e:
             with contextlib.suppress(OSError):
                 os.unlink(tmp_path)
@@ -103,10 +101,7 @@ class TaskCheckpoint:
             return None
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            logger.info(
-                f"[Checkpoint] 已加载: {task_id} "
-                f"({data.get('completed', 0)}/{data.get('total', 0)})"
-            )
+            logger.info(f"[Checkpoint] 已加载: {task_id} ({data.get('completed', 0)}/{data.get('total', 0)})")
             return data
         except Exception as e:
             logger.warning(f"[Checkpoint] 加载失败 {task_id}: {e}")

@@ -170,7 +170,19 @@ def get_lang(request: Any) -> str:
         if lang:
             if lang in _LANG_FILE_MAP:
                 return lang
-            lang_map = {"zh": "zh-CN", "zh-TW": "zh-TW", "zh-Hant": "zh-TW", "zh-tw": "zh-TW", "zhCN": "zh-CN", "zhTW": "zh-TW", "ja": "ja", "jp": "ja", "ko": "ko", "kr": "ko", "en": "en"}
+            lang_map = {
+                "zh": "zh-CN",
+                "zh-TW": "zh-TW",
+                "zh-Hant": "zh-TW",
+                "zh-tw": "zh-TW",
+                "zhCN": "zh-CN",
+                "zhTW": "zh-TW",
+                "ja": "ja",
+                "jp": "ja",
+                "ko": "ko",
+                "kr": "ko",
+                "en": "en",
+            }
             if lang in lang_map:
                 return lang_map[lang]
     except (AttributeError, Exception):
@@ -181,7 +193,19 @@ def get_lang(request: Any) -> str:
         if lang:
             if lang in _LANG_FILE_MAP:
                 return lang
-            lang_map = {"zh": "zh-CN", "zh-TW": "zh-TW", "zh-Hant": "zh-TW", "zh-tw": "zh-TW", "zhCN": "zh-CN", "zhTW": "zh-TW", "ja": "ja", "jp": "ja", "ko": "ko", "kr": "ko", "en": "en"}
+            lang_map = {
+                "zh": "zh-CN",
+                "zh-TW": "zh-TW",
+                "zh-Hant": "zh-TW",
+                "zh-tw": "zh-TW",
+                "zhCN": "zh-CN",
+                "zhTW": "zh-TW",
+                "ja": "ja",
+                "jp": "ja",
+                "ko": "ko",
+                "kr": "ko",
+                "en": "en",
+            }
             if lang in lang_map:
                 return lang_map[lang]
     except AttributeError:

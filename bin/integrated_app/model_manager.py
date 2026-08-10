@@ -539,6 +539,7 @@ def _do_load_voxcpm2_internal(
     # 注入 reference_repos/VoxCPM/src 到 sys.path，使 voxcpm 源码包可被发现
     # (未 pip install 该包时的兼容路径)
     import sys as _sys
+
     _voxcpm_src = os.path.join(ROOT_DIR, "reference_repos", "VoxCPM", "src")
     if os.path.isdir(_voxcpm_src) and _voxcpm_src not in _sys.path:
         _sys.path.insert(0, _voxcpm_src)
