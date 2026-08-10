@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TTS MultiModel · 在线模拟演示</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236344a3'/%3E%3Cpath d='M7 13v6h4l5 4V9l-5 4H7zm12 1a4 4 0 010 6m2-9a7 7 0 010 12' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --accent:#8b7cf6;--accent-strong:#6b5bce;--accent-soft:rgba(139,124,246,.14);
+  --bg:#131318;--bg2:#1b1b22;--bg3:#24242e;--bg-hover:#2c2c38;
+  --t1:#eceaf6;--t2:#b6b2c8;--t3:#7c7890;
+  --border:#2c2c3a;--border-hover:#3d3d50;
+  --green:#4ade80;--amber:#fbbf24;--red:#f87171;--blue:#60a5fa;
+  --radius:10px;
+  --sans:'Inter',system-ui,"Segoe UI",sans-serif;
+  --mono:ui-monospace,Consolas,"Cascadia Code",monospace;
+}
+[data-theme="light"]{
+  --accent:#6b5bce;--accent-strong:#5a4a8a;--accent-soft:rgba(107,91,206,.1);
+  --bg:#f6f5fa;--bg2:#ffffff;--bg3:#efedf5;--bg-hover:#e6e3ef;
+  --t1:#221f2e;--t2:#4d485f;--t3:#8a8598;
+  --border:#e2dfec;--border-hover:#c9c4da;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--t1);font:13.5px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:13px;color:var(--t1);background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 11px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.hidden{display:none!important}
+
+.demo-banner{background:linear-gradient(90deg,#221c3a,#2a1f3e);color:#cfc8ee;font-size:12px;padding:6px 16px;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--border)}
+[data-theme="light"] .demo-banner{background:linear-gradient(90deg,#efeafd,#e7e0fa);color:#4d4366}
+.demo-banner .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);flex:none;animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.demo-banner b{color:#a78bfa}
+[data-theme="light"] .demo-banner b{color:#6b5bce}
+
+.app{display:flex;min-height:calc(100vh - 31px)}
+
+/* 侧边栏 */
+.sidebar{width:218px;flex:none;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:calc(100vh - 31px)}
+.sidebar-brand{display:flex;align-items:center;gap:9px;padding:14px 14px 10px;font-weight:700;font-size:14px}
+.sidebar-brand .logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-strong));display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px}
+.sidebar-brand small{display:block;font-weight:400;color:var(--t3);font-size:10.5px;line-height:1.2}
+.sidebar-nav{flex:1;overflow-y:auto;padding:4px 8px 12px}
+.nav-sec-label{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;padding:12px 8px 5px}
+.nav-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;color:var(--t2);padding:8px 10px;border-radius:8px;font-size:13px;transition:.13s}
+.nav-item:hover{background:var(--bg-hover);color:var(--t1)}
+.nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav-item .ic{width:17px;text-align:center;font-size:13px}
+.sidebar-foot{padding:10px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--t3);display:flex;align-items:center;justify-content:space-between}
+
+/* 主区 */
+.main{flex:1;min-width:0;padding:18px 22px 60px;max-width:1080px}
+.page{display:none}
+.page.active{display:block;animation:fade .22s}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1}}
+.page-head{margin-bottom:16px}
+.page-head h1{font-size:20px;font-weight:700}
+.page-head p{color:var(--t3);font-size:12.5px;margin-top:2px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:11px;display:flex;align-items:center;gap:7px}
+.card-title .bar{width:3px;height:13px;border-radius:2px;background:var(--accent)}
+label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:820px){.grid-2{grid-template-columns:1fr}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;transition:.14s;background:linear-gradient(135deg,var(--accent),var(--accent-strong));color:#fff}
+.btn:hover{filter:brightness(1.1)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:var(--bg3);color:var(--t2);border:1px solid var(--border)}
+.btn.ghost:hover{border-color:var(--border-hover);color:var(--t1)}
+.btn.sm{padding:5px 11px;font-size:12px;border-radius:7px}
+.badge{display:inline-flex;align-items:center;gap:5px;background:var(--accent-soft);color:var(--accent);padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600}
+.badge.gray{background:var(--bg3);color:var(--t3)}
+.badge.green{background:rgba(74,222,128,.13);color:var(--green)}
+.slider-row{display:flex;align-items:center;gap:12px;margin:9px 0}
+.slider-row label{font-size:12px;color:var(--t3);width:64px;flex:none}
+.slider-row input[type=range]{flex:1;accent-color:var(--accent)}
+.slider-row .val{width:44px;text-align:right;font-size:12px;color:var(--t2);font-family:var(--mono)}
+
+/* 进度 */
+.steps{display:flex;flex-direction:column;gap:7px;margin-top:13px}
+.step{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--t3);padding:6px 10px;border-radius:8px;background:var(--bg3)}
+.step .st-ic{width:16px;height:16px;border-radius:50%;border:2px solid var(--border-hover);flex:none;display:flex;align-items:center;justify-content:center;font-size:9px}
+.step.done{color:var(--t2)}
+.step.done .st-ic{border-color:var(--green);background:var(--green);color:#0a0f0a}
+.step.run{color:var(--t1)}
+.step.run .st-ic{border-color:var(--accent);border-top-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 播放器 */
+.player{display:flex;align-items:center;gap:14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:13px 15px;margin-top:13px}
+.player .play-btn{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-strong));border:none;color:#fff;font-size:15px;flex:none;display:flex;align-items:center;justify-content:center}
+.player .play-btn:disabled{opacity:.5}
+.wave{flex:1;height:44px}
+.wave canvas{width:100%;height:100%;display:block}
+.player .p-meta{font-size:11.5px;color:var(--t3);width:110px;flex:none;text-align:right}
+.sim-note{margin-top:10px;font-size:11.5px;color:var(--t3);background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:8px 11px}
+
+/* 剧本 */
+.script-row{display:grid;grid-template-columns:110px 1fr 130px 88px;gap:9px;margin-bottom:9px;align-items:center}
+@media(max-width:760px){.script-row{grid-template-columns:1fr;gap:6px}}
+.script-row input,.script-row select{width:100%}
+.script-row .role-input{font-weight:600}
+.table{margin-top:10px}
+.table .tr{display:grid;grid-template-columns:1fr 150px 90px;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;align-items:center}
+.table .tr.head{color:var(--t3);font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom-color:var(--border-hover)}
+
+/* 文件上传 */
+.upload{border:1.5px dashed var(--border-hover);border-radius:var(--radius);padding:26px;text-align:center;color:var(--t3);cursor:pointer;transition:.15s}
+.upload:hover{border-color:var(--accent);color:var(--t2);background:var(--accent-soft)}
+.file-tag{display:inline-flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:12.5px;margin-top:9px}
+.file-tag .x{cursor:pointer;color:var(--t3)}
+.file-tag .x:hover{color:var(--red)}
+
+/* 引擎卡 */
+.engine-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:11px}
+.eng{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:13px}
+.eng .name{font-weight:700;font-size:13.5px;display:flex;justify-content:space-between;align-items:center}
+.eng .name .st{font-size:11px;font-weight:600;color:var(--green)}
+.eng .desc{font-size:11.5px;color:var(--t3);margin-top:4px}
+.eng .gpu{font-size:11px;font-family:var(--mono);color:var(--t2);margin-top:8px}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--bg3);border:1px solid var(--border-hover);color:var(--t1);padding:10px 18px;border-radius:9px;font-size:13px;z-index:200;opacity:0;transition:.22s;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.toast.show{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+
+<div class="demo-banner"><span class="dot"></span><span><b>在线模拟演示模式</b> — 纯前端仿真环境。合成结果使用浏览器内置语音引擎（Web Speech API）模拟发声，非 VoxCPM2 / IndexTTS2 真实推理。</span></div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><div class="logo">◉</div><div>TTS MultiModel<small>多模型语音合成 · 模拟演示</small></div></div>
+    <nav class="sidebar-nav" id="nav">
+      <div class="nav-sec-label">VoxCPM2 · 核心</div>
+      <button class="nav-item active" data-page="design"><span class="ic">🎨</span>声音设计</button>
+      <button class="nav-item" data-page="clone"><span class="ic">🧬</span>声音克隆</button>
+      <button class="nav-item" data-page="ultimate"><span class="ic">⭐</span>极致克隆</button>
+      <div class="nav-sec-label">VoxCPM2 · 高级</div>
+      <button class="nav-item" data-page="script"><span class="ic">🎭</span>剧本配音</button>
+      <button class="nav-item" data-page="lora"><span class="ic">🧩</span>LoRA 微调</button>
+      <div class="nav-sec-label">其他引擎</div>
+      <button class="nav-item" data-page="indextts"><span class="ic">🔊</span>IndexTTS 2.0</button>
+      <button class="nav-item" data-page="dotstts"><span class="ic">⚡</span>dots.tts 快速合成</button>
+      <div class="nav-sec-label">系统</div>
+      <button class="nav-item" data-page="settings"><span class="ic">⚙</span>系统设置</button>
+    </nav>
+    <div class="sidebar-foot"><span>引擎: 模拟</span><button class="btn ghost sm" id="themeBtn">🌗</button></div>
+  </aside>
+
+  <main class="main">
+
+    <!-- ===== 声音设计 ===== -->
+    <section class="page active" id="page-design">
+      <div class="page-head"><h1>声音设计</h1><p>通过文字描述目标音色，生成对应语音（演示使用浏览器语音引擎模拟）。</p></div>
+      <div class="card">
+        <label class="fld" for="d-text">合成文本</label>
+        <textarea id="d-text" rows="3" style="width:100%;resize:vertical">你好，欢迎体验 TTS MultiModel 在线模拟演示。这是一个纯前端仿真环境，所有语音均由浏览器本地合成。</textarea>
+        <label class="fld" style="margin-top:11px">音色描述（如：温柔的女声 / 沉稳的男声 / 活泼的少年音）</label>
+        <input id="d-voice" style="width:100%" value="温柔清晰的女声，语速适中">
+        <div class="slider-row"><label>语速</label><input type="range" id="d-rate" min="0.5" max="1.8" step="0.05" value="1"><span class="val" id="d-rate-v">1.00</span></div>
+        <div class="slider-row"><label>音调</label><input type="range" id="d-pitch" min="0.5" max="1.8" step="0.05" value="1"><span class="val" id="d-pitch-v">1.00</span></div>
+        <div class="slider-row"><label>情感</label><select id="d-emotion" style="flex:1"><option value="自然">自然</option><option value="开心">开心 😊</option><option value="悲伤">悲伤 😢</option><option value="激动">激动 🔥</option><option value="沉稳">沉稳 🧘</option></select></div>
+        <button class="btn" id="d-run" style="width:100%;margin-top:12px">▶ 合成语音（模拟）</button>
+        <div class="steps hidden" id="d-steps"></div>
+        <div id="d-player" class="hidden"></div>
+        <div class="sim-note hidden" id="d-note">⚡ 模拟说明：真实系统使用 VoxCPM2 声学模型 + 声码器生成 24kHz 音频并附带音频水印；演示环境由浏览器 Web Speech API 合成，音色描述与情感仅作展示。</div>
+      </div>
+    </section>
+
+    <!-- ===== 声音克隆 ===== -->
+    <section class="page" id="page-clone">
+      <div class="page-head"><h1>声音克隆</h1><p>上传参考音频，克隆其音色（模拟流程，实际发音仍为浏览器引擎）。</p></div>
+      <div class="card">
+        <div class="upload" id="c-upload" tabindex="0">🎤 点击或拖拽上传参考音频（3–10 秒，wav/mp3/m4a）<br><span style="font-size:11.5px">演示环境仅解析文件信息，不提取音色</span></div>
+        <input type="file" id="c-file" accept="audio/*" class="hidden">
+        <div id="c-filetag"></div>
+        <label class="fld" style="margin-top:13px">克隆文本</label>
+        <textarea id="c-text" rows="3" style="width:100%;resize:vertical">这是一段声音克隆演示，系统将尝试模仿参考音频的音色来朗读这段文字。</textarea>
+        <div class="grid-2" style="margin-top:10px">
+          <div><label class="fld">克隆强度</label><input type="range" id="c-strong" min="0" max="1" step="0.05" value="0.8" style="width:100%"></div>
+          <div><label class="fld">语速</label><input type="range" id="c-rate" min="0.5" max="1.5" step="0.05" value="1" style="width:100%"></div>
+        </div>
+        <button class="btn" id="c-run" style="width:100%;margin-top:12px">▶ 克隆并合成（模拟）</button>
+        <div class="steps hidden" id="c-steps"></div>
+        <div id="c-player" class="hidden"></div>
+      </div>
+    </section>
+
+    <!-- ===== 极致克隆 ===== -->
+    <section class="page" id="page-ultimate">
+      <div class="page-head"><h1>极致克隆</h1><p>少量音频 + 参考文本即可克隆音色（模拟流程）。</p></div>
+      <div class="card">
+        <div class="grid-2">
+          <div>
+            <label class="fld">参考音频</label>
+            <div class="upload" id="u-upload" tabindex="0">🎤 上传参考音频（3–10 秒）</div>
+            <input type="file" id="u-file" accept="audio/*" class="hidden">
+            <div id="u-filetag"></div>
+          </div>
+          <div>
+            <label class="fld">参考音频内容（转写文本）</label>
+            <textarea id="u-reftext" rows="3" style="width:100%;resize:vertical">大家好，今天天气真不错，我们去公园散步吧。</textarea>
+          </div>
+        </div>
+        <label class="fld" style="margin-top:11px">待合成文本</label>
+        <textarea id="u-text" rows="3" style="width:100%;resize:vertical">极致克隆模式支持更精细的音色还原，包括说话习惯与语气特征。</textarea>
+        <button class="btn" id="u-run" style="width:100%;margin-top:12px">▶ 极致克隆合成（模拟）</button>
+        <div class="steps hidden" id="u-steps"></div>
+        <div id="u-player" class="hidden"></div>
+      </div>
+    </section>
+
+    <!-- ===== 剧本配音 ===== -->
+    <section class="page" id="page-script">
+      <div class="page-head"><h1>剧本配音</h1><p>多角色对话剧本，自动分配说话人并批量生成（模拟流程，按角色顺序播放）。</p></div>
+      <div class="card">
+        <div id="scriptRows"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn ghost sm" id="s-add">＋ 添加台词</button>
+          <button class="btn sm" id="s-run">▶ 开始配音（模拟）</button>
+          <button class="btn ghost sm" id="s-play">🔊 播放全部</button>
+        </div>
+        <div class="steps hidden" id="s-steps"></div>
+        <div id="s-player" class="hidden"></div>
+      </div>
+    </section>
+
+    <!-- ===== LoRA ===== -->
+    <section class="page" id="page-lora">
+      <div class="page-head"><h1>LoRA 微调</h1><p>用自定义数据集微调音色 LoRA（模拟训练流程）。</p></div>
+      <div class="card">
+        <div class="table">
+          <div class="tr head"><span>LoRA 名称</span><span>状态</span><span>操作</span></div>
+          <div class="tr"><span>lora_温柔女主播_v3</span><span class="badge green">已就绪</span><span><button class="btn ghost sm">应用到合成</button></span></div>
+          <div class="tr"><span>lora_游戏解说_热血</span><span class="badge green">已就绪</span><span><button class="btn ghost sm">应用到合成</button></span></div>
+          <div class="tr"><span>lora_纪录片旁白</span><span class="badge gray">训练中…</span><span><button class="btn ghost sm" disabled>等待中</button></span></div>
+        </div>
+        <div class="divider" style="height:1px;background:var(--border);margin:14px 0"></div>
+        <div class="grid-2">
+          <div>
+            <label class="fld">数据集目录</label><input style="width:100%" value="data/datasets/my_voice_30min">
+            <label class="fld" style="margin-top:9px">训练轮数</label><input type="number" value="2000" style="width:100%">
+          </div>
+          <div>
+            <label class="fld">学习率</label><input value="1e-4" style="width:100%">
+            <label class="fld" style="margin-top:9px">LoRA 名称</label><input value="lora_custom_demo" style="width:100%">
+          </div>
+        </div>
+        <button class="btn sm" id="lora-run" style="margin-top:13px">🚀 开始训练（模拟）</button>
+        <div class="steps hidden" id="lora-steps"></div>
+      </div>
+    </section>
+
+    <!-- ===== IndexTTS 2.0 ===== -->
+    <section class="page" id="page-indextts">
+      <div class="page-head"><h1>IndexTTS 2.0 合成</h1><p>零样本音色克隆引擎（模拟流程）。</p></div>
+      <div class="card">
+        <label class="fld">参考音频（5–10 秒）</label>
+        <div class="upload" id="i-upload" tabindex="0">🎤 上传参考音频</div>
+        <input type="file" id="i-file" accept="audio/*" class="hidden">
+        <div id="i-filetag"></div>
+        <label class="fld" style="margin-top:12px">合成文本</label>
+        <textarea id="i-text" rows="3" style="width:100%;resize:vertical">IndexTTS 2.0 支持零样本克隆，只需几秒参考音频就能模仿目标音色。</textarea>
+        <button class="btn" id="i-run" style="width:100%;margin-top:12px">▶ 合成（模拟）</button>
+        <div class="steps hidden" id="i-steps"></div>
+        <div id="i-player" class="hidden"></div>
+      </div>
+    </section>
+
+    <!-- ===== dots.tts ===== -->
+    <section class="page" id="page-dotstts">
+      <div class="page-head"><h1>dots.tts 快速合成</h1><p>轻量引擎，低延迟快速合成（模拟流程）。</p></div>
+      <div class="card">
+        <label class="fld">合成文本</label>
+        <textarea id="t-text" rows="3" style="width:100%;resize:vertical">dots.tts 是轻量级 TTS 引擎，适合快速合成场景。</textarea>
+        <button class="btn" id="t-run" style="width:100%;margin-top:12px">⚡ 快速合成（模拟）</button>
+        <div class="steps hidden" id="t-steps"></div>
+        <div id="t-player" class="hidden"></div>
+      </div>
+    </section>
+
+    <!-- ===== 系统设置 ===== -->
+    <section class="page" id="page-settings">
+      <div class="page-head"><h1>系统设置</h1><p>引擎状态与运行参数（模拟信息）。</p></div>
+      <div class="card">
+        <div class="card-title"><span class="bar"></span>引擎状态</div>
+        <div class="engine-cards">
+          <div class="eng"><div class="name">VoxCPM2 <span class="st">● 已加载</span></div><div class="desc">声音设计 / 克隆 / 剧本配音 / LoRA</div><div class="gpu">VRAM 5.6 GB · FP16</div></div>
+          <div class="eng"><div class="name">IndexTTS 2.0 <span class="st">● 已加载</span></div><div class="desc">零样本音色克隆</div><div class="gpu">VRAM 3.2 GB · FP16</div></div>
+          <div class="eng"><div class="name">dots.tts <span class="st" style="color:var(--amber)">● 模拟</span></div><div class="desc">轻量快速合成</div><div class="gpu">VRAM 0.9 GB · INT8</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="bar"></span>运行参数（模拟）</div>
+        <div class="grid-2">
+          <div><label class="fld">GPU 后端</label><select style="width:100%"><option>NVIDIA CUDA</option><option>Apple MPS</option><option>CPU</option></select></div>
+          <div><label class="fld">采样率</label><select style="width:100%"><option>24 kHz</option><option>44.1 kHz</option></select></div>
+        </div>
+        <div class="slider-row" style="margin-top:10px"><label>输出音量</label><input type="range" min="0" max="100" value="85" style="flex:1"><span class="val" id="vol-v">85%</span></div>
+        <button class="btn sm" style="margin-top:10px" onclick="showToast('设置已保存（模拟）')">保存设置</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== 基础 ===== */
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+let toastTimer;
+function showToast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2300)}
+function applyTheme(t){document.documentElement.dataset.theme=t}
+$('#themeBtn').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+
+/* 导航 */
+$$('#nav .nav-item').forEach(b=>b.onclick=()=>{
+  $$('#nav .nav-item').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+  $$('.page').forEach(p=>p.classList.remove('active'));$('#page-'+b.dataset.page).classList.add('active');
+  window.scrollTo({top:0});
+});
+
+/* ===== 语音引擎（模拟） ===== */
+let zhVoice=null;
+function loadVoices(){
+  const vs=speechSynthesis.getVoices();
+  zhVoice=vs.find(v=>/zh/i.test(v.lang)&&/female|xiaoxiao|yaoyao|tingting/i.test(v.name))||vs.find(v=>/zh/i.test(v.lang))||null;
+}
+loadVoices();
+if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=loadVoices;
+
+function synth(text,rate=1,pitch=1,emotion='自然'){
+  return new Promise(res=>{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    if(zhVoice)u.voice=zhVoice;else u.lang='zh-CN';
+    u.rate=rate;u.pitch=pitch;
+    if(emotion==='开心')u.pitch=pitch*1.15,u.rate=rate*1.08;
+    if(emotion==='悲伤')u.pitch=pitch*0.85,u.rate=rate*0.85;
+    if(emotion==='激动')u.rate=rate*1.2,u.pitch=pitch*1.05;
+    if(emotion==='沉稳')u.rate=rate*0.82,u.pitch=pitch*0.9;
+    u.onend=()=>res();u.onerror=()=>res();
+    speechSynthesis.speak(u);
+  });
+}
+
+/* 波形动画 */
+function startWave(canvas,onDone){
+  const ctx=canvas.getContext('2d');let raf,playing=true;
+  const W=canvas.clientWidth||300,H=canvas.clientHeight||44;
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const bars=Math.floor(W/5);
+    for(let i=0;i<bars;i++){
+      const h=playing?(3+Math.random()*H*0.8):3;
+      const x=i*5+1;
+      ctx.fillStyle=i%9===0?'#8b7cf6':'#4c4663';
+      ctx.beginPath();ctx.roundRect(x,H/2-h/2,3,h,2);ctx.fill();
+    }
+    raf=requestAnimationFrame(draw);
+  }
+  draw();
+  return {stop(){playing=false;cancelAnimationFrame(raf);ctx.clearRect(0,0,W,H)}};
+}
+
+/* 播放器构建 */
+function buildPlayer(containerId,text,rate,pitch,emotion){
+  const c=$('#'+containerId);
+  c.classList.remove('hidden');
+  c.innerHTML=`<div class="player">
+    <button class="play-btn" title="播放">▶</button>
+    <div class="wave"><canvas></canvas></div>
+    <div class="p-meta">模拟语音<br><span style="font-size:10.5px">${zhVoice?'浏览器语音引擎':'（未找到中文语音）'}</span></div>
+  </div>`;
+  const btn=c.querySelector('.play-btn'),cv=c.querySelector('canvas');
+  let wave=null,playing=false;
+  btn.onclick=async()=>{
+    if(playing){speechSynthesis.cancel();return}
+    playing=true;btn.textContent='⏸';if(wave)wave.stop();wave=startWave(cv);
+    await synth(text,rate,pitch,emotion);
+    playing=false;btn.textContent='▶';if(wave)wave.stop();
+  };
+  return c;
+}
+
+/* 通用分步进度 */
+function runSteps(boxId,steps,delay=650){
+  const box=$('#'+boxId);box.classList.remove('hidden');
+  box.innerHTML=steps.map(s=>`<div class="step" data-i="${s}"><span class="st-ic"></span>${s}</div>`).join('');
+  const els=[...box.querySelectorAll('.step')];
+  return new Promise(res=>{
+    els.forEach((el,i)=>{
+      setTimeout(()=>{
+        if(i>0)els[i-1].classList.replace('run','done');
+        el.classList.add('run');
+        if(i===els.length-1)setTimeout(()=>{el.classList.replace('run','done');res()},delay);
+      },i*delay);
+    });
+  });
+}
+
+/* ===== 声音设计 ===== */
+$('#d-rate').oninput=e=>$('#d-rate-v').textContent=Number(e.target.value).toFixed(2);
+$('#d-pitch').oninput=e=>$('#d-pitch-v').textContent=Number(e.target.value).toFixed(2);
+$('#d-run').onclick=async()=>{
+  const text=$('#d-text').value.trim()||'（空文本）';
+  $('#d-run').disabled=true;$('#d-note').classList.remove('hidden');
+  await runSteps('d-steps',['文本前端 · 字素转音素…','音色编码 · '+($('#d-voice').value||'默认描述')+'…','声学模型 VoxCPM2 · 生成 mel 谱…','声码器 · 24kHz 波形合成…'],620);
+  buildPlayer('d-player',text,parseFloat($('#d-rate').value),parseFloat($('#d-pitch').value),$('#d-emotion').value);
+  $('#d-run').disabled=false;
+  showToast('合成完成（模拟）✓');
+};
+
+/* ===== 通用上传 ===== */
+function bindUpload(uploadId,fileId,tagId,label){
+  const up=$('#'+uploadId),fi=$('#'+fileId),tg=$('#'+tagId);
+  let current=null;
+  up.onclick=()=>fi.click();
+  up.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fi.click()}};
+  up.addEventListener('dragover',e=>{e.preventDefault();up.style.borderColor='var(--accent)'});
+  up.addEventListener('dragleave',()=>up.style.borderColor='');
+  up.addEventListener('drop',e=>{e.preventDefault();up.style.borderColor='';if(e.dataTransfer.files[0])set(e.dataTransfer.files[0])});
+  fi.onchange=e=>{if(e.target.files[0])set(e.target.files[0])};
+  function set(f){
+    current=f;
+    tg.innerHTML=`<span class="file-tag">🎵 ${f.name} <span style="font-size:11px;color:var(--t3)">${(f.size/1024).toFixed(0)} KB · ${(f.type||'audio')}</span><span class="x" title="移除">✕</span></span>`;
+    tg.querySelector('.x').onclick=()=>{current=null;tg.innerHTML=''};
+  }
+  return ()=>current;
+}
+const getCFile=bindUpload('c-upload','c-file','c-filetag','参考音频');
+const getUFile=bindUpload('u-upload','u-file','u-filetag','参考音频');
+const getIFile=bindUpload('i-upload','i-file','i-filetag','参考音频');
+
+/* 声音克隆 */
+$('#c-run').onclick=async()=>{
+  const ref=getCFile();$('#c-run').disabled=true;
+  const steps=['加载参考音频…','特征提取 · 音色嵌入…','音色映射 · 克隆强度 '+$('#c-strong').value+'…'];
+  if(!ref)steps.unshift('（未上传参考音频，使用默认音色）');
+  await runSteps('c-steps',steps,600);
+  buildPlayer('c-player',$('#c-text').value.trim()||'（空文本）',parseFloat($('#c-rate').value),0.9+(parseFloat($('#c-strong').value)*0.35),'自然');
+  $('#c-run').disabled=false;showToast('克隆合成完成（模拟）✓');
+};
+
+/* 极致克隆 */
+$('#u-run').onclick=async()=>{
+  const ref=getUFile();$('#u-run').disabled=true;
+  const steps=['加载参考音频…','语义 token 提取…','说话人嵌入 + 参考文本对齐…','极致克隆采样…'];
+  if(!ref)steps.unshift('（未上传参考音频，使用默认音色）');
+  await runSteps('u-steps',steps,650);
+  buildPlayer('u-player',$('#u-text').value.trim()||'（空文本）',0.95,1.05,'自然');
+  $('#u-run').disabled=false;showToast('极致克隆完成（模拟）✓');
+};
+
+/* IndexTTS */
+$('#i-run').onclick=async()=>{
+  const ref=getIFile();$('#i-run').disabled=true;
+  const steps=['加载参考音频…','说话人嵌入提取…','条件扩散采样…'];
+  if(!ref)steps.unshift('（未上传参考音频，使用默认音色）');
+  await runSteps('i-steps',steps,620);
+  buildPlayer('i-player',$('#i-text').value.trim()||'（空文本）',1,1,'自然');
+  $('#i-run').disabled=false;showToast('合成完成（模拟）✓');
+};
+
+/* dots.tts */
+$('#t-run').onclick=async()=>{
+  $('#t-run').disabled=true;
+  await runSteps('t-steps',['轻量引擎 · 直接端到端合成…'],550);
+  buildPlayer('t-player',$('#t-text').value.trim()||'（空文本）',1.05,1,'自然');
+  $('#t-run').disabled=false;showToast('快速合成完成（模拟）✓');
+};
+
+/* ===== 剧本配音 ===== */
+const ROLES=['旁白','男主','女主','老人','小孩','机器人'];
+const ROLE_VOICE={旁白:{p:0.95,r:0.95},男主:{p:0.8,r:1},女主:{p:1.15,r:1},老人:{p:0.7,r:0.85},小孩:{p:1.5,r:1.15},机器人:{p:0.9,r:0.6}};
+let scriptRows=[{role:'女主',text:'你终于来了，我等你好久了。'},{role:'男主',text:'抱歉，路上堵车了。今天想去哪里？'},{role:'旁白',text:'黄昏的街道上，两人并肩而行，影子被拉得很长。'}];
+function renderScript(){
+  $('#scriptRows').innerHTML=scriptRows.map((r,i)=>`
+    <div class="script-row">
+      <select class="role-input" data-i="${i}" data-k="role">${ROLES.map(x=>`<option ${x===r.role?'selected':''}>${x}</option>`).join('')}</select>
+      <input data-i="${i}" data-k="text" value="${r.text}">
+      <button class="btn ghost sm" data-play="${i}">▶ 试听</button>
+      <button class="btn ghost sm" data-del="${i}" style="color:var(--red)">删除</button>
+    </div>`).join('');
+  $$('#scriptRows [data-k]').forEach(el=>el.onchange=()=>{scriptRows[+el.dataset.i][el.dataset.k]=el.value});
+  $$('#scriptRows [data-del]').forEach(el=>el.onclick=()=>{scriptRows.splice(+el.dataset.del,1);renderScript()});
+  $$('#scriptRows [data-play]').forEach(el=>el.onclick=()=>{
+    const r=scriptRows[+el.dataset.play],v=ROLE_VOICE[r.role]||{p:1,r:1};
+    synth(r.text||'（空）',v.r,v.p,'自然');
+  });
+}
+$('#s-add').onclick=()=>{scriptRows.push({role:'旁白',text:'新台词…'});renderScript()};
+$('#s-run').onclick=async()=>{
+  $('#s-run').disabled=true;
+  const steps=scriptRows.map((r,i)=>`角色「${r.role}」· 第 ${i+1} 句 · 分配音色…`);
+  await runSteps('s-steps',steps,420);
+  $('#s-run').disabled=false;
+  showToast('剧本配音生成完成（模拟）✓');
+  $('#s-player').classList.remove('hidden');
+  $('#s-player').innerHTML=`<div class="sim-note" style="margin-top:13px">✅ 已生成 ${scriptRows.length} 段配音（模拟）— 点击下方「播放全部」按角色顺序试听。</div>`;
+};
+$('#s-play').onclick=async()=>{
+  $('#s-play').disabled=true;
+  for(const r of scriptRows){
+    const v=ROLE_VOICE[r.role]||{p:1,r:1};
+    await synth(r.text||'（空）',v.r,v.p,'自然');
+    await new Promise(res=>setTimeout(res,350));
+  }
+  $('#s-play').disabled=false;
+  showToast('剧本播放完毕（模拟）✓');
+};
+renderScript();
+
+/* ===== LoRA 训练 ===== */
+$('#lora-run').onclick=async()=>{
+  $('#lora-run').disabled=true;
+  await runSteps('lora-steps',['加载数据集 · 30min 音频切片…','特征提取 · 说话人嵌入…','LoRA 训练 · epoch 1/50…','保存权重 · lora_custom_demo.safetensors'],700);
+  $('#lora-run').disabled=false;showToast('LoRA 训练完成（模拟）✓');
+};
+
+/* 音量 */
+const vol=$('#vol-v');
+document.querySelector('#page-settings input[type=range]').oninput=e=>vol.textContent=e.target.value+'%';
+
+/* 主题初始化 */
+applyTheme('dark');
+</script>
+</body>
+</html>

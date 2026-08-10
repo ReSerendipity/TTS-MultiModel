@@ -17,6 +17,14 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 
 [English](#english) · [中文](#中文) · [Features](#-features) · [Quick Start](#-quick-start) · [Documentation](#-documentation) · [API](#-api-endpoints) · [Contributing]
 
+## 🧪 在线模拟演示（GitHub Pages）
+
+无需 GPU / 模型权重，纯前端仿真环境即可体验声音设计、声音克隆、剧本配音等完整流程（发声由浏览器内置语音引擎模拟）：
+
+**<https://reserendipity.github.io/TTS_MultiModel/>** （由 `.github/workflows/pages-deploy.yml` 自动部署 `demo/` 目录，详见 [demo/README.md](demo/README.md)）
+
+---
+
 </div>
 
 ---
