@@ -89,6 +89,14 @@ jobs:
           echo "===== server.log (tail) ====="
           tail -50 /tmp/server.log || true
 
+      - name: Generate Linux baselines (temp step, will be removed)
+        if: always()
+        env:
+          TTS_SERVER_URL: "http://127.0.0.1:7869"
+          TTS_SNAPSHOT_UPDATE: "1"
+        run: |
+          pytest tests/e2e/test_visual_regression.py -q
+
       - name: Run Playwright E2E tests (required gate)
         env:
           TTS_SERVER_URL: "http://127.0.0.1:7869"
