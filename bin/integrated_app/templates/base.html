@@ -13,6 +13,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ "app_title"|t(lang) }}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+    <!-- 免费开源字体（Google Fonts，SIL OFL / Apache 2.0 协议） -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;600;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+QingKe+HuangYou&family=ZCOOL+KuaiLe&family=Long+Cang&family=Liu+Jian+Mao+Cao&family=Zhi+Mang+Xing&family=Playfair+Display:wght@400;600&family=Cinzel:wght@400;600&family=Great+Vibes&family=Pacifico&family=Dancing+Script:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/variables.css?v={{ app_version }}">
     <link rel="stylesheet" href="/static/css/styles.css?v={{ app_version }}">
     <link rel="stylesheet" href="/static/css/beautify.css?v={{ app_version }}">
@@ -209,6 +213,9 @@
                     </button>
                     <button class="sidebar-toggle-btn" id="lang-toggle-btn" onclick="toggleLang()" title="{{ "switch_lang"|t(lang) }}" aria-label="Switch language">
                         <span id="lang-current-label">{{ '繁' if (lang.startswith('zh-TW') or lang.startswith('zh-Hant')) else ('中' if lang.startswith('zh') else ('EN' if lang == 'en' else ('日' if lang == 'ja' else '한'))) }}</span>
+                    </button>
+                    <button class="sidebar-toggle-btn" id="font-toggle-btn" title="切换标题字体" aria-label="Switch font">
+                        <span style="font-weight:700;font-style:italic;font-size:13px">Aa</span>
                     </button>
                     <button class="sidebar-help-btn" onclick="toggleHelpDrawer()" title="{{ "help_with_shortcut"|t(lang) }}" aria-label="{{ "help"|t(lang) }}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -528,6 +535,9 @@
         window.CURRENT_LANG = '{{ lang }}';
     </script>
 
+    <!-- Font popup (must be before scripts that reference #fontPop) -->
+    <div id="fontPop" role="menu"></div>
+
     <!-- Modular JS files (loaded in dependency order) -->
     <script src="/static/js/namespace.js?v={{ app_version }}"></script>
     <script src="/static/js/audio_player.js?v={{ app_version }}"></script>
@@ -606,5 +616,127 @@
     <div id="toast-container" class="tts-toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
 
     <script src="/static/js/command_palette.js?v={{ app_version }}"></script>
+
+    <!-- Font popup inline script (runs last, all DOM ready) -->
+    <script>
+    (function () {
+        var FONTS = [
+            { g: '中文现代', items: [
+                { n: '思源黑体', f: '"Noto Sans SC",sans-serif', d: '现代简洁 · 默认' },
+                { n: '思源宋体', f: '"Noto Serif SC",serif', d: '优雅衬线' },
+                { n: '站酷小薇', f: '"ZCOOL XiaoWei",serif', d: '文艺手写' },
+                { n: '站酷庆科黄油体', f: '"ZCOOL QingKe HuangYou",sans-serif', d: '圆润趣味' },
+                { n: '站酷快乐体', f: '"ZCOOL KuaiLe",sans-serif', d: '活泼可爱' }
+            ]},
+            { g: '中文书法', items: [
+                { n: '马善政楷书', f: '"Ma Shan Zheng",cursive', d: '毛笔楷书' },
+                { n: '龙藏手书', f: '"Long Cang",cursive', d: '手写行书' },
+                { n: '志莽行书', f: '"Zhi Mang Xing",cursive', d: '洒脱行书' },
+                { n: '柳建茂草书', f: '"Liu Jian Mao Cao",cursive', d: '狂草艺术' }
+            ]},
+            { g: '西文艺术', items: [
+                { n: 'Playfair Display', f: '"Playfair Display",serif', d: '优雅衬线' },
+                { n: 'Cinzel', f: '"Cinzel",serif', d: '古典罗马' },
+                { n: 'Great Vibes', f: '"Great Vibes",cursive', d: '花体手写' },
+                { n: 'Pacifico', f: '"Pacifico",cursive', d: '复古圆润' },
+                { n: 'Dancing Script', f: '"Dancing Script",cursive', d: '流畅手写' }
+            ]}
+        ];
+        var pop = document.getElementById('fontPop');
+        var btn = document.getElementById('font-toggle-btn');
+        if (!pop || !btn) { console.warn('[FontPop] element not found:', !!pop, !!btn); return; }
+        console.log('[FontPop] initialized, pop=', pop, 'btn=', btn);
+
+        pop.style.cssText = 'position:fixed;display:none;width:240px;max-height:52vh;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:4px;z-index:10000;overflow-y:auto;';
+
+        function curFont() { try { return localStorage.getItem('tts-font') || ''; } catch (e) { return ''; } }
+
+        function build() {
+            pop.innerHTML = '';
+            FONTS.forEach(function (grp) {
+                var g = document.createElement('div');
+                g.className = 'tts-font-group';
+                g.textContent = grp.g;
+                g.style.cssText = 'padding:8px 10px 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.5;font-weight:700;color:var(--text-muted,#888)';
+                pop.appendChild(g);
+                grp.items.forEach(function (f) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;background:none;padding:7px 10px;font-size:14px;color:var(--text-primary,#222);border-radius:8px;cursor:pointer;line-height:1.3;font-family:' + f.f;
+                    b.dataset.f = f.f;
+                    b.innerHTML = f.n + '<span style="font-size:10px;opacity:.45;font-weight:400;margin-left:auto;white-space:nowrap">' + f.d + '</span>';
+                    b.addEventListener('mouseenter', function () { b.style.background = 'rgba(120,120,120,.1)'; });
+                    b.addEventListener('mouseleave', function () { b.style.background = 'none'; });
+                    b.addEventListener('click', function () {
+                        document.documentElement.style.setProperty('--tts-font', f.f);
+                        try { localStorage.setItem('tts-font', f.f); } catch (e) {}
+                        sync();
+                        hidePop();
+                    });
+                    pop.appendChild(b);
+                });
+            });
+            sync();
+        }
+
+        function sync() {
+            var cur = curFont();
+            pop.querySelectorAll('button[data-f]').forEach(function (b) {
+                if (b.dataset.f === cur) {
+                    b.style.color = 'var(--accent-primary,#5e7d5a)';
+                    b.style.fontWeight = '600';
+                } else {
+                    b.style.color = '';
+                    b.style.fontWeight = '';
+                }
+            });
+        }
+
+        function restore() {
+            var saved = curFont();
+            if (saved) document.documentElement.style.setProperty('--tts-font', saved);
+            sync();
+        }
+
+        function showPop() {
+            console.log('[FontPop] showPop called');
+            pop.style.display = 'block';
+            var btnRect = btn.getBoundingClientRect();
+            var gap = 6;
+            var top = btnRect.bottom + gap;
+            var left = btnRect.left;
+            var popH = pop.scrollHeight || 300;
+            if (left + 240 > window.innerWidth - 8) left = window.innerWidth - 248;
+            if (left < 8) left = 8;
+            if (top + popH > window.innerHeight - 8) top = btnRect.top - popH - gap;
+            if (top < 8) top = 8;
+            pop.style.top = top + 'px';
+            pop.style.left = left + 'px';
+        }
+
+        function hidePop() { console.log('[FontPop] hidePop called'); pop.style.display = 'none'; }
+
+        btn.addEventListener('click', function (e) {
+            console.log('[FontPop] click handler fired, display=', pop.style.display);
+            e.stopPropagation();
+            if (pop.style.display === 'none' || !pop.style.display) {
+                showPop();
+            } else {
+                hidePop();
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('#font-toggle-btn') && !e.target.closest('#fontPop')) hidePop();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') hidePop();
+        });
+
+        build();
+        restore();
+    })();
+    </script>
 </body>
 </html>
