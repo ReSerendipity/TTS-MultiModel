@@ -97,11 +97,19 @@ jobs:
         run: |
           pytest tests/e2e/test_visual_regression.py -q
 
+      # 视觉回归必须在干净服务器状态上对比（其他 E2E 测试会污染页面状态），
+      # 因此先跑 visual gate（baseline 刚生成，diff≈0），再跑其余测试
+      - name: Run Visual Regression gate (clean state)
+        env:
+          TTS_SERVER_URL: "http://127.0.0.1:7869"
+        run: |
+          pytest tests/e2e/test_visual_regression.py -q
+
       - name: Run Playwright E2E tests (required gate)
         env:
           TTS_SERVER_URL: "http://127.0.0.1:7869"
         run: |
-          pytest tests/e2e/ -v --tb=short
+          pytest tests/e2e/ -v --tb=short --ignore=tests/e2e/test_visual_regression.py
 
       - name: Upload E2E screenshots
         if: always()
