@@ -118,7 +118,7 @@ def _capture_and_compare(page, screenshots_dir, filename):
     # 捕获到临时文件
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
         tmp_path = tmp.name
-    page.screenshot(path=tmp_path)
+    page.screenshot(path=tmp_path, animations="disabled")
 
     # 检查是否需要更新或创建 baseline
     # 支持环境变量 TTS_SNAPSHOT_UPDATE=1 或命令行 --snapshot-update
@@ -181,8 +181,13 @@ def _block_remote_fonts(context):
 
 
 def _stabilize_page(page):
-    """统一稳定化：dismiss onboarding overlay + 等待渲染稳定。"""
+    """统一稳定化：dismiss onboarding overlay + 停止动画 + 等待渲染稳定。"""
     _freeze_random(page)
+    # 停止所有 JS 定时器（进度条模拟动画等），消除动画帧差异
+    page.evaluate(
+        "() => { const maxId = window.setInterval(() => {}, 1e9); "
+        "for (let i = 1; i <= maxId; i++) clearInterval(i); }"
+    )
     page.evaluate("() => document.fonts.ready.then(() => true)")
     page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); }")
     page.wait_for_timeout(2200)
