@@ -161,6 +161,12 @@ def _capture_and_compare(page, screenshots_dir, filename):
                                 f"x=[{xs.min()}-{xs.max()}] y=[{ys.min()}-{ys.max()}] "
                                 f"pixels={len(xs)}"
                             )
+                    # 保存当前截图便于人工对比定位
+                    import shutil as _shutil
+                    try:
+                        _shutil.copy(tmp_path, os.path.join(screenshots_dir, f"current_{filename}"))
+                    except OSError:
+                        pass
             finally:
                 os.unlink(tmp_path)
             assert is_match, (
