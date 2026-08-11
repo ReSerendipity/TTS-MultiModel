@@ -89,14 +89,6 @@ jobs:
           echo "===== server.log (tail) ====="
           tail -50 /tmp/server.log || true
 
-      - name: Generate Linux baselines (temp step, will be removed)
-        if: always()
-        env:
-          TTS_SERVER_URL: "http://127.0.0.1:7869"
-          TTS_SNAPSHOT_UPDATE: "1"
-        run: |
-          pytest tests/e2e/test_visual_regression.py -q
-
       # 视觉回归必须在干净服务器状态上对比（其他 E2E 测试会污染页面状态），
       # baseline 为 CI (Linux) 环境生成并入库；UI 改动后需重新生成 baseline：
       #   TTS_SNAPSHOT_UPDATE=1 pytest tests/e2e/test_visual_regression.py -q
