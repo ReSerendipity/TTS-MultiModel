@@ -1,0 +1,88 @@
+name: Update Baselines
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: '确认在 CI (Linux) 环境重新生成视觉回归 baseline 并自动提交'
+        required: true
+        default: 'yes'
+
+jobs:
+  update-baselines:
+    name: Regenerate visual regression baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+          # 与 e2e.yml 保持同一 playwright 版本（防渲染差异）
+          pip install playwright==1.62.0
+          playwright install --with-deps chromium
+
+      - name: Start TTS MultiModel server
+        env:
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_OFFLINE: "1"
+          MODELSCOPE_OFFLINE: "1"
+          CUDA_VISIBLE_DEVICES: ""
+          TTS_AUTO_LOAD_MODEL: "0"
+        run: |
+          cd bin
+          python -u -m integrated_app.app_server --host 127.0.0.1 --port 7869 > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+          READY=0
+          for i in $(seq 1 75); do
+            if curl -s http://127.0.0.1:7869/ > /dev/null 2>&1; then
+              echo "Server is ready"
+              READY=1
+              break
+            fi
+            if ! kill -0 $(cat /tmp/server.pid) 2>/dev/null; then
+              echo "Server process exited early (iteration $i)"
+              break
+            fi
+            echo "Waiting for server... ($i/75)"
+            sleep 2
+          done
+          if [ "$READY" != "1" ]; then
+            tail -100 /tmp/server.log || true
+            echo "Server failed to start"
+            exit 1
+          fi
+
+      - name: Regenerate baselines
+        env:
+          TTS_SERVER_URL: "http://127.0.0.1:7869"
+          TTS_SNAPSHOT_UPDATE: "1"
+        run: |
+          pytest tests/e2e/test_visual_regression.py -q
+
+      - name: Commit and push baselines
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet tests/e2e/screenshots/; then
+            git add tests/e2e/screenshots/
+            git commit -m "chore(e2e): update visual regression baselines"
+            git push origin HEAD:master || {
+              echo "push failed (branch protection or race) - baselines committed locally only"
+              git log --oneline -1
+            }
+          else
+            echo "no baseline changes"
+          fi
