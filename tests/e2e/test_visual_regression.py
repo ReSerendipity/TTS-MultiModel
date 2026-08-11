@@ -153,8 +153,14 @@ def _capture_and_compare(page, screenshots_dir, filename):
             )
 
 
+def _freeze_random(page):
+    """冻结 Math.random，消除波形等动态元素导致的截图差异。"""
+    page.evaluate("() => { Math.random = () => 0.5; }")
+
+
 def _stabilize_page(page):
     """统一稳定化：dismiss onboarding overlay + 等待渲染稳定。"""
+    _freeze_random(page)
     page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); }")
     page.wait_for_timeout(2200)
     page.evaluate(
@@ -171,6 +177,7 @@ class TestVisualRegression:
     def test_home_page_visual(self, server_url, browser):
         """首页视觉回归 — 对比首页截图。"""
         context = browser.new_context(viewport=VIEWPORT)
+        context.add_init_script("Math.random = () => 0.5;")
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -181,6 +188,7 @@ class TestVisualRegression:
     def test_voice_design_tab_visual(self, server_url, browser):
         """声音设计 tab 视觉回归。"""
         context = browser.new_context(viewport=VIEWPORT)
+        context.add_init_script("Math.random = () => 0.5;")
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -200,6 +208,7 @@ class TestVisualRegression:
     def test_voice_clone_tab_visual(self, server_url, browser):
         """语音克隆 tab 视觉回归。"""
         context = browser.new_context(viewport=VIEWPORT)
+        context.add_init_script("Math.random = () => 0.5;")
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -218,6 +227,7 @@ class TestVisualRegression:
     def test_dark_theme_visual(self, server_url, browser):
         """暗色主题视觉回归。"""
         context = browser.new_context(viewport=VIEWPORT)
+        context.add_init_script("Math.random = () => 0.5;")
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -252,6 +262,7 @@ class TestVisualRegression:
             viewport={"width": 375, "height": 812},
             user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
         )
+        context.add_init_script("Math.random = () => 0.5;")
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
