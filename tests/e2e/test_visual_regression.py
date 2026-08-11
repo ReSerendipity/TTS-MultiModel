@@ -158,9 +158,16 @@ def _freeze_random(page):
     page.evaluate("() => { Math.random = () => 0.5; }")
 
 
+def _block_remote_fonts(context):
+    """拦截 Google Fonts，消除字体加载时序导致的截图差异。"""
+    context.route("**://fonts.googleapis.com/**", lambda route: route.abort())
+    context.route("**://fonts.gstatic.com/**", lambda route: route.abort())
+
+
 def _stabilize_page(page):
     """统一稳定化：dismiss onboarding overlay + 等待渲染稳定。"""
     _freeze_random(page)
+    page.evaluate("() => document.fonts.ready.then(() => true)")
     page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); }")
     page.wait_for_timeout(2200)
     page.evaluate(
@@ -178,6 +185,7 @@ class TestVisualRegression:
         """首页视觉回归 — 对比首页截图。"""
         context = browser.new_context(viewport=VIEWPORT)
         context.add_init_script("Math.random = () => 0.5;")
+        _block_remote_fonts(context)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -189,6 +197,7 @@ class TestVisualRegression:
         """声音设计 tab 视觉回归。"""
         context = browser.new_context(viewport=VIEWPORT)
         context.add_init_script("Math.random = () => 0.5;")
+        _block_remote_fonts(context)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -209,6 +218,7 @@ class TestVisualRegression:
         """语音克隆 tab 视觉回归。"""
         context = browser.new_context(viewport=VIEWPORT)
         context.add_init_script("Math.random = () => 0.5;")
+        _block_remote_fonts(context)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -228,6 +238,7 @@ class TestVisualRegression:
         """暗色主题视觉回归。"""
         context = browser.new_context(viewport=VIEWPORT)
         context.add_init_script("Math.random = () => 0.5;")
+        _block_remote_fonts(context)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -263,6 +274,7 @@ class TestVisualRegression:
             user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
         )
         context.add_init_script("Math.random = () => 0.5;")
+        _block_remote_fonts(context)
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
