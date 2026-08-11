@@ -610,6 +610,7 @@ function buildPlayer(containerId,text,rate,pitch,emotion,engine='voxcpm2'){
   let wave=null,playing=false;
   btn.onclick=async()=>{
     if(playing){speechSynthesis.cancel();return}
+    if(!zhVoice){showToast('⚠ 未找到中文语音引擎，发音可能与文本不匹配（浏览器限制）')}
     playing=true;btn.textContent='⏸';if(wave)wave.stop();wave=startWave(cv);
     showStream(streamOn());
     await synth(text,rate,pitch,emotion);
@@ -795,9 +796,10 @@ $('#p-run').onclick=async()=>{
   $('#p-run').disabled=true;
   await runSteps('p-steps',['文本续写 · LLM 采样…','续写结果后处理…','语音合成 · '+$('#p-voice').value+'…'],650);
   const cont=CONTINUES[$('#p-len').value];
+  const full=($('#p-text').value.trim()+' '+cont).trim();
   $('#p-cont').classList.remove('hidden');
-  $('#p-cont-text').textContent=cont;
-  buildPlayer('p-player',$('#p-text').value.trim()+' '+cont,1,1,'自然');
+  $('#p-cont-text').textContent=full;
+  buildPlayer('p-player',full,1,1,'自然');
   $('#p-run').disabled=false;showToast('续写完成（模拟）✓');
 };
 
