@@ -195,6 +195,25 @@ def _stabilize_page(page):
         "for (let i = 1; i <= maxId; i++) clearInterval(i); }"
     )
     page.evaluate("() => document.fonts.ready.then(() => true)")
+    # 等待 htmx 异步内容加载完成（tab-loading spinner 隐藏 / tab-content 渲染）
+    try:
+        page.wait_for_function(
+            "() => {"
+            " const spin = document.querySelector('#tab-loading');"
+            " if (spin && !spin.classList.contains('tts-hidden')) return false;"
+            " return true;"
+            " }",
+            timeout=15000,
+        )
+        page.wait_for_function(
+            "() => {"
+            " const c = document.querySelector('#tab-content');"
+            " return !c || (c.children.length > 0 && getComputedStyle(c).display !== 'none');"
+            " }",
+            timeout=15000,
+        )
+    except Exception:
+        pass  # 超时也不阻塞：等待已尽力，至少固定时序
     page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); }")
     page.wait_for_timeout(2200)
     page.evaluate(
