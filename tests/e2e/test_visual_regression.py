@@ -145,6 +145,22 @@ def _capture_and_compare(page, screenshots_dir, filename):
         else:
             try:
                 is_match, diff_ratio = _compare_images(baseline_path, tmp_path)
+                if not is_match:
+                    # 诊断：输出差异区域的 bounding box（便于定位差异元素）
+                    import numpy as _np
+
+                    baseline = _load_image_png(baseline_path)
+                    current = _load_image_png(tmp_path)
+                    if baseline.shape == current.shape:
+                        diff = _np.abs(baseline.astype(_np.int16) - current.astype(_np.int16))
+                        mask = _np.any(diff > 10, axis=2)
+                        ys, xs = _np.where(mask)
+                        if len(xs) > 0:
+                            print(
+                                f"[DIAG] {filename} diff region: "
+                                f"x=[{xs.min()}-{xs.max()}] y=[{ys.min()}-{ys.max()}] "
+                                f"pixels={len(xs)}"
+                            )
             finally:
                 os.unlink(tmp_path)
             assert is_match, (
