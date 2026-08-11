@@ -825,6 +825,7 @@ function renderScript(){
 $('#s-add').onclick=()=>{scriptRows.push({role:'旁白',text:'新台词…'});renderScript()};
 $('#s-run').onclick=async()=>{
   $('#s-run').disabled=true;
+  if(!zhVoice)showToast('⚠ 未找到中文语音引擎，发音可能与文本不匹配（浏览器限制）');
   const steps=scriptRows.map((r,i)=>`角色「${r.role}」· 第 ${i+1} 句 · 分配音色…`);
   await runSteps('s-steps',steps,420);
   $('#s-run').disabled=false;
@@ -834,6 +835,7 @@ $('#s-run').onclick=async()=>{
 };
 $('#s-play').onclick=async()=>{
   $('#s-play').disabled=true;
+  if(!zhVoice)showToast('⚠ 未找到中文语音引擎，发音可能与文本不匹配（浏览器限制）');
   for(const r of scriptRows){
     const v=ROLE_VOICE[r.role]||{p:1,r:1};
     await synth(r.text||'（空）',v.r,v.p,'自然');
