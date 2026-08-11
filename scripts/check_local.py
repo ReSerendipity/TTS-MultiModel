@@ -15,18 +15,34 @@
     - 编码扫描对 git ls-files 中所有文本文件做严格 UTF-8 解码，
       可抓"乱码提交"（compileall 只能抓 SyntaxError，抓不到字符串/JSON 里的乱码）
 """
+
 from __future__ import annotations
 
 import argparse
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 TEXT_EXTS = {
-    ".py", ".json", ".yaml", ".yml", ".toml", ".md", ".txt",
-    ".html", ".css", ".js", ".mjs", ".ts", ".cfg", ".ini",
-    ".sh", ".ps1", ".bat", ".svg", ".xml",
+    ".py",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".md",
+    ".txt",
+    ".html",
+    ".css",
+    ".js",
+    ".mjs",
+    ".ts",
+    ".cfg",
+    ".ini",
+    ".sh",
+    ".ps1",
+    ".bat",
+    ".svg",
+    ".xml",
 }
 
 
@@ -45,9 +61,7 @@ def check_dir(path: str) -> bool:
 def utf8_scan() -> None:
     """严格 UTF-8 扫描所有被 git 跟踪的文本文件。"""
     print("== UTF-8 编码扫描（git ls-files 文本文件）==", flush=True)
-    listed = subprocess.run(
-        ["git", "ls-files"], capture_output=True, text=True
-    )
+    listed = subprocess.run(["git", "ls-files"], capture_output=True, text=True)
     if listed.returncode != 0:
         print("  (不是 git 仓库，跳过)", flush=True)
         return
@@ -64,7 +78,10 @@ def utf8_scan() -> None:
         except OSError:
             continue
     if bad:
-        print("FAIL: 以下文件不是有效 UTF-8（可能是编码损坏，提交前必须修复）:", flush=True)
+        print(
+            "FAIL: 以下文件不是有效 UTF-8（可能是编码损坏，提交前必须修复）:",
+            flush=True,
+        )
         for b in bad:
             print(f"  {b}", flush=True)
         sys.exit(1)
@@ -77,7 +94,10 @@ def compile_all() -> None:
     if not dirs:
         print("== compileall：无可检查目录 ==", flush=True)
         return
-    run([sys.executable, "-m", "compileall", "-q", "-j", "4", *dirs], "compileall 语法检查")
+    run(
+        [sys.executable, "-m", "compileall", "-q", "-j", "4", *dirs],
+        "compileall 语法检查",
+    )
 
 
 def main() -> None:
@@ -105,8 +125,15 @@ def main() -> None:
     if args.full:
         # 全量 pytest（--timeout 防挂死；--full 时才跑，耗时较长）
         run(
-            [sys.executable, "-m", "pytest", "-q", "--timeout=180",
-             "-m", "not integration and not gpu and not cuda and not vram"],
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--timeout=180",
+                "-m",
+                "not integration and not gpu and not cuda and not vram",
+            ],
             "pytest 全量（含超时保护）",
         )
 
