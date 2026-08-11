@@ -41,7 +41,9 @@ jobs:
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
           pip install pytest pytest-asyncio httpx
-          pip install playwright
+          # 固定 playwright 版本：未固定会导致跨 run chromium 版本漂移，
+          # 引起视觉回归截图渲染差异（像素级对比敏感）
+          pip install playwright==1.62.0
           playwright install --with-deps chromium
 
       - name: Start TTS MultiModel server
