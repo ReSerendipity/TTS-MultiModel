@@ -153,6 +153,18 @@ def _capture_and_compare(page, screenshots_dir, filename):
             )
 
 
+def _stabilize_page(page):
+    """统一稳定化：dismiss onboarding overlay + 等待渲染稳定。"""
+    page.evaluate("() => { localStorage.setItem('tts_onboarded_v1','1'); }")
+    page.wait_for_timeout(2200)
+    page.evaluate(
+        "() => { localStorage.setItem('tts_onboarded_v1','1'); "
+        "['onboarding-overlay','onboarding-spotlight','onboarding-card']"
+        ".forEach((id) => document.getElementById(id)?.remove()); }"
+    )
+    page.wait_for_timeout(1000)
+
+
 class TestVisualRegression:
     """核心页面视觉回归测试。"""
 
@@ -162,6 +174,7 @@ class TestVisualRegression:
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
+        _stabilize_page(page)
         _capture_and_compare(page, SCREENSHOTS_DIR, "regression_home.png")
         context.close()
 
@@ -171,6 +184,7 @@ class TestVisualRegression:
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
+        _stabilize_page(page)
 
         # Navigate to voice_design tab
         button = page.locator(".sidebar-item[data-tab='voice_design']")
@@ -178,6 +192,7 @@ class TestVisualRegression:
             button.first.click()
             page.wait_for_load_state("domcontentloaded", timeout=15000)
             page.wait_for_selector("#tab-content", state="visible", timeout=5000)
+            page.wait_for_timeout(800)
 
         _capture_and_compare(page, SCREENSHOTS_DIR, "regression_voice_design.png")
         context.close()
@@ -188,12 +203,14 @@ class TestVisualRegression:
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
+        _stabilize_page(page)
 
         button = page.locator(".sidebar-item[data-tab='voice_clone']")
         if button.count() > 0:
             button.first.click()
             page.wait_for_load_state("domcontentloaded", timeout=15000)
             page.wait_for_selector("#tab-content", state="visible", timeout=5000)
+            page.wait_for_timeout(800)
 
         _capture_and_compare(page, SCREENSHOTS_DIR, "regression_voice_clone.png")
         context.close()
@@ -205,7 +222,7 @@ class TestVisualRegression:
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
 
-        # Set dark theme
+        # Set dark theme + dismiss onboarding (wait for scheduled overlay)
         page.evaluate("""
             () => {
                 localStorage.setItem('tts_onboarded_v1', '1');
@@ -215,7 +232,16 @@ class TestVisualRegression:
                 document.documentElement.style.colorScheme = 'dark';
             }
         """)
-        page.wait_for_timeout(300)
+        page.wait_for_timeout(2200)
+        page.evaluate("""
+            () => {
+                localStorage.setItem('tts_onboarded_v1', '1');
+                ['onboarding-overlay', 'onboarding-spotlight', 'onboarding-card']
+                    .forEach((id) => document.getElementById(id)?.remove());
+            }
+        """)
+        # 等待主题切换后的渲染稳定（CSS 过渡 + 字体）
+        page.wait_for_timeout(1200)
 
         _capture_and_compare(page, SCREENSHOTS_DIR, "regression_dark_theme.png")
         context.close()
@@ -229,6 +255,7 @@ class TestVisualRegression:
         page = context.new_page()
         page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_load_state("domcontentloaded", timeout=15000)
+        _stabilize_page(page)
 
         _capture_and_compare(page, SCREENSHOTS_DIR, "regression_mobile.png")
         context.close()
