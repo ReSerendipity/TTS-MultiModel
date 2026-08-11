@@ -10,10 +10,14 @@ on:
     - cron: '0 1 * * 0'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   pip-audit:
     name: Dependency Vulnerability Scan (pip-audit)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +36,7 @@ jobs:
   bandit:
     name: Code Security Scan (bandit)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
