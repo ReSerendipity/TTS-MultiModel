@@ -10,10 +10,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint (ruff)
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +41,7 @@ jobs:
   test:
     name: Test (pytest)
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     needs: lint
     strategy:
       matrix:
@@ -59,6 +64,7 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
+          pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
 
       - name: Install dependencies (macOS)
@@ -67,6 +73,7 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio
           pip install -r requirements.txt
+          pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
 
       - name: Install dependencies (Windows)
@@ -75,6 +82,7 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
+          pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
         shell: pwsh
 
@@ -127,6 +135,7 @@ jobs:
   build:
     name: Build (sdist/wheel)
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     needs: test
     steps:
       - uses: actions/checkout@v4
