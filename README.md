@@ -38,7 +38,7 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 | **一站式平台** | 集成 VoxCPM2 + IndexTTS2 + dots.tts 多引擎，声音克隆、声音设计、剧本配音、LoRA 微调，无需在多个工具间切换 |
 | **极低门槛** | 内置 WinPython + 一键安装脚本，Windows 用户开箱即用；Docker 部署仅需一行命令 |
 | **完整工具链** | 从数据准备到模型训练到推理部署，覆盖 TTS 全生命周期 |
-| **开源透明** | Apache 2.0 许可，可商用，可二次开发，社区驱动 |
+| **开源透明** | 项目代码 Apache 2.0；**模型权重许可各异**（见「模型许可说明」），商用前请逐项核对 |
 | **多语言界面** | 支持中文、英文、日文、韩文，国际化开箱即用 |
 
 ## Demo
@@ -357,6 +357,21 @@ TTS_MultiModel/
 4. **改进文档** - 修复错别字、添加示例、翻译内容
 
 详见 [贡献指南](CONTRIBUTING.md)。
+
+
+## 模型许可说明
+
+> 本表为**模型权重**的许可清单（项目代码为 Apache-2.0，见 [LICENSE](LICENSE)）。
+> **接入新引擎时：更新本表 + `config.yaml` 中对应引擎的 `license` 字段。**
+
+| 引擎 | 权重许可 | 商用 | 说明 |
+|---|---|---|---|
+| VoxCPM2（面壁智能/OpenBMB） | Apache-2.0 | ✅ 可商用 | 默认推荐引擎；persona 微调基座 |
+| dots.tts（小红书 hilab） | Apache-2.0 | ✅ 可商用 | |
+| IndexTTS2（bilibili Index Team） | bilibili Model Use License Agreement | ⚠️ **商用须事先向 bilibili 登记并取得书面授权** | 见引擎仓库 LICENSE |
+| CosyVoice2 / ChatTTS / F5-TTS（data/ 参考或历史引擎） | Apache-2.0 / CC BY-NC 等 | ⚠️ 逐项核对（ChatTTS、F5-TTS 模型为非商用许可） | 仅作研究参考或标注后使用 |
+
+**新增引擎检查清单**：① `config.yaml` 填写真实 `license` 字段；② 更新本表；③ 非商用模型（NC/自定义许可）不得作为商用发行默认引擎、不随商业发行物分发；④ 使用前核对许可最新版本。
 
 ## 许可证
 

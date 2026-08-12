@@ -46,7 +46,7 @@ models:
       ram_gb: 16.0
       languages: ["zh", "en"]
       quality: "high"
-      license: "MIT"
+      license: "bilibili Model Use License（商用需向 bilibili 登记书面授权）"
       supported_features: ["clone", "emotion_control"]
       sample_rate: 24000
       requires_gpu: true
