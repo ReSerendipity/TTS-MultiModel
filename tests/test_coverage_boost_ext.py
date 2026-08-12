@@ -330,7 +330,7 @@ class TestSSERoutes:
                 result["status"] = -1
                 result["error"] = str(e)
 
-        t = threading.Thread(target=make_request)
+        t = threading.Thread(target=make_request, daemon=True)
         t.start()
         t.join(timeout=3)
         # SSE should return 200 (or timeout, which is also fine)
