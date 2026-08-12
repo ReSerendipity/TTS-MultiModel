@@ -65,7 +65,7 @@ jobs:
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
           pip check
-          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
+          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -74,7 +74,7 @@ jobs:
           pip install torch torchvision torchaudio
           pip install -r requirements.txt
           pip check
-          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
+          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -83,7 +83,7 @@ jobs:
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
           pip check
-          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx
+          pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
         shell: pwsh
 
       - name: Run tests with coverage
