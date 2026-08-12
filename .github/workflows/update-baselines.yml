@@ -8,6 +8,10 @@ on:
         required: true
         default: 'yes'
 
+concurrency:
+  group: update-baselines-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   update-baselines:
     name: Regenerate visual regression baselines
