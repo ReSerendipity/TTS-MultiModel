@@ -31,7 +31,7 @@ jobs:
 
       - name: Scan dependencies for known vulnerabilities
         run: |
-          pip-audit -r requirements.txt --desc --ignore-vuln GHSA-XXXX || true
+          pip-audit -r requirements.txt --desc || true
 
   bandit:
     name: Code Security Scan (bandit)
