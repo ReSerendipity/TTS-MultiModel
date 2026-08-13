@@ -531,7 +531,7 @@ class PromptExpander:
             扩展后的详细提示词。
         """
         if not text or not text.strip():
-            return text or ""
+            return text.strip() if text else ""
 
         matched_ids: list[str] = []
         for keyword, template_ids in _KEYWORD_MAP.items():

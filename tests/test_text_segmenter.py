@@ -242,7 +242,8 @@ class TestAudioCrossfader:
         audio1 = np.ones(2000, dtype=np.float32)
         audio2 = np.ones(2000, dtype=np.float32)
         result = self.crossfader.crossfade_concat([audio1, audio2], self.sr)
-        expected_len = len(audio1) + len(audio2) - 2 * fade_samples
+        # 交叉淡入淡出重叠长度为 fade_samples，结果长度 = len1 + len2 - fade_samples
+        expected_len = len(audio1) + len(audio2) - fade_samples
         assert len(result) == expected_len
 
     def test_no_click_noise_at_boundary(self):

@@ -329,10 +329,10 @@ class G2PManager:
         """
         start_time = time.perf_counter()
 
-        # 参数校验
+        # 参数校验：空文本或纯空白文本统一返回空结果
         if not text or not text.strip():
             return G2PResult(
-                text=text or "",
+                text=text.strip() if text else "",
                 language=lang,
                 engine_name="empty",
                 cached=False,

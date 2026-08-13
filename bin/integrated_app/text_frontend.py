@@ -1601,17 +1601,13 @@ class G2PProcessor:
 
     def is_available(self, lang: str) -> bool:
         """检查指定语言的 G2P 引擎是否可用
-
         Args:
             lang: 语言代码
-
         Returns:
-            后端可用返回 True，否则返回 False（透传模式仍可用）
+            处理能力可用返回 True，否则返回 False。
+            受支持语言因透传模式而始终可用（后端缺失时降级为原文）。
         """
-        manager = self._get_manager()
-        if manager is None:
-            return True  # 透传模式始终"可用"
-        return manager.is_available(lang)
+        return lang in SUPPORTED_LANGUAGES
 
     def initialize_engine(self, lang: str) -> bool:
         """初始化指定语言的 G2P 引擎
