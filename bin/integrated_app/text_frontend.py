@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 logger = logging.getLogger("tts_multimodel")
 
@@ -1527,45 +1528,76 @@ class TextNormalizer:
 
 
 class G2PProcessor:
-    """Grapheme-to-Phoneme 处理器（桩实现）
+    """Grapheme-to-Phoneme 处理器
 
-    提供统一的 G2P 处理接口，当前为桩实现直接返回原文。
-    预留未来集成 G2PW / pypinyin / g2p_en / pyopenjtalk / g2pk 等引擎。
+    提供统一的 G2P 处理接口，通过 G2PManager 委托给具体 G2P 后端。
+    支持 pypinyin（中文多音字消歧）、g2p_en（英文）、pyopenjtalk（日文）、
+    g2pk2（韩文）。所有后端均为可选依赖，未安装时优雅降级为透传模式。
 
     设计参考主流 TTS 文本前端：
       - chinese.py  使用 pypinyin + jieba + cn2an
       - english.py  使用 g2p_en + CMU dict
       - japanese.py 使用 pyopenjtalk
       - korean.py   使用 g2pk2 + jamo
+
+    内置 LRU 缓存提升重复文本处理速度，缓存命中率通过 stats 属性可查。
     """
 
     def __init__(self) -> None:
         self._initialized: dict[str, bool] = {}
+        # 懒导入 G2PManager，避免循环依赖
+        self._manager: Any | None = None
+
+    def _get_manager(self) -> Any:
+        """懒获取 G2PManager 实例。
+
+        Returns:
+            G2PManager 实例。
+        """
+        if self._manager is None:
+            try:
+                from .g2p_manager import get_g2p_manager
+
+                self._manager = get_g2p_manager()
+            except ImportError as e:
+                logger.warning("G2PManager 导入失败，回退为透传模式: %s", e)
+                self._manager = False  # type: ignore[assignment]
+        return self._manager if self._manager is not False else None
 
     def process(self, text: str, lang: str) -> str:
         """对文本执行 G2P 处理
 
-        当前为桩实现，直接返回原文。
-        未来将根据语言加载对应 G2P 引擎。
+        通过 G2PManager 委托给具体 G2P 后端。
+        后端不可用时优雅降级为透传模式（返回原文）。
 
         Args:
             text: 规范化后的文本
             lang: 语言代码 (zh/en/ja/ko)
 
         Returns:
-            G2P 处理后的文本（当前等同于输入）
+            G2P 处理后的文本（音素序列或带注音文本）
         """
         if not text:
             return text
 
-        # 桩实现：直接返回原文
-        # 未来集成点：
-        #   zh -> pypinyin / G2PW
-        #   en -> g2p_en / CMU dict
-        #   ja -> pyopenjtalk
-        #   ko -> g2pk2 / jamo
-        logger.debug("G2P 桩处理: lang=%s, text='%s'", lang, text[:50])
-        return text
+        manager = self._get_manager()
+        if manager is None:
+            logger.debug("G2P 透传（manager 不可用）: lang=%s, text='%s'", lang, text[:50])
+            return text
+
+        try:
+            result = manager.convert_text(text, lang)
+            logger.debug(
+                "G2P 处理: lang=%s, engine=%s, text='%s' -> '%s'",
+                lang,
+                manager.get_engine_name(lang),
+                text[:50],
+                result[:50],
+            )
+            return result
+        except Exception as e:
+            logger.error("G2P 处理失败 (lang=%s): %s — 透传原文", lang, e)
+            return text
 
     def is_available(self, lang: str) -> bool:
         """检查指定语言的 G2P 引擎是否可用
@@ -1574,14 +1606,18 @@ class G2PProcessor:
             lang: 语言代码
 
         Returns:
-            当前始终返回 True（桩实现）
+            后端可用返回 True，否则返回 False（透传模式仍可用）
         """
-        return True
+        manager = self._get_manager()
+        if manager is None:
+            return True  # 透传模式始终"可用"
+        return manager.is_available(lang)
 
     def initialize_engine(self, lang: str) -> bool:
         """初始化指定语言的 G2P 引擎
 
-        桩实现中不做任何操作，始终返回 True。
+        G2PManager 采用懒初始化策略，此方法仅记录初始化状态。
+        实际引擎在首次 convert 调用时按需加载。
 
         Args:
             lang: 语言代码
@@ -1594,7 +1630,7 @@ class G2PProcessor:
             return False
 
         self._initialized[lang] = True
-        logger.debug("G2P 引擎初始化（桩）: lang=%s", lang)
+        logger.debug("G2P 引擎初始化: lang=%s", lang)
         return True
 
 

@@ -172,6 +172,8 @@ markers = [
     "gpu: tests requiring a real GPU device",
     "cuda: tests requiring CUDA GPU for inference",
     "vram: tests for VRAM switching / memory management",
+    "e2e: end-to-end tests with browser/server",
+    "smoke: quick smoke tests for basic functionality",
 ]
 
 [tool.coverage.run]
