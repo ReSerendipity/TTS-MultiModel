@@ -35,7 +35,7 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 
 | 优势 | 说明 |
 |------|------|
-| **一站式平台** | 集成 VoxCPM2 + IndexTTS2 + dots.tts 多引擎，声音克隆、声音设计、剧本配音、LoRA 微调，无需在多个工具间切换 |
+| **一站式平台** | 集成 VoxCPM2 + IndexTTS 2.5 + dots.tts 多引擎，声音克隆、声音设计、剧本配音、LoRA 微调，无需在多个工具间切换 |
 | **极低门槛** | 内置 WinPython + 一键安装脚本，Windows 用户开箱即用；Docker 部署仅需一行命令 |
 | **完整工具链** | 从数据准备到模型训练到推理部署，覆盖 TTS 全生命周期 |
 | **开源透明** | 项目代码 Apache 2.0；**模型权重许可各异**（见「模型许可说明」），商用前请逐项核对 |
@@ -189,7 +189,7 @@ docker run -d --gpus all -p 7869:7869 \
 
 | 模型 | 说明 | 存放目录 | 下载源 |
 |------|------|----------|--------|
-| IndexTTS2 | IndexTTS 2.5 TTS 模型 | `pretrained_models/IndexTTS2/` | [ModelScope: IndexTeam/IndexTTS-2.5](https://modelscope.cn/models/IndexTeam/IndexTTS-2.5) |
+| IndexTTS 2.5 | IndexTTS 2.5 TTS 模型 | `pretrained_models/IndexTTS2/` | [ModelScope: IndexTeam/IndexTTS-2.5](https://modelscope.cn/models/IndexTeam/IndexTTS-2.5) |
 
 ### dots.tts 引擎所需模型
 
@@ -368,7 +368,7 @@ TTS_MultiModel/
 |---|---|---|---|
 | VoxCPM2（面壁智能/OpenBMB） | Apache-2.0 | ✅ 可商用 | 默认推荐引擎；persona 微调基座 |
 | dots.tts（小红书 hilab） | Apache-2.0 | ✅ 可商用 | |
-| IndexTTS2（bilibili Index Team） | bilibili Model Use License Agreement | ⚠️ **商用须事先向 bilibili 登记并取得书面授权** | 见引擎仓库 LICENSE |
+| IndexTTS 2.5（bilibili Index Team） | bilibili Model Use License Agreement | ⚠️ **商用须事先向 bilibili 登记并取得书面授权** | 见引擎仓库 LICENSE |
 | CosyVoice2 / ChatTTS / F5-TTS（data/ 参考或历史引擎） | Apache-2.0 / CC BY-NC 等 | ⚠️ 逐项核对（ChatTTS、F5-TTS 模型为非商用许可） | 仅作研究参考或标注后使用 |
 
 
@@ -389,7 +389,7 @@ Copyright (c) 2026 ReSerendipity
 
 - [模型下载指南](docs/MODEL_DOWNLOADS.md) - 模型下载与配置
 - [模型扩展指南](docs/MODEL_EXTENSION_GUIDE.md) - 添加新 TTS 引擎
-- [IndexTTS2 集成指南](docs/INDEXTTS2_INTEGRATION_GUIDE.md) - IndexTTS 2.5 集成详情
+- [IndexTTS 2.5 集成指南](docs/INDEXTTS2_INTEGRATION_GUIDE.md) - IndexTTS 2.5 集成详情
 - [项目架构](docs/PROJECT_ARCHITECTURE.md) - 系统架构概览
 - [参数调整](docs/ADJUSTABLE_PARAMETERS.md) - 配置参数参考
 - [UI 开发指南](docs/UI 开发指南_README.md) - Web UI 开发指南
@@ -412,7 +412,7 @@ Copyright (c) 2026 ReSerendipity
 ## 致谢
 
 - [VoxCPM2](https://github.com/OpenBMB/VoxCPM) - OpenBMB 开源 TTS 模型
-- [IndexTTS2](https://github.com/IndexTeam/IndexTTS2) - IndexTeam 开源 TTS 模型
+- [IndexTTS 2.5](https://github.com/IndexTeam/IndexTTS2) - IndexTeam 开源 TTS 模型
 - [dots.tts](https://github.com/dots-tts/dots) - dots.tts 引擎及实现
 - [FastAPI](https://fastapi.tiangolo.com/) 和 [HTMX](https://htmx.org/) - Web 框架
 - 所有开源贡献者
