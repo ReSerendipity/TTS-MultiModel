@@ -371,6 +371,12 @@ TTS_MultiModel/
 | IndexTTS2（bilibili Index Team） | bilibili Model Use License Agreement | ⚠️ **商用须事先向 bilibili 登记并取得书面授权** | 见引擎仓库 LICENSE |
 | CosyVoice2 / ChatTTS / F5-TTS（data/ 参考或历史引擎） | Apache-2.0 / CC BY-NC 等 | ⚠️ 逐项核对（ChatTTS、F5-TTS 模型为非商用许可） | 仅作研究参考或标注后使用 |
 
+
+### 非官方声明
+
+- 本项目为**独立开源项目**，与哔哩哔哩 Index 团队、面壁智能/OpenBMB、小红书 hilab 等模型官方团队**无隶属、赞助或官方合作关系**；集成的模型名称（IndexTTS、VoxCPM2、dots.tts）仅作**描述性引用**。
+- "IndexTTS" 为 bilibili 的商标/产品名，使用须遵守 **bilibili Model Use License Agreement**：其第 5.2 条仅允许合理且符合惯例的描述性引用，不得暗示官方背书；**商用须事先向 bilibili 登记并取得书面授权**（详见上表及引擎仓库 LICENSE）。
+- 使用 IndexTTS 引擎还须遵守其 DISCLAIMER，包括**禁止合成政治人物、公众人物等声音**；请勿将本项目用于侵权、诈骗、伪造等违法用途。
 **新增引擎检查清单**：① `config.yaml` 填写真实 `license` 字段；② 更新本表；③ 非商用模型（NC/自定义许可）不得作为商用发行默认引擎、不随商业发行物分发；④ 使用前核对许可最新版本。
 
 ## 许可证
