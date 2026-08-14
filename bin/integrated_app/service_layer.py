@@ -837,14 +837,14 @@ class ModelService:
                     logger.info(f"[ModelService] IndexTTS2 加载成功，耗时 {load_time:.1f}s")
                     return LoadResult(
                         success=True,
-                        message="IndexTTS 2.0 加载成功",
+                        message="IndexTTS 2.5 加载成功",
                         engine="indextts2",
                         load_time=load_time,
                     )
                 else:
                     return LoadResult(
                         success=False,
-                        message=final_status or "IndexTTS 2.0 加载失败",
+                        message=final_status or "IndexTTS 2.5 加载失败",
                         engine="indextts2",
                         load_time=load_time,
                     )

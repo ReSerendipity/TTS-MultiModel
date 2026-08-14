@@ -333,7 +333,7 @@ INDEXTTTS2_UI_DATA = EngineUIData(
     engine_id="indextts2",
     name_i18n="engine.indextts2.name",
     description_i18n="engine.indextts2.description",
-    version="2.0",
+    version="2.5",
     min_vram_gb=6.0,
     recommended_vram_gb=12.0,
     features=[
@@ -344,7 +344,7 @@ INDEXTTTS2_UI_DATA = EngineUIData(
     tab_order=20,
     icon="heart",
     color="#ef4444",
-    sample_rate=16000,
+    sample_rate=22050,
     params=[
         ParamDefinition(
             key="text",
@@ -354,6 +354,22 @@ INDEXTTTS2_UI_DATA = EngineUIData(
             group=ParamGroup.BASIC,
             placeholder_i18n="param.text.placeholder",
             required=True,
+        ),
+        ParamDefinition(
+            key="lang",
+            label_i18n="param.lang.label",
+            description_i18n="param.lang.description",
+            param_type=ParamType.SELECT,
+            group=ParamGroup.BASIC,
+            default="Auto",
+            options=[
+                ParamOption("Auto", "lang.auto"),
+                ParamOption("ZH", "lang.zh"),
+                ParamOption("EN", "lang.en"),
+                ParamOption("JA", "lang.ja"),
+                ParamOption("ES", "lang.es"),
+                ParamOption("AR", "lang.ar"),
+            ],
         ),
         ParamDefinition(
             key="reference_audio",

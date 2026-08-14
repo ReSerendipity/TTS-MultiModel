@@ -4,7 +4,7 @@
 
 **多模型语音合成平台 | Multi-Model Text-to-Speech Platform**
 
-基于 VoxCPM2、IndexTTS 2.0 和 dots.tts 的开源语音合成平台，支持声音克隆、声音设计、LoRA 微调与多角色剧本配音
+基于 VoxCPM2、IndexTTS 2.5 和 dots.tts 的开源语音合成平台，支持声音克隆、声音设计、LoRA 微调与多角色剧本配音
 
 A powerful open-source multi-model Text-to-Speech platform with voice cloning, voice design, LoRA fine-tuning, and multi-character script dubbing
 
@@ -65,7 +65,7 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 
 | 功能 | 描述 |
 |------|------|
-| **多引擎架构** | VoxCPM2 + IndexTTS 2.0 + dots.tts 多 TTS 引擎，灵活切换 |
+| **多引擎架构** | VoxCPM2 + IndexTTS 2.5 + dots.tts 多 TTS 引擎，灵活切换 |
 | **声音克隆** | 仅需少量音频样本即可克隆声音（可控克隆 + 极致克隆） |
 | **声音设计** | 通过文字描述生成目标音色的语音 |
 | **剧本配音** | 多角色对话剧本自动分配说话人，批量生成配音 |
@@ -185,11 +185,11 @@ docker run -d --gpus all -p 7869:7869 \
 | SenseVoiceSmall | ASR 语音识别模型 | `pretrained_models/SenseVoiceSmall/` | [ModelScope: iic/SenseVoiceSmall](https://www.modelscope.cn/models/iic/SenseVoiceSmall) / [HuggingFace: FunAudioLLM/SenseVoiceSmall](https://huggingface.co/FunAudioLLM/SenseVoiceSmall) |
 | speech_zipenhancer | 音频降噪模型 | `pretrained_models/speech_zipenhancer/` | [ModelScope 搜索 speech_zipenhancer](https://modelscope.cn/search?q=speech_zipenhancer) |
 
-### IndexTTS 2.0 引擎所需模型
+### IndexTTS 2.5 引擎所需模型
 
 | 模型 | 说明 | 存放目录 | 下载源 |
 |------|------|----------|--------|
-| IndexTTS2 | IndexTTS 2.0 TTS 模型 | `pretrained_models/IndexTTS2/` | [ModelScope: IndexTeam/IndexTTS-2](https://modelscope.cn/models/IndexTeam/IndexTTS-2) |
+| IndexTTS2 | IndexTTS 2.5 TTS 模型 | `pretrained_models/IndexTTS2/` | [ModelScope: IndexTeam/IndexTTS-2.5](https://modelscope.cn/models/IndexTeam/IndexTTS-2.5) |
 
 ### dots.tts 引擎所需模型
 
@@ -200,7 +200,7 @@ docker run -d --gpus all -p 7869:7869 \
 从 [HuggingFace](https://huggingface.co/) 或 [ModelScope](https://modelscope.cn/) 下载，也可以使用项目内置的快捷下载脚本：
 
 ```bash
-python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.0（IndexTeam/IndexTTS-2）
+python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.5（IndexTeam/IndexTTS-2.5）
 python scripts/download_dotstts.py     # dots.tts
 ```
 ```
@@ -277,7 +277,7 @@ shared 模式下，路径结构须与 portable 一致（`{shared_root}/VoxCPM2/`
 |------|------|
 | Web 框架 | FastAPI + Uvicorn |
 | 前端 | HTMX + Jinja2 + Bootstrap |
-| TTS 引擎 | VoxCPM2 + IndexTTS 2.0 + dots.tts |
+| TTS 引擎 | VoxCPM2 + IndexTTS 2.5 + dots.tts |
 | ASR 引擎 | SenseVoiceSmall |
 | 音频处理 | speech_zipenhancer + FFmpeg + SoX |
 | 深度学习 | PyTorch + Transformers + FunASR |
@@ -294,7 +294,7 @@ shared 模式下，路径结构须与 portable 一致（`{shared_root}/VoxCPM2/`
 | `/api/generate/voxcpm2/design` | POST | 声音设计 (VoxCPM2) |
 | `/api/generate/voxcpm2/script` | POST | 剧本配音 (VoxCPM2) |
 | `/api/generate/voxcpm2/streaming_sse` | POST | 流式生成 (SSE) |
-| `/api/generate/indextts2/synthesize` | POST | TTS 合成 (IndexTTS 2.0) |
+| `/api/generate/indextts2/synthesize` | POST | TTS 合成 (IndexTTS 2.5) |
 | `/api/generate/dots/synthesize` | POST | TTS 合成 (dots.tts) |
 | `/api/model/load` | POST | 加载模型 |
 | `/api/model/unload` | POST | 卸载模型 |
@@ -313,7 +313,7 @@ TTS_MultiModel/
 │   │   │   └── system/         # 系统路由 (健康检查，GPU, 设置)
 │   │   ├── engines/            # TTS 模型引擎
 │   │   │   ├── voxcpm2/       # VoxCPM2 引擎实现
-│   │   │   └── indextts2_engine.py  # IndexTTS 2.0 引擎
+│   │   │   └── indextts2_engine.py  # IndexTTS 2.5 引擎
 │   │   │   └── dots_engine.py        # dots.tts 引擎实现（示例）
 │   │   ├── training/           # 模型训练模块
 │   │   ├── middleware/         # HTTP 中间件 (CSRF, 请求 ID)
@@ -383,7 +383,7 @@ Copyright (c) 2026 ReSerendipity
 
 - [模型下载指南](docs/MODEL_DOWNLOADS.md) - 模型下载与配置
 - [模型扩展指南](docs/MODEL_EXTENSION_GUIDE.md) - 添加新 TTS 引擎
-- [IndexTTS2 集成指南](docs/INDEXTTS2_INTEGRATION_GUIDE.md) - IndexTTS 2.0 集成详情
+- [IndexTTS2 集成指南](docs/INDEXTTS2_INTEGRATION_GUIDE.md) - IndexTTS 2.5 集成详情
 - [项目架构](docs/PROJECT_ARCHITECTURE.md) - 系统架构概览
 - [参数调整](docs/ADJUSTABLE_PARAMETERS.md) - 配置参数参考
 - [UI 开发指南](docs/UI 开发指南_README.md) - Web UI 开发指南

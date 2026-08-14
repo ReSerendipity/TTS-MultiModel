@@ -134,7 +134,7 @@
                         <span class="sidebar-label-text">{{ "tab_lora_training" | t(lang) }}</span>
                     </button>
                 </div>
-                <div class="sidebar-nav-section" data-section-model="indextts2" data-engine-name="IndexTTS 2.0">
+                <div class="sidebar-nav-section" data-section-model="indextts2" data-engine-name="IndexTTS 2.5">
                     <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "indextts2_section"|t(lang) }}</span></div>
                     <button class="sidebar-item" data-tab="indextts2_clone" data-model="indextts2"
                             hx-get="/tab/indextts2_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
@@ -241,7 +241,7 @@
                         </button>
                         <button class="model-tab" data-model="indextts2" onclick="window.switchModel('indextts2')" role="tab" aria-selected="false" title="{{ "load_model_with_shortcut"|t(lang) }}">
                             <svg class="model-tab-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                            <span class="model-tab-label">IndexTTS 2.0</span>
+                            <span class="model-tab-label">IndexTTS 2.5</span>
                         </button>
                         <button class="model-tab" data-model="dotstts" onclick="window.switchModel('dotstts')" role="tab" aria-selected="false" title="{{ "load_model_with_shortcut"|t(lang) }}">
                             <svg class="model-tab-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>

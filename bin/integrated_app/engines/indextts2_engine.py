@@ -1,7 +1,7 @@
-"""IndexTTS 2.0 引擎适配器模块。
+"""IndexTTS 2.5 引擎适配器模块。
 
 **功能定位**：
-    本模块实现 IndexTTS 2.0 语音合成引擎的完整适配器，是 TTS_MultiModel
+    本模块实现 IndexTTS 2.5 语音合成引擎的完整适配器，是 TTS_MultiModel
     项目中支持**零样本语音克隆**和**8 维精细情感控制**的核心引擎模块。
     IndexTTS2 是由 Index Team 开发的先进 TTS 模型，特点是：
     - 仅需 3-10 秒参考音频即可实现高质量零样本音色克隆
@@ -12,7 +12,7 @@
 **架构角色**：
     IndexTTS2Engine 是 :class:`TTSEngine` Protocol 的具体实现类。不同于
     :class:`VoxCPM2Engine` 仅作为 Facade（外观模式）将调用转发至内部子模块，
-    本类是**真正自包含推理逻辑的引擎适配器**，直接封装 IndexTTS 2.0 的
+    本类是**真正自包含推理逻辑的引擎适配器**，直接封装 IndexTTS 2.5 的
     推理管线（模型加载、设备迁移、情感控制、语音合成），不依赖额外子模块。
 
 **主要类**：
@@ -24,7 +24,7 @@
       * ``..exceptions``：统一异常体系（EngineLoadError/GenerationError等）
       * ``..gpu_backend``：GPU 后端抽象（CUDA/MPS/CPU 检测与显存管理）
       * ``..text_frontend.normalize_text``：文本预处理规范化
-      * ``indextts.infer_v2.IndexTTS2``：底层 IndexTTS2 推理库（外部依赖）
+      * ``indextts.infer_v2_5.IndexTTS2``：底层 IndexTTS2 推理库（外部依赖）
     - 下游被依赖：
       * ``..model_manager.ModelManager``：模型加载与引擎切换
       * ``..model_registry.registry``：全局引擎状态注册表
@@ -72,20 +72,20 @@
     IndexTTS2 内部包含 4 个核心子模型：
     - **gpt**：GPT 风格自回归模型，负责文本 tokens → mel 谱 tokens 序列生成
     - **s2mel**：语义特征到 mel 谱的转换模型
-    - **vocoder**：声码器（HiFi-GAN 变体），将 mel 谱转换为最终波形
+    - **vocoder**：声码器（BigVGAN 变体），将 mel 谱转换为最终波形
     - **codec**：音频编解码器，用于参考音频的特征提取与重构
 
-**DeepSpeed / FP16 支持说明**：
+**DeepSpeed / BF16 支持说明**：
     - **DeepSpeed**：可选依赖，需额外安装 ``deepspeed`` 包。
       启用（``use_deepspeed=True``）后通过 DeepSpeed Inference Engine
       加速推理，在大 batch 或长文本场景下吞吐量提升显著。
-    - **FP16**：CUDA 后端可用时默认开启（``use_fp16=True``），
-      显存占用降低约 50%；MPS / CPU 后端会**强制关闭** FP16
+    - **BF16**：CUDA 后端可用时默认开启（``use_bf16=True``），
+      显存占用降低约 50%；MPS / CPU 后端会**强制关闭** BF16
       （见 :meth:`__init__` 中的 Why 注释）。
 
 **显存管理策略**：
     - 加载前预检：model_manager 会先检查可用显存是否 ≥ 模型大小的 1.5 倍
-    - 半精度推理：CUDA 下默认 FP16，显存占用减半
+    - 半精度推理：CUDA 下默认 BF16，显存占用减半
     - 组件级迁移：逐个迁移子模型到 GPU，codec 可容错留在 CPU
     - 卸载清理：显式删除子属性打破循环引用，配合 gc.collect() 和
       torch.cuda.empty_cache() 确保显存及时释放
@@ -115,9 +115,9 @@ logger = logging.getLogger("tts_multimodel")
 
 
 class IndexTTS2Engine(TTSEngine):
-    """IndexTTS 2.0 引擎适配器。
+    """IndexTTS 2.5 引擎适配器。
 
-    封装 IndexTTS 2.0 推理接口，提供统一的 API 供 TTS MultiModel 使用。
+    封装 IndexTTS 2.5 推理接口，提供统一的 API 供 TTS MultiModel 使用。
     支持零样本语音克隆、三种情感控制方式和精确时长控制。
 
     **类职责**：
@@ -132,11 +132,16 @@ class IndexTTS2Engine(TTSEngine):
 
     **Attributes 属性说明**：
         model_dir (str):
-            模型文件目录的绝对路径。默认指向 ``<project_root>/pretrained_models/IndexTTS2``，
-            目录下需包含 gpt.pth、s2mel.pth、bpe.model、config.yaml 等 8 个必需文件。
+            模型文件目录的绝对路径。默认指向 ``<project_root>/pretrained_models/IndexTTS2``。
         use_deepspeed (bool):
             是否启用 DeepSpeed 推理加速标志。需额外安装 deepspeed 包，
             启用后在长文本/大 batch 场景下吞吐量提升显著。
+        lang (str):
+            合成语言，默认 ``"Auto"``（自动检测）。
+        use_qwen_emo (bool):
+            是否启用 QwenEmotion 情感文本模型。构造 IndexTTS2 时作为
+            ``use_qwen_emo`` 传入，用于支持情感文本描述模式
+            （``emo_text`` + ``use_emo_text=True``）。
         backend (GPUBackend):
             经 GPUBackendManager 检测或用户指定的 GPU 后端枚举值，
             可选值：``GPUBackend.CUDA``（NVIDIA GPU）、``GPUBackend.MPS``（Apple Silicon）、
@@ -144,11 +149,11 @@ class IndexTTS2Engine(TTSEngine):
         device (str):
             最终使用的设备字符串，如 ``"cuda"``、``"cuda:0"``、``"mps"``、``"cpu"``。
             所有可迁移的模型子组件最终都会被放置到此设备上。
-        use_fp16 (bool):
-            最终生效的 FP16 半精度推理开关。CUDA 后端下默认为 True（显存减半），
+        use_bf16 (bool):
+            最终生效的 BF16 半精度推理开关。CUDA 后端下默认为 True（显存减半），
             MPS/CPU 后端被强制覆盖为 False（避免算子不兼容或音质劣化）。
         tts (Any):
-            底层 IndexTTS2 推理实例，类型为 ``indextts.infer_v2.IndexTTS2``。
+            底层 IndexTTS2 推理实例，类型为 ``indextts.infer_v2_5.IndexTTS2``。
             未加载或已卸载时为 ``None``，可通过 :meth:`is_ready` 检查状态。
             内部包含 4 个核心子模块：gpt、s2mel、vocoder、codec。
 
@@ -160,7 +165,7 @@ class IndexTTS2Engine(TTSEngine):
         4. **精确时长控制**：通过 target_duration 参数指定输出音频秒数
         5. **时长缩放因子**：duration_factor 兼容参数，支持变速不变调
         6. **多后端支持**：NVIDIA CUDA（推荐）、Apple MPS、CPU 兜底
-        7. **FP16 半精度推理**：CUDA 下自动启用，显存占用降低约 50%
+        7. **BF16 半精度推理**：CUDA 下自动启用，显存占用降低约 50%
         8. **DeepSpeed 加速**：可选推理加速引擎（需额外安装）
         9. **随机种子控制**：seed 参数支持可复现生成
         10. **预设情感模板**：内置 10 种常用情感预设（neutral/happy/angry 等）
@@ -219,35 +224,42 @@ class IndexTTS2Engine(TTSEngine):
     def __init__(
         self,
         model_dir: str | None = None,
-        use_fp16: bool = True,
+        use_bf16: bool = True,
         device: str | None = None,
         use_deepspeed: bool = False,
+        lang: str = "Auto",
+        use_qwen_emo: bool = False,
     ) -> None:
-        """初始化 IndexTTS 2.0 引擎。
+        """初始化 IndexTTS 2.5 引擎。
 
         设备选择优先级：
             1. 显式传入的 ``device`` 参数（优先级最高）
             2. ``GPUBackendManager.detect_backend()`` 自动检测
                （CUDA > MPS > CPU 回退链）
 
-        MPS / CPU 自动关闭 FP16 的原因（Why 注释见实现体）。
+        MPS / CPU 自动关闭 BF16 的原因（Why 注释见实现体）。
 
         Args:
             model_dir: 模型文件目录路径。``None`` 时回退到
                 ``<project_root>/pretrained_models/IndexTTS2``。
-            use_fp16: 是否使用 FP16 半精度推理。仅 CUDA 后端时此参数生效；
+            use_bf16: 是否使用 BF16 混合精度推理。仅 CUDA 后端时此参数生效；
                 MPS / CPU 后端会被强制覆盖为 ``False``。
             device: 强制指定运行设备（``"cuda"`` / ``"mps"`` / ``"cpu"``）。
                 ``None`` 时自动检测。
             use_deepspeed: 是否启用 DeepSpeed 推理加速。
                 需额外安装 ``deepspeed`` 依赖，否则加载时抛 ImportError。
+            lang: 合成文本的语言代码（如 ``"zh"`` / ``"en"`` / ``"ja"``），
+                默认 ``"zh"``。
+            use_qwen_emo: 是否启用 Qwen 情感标签解析（依赖 Qwen 模型）。
 
         Attributes:
             self.model_dir (str): 实际使用的模型目录绝对路径。
             self.use_deepspeed (bool): DeepSpeed 加速标志。
             self.backend (GPUBackend): 经 GPUBackendManager 检测/指定的后端枚举。
             self.device (str): 最终使用的设备字符串（如 ``"cuda:0"``）。
-            self.use_fp16 (bool): 最终生效的 FP16 开关（MPS/CPU 下恒为 False）。
+            self.use_bf16 (bool): 最终生效的 BF16 开关（MPS/CPU 下恒为 False）。
+            self.lang (str): 默认合成语言代码。
+            self.use_qwen_emo (bool): Qwen 情感标签解析开关。
             self.tts (Any): 底层 IndexTTS2 推理实例，未加载时为 ``None``。
         """
         # ========== 延迟导入 GPU 后端模块 ==========
@@ -264,6 +276,8 @@ class IndexTTS2Engine(TTSEngine):
 
         self.model_dir: str = model_dir
         self.use_deepspeed: bool = use_deepspeed
+        self.lang: str = lang
+        self.use_qwen_emo: bool = use_qwen_emo
 
         # ========== 后端检测与设备选择逻辑 ==========
         # 后端选择优先级链：CUDA > MPS > CPU（自动检测模式）
@@ -273,43 +287,43 @@ class IndexTTS2Engine(TTSEngine):
             # ---------- 用户显式指定设备模式 ----------
             self.device: str = device
             if device.startswith("cuda"):
-                # CUDA 设备：尊重用户的 use_fp16 设置
-                self.use_fp16: bool = use_fp16
+                # CUDA 设备：尊重用户的 use_bf16 设置
+                self.use_bf16: bool = use_bf16
             else:
-                # WHY MPS/CPU 强制 use_fp16=False：
-                # ① Apple MPS 算子支持不完整：HalfTensor 对应的部分 CUDA kernel
+                # WHY MPS/CPU 强制 use_bf16=False：
+                # ① Apple MPS 算子支持不完整：BF16 对应的部分 CUDA kernel
                 #    在 MPS 端未实现，会触发 RuntimeError 或静默 fallback 到 CPU，
                 #    结果不可控；
-                # ② CPU 使用 FP16 不会加速：x86/ARM CPU 的 FP16 指令集支持
+                # ② CPU 使用 BF16 不会加速：x86/ARM CPU 的 BF16 指令集支持
                 #    有限，softmax / layer norm 等算子会因精度损失导致音质劣化，
                 #    且实际推理速度反而比 FP32 更慢。
-                self.use_fp16 = False
+                self.use_bf16 = False
         else:
             # ---------- 自动检测后端模式 ----------
             # 根据 detect_backend() 结果按优先级选择最佳设备
             if self.backend == GPUBackend.CUDA:
-                # NVIDIA GPU：首选 CUDA，启用 FP16 半精度
-                # FP16 可将显存占用降低约 50%（从 ~10GB → ~5GB），
-                # 且现代 NVIDIA GPU（Turing+ 架构）对 FP16 有 Tensor Core 加速
+                # NVIDIA GPU：首选 CUDA，启用 BF16 半精度
+                # BF16 可将显存占用降低约 50%（从 ~10GB → ~5GB），
+                # 且现代 NVIDIA GPU（Turing+ 架构）对 BF16 有 Tensor Core 加速
                 self.device = "cuda"
-                self.use_fp16 = use_fp16
+                self.use_bf16 = use_bf16
             elif self.backend == GPUBackend.MPS:
                 # Apple Silicon（M1/M2/M3/M4）：使用 Metal Performance Shaders
-                # MPS 目前对 FP16 支持不完善，强制使用 FP32
+                # MPS 目前对 BF16 支持不完善，强制使用 FP32
                 # 注意：MPS 下显存与系统内存共享，无需担心显存放不下的问题
                 self.device = "mps"
-                self.use_fp16 = False
+                self.use_bf16 = False
             else:
                 # CPU 兜底模式：无可用 GPU 时使用纯 CPU 推理
                 # 速度较慢（实时比约 1:10~1:30），但保证功能可用
                 self.device = "cpu"
-                self.use_fp16 = False
+                self.use_bf16 = False
 
         self.tts: Any = None
 
         logger.info(
             f"[IndexTTS2] 初始化引擎: model_dir={self.model_dir}, "
-            f"device={self.device}, fp16={self.use_fp16}, "
+            f"device={self.device}, bf16={self.use_bf16}, "
             f"backend={self.backend.value}, deepspeed={self.use_deepspeed}"
         )
 
@@ -323,7 +337,7 @@ class IndexTTS2Engine(TTSEngine):
     def _validate_model_files(self) -> None:
         """验证必需的模型文件是否存在且可读。
 
-        必需文件清单及其作用：
+        必需文件清单及其作用（IndexTTS 2.5 权重布局）：
             - ``gpt.pth``：GPT 文本→mel 谱自回归生成模型权重
             - ``s2mel.pth``：mel 谱预测模型（基于语义 token）权重
             - ``bpe.model``：BPE 分词器（SentencePiece 模型），用于文本 tokenization
@@ -332,6 +346,10 @@ class IndexTTS2Engine(TTSEngine):
             - ``feat2.pt``：wav2vec2-BERT 第 2 层投影矩阵（语义特征提取）
             - ``wav2vec2bert_stats.pt``：wav2vec2-BERT 特征归一化统计量（均值/方差）
             - ``configuration.json``：wav2vec2-BERT 预训练模型配置
+
+        可选但建议文件（缺失仅 warning，不阻塞加载）：
+            - ``bigvgan.pth``：BigVGAN 声码器权重（IndexTTS 2.5 使用的声码器）
+            - ``campplus.pth``：CAMPPlus 说话人模型权重（音色特征提取）
 
         Raises:
             EngineLoadError: 当任一必需文件缺失或当前进程无读取权限时抛出，
@@ -348,6 +366,14 @@ class IndexTTS2Engine(TTSEngine):
             "configuration.json",
         ]
 
+        # 可选但建议文件：IndexTTS 2.5 引入了 BigVGAN 声码器与 CAMPPlus
+        # 说话人模型。由于无法 100% 确认 2.5 精确文件名，为避免缺省时误报
+        # 阻塞加载，这里仅做 warning 提示，不参与必需校验。
+        optional_files: list[str] = [
+            "bigvgan.pth",
+            "campplus.pth",
+        ]
+
         problematic_files: list[str] = []
         for filename in required_files:
             filepath = os.path.join(self.model_dir, filename)
@@ -361,9 +387,16 @@ class IndexTTS2Engine(TTSEngine):
             except OSError as e:
                 problematic_files.append(f"{filename}(访问错误: {e})")
 
+        for filename in optional_files:
+            if not os.path.exists(os.path.join(self.model_dir, filename)):
+                logger.warning(
+                    f"[IndexTTS2] 可选文件缺失: {filename}（IndexTTS 2.5 建议文件，"
+                    f"缺失时相关能力可能降级，但不阻塞加载）"
+                )
+
         if problematic_files:
             raise EngineLoadError(
-                f"IndexTTS 2.0 模型文件不可读: {problematic_files}\n"
+                f"IndexTTS 2.5 模型文件不可读: {problematic_files}\n"
                 f"请运行: python scripts/download_indextts2.py 下载模型，"
                 f"或检查目录权限。",
                 engine="indextts2",
@@ -372,10 +405,10 @@ class IndexTTS2Engine(TTSEngine):
         logger.info(f"[IndexTTS2] 模型文件验证通过: {self.model_dir}")
 
     def _load_model(self) -> None:
-        """加载 IndexTTS 2.0 模型权重并初始化推理管线。
+        """加载 IndexTTS 2.5 模型权重并初始化推理管线。
 
         执行流程：
-            1. 导入 ``indextts.infer_v2.IndexTTS2``（未安装时抛 ImportError）
+            1. 导入 ``indextts.infer_v2_5.IndexTTS2``（未安装时抛 ImportError）
             2. 实例化 IndexTTS2（期间加载所有权重）
             3. 调用 :meth:`_move_to_device` 将模型组件迁移到目标设备
             4. GPU 后端下调用 :meth:`_log_memory_info` 打印显存快照
@@ -387,10 +420,11 @@ class IndexTTS2Engine(TTSEngine):
             EngineLoadError: 其他模型权重加载失败场景（损坏、版本不兼容等）。
         """
         try:
-            from indextts.infer_v2 import IndexTTS2
+            from indextts.infer_v2_5 import IndexTTS2
         except ImportError as e:
             raise ImportError(
-                "indextts 未安装，请运行: pip install indextts\n或参考: https://github.com/index-tts/index-tts"
+                "indextts 未安装或缺少 IndexTTS 2.5 推理模块，请运行: pip install indextts\n"
+                "或参考: https://github.com/index-tts/index-tts"
             ) from e
 
         config_path = os.path.join(self.model_dir, "config.yaml")
@@ -407,9 +441,10 @@ class IndexTTS2Engine(TTSEngine):
             self.tts = IndexTTS2(
                 cfg_path=config_path,
                 model_dir=self.model_dir,
-                use_fp16=self.use_fp16,
+                use_bf16=self.use_bf16,
                 use_cuda_kernel=False,
                 use_deepspeed=self.use_deepspeed,
+                use_qwen_emo=self.use_qwen_emo,
             )
         except RuntimeError as e:
             err_msg = str(e).lower()
@@ -421,7 +456,7 @@ class IndexTTS2Engine(TTSEngine):
                     free_gb = free_bytes / (1024**3)
                 except Exception:
                     free_gb = 0.0
-                needed_gb: float = 9.0 if self.use_fp16 else 6.0
+                needed_gb: float = 9.0 if self.use_bf16 else 6.0
                 raise InsufficientVRAMError(
                     f"IndexTTS2 加载显存不足，需要 {needed_gb:.1f}GB，"
                     f"实际可用 {free_gb:.1f}GB。请关闭其他占用显存的程序"
@@ -453,7 +488,7 @@ class IndexTTS2Engine(TTSEngine):
 
         Why 不使用 ``self.tts.to(device)`` 整体迁移：
             IndexTTS2 内部部分组件（如 wav2vec2bert 的预处理）设计为常驻 CPU，
-            且 codec（声码器，HiFi-GAN 风格）权重位于"lazy init"buffer 中，
+            且 codec（声码器，BigVGAN 风格）权重位于"lazy init"buffer 中，
             整体 ``to(device)`` 对 codec 无效。必须显式遍历各子组件调用
             ``.to(device)`` 才能确保所有推理子模块都在正确设备上。
 
@@ -509,9 +544,10 @@ class IndexTTS2Engine(TTSEngine):
         target_duration: float | None = None,
         seed: int | None = None,
         duration_factor: float = 1.0,
+        lang: str | None = None,
         **kwargs: Any,
     ) -> tuple[int, np.ndarray, str]:
-        """执行 IndexTTS 2.0 语音合成推理。
+        """执行 IndexTTS 2.5 语音合成推理。
 
         三种情感控制方式（互斥优先级从高到低）：
             1. ``emo_audio_prompt``：指定情感参考音频路径，从中提取情感嵌入
@@ -537,18 +573,21 @@ class IndexTTS2Engine(TTSEngine):
             seed: 随机数种子，用于可复现生成。``None`` 时使用随机种子。
             duration_factor: 时长缩放因子（兼容参数），``target_duration``
                 优先于本参数。默认 ``1.0``（不缩放）。
+            lang: 合成语言代码。``None`` 时使用构造时传入的 ``self.lang``
+                默认 ``"Auto"``（自动检测）。
             **kwargs: 额外透传给底层 ``IndexTTS2.infer`` 的参数。
 
         Returns:
             tuple[int, np.ndarray, str]: 三元组 ``(sample_rate, wav, output_path)``：
-                - ``sample_rate`` (int)：输出音频采样率（Hz，通常为 24000）
+                - ``sample_rate`` (int)：输出音频采样率（Hz，通常为 22050）
                 - ``wav`` (np.ndarray)：合成的波形数据（float32，形状 ``(N,)`` 或 ``(1, N)``）
                 - ``output_path`` (str)：保存到磁盘的音频文件路径
 
         Raises:
             EngineNotLoadedError: 当前引擎未就绪（``is_ready() == False``）。
             FileNotFoundError: ``spk_audio_prompt`` 或 ``emo_audio_prompt`` 指定的文件不存在。
-            ValueError: 文本为空字符串。
+            ValueError: 文本为空字符串，或使用情感文本模式但未启用
+                ``use_qwen_emo``。
             GenerationError: 底层推理过程中发生未分类运行时错误。
         """
         from ..exceptions import GenerationError
@@ -583,7 +622,8 @@ class IndexTTS2Engine(TTSEngine):
             f"[IndexTTS2] 开始合成: text='{text[:50]}...', "
             f"output={output_path}, "
             f"emo_alpha={emo_alpha}, "
-            f"target_duration={target_duration}"
+            f"target_duration={target_duration}, "
+            f"lang={lang if lang is not None else self.lang}"
         )
 
         try:
@@ -624,6 +664,13 @@ class IndexTTS2Engine(TTSEngine):
                 # 原理：底层模型通过文本编码器将情感描述映射到情感嵌入空间
                 # 适用场景：用户交互场景，最易用但可控性相对较低
                 # use_emo_text 作为显式开关防止误将普通文本当作情感描述
+                # IndexTTS 2.5 情感文本模式依赖 QwenEmotion 情感文本模型，
+                # 未以 use_qwen_emo=True 构造引擎时无法使用该模式。
+                if not self.use_qwen_emo:
+                    raise ValueError(
+                        "IndexTTS2 情感文本描述模式需要以 use_qwen_emo=True 构造引擎"
+                        "（加载 QwenEmotion 情感文本模型）才能使用。"
+                    )
                 infer_kwargs["emo_text"] = emo_text
                 infer_kwargs["use_emo_text"] = True
                 logger.debug(f"[IndexTTS2] 情感控制模式：文本描述='{emo_text}'")
@@ -657,6 +704,11 @@ class IndexTTS2Engine(TTSEngine):
             if seed is not None:
                 infer_kwargs["seed"] = int(seed)
 
+            # ========== 语言设置 ==========
+            # 指定合成文本的语言代码，交由底层 2.5 模型处理。
+            # 显式传入的 lang 优先；否则使用构造时保存的 self.lang（默认 "Auto"）。
+            infer_kwargs["lang"] = lang if lang is not None else self.lang
+
             # 透传额外 kwargs，支持高级用户传入底层 IndexTTS2 的其他参数
             infer_kwargs.update(kwargs)
 
@@ -687,7 +739,7 @@ class IndexTTS2Engine(TTSEngine):
                 logger.debug(f"[IndexTTS2] 推理完成: sample_rate={sample_rate}, wav_shape={wav.shape}")
             else:
                 logger.warning(f"[IndexTTS2] 推理返回格式异常: {type(result)}")
-                sample_rate, wav = 24000, np.zeros(0, dtype=np.float32)
+                sample_rate, wav = 22050, np.zeros(0, dtype=np.float32)
 
             if os.path.exists(output_path):
                 file_size = os.path.getsize(output_path)
@@ -705,7 +757,7 @@ class IndexTTS2Engine(TTSEngine):
                 with contextlib.suppress(OSError):
                     os.unlink(output_path)
             raise GenerationError(
-                f"IndexTTS 2.0 合成失败: {type(e).__name__}: {e}",
+                f"IndexTTS 2.5 合成失败: {type(e).__name__}: {e}",
                 engine="indextts2",
             ) from e
 
@@ -718,6 +770,7 @@ class IndexTTS2Engine(TTSEngine):
         emo_vector: list[float] | None = None,
         emo_text: str | None = None,
         duration_factor: float = 1.0,
+        lang: str | None = None,
         **kwargs: Any,
     ) -> tuple[int, np.ndarray, str]:
         """TTSEngine Protocol 合成入口（infer 的薄封装）。
@@ -735,6 +788,8 @@ class IndexTTS2Engine(TTSEngine):
             emo_text: 自然语言情感描述（优先级 3，需配合
                 ``use_emo_text=True`` 在 kwargs 中传入）。
             duration_factor: 时长缩放因子，默认 ``1.0``。
+            lang: 合成语言代码。``None`` 时使用构造时传入的 ``self.lang``
+                （默认 ``"Auto"`` 自动检测）。
             **kwargs: 透传给 :meth:`infer` 的其他参数（如 emo_alpha、seed 等）。
 
         Returns:
@@ -749,6 +804,7 @@ class IndexTTS2Engine(TTSEngine):
             emo_vector=emo_vector,
             emo_text=emo_text,
             duration_factor=duration_factor,
+            lang=lang,
             **kwargs,
         )
 
@@ -958,9 +1014,9 @@ class IndexTTS2Engine(TTSEngine):
         """返回引擎版本标识字符串。
 
         Returns:
-            str: 固定为 ``"IndexTTS 2.0"``。
+            str: 固定为 ``"IndexTTS 2.5"``。
         """
-        return "IndexTTS 2.0"
+        return "IndexTTS 2.5"
 
     @property
     def min_vram_gb(self) -> float:

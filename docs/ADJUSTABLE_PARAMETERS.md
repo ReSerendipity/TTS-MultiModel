@@ -219,7 +219,7 @@
 | **最低显存需求** (indextts2_vram) | 6.0 GB | ❌ | IndexTTS2 最低显存要求 |
 | **最低内存需求** (min_ram_gb) | 16.0 GB | ❌ | IndexTTS2 最低系统内存要求 |
 | **采样率** (sample_rate) | 22000 Hz | ❌ | IndexTTS2 输出采样率 |
-| **FP16 精度** (use_fp16) | true | ❌ | 是否使用半精度推理 |
+| **BF16 精度** (use_bf16) | true | ❌ | 是否使用 BF16 精度推理 |
 | **DeepSpeed 加速** (use_deepspeed) | false | ❌ | 是否使用 DeepSpeed 加速 |
 | **情感维度数** (EMOTION_DIMENSIONS) | 8 |  | 情感向量维度 |
 

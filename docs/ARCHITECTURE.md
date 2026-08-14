@@ -22,7 +22,7 @@
 │                    引擎抽象层 (engines/)                    │
 │  TTSEngine Protocol + EngineRegistry                      │
 │  ┌──────────┐ ┌──────────────┐ ┌───────────┐            │
-│  │ VoxCPM2  │ │ IndexTTS 2.0 │ │ dots.tts  │            │
+│  │ VoxCPM2  │ │ IndexTTS 2.5 │ │ dots.tts  │            │
 │  └──────────┘ └──────────────┘ └───────────┘            │
 ├─────────────────────────────────────────────────────────┤
 │                    基础设施层                               │
@@ -64,7 +64,7 @@ graph TB
 
     subgraph "底层推理库"
         LIB_VOX["VoxCPM2 / minicpm-audio<br/>(OpenBMB)"]
-        LIB_IDX["indextts.infer_v2.IndexTTS2<br/>(IndexTeam)"]
+        LIB_IDX["indextts.infer_v2_5.IndexTTS2<br/>(IndexTeam)"]
         LIB_DOTS["dots_tts.runtime<br/>(rednote-hilab)"]
     end
 

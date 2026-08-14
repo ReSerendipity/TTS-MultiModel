@@ -1,6 +1,6 @@
 # Contributing to TTS MultiModel
 
-Thank you for your interest in contributing to TTS MultiModel — a multi-model TTS platform (VoxCPM2, IndexTTS 2.0, dots.tts).
+Thank you for your interest in contributing to TTS MultiModel — a multi-model TTS platform (VoxCPM2, IndexTTS 2.5, dots.tts).
 
 This document gives a short "10-minute quick start" to get contributors productive, and a concise reference for common contribution tasks.
 

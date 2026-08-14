@@ -240,7 +240,8 @@ def warmup_indextts2(
     try:
         wav, sr = engine.synthesize(
             text="你好",
-            emotion="calm",
+            spk_audio_prompt="",
+            lang="ZH",
             seed=42,
         )
         if wav is not None and len(wav) > 0:

@@ -3,6 +3,8 @@
 覆盖目标模块: bin/integrated_app/engines/indextts2_engine.py
 """
 
+import inspect
+
 import pytest
 
 from integrated_app.engines.indextts2_engine import IndexTTS2Engine
@@ -59,3 +61,51 @@ class TestIndexTTS2EngineInterface:
 
         with pytest.raises(EngineLoadError):
             IndexTTS2Engine(model_dir="/nonexistent/path")
+
+
+class TestVersion:
+    """IndexTTS 2.5 升级相关断言。
+
+    注意：``version`` 是 @property，通过实例访问会触发模型加载（__init__ 中
+    即加载模型），因此这里只做类层面（描述符）断言，不实例化。
+    """
+
+    def test_version_is_property(self):
+        # 类层面访问 @property 得到描述符对象，验证 version 是 property
+        assert isinstance(IndexTTS2Engine.__dict__["version"], property)
+
+    def test_version_is_2_5(self):
+        # 通过 property 的 fget 获取返回值，避免实例化触发模型加载
+        fget = IndexTTS2Engine.__dict__["version"].fget
+        assert fget is not None
+        assert fget(IndexTTS2Engine) == "IndexTTS 2.5"
+
+
+class TestIndexTTS2LangCapability:
+    """IndexTTS 2.5 新增 lang 语言能力。
+
+    通过 inspect.signature 检查方法签名（不实例化、不触发模型加载）。
+    """
+
+    def test_infer_has_lang_param(self):
+        params = inspect.signature(IndexTTS2Engine.infer).parameters
+        assert "lang" in params
+
+    def test_synthesize_has_lang_param(self):
+        params = inspect.signature(IndexTTS2Engine.synthesize).parameters
+        assert "lang" in params
+
+
+class TestIndexTTS2InitSignature:
+    """IndexTTS 2.5 __init__ 参数检查（不实例化）。"""
+
+    def test_init_uses_bf16_not_fp16(self):
+        params = inspect.signature(IndexTTS2Engine.__init__).parameters
+        assert "use_bf16" in params
+        assert "use_fp16" not in params
+
+    def test_init_has_lang_param(self):
+        assert "lang" in inspect.signature(IndexTTS2Engine.__init__).parameters
+
+    def test_init_has_use_qwen_emo_param(self):
+        assert "use_qwen_emo" in inspect.signature(IndexTTS2Engine.__init__).parameters

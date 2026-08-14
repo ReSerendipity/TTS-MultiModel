@@ -738,11 +738,11 @@ def _register_builtin_engines() -> None:
     engine_registry.register(
         "indextts2",
         lazy_module=".engines.indextts2_engine:IndexTTS2Engine",
-        display_name="IndexTTS 2.0",
+        display_name="IndexTTS 2.5",
         vram_requirement=6.0,
-        languages=["zh", "en"],
+        languages=["zh", "en", "ja", "es", "ar"],
         supported_features=["clone", "emotion_control"],
-        sample_rate=24000,
+        sample_rate=22050,
         requires_gpu=False,
         quality="high",
     )

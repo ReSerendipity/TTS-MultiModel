@@ -318,6 +318,7 @@ async def generate_indextts2(
                 "spk_audio_prompt": ref_audio_path or "",
                 "output_path": None,
                 "verbose": False,
+                "lang": lang,
             }
             if emotion_data is not None:
                 if emotion_mode == _EMOTION_MODE_TEXT:
@@ -357,7 +358,7 @@ async def generate_indextts2(
         import scipy.io.wavfile as wavfile
 
         wavfile.write(output_path, 44100, combined)
-        return (44100, "wav", filename), "IndexTTS 2.0 生成完成"
+        return (44100, "wav", filename), "IndexTTS 2.5 生成完成"
 
     # ------------------------------------------------------------------
     # 6. 统一生成执行器：
@@ -374,7 +375,7 @@ async def generate_indextts2(
         run_fn=_run,
         endpoint_name="IndexTTS2",
         voice_or_persona="",
-        model_type="IndexTTS 2.0",
+        model_type="IndexTTS 2.5",
         engine="indextts2",
         tempo_factor=tempo_factor,
         voice_enhancement=voice_enhancement,

@@ -78,6 +78,6 @@ from .indextts2_engine import IndexTTS2Engine
 engine_registry.register(
     "indextts2",
     IndexTTS2Engine,
-    display_name="IndexTTS 2.0",
+    display_name="IndexTTS 2.5",
     vram_requirement=6.0,
 )

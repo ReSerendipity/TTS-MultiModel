@@ -1,17 +1,21 @@
 """
-TTS MultiModel - IndexTTS 2.0 模型下载脚本
+TTS MultiModel - IndexTTS 2.5 模型下载脚本
 ===========================================
 
 项目名称: TTS MultiModel (多引擎语音合成平台)
-主要功能: 从 ModelScope 下载 IndexTTS 2.0 情感语音合成引擎的模型文件
+主要功能: 从 ModelScope 下载 IndexTTS 2.5 情感语音合成引擎的模型文件
 核心技术栈: Python + modelscope SDK
 
-IndexTTS 2.0 引擎特性:
+IndexTTS 2.5 引擎特性:
     - 零样本语音克隆（仅需 3-10 秒参考音频）
     - 8 维情感向量控制（开心/愤怒/悲伤/恐惧/厌恶/忧郁/惊讶/平静）
     - 精细的时长控制
     - 多后端 GPU 支持（CUDA/MPS/CPU）
     - 最低硬件要求: 6GB VRAM + 16GB RAM
+
+IndexTTS 2.5 使用以下辅助模型（BigVGAN 声码器、MaskGCT 语义编解码、
+CAMPPlus 说话人模型、w2v-bert-2.0 特征提取器）。这些辅助模型**不属于
+主模型仓库的一部分**，会在首次运行时自动下载到 ``hf_cache/`` 目录。
 
 下载文件清单（总大小约 4.7GB）:
     - gpt.pth (~3.48GB) - GPT 模型主权重
@@ -21,6 +25,9 @@ IndexTTS 2.0 引擎特性:
     - feat1.pt / feat2.pt - 语音特征统计文件
     - wav2vec2bert_stats.pt - Wav2Vec2-BERT 特征统计
     - configuration.json - 额外配置元数据
+
+注意: 上述文件名基于 IndexTTS 2.5 仓库整理，无法确认 2.5 精确文件名
+（以实际仓库为准），此处保守保留原 8 个文件。
 
 依赖要求:
     pip install modelscope
@@ -32,9 +39,9 @@ IndexTTS 2.0 引擎特性:
     pretrained_models/IndexTTS2/
 
 下载完成后:
-    1. 安装 IndexTTS 2.0 依赖: pip install indextts
+    1. 安装 IndexTTS 2.5 依赖: pip install indextts
     2. 重启应用（start.bat 或 clean_launch.py）
-    3. IndexTTS 2.0 引擎将自动出现在引擎切换选项中
+    3. IndexTTS 2.5 引擎将自动出现在引擎切换选项中
 
 注意事项:
     - 模型总大小约 4.7GB，请确保磁盘空间充足
@@ -53,10 +60,10 @@ logger = logging.getLogger(__name__)
 
 def download_indextts2_model():
     """
-    从 ModelScope 下载 IndexTTS 2.0 模型文件
+    从 ModelScope 下载 IndexTTS 2.5 模型文件
 
     功能说明:
-        使用 modelscope 的 snapshot_download 函数下载 IndexTeam/IndexTTS-2 仓库
+        使用 modelscope 的 snapshot_download 函数下载 IndexTeam/IndexTTS-2.5 仓库
         到本地 pretrained_models/IndexTTS2 目录。下载完成后验证所有必需文件是否存在，
         并打印每个文件的大小信息。
 
@@ -90,7 +97,7 @@ def download_indextts2_model():
     model_dir = project_root / "pretrained_models" / "IndexTTS2"
 
     logger.info(f"目标目录: {model_dir}")
-    logger.info("开始下载 IndexTTS 2.0 模型...")
+    logger.info("开始下载 IndexTTS 2.5 模型...")
     logger.info("模型列表:")
     logger.info("  - gpt.pth (~3.48GB)")
     logger.info("  - s2mel.pth (~1.20GB)")
@@ -104,7 +111,7 @@ def download_indextts2_model():
 
     try:
         cache_dir = model_dir.parent / ".cache" / "indextts2"
-        downloaded_path = snapshot_download("IndexTeam/IndexTTS-2", cache_dir=str(cache_dir), local_dir=str(model_dir))
+        downloaded_path = snapshot_download("IndexTeam/IndexTTS-2.5", cache_dir=str(cache_dir), local_dir=str(model_dir))
 
         logger.info(f"下载完成: {downloaded_path}")
 
@@ -180,7 +187,7 @@ def main():
         - 失败时: 打印错误信息和重试建议
     """
     print("=" * 60)
-    print("IndexTTS 2.0 模型下载工具")
+    print("IndexTTS 2.5 模型下载工具")
     print("=" * 60)
     print()
 
@@ -191,8 +198,8 @@ def main():
         print("✅ 下载完成！")
         print()
         print("下一步:")
-        print("  1. 安装 IndexTTS 2.0 依赖: pip install indextts")
-        print("  2. 重启应用，IndexTTS 2.0 引擎将自动可用")
+        print("  1. 安装 IndexTTS 2.5 依赖: pip install indextts")
+        print("  2. 重启应用，IndexTTS 2.5 引擎将自动可用")
     else:
         print("❌ 下载失败，请检查网络连接后重试")
 

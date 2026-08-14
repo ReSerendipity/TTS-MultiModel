@@ -1,5 +1,5 @@
 """Path configuration, constants, model path mapping, language list, etc.
-Multi-engine configuration (VoxCPM2 + IndexTTS 2.0).
+Multi-engine configuration (VoxCPM2 + IndexTTS 2.5).
 
 Configuration is managed through the AppConfig class, accessible via get_config().
 Module-level deprecated variables have been removed; use get_config() instead.
@@ -113,7 +113,7 @@ VOXCPM2_ASR_PATH = os.path.join(PRETRAINED_DIR, "SenseVoiceSmall")
 VOXCPM2_DENOISER_PATH = os.path.join(PRETRAINED_DIR, "speech_zipenhancer")
 LORA_DIR = os.path.join(ROOT_DIR, "lora")
 
-# --- IndexTTS 2.0 Model Paths ---
+# --- IndexTTS 2.5 Model Paths ---
 INDEXTTS2_MODEL_PATH = os.path.join(PRETRAINED_DIR, "IndexTTS2")
 
 # --- dots.tts Model Paths ---
@@ -163,7 +163,7 @@ def get_voxcpm2_denoiser_path() -> str:
 
 
 def get_indextts2_model_path() -> str:
-    """获取 IndexTTS 2.0 模型路径（考虑 shared/portable 模式）。"""
+    """获取 IndexTTS 2.5 模型路径（考虑 shared/portable 模式）。"""
     return os.path.join(get_pretrained_dir(), "IndexTTS2")
 
 
@@ -519,9 +519,9 @@ def check_models_available() -> tuple[bool, list[str]]:
 
     # IndexTTS2: directory must exist and contain weight files
     if not os.path.isdir(indextts2_path):
-        missing.append(f"IndexTTS 2.0 ({indextts2_path} 目录不存在)")
+        missing.append(f"IndexTTS 2.5 ({indextts2_path} 目录不存在)")
     elif not _has_model_weights(indextts2_path):
-        missing.append(f"IndexTTS 2.0 ({indextts2_path} 缺少模型权重文件)")
+        missing.append(f"IndexTTS 2.5 ({indextts2_path} 缺少模型权重文件)")
 
     return len(missing) == 0, missing
 
@@ -540,10 +540,10 @@ def get_download_hints() -> dict[str, str]:
         )
     if not os.path.isdir(indextts2_path) or not _has_model_weights(indextts2_path):
         hints["indextts2"] = (
-            "IndexTTS 2.0 模型未找到。下载命令:\n"
+            "IndexTTS 2.5 模型未找到。下载命令:\n"
             "  pip install modelscope\n"
             "  python scripts/download_indextts2.py\n"
-            "  或: modelscope download IndexTeam/IndexTTS-2 --local_dir pretrained_models/IndexTTS2"
+            "  或: modelscope download IndexTeam/IndexTTS-2.5 --local_dir pretrained_models/IndexTTS2"
         )
     return hints
 

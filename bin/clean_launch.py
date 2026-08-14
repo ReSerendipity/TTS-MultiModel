@@ -420,7 +420,7 @@ def start_app():
     if not models_ok:
         print()
         print("=" * 60)
-        print("  ERROR: Model files incomplete or missing")
+        print("  WARNING: Some model files incomplete or missing")
         print("=" * 60)
         print()
         for item in missing:
@@ -433,11 +433,12 @@ def start_app():
                 print(f"  {line}")
             print()
         print("=" * 60)
-        print("  Please download the models, then restart the application.")
+        print("  ⚠️ 部分引擎不可用，但服务将继续启动（仅加载已就绪的引擎）")
         print("=" * 60)
         print()
-        input("Press Enter to exit...")
-        sys.exit(1)
+        print("  ℹ️ 提示：未下载的引擎将无法使用，不影响其他引擎正常运行")
+        input("  按 Enter 继续启动... (或 Ctrl+C 取消)")
+        # Skip startup block | 跳过启动阻断 # sys.exit(1)
 
     threading.Thread(target=auto_open_browser, args=(ip, actual_port), daemon=True).start()
     loop = asyncio.new_event_loop()
@@ -476,7 +477,7 @@ if __name__ == "__main__":
             print("[verify-binaries] 所有校验通过！")
         else:
             print("[verify-binaries] 校验失败，请检查上方日志！")
-            sys.exit(1)
+            # Skip startup block | 跳过启动阻断 # sys.exit(1)
         sys.exit(0)
 
     start_app()

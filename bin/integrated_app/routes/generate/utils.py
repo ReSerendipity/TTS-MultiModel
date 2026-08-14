@@ -420,7 +420,7 @@ def _check_engine_ready(
     if engine_name == "indextts2":
         if registry.indextts2_engine is None:
             return _error_html(
-                request, "IndexTTS 2.0 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id="indextts2"
+                request, "IndexTTS 2.5 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id="indextts2"
             )
     else:
         if registry.voxcpm_model is None:
@@ -791,12 +791,25 @@ async def resolve_persona_ref(
     if not persona_name:
         return None, None
 
-    from ...persona_manager import load_persona_embedding
+    from ...persona_manager import PERSONA_DIR, load_persona_embedding
 
     safe_name: str = os.path.basename(persona_name)
     persona_data: Any | None = load_persona_embedding(safe_name)
     if persona_data is not None:
-        wav_path, ref_text = persona_data
+        # 处理不同返回格式（兼容 .pt 缓存嵌入和在线计算）
+        # 情况 1: 在线计算分支 -> 返回二元组 (wav_path, ref_text)
+        # 情况 2: .pt 缓存分支 -> 直接返回嵌入对象（此时音频文件必然存在）
+        wav_path: str | None = None
+        if isinstance(persona_data, tuple) and len(persona_data) == 2:
+            wav_path, ref_text = persona_data
+        elif isinstance(persona_data, (str, os.PathLike)) and os.path.isfile(str(persona_data)):
+            wav_path = str(persona_data)
+        else:
+            # 缓存嵌入对象（张量或其他嵌入数据），wav 文件必然存在
+            # （.pt 缓存只在 wav 存在后才会写入）
+            candidate = os.path.join(PERSONA_DIR, f"{safe_name}.wav")
+            wav_path = candidate
+
         if wav_path and os.path.isfile(wav_path):
             return wav_path, None
         else:

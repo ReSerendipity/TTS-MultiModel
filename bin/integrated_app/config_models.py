@@ -224,7 +224,7 @@ class ModelConfig(BaseModel):
             为空时回退到 portable 模式。
         base_dir: 模型权重根目录名（相对于项目根目录）。
         voxcpm_vram: VoxCPM2 引擎的最低显存需求 (GB)，必须 > 0。
-        indextts2_vram: IndexTTS 2.0 引擎的最低显存需求 (GB)，必须 > 0。
+        indextts2_vram: IndexTTS 2.5 引擎的最低显存需求 (GB)，必须 > 0。
         engines: 声明式引擎注册表，key 为引擎名称，value 为 EngineSpecConfig。
     """
 
@@ -240,7 +240,7 @@ class ModelConfig(BaseModel):
     )
     base_dir: str = Field(default="models", description="Base directory for model weights")
     voxcpm_vram: float = Field(default=6.0, gt=0, description="VoxCPM2 VRAM requirement (GB)")
-    indextts2_vram: float = Field(default=6.0, gt=0, description="IndexTTS 2.0 VRAM requirement (GB)")
+    indextts2_vram: float = Field(default=6.0, gt=0, description="IndexTTS 2.5 VRAM requirement (GB)")
     engines: dict[str, EngineSpecConfig] = Field(
         default_factory=dict,
         description="声明式引擎注册表，key 为引擎名称",

@@ -204,7 +204,7 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
       <button class="nav-item" data-page="continue"><span class="ic">✍</span>续写生成</button>
       <button class="nav-item" data-page="lora"><span class="ic">🧩</span>LoRA 管理</button>
       <button class="nav-item" data-page="lora_train"><span class="ic">📈</span>LoRA 训练</button>
-      <div class="nav-sec-label">IndexTTS 2.0</div>
+      <div class="nav-sec-label">IndexTTS 2.5</div>
       <button class="nav-item" data-page="ic"><span class="ic">🔊</span>克隆合成</button>
       <button class="nav-item" data-page="ie"><span class="ic">😊</span>情感控制</button>
       <button class="nav-item" data-page="id"><span class="ic">⏱</span>时长控制</button>
@@ -351,7 +351,7 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
           </div>
           <div>
             <label class="fld">LoRA 名称</label><input value="lora_custom_demo" style="width:100%">
-            <label class="fld" style="margin-top:9px">基础模型</label><select style="width:100%"><option>VoxCPM2</option><option>IndexTTS 2.0</option></select>
+            <label class="fld" style="margin-top:9px">基础模型</label><select style="width:100%"><option>VoxCPM2</option><option>IndexTTS 2.5</option></select>
             <label class="fld" style="margin-top:9px">保存格式</label><select style="width:100%"><option>safetensors</option><option>bin</option></select>
           </div>
         </div>
@@ -362,14 +362,14 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
 
     <!-- IndexTTS 克隆 -->
     <section class="page" id="page-ic">
-      <div class="page-head"><h1>IndexTTS 2.0 · 克隆合成</h1><p>零样本音色克隆引擎（模拟流程）。</p></div>
+      <div class="page-head"><h1>IndexTTS 2.5 · 克隆合成</h1><p>零样本音色克隆引擎（模拟流程）。</p></div>
       <div class="card">
         <label class="fld">参考音频（5–10 秒）</label>
         <div class="upload" id="i-upload" tabindex="0">🎤 上传参考音频</div>
         <input type="file" id="i-file" accept="audio/*" class="hidden">
         <div id="i-filetag"></div>
         <label class="fld" style="margin-top:12px">合成文本</label>
-        <textarea id="i-text" rows="3" style="width:100%;resize:vertical">IndexTTS 2.0 支持零样本克隆，只需几秒参考音频就能模仿目标音色。</textarea>
+        <textarea id="i-text" rows="3" style="width:100%;resize:vertical">IndexTTS 2.5 支持零样本克隆，只需几秒参考音频就能模仿目标音色。</textarea>
         <button class="btn" id="i-run" style="width:100%;margin-top:12px">▶ 合成（模拟）</button>
         <div class="steps hidden" id="i-steps"></div>
         <div id="i-player" class="hidden"></div>
@@ -378,7 +378,7 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
 
     <!-- IndexTTS 情感 -->
     <section class="page" id="page-ie">
-      <div class="page-head"><h1>IndexTTS 2.0 · 情感控制</h1><p>通过情感标签控制合成语气（模拟流程）。</p></div>
+      <div class="page-head"><h1>IndexTTS 2.5 · 情感控制</h1><p>通过情感标签控制合成语气（模拟流程）。</p></div>
       <div class="card">
         <label class="fld">合成文本</label>
         <textarea id="ie-text" rows="3" style="width:100%;resize:vertical">太好了！我们终于成功了，这真是一个值得庆祝的时刻。</textarea>
@@ -391,7 +391,7 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
 
     <!-- IndexTTS 时长 -->
     <section class="page" id="page-id">
-      <div class="page-head"><h1>IndexTTS 2.0 · 时长控制</h1><p>指定目标时长，自动调整语速生成（模拟流程）。</p></div>
+      <div class="page-head"><h1>IndexTTS 2.5 · 时长控制</h1><p>指定目标时长，自动调整语速生成（模拟流程）。</p></div>
       <div class="card">
         <label class="fld">合成文本</label>
         <textarea id="id-text" rows="3" style="width:100%;resize:vertical">这是一段用于测试时长控制的语音，系统会根据目标时长自动调整语速。</textarea>
@@ -425,7 +425,7 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
         <div class="card-title"><span class="bar"></span>引擎状态</div>
         <div class="engine-cards">
           <div class="eng"><div class="name">VoxCPM2 <span class="st">● 已加载</span></div><div class="desc">声音设计 / 克隆 / 剧本配音 / LoRA</div><div class="gpu">VRAM 5.6 GB · FP16</div></div>
-          <div class="eng"><div class="name">IndexTTS 2.0 <span class="st">● 已加载</span></div><div class="desc">零样本克隆 / 情感 / 时长控制</div><div class="gpu">VRAM 3.2 GB · FP16</div></div>
+          <div class="eng"><div class="name">IndexTTS 2.5 <span class="st">● 已加载</span></div><div class="desc">零样本克隆 / 情感 / 时长控制</div><div class="gpu">VRAM 3.2 GB · FP16</div></div>
           <div class="eng"><div class="name">dots.tts <span class="st" style="color:var(--amber)">● 模拟</span></div><div class="desc">轻量快速克隆</div><div class="gpu">VRAM 0.9 GB · INT8</div></div>
         </div>
       </div>

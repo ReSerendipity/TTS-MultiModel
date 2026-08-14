@@ -75,7 +75,7 @@ class EngineName(str, Enum):
         VOXCPM2 (str): "voxcpm2" —— VoxCPM 2.x 核心多模态 TTS 引擎，
             支持语音设计、零样本克隆、终极克隆、剧本工坊、流式生成、
             Prompt 续写、LoRA 微调等全功能。
-        INDEXTTS2 (str): "indextts2" —— IndexTTS 2.0 情感控制引擎，
+        INDEXTTS2 (str): "indextts2" —— IndexTTS 2.5 情感控制引擎，
             支持零样本克隆、8 维情感向量控制、时长控制，显存占用更低。
 
     使用示例::
@@ -95,7 +95,7 @@ class EngineName(str, Enum):
 #: 可通过 :func:`load_engine_specs_from_config` 从 config.yaml 动态覆盖。
 ENGINE_DISPLAY_NAMES: dict[str, str] = {
     EngineName.VOXCPM2.value: "VoxCPM2",
-    EngineName.INDEXTTS2.value: "IndexTTS 2.0",
+    EngineName.INDEXTTS2.value: "IndexTTS 2.5",
 }
 
 #: 各引擎的基线显存需求字典（单位 GB，浮点数）。
@@ -236,7 +236,7 @@ class ModelRegistry:
         self._current_type: str = ""
         self._current_size: str = ""
 
-        # --- IndexTTS 2.0 state (property-backed, thread-safe) ---
+        # --- IndexTTS 2.5 state (property-backed, thread-safe) ---
         self._indextts2_engine: Any = None
         self._indextts2_model_path: str = ""
 
@@ -321,7 +321,7 @@ class ModelRegistry:
 
     @property
     def indextts2_engine(self) -> Any:
-        """IndexTTS 2.0 引擎实例（包含模型 + 推理管线）。读/写均在 RLock 保护下完成。"""
+        """IndexTTS 2.5 引擎实例（包含模型 + 推理管线）。读/写均在 RLock 保护下完成。"""
         with self._lock:
             return self._indextts2_engine
 
@@ -446,7 +446,7 @@ class ModelRegistry:
         self._notify_sse()
 
     def set_indextts2_loaded(self, engine: Any) -> None:
-        """原子性设置 IndexTTS 2.0 已加载状态，并触发 SSE engine_switch 事件。
+        """原子性设置 IndexTTS 2.5 已加载状态，并触发 SSE engine_switch 事件。
 
         在单次 RLock 持有时间内完成：
         1. 写入引擎实例 ``_indextts2_engine``。
@@ -513,7 +513,7 @@ class ModelRegistry:
         self._notify_sse()
 
     def clear_indextts2(self) -> None:
-        """原子性清除 IndexTTS 2.0 引擎引用，并触发 SSE 通知。
+        """原子性清除 IndexTTS 2.5 引擎引用，并触发 SSE 通知。
 
         **设计意图 —— 不重置 current_engine**：
             同 :meth:`clear_voxcpm`，为渐进式引擎切换保留 current_engine 状态。
@@ -568,7 +568,7 @@ class ModelRegistry:
             return self._voxcpm_model is not None and self._current_engine == EngineName.VOXCPM2.value
 
     def is_indextts2_ready(self) -> bool:
-        """判断 IndexTTS 2.0 引擎是否就绪可用于推理。
+        """判断 IndexTTS 2.5 引擎是否就绪可用于推理。
 
         **就绪标准**：
         1. ``_indextts2_engine`` 不为 ``None``（引擎管线确实已初始化）。
@@ -763,7 +763,7 @@ class ModelRegistry:
                 若 current_engine 也为 ``None`` 则回退到 ``"None"``。
 
         Returns:
-            对应的人类可读名称（如 ``"VoxCPM2"``、``"IndexTTS 2.0"``）。
+            对应的人类可读名称（如 ``"VoxCPM2"``、``"IndexTTS 2.5"``）。
             未在 :data:`ENGINE_DISPLAY_NAMES` 中找到时原样返回 engine 字符串。
         """
         eng = engine or self.current_engine or ""

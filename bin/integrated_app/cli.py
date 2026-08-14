@@ -34,6 +34,13 @@ import sys
 import time
 from pathlib import Path
 
+# vendor 化：优先从项目内 bin/integrated_app/vendor 加载 voxcpm 源码包，
+# 不依赖 references/ 下随时可能被删除的克隆学习仓库
+if os.path.isdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")):
+    _vendor_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
+    if _vendor_dir not in sys.path:
+        sys.path.insert(0, _vendor_dir)
+
 import soundfile as sf
 
 logger = logging.getLogger("tts_multimodel.cli")

@@ -313,3 +313,6 @@ tests/*_results.txt
 scripts/capture_screenshots.py
 scripts/optimize_ui.py
 docs/UI_RESTRUCTURE_IMPLEMENTATION.md
+
+# Cloned learning repos (research reference only, not part of project)
+references/

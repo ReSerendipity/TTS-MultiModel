@@ -2,14 +2,14 @@
 
 提供模型加载、卸载、引擎切换、LRU 缓存、进度追踪、GPU 显存监控以及音色缓存预热功能。
 
-支持 VoxCPM2 与 IndexTTS 2.0 双引擎架构。
+支持 VoxCPM2 与 IndexTTS 2.5 双引擎架构。
 
 Model management module.
 
 Provides model loading, unloading, engine switching, LRU caching,
 progress tracking, GPU memory monitoring, and persona cache warmup.
 
-Supports VoxCPM2 and IndexTTS 2.0 dual-engine architecture.
+Supports VoxCPM2 and IndexTTS 2.5 dual-engine architecture.
 
 重构说明 (M-R1/R2/R3/R5):
 - M-R1: 常量提取消除魔法数字；switch_engine 拆分为 5 个职责单一的辅助函数
@@ -536,14 +536,14 @@ def _do_load_voxcpm2_internal(
     Raises:
         Exception: 清理半加载状态后重新抛出加载过程中的任何异常。
     """
-    # 注入 reference_repos/VoxCPM/src 到 sys.path，使 voxcpm 源码包可被发现
-    # (未 pip install 该包时的兼容路径)
+    # 注入 bin/integrated_app/vendor 到 sys.path，使 vendor/voxcpm 源码包可被发现
+    # （未 pip install 该包时的兼容路径；vendor 化后不依赖 references/ 克隆仓库）
     import sys as _sys
 
-    _voxcpm_src = os.path.join(ROOT_DIR, "reference_repos", "VoxCPM", "src")
+    _voxcpm_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
     if os.path.isdir(_voxcpm_src) and _voxcpm_src not in _sys.path:
         _sys.path.insert(0, _voxcpm_src)
-        logger.info(f"[VoxCPM2] 注入源码路径: {_voxcpm_src}")
+        logger.info(f"[VoxCPM2] 注入 vendor 源码路径: {_voxcpm_src}")
 
     import voxcpm
     from funasr import AutoModel
@@ -737,19 +737,19 @@ def load_voxcpm2(
 def load_indextts2(
     progress_callback: Callable[..., None] | None = None,
 ) -> Generator[tuple[str, None, None, None], None, None]:
-    """加载 IndexTTS 2.0 引擎（生成器进度事件流）。
+    """加载 IndexTTS 2.5 引擎（生成器进度事件流）。
 
-    Generator function to load IndexTTS 2.0 engine step by step.
+    Generator function to load IndexTTS 2.5 engine step by step.
 
     生成器产出格式（每条均为 ``(status_text, None, None, None)`` 四元组，
     兼容调用方 ``for status_text, _, _, _ in gen:`` 解包）：
         1. ``"正在检查系统资源..."``：
            校验 ``get_indextts2_model_path()`` 是否存在并查询显存状态。
-        2. ``"正在加载 IndexTTS 2.0 引擎..."``：
+        2. ``"正在加载 IndexTTS 2.5 引擎..."``：
            构造 ``IndexTTS2Engine``，内部依次加载 VQ Encoder、
            Flow Matching 主干、HiFi-GAN Vocoder 等子模块。
-        3. ``"IndexTTS 2.0 引擎就绪"``：加载完成。
-        4. 异常时：``"IndexTTS 2.0 加载失败: <ErrType>: <msg>"``。
+        3. ``"IndexTTS 2.5 引擎就绪"``：加载完成。
+        4. 异常时：``"IndexTTS 2.5 加载失败: <ErrType>: <msg>"``。
 
     ``try/finally`` 保证：
         a) 半加载异常时清理 ``registry.indextts2_engine``；
@@ -778,7 +778,7 @@ def load_indextts2(
         # Check if model files exist
         if not os.path.exists(get_indextts2_model_path()):
             raise FileNotFoundError(
-                f"IndexTTS 2.0 模型文件不存在: {get_indextts2_model_path()}\n"
+                f"IndexTTS 2.5 模型文件不存在: {get_indextts2_model_path()}\n"
                 "请运行: python scripts/download_indextts2.py 下载模型"
             )
 
@@ -804,22 +804,22 @@ def load_indextts2(
                 logger.debug(f"[IndexTTS2] 显存查询失败（跳过预检）: {mem_err}")
 
         # Step 2: Load model
-        status_text = "正在加载 IndexTTS 2.0 引擎..."
+        status_text = "正在加载 IndexTTS 2.5 引擎..."
         if progress_callback is not None:
             with contextlib.suppress(Exception):
                 progress_callback(status_text)
         yield status_text, None, None, None
 
-        logger.info("[IndexTTS2] 开始加载 IndexTTS 2.0 引擎...")
+        logger.info("[IndexTTS2] 开始加载 IndexTTS 2.5 引擎...")
         start_time: float = time.time()
 
         new_engine: Any = IndexTTS2Engine(
             model_dir=get_indextts2_model_path(),
-            use_fp16=(backend != GPUBackend.CPU),
+            use_bf16=(backend != GPUBackend.CPU),
         )
 
         load_time: float = time.time() - start_time
-        logger.info(f"[IndexTTS2] IndexTTS 2.0 引擎加载完成，耗时: {load_time:.1f}秒")
+        logger.info(f"[IndexTTS2] IndexTTS 2.5 引擎加载完成，耗时: {load_time:.1f}秒")
 
         registry.set_indextts2_loaded(new_engine)
 
@@ -834,7 +834,7 @@ def load_indextts2(
         except Exception as idx_warmup_err:
             logger.debug(f"IndexTTS2 预热失败（可忽略）: {idx_warmup_err}")
 
-        status_text = "IndexTTS 2.0 引擎就绪"
+        status_text = "IndexTTS 2.5 引擎就绪"
         logger.info(f"[IndexTTS2] {status_text}")
         if progress_callback is not None:
             with contextlib.suppress(Exception):
@@ -854,20 +854,20 @@ def load_indextts2(
         logger.error(f"[IndexTTS2] 文件系统错误: {fs_err}")
         with contextlib.suppress(Exception):
             free_gpu_memory()
-        error_msg: str = f"IndexTTS 2.0 加载失败: {type(fs_err).__name__}: {fs_err}"
+        error_msg: str = f"IndexTTS 2.5 加载失败: {type(fs_err).__name__}: {fs_err}"
         yield error_msg, None, None, None
     except Exception as e:
         import traceback
 
         tb: str = traceback.format_exc()
-        logger.error(f"[IndexTTS2] IndexTTS 2.0 加载失败: {type(e).__name__}: {e}\n详细错误:\n{tb}")
+        logger.error(f"[IndexTTS2] IndexTTS 2.5 加载失败: {type(e).__name__}: {e}\n详细错误:\n{tb}")
         gc.collect()
         from .gpu_backend import GPUBackendManager
 
         with contextlib.suppress(Exception):
             GPUBackendManager.empty_cache()
             free_gpu_memory()
-        error_msg = f"IndexTTS 2.0 加载失败: {type(e).__name__}: {e}"
+        error_msg = f"IndexTTS 2.5 加载失败: {type(e).__name__}: {e}"
         yield error_msg, None, None, None
     finally:
         with contextlib.suppress(Exception):
@@ -981,15 +981,15 @@ class PreloadService:
                             logger.warning(f"[预加载] VoxCPM2 ASR 模型预读失败: {asr_err}")
 
                 elif engine == EngineName.INDEXTTS2.value:
-                    logger.info("[预加载] 开始预读 IndexTTS 2.0 模型文件到系统内存...")
+                    logger.info("[预加载] 开始预读 IndexTTS 2.5 模型文件到系统内存...")
                     if os.path.exists(get_indextts2_model_path()):
                         try:
                             self._read_files_to_cache(get_indextts2_model_path())
-                            logger.info("[预加载] IndexTTS 2.0 模型文件已预读到系统缓存")
+                            logger.info("[预加载] IndexTTS 2.5 模型文件已预读到系统缓存")
                         except (OSError, PermissionError) as idx_err:
-                            logger.warning(f"[预加载] IndexTTS 2.0 模型预读失败: {idx_err}")
+                            logger.warning(f"[预加载] IndexTTS 2.5 模型预读失败: {idx_err}")
                     else:
-                        logger.warning(f"[预加载] IndexTTS 2.0 模型路径不存在: {get_indextts2_model_path()}")
+                        logger.warning(f"[预加载] IndexTTS 2.5 模型路径不存在: {get_indextts2_model_path()}")
 
                 with self._lock:
                     self._state["completed"] = True
@@ -1394,7 +1394,7 @@ def _rollback_engine(prev_state: dict[str, Any], error: Exception) -> None:
             backend = GPUBackendManager.detect_backend()
             new_engine: Any = IndexTTS2Engine(
                 model_dir=get_indextts2_model_path(),
-                use_fp16=(backend != GPUBackend.CPU),
+                use_bf16=(backend != GPUBackend.CPU),
             )
             registry.set_indextts2_loaded(new_engine)
             logger.info("[引擎切换] 回滚: IndexTTS2 引擎重新加载完成")
