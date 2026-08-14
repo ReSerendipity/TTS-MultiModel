@@ -127,28 +127,53 @@ class CachedStaticFiles(StaticFiles):
 
 
 def setup_logging() -> None:
-    """配置日志轮转：单个文件 10MB，保留 3 个备份。所有入口点均可调用。"""
+    """配置日志：控制台 + 按大小轮转的文件（单文件 10MB，保留 3 个备份）。
+
+    日志级别与路径支持环境变量覆盖（优先级高于默认值）：
+    - ``LOG_LEVEL``：DEBUG / INFO / WARNING / ERROR
+    - ``LOG_PATH``：日志文件路径，默认 ``<项目根>/logs/app.log``
+
+    统一格式：时间戳 + 级别 + 进程/线程 + 模块位置 + 请求ID + 消息，
+    便于生产环境按 request_id 做链路追踪、按 filename:lineno 快速定位。
+    """
     root_logger = logging.getLogger()
     if any(isinstance(h, RotatingFileHandler) for h in root_logger.handlers):
         return
-    log_dir = os.path.join(_PROJECT_ROOT, "logs")
+
+    # 日志路径：环境变量 LOG_PATH 优先，否则使用项目根 logs/app.log
+    log_path = os.environ.get("LOG_PATH", os.path.join(_PROJECT_ROOT, "logs", "app.log"))
+    log_dir = os.path.dirname(log_path)
     os.makedirs(log_dir, exist_ok=True)
+
+    # 日志级别：环境变量 LOG_LEVEL 优先，默认 INFO
+    level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+    log_level = getattr(logging, level_name, logging.INFO)
+
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] [PID:%(process)d TID:%(thread)d] "
+        "[%(name)s:%(filename)s:%(lineno)d] [req=%(request_id)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # 控制台输出（开发/调试时可见）
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    stream_handler.addFilter(RequestIDLogFilter())
+    root_logger.addHandler(stream_handler)
+
+    # 文件输出（按大小轮转）
     file_handler = RotatingFileHandler(
-        os.path.join(log_dir, "app.log"),
+        log_path,
         maxBytes=10 * 1024 * 1024,
         backupCount=3,
         encoding="utf-8",
     )
-    file_handler.setFormatter(
-        logging.Formatter(
-            "[%(asctime)s] [%(levelname)s] [%(request_id)s] %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-    )
+    file_handler.setFormatter(formatter)
     file_handler.addFilter(RequestIDLogFilter())
     root_logger.addHandler(file_handler)
-    if not root_logger.level or root_logger.level == logging.NOTSET:
-        root_logger.setLevel(logging.INFO)
+
+    # 无条件设置根 logger 级别（默认 root 为 WARNING，会过滤 INFO 日志）
+    root_logger.setLevel(log_level)
 
 
 def _discover_routes(package_name: str = ".routes") -> list[str]:
@@ -372,7 +397,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 if auto_engine == EngineName.INDEXTTS2.value:
                     from .model_manager import load_indextts2
 
-                    logger.info("[lifespan] 后台加载 IndexTTS 2.0 模型中...")
+                    logger.info("[lifespan] 后台加载 IndexTTS 2.5 模型中...")
                     gen = load_indextts2()
                 else:
                     from .model_manager import load_voxcpm2
