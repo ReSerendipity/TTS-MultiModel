@@ -462,7 +462,7 @@ def unload_model() -> None:
                 except Exception as e:
                     logger.warning(f"IndexTTS2 卸载失败: {e}")
 
-            # Unload 通用新式引擎（dotstts 等）
+            # Unload 通用新式引擎（generic_tts_engine 等）
             for gname, ginst in registry.get_all_engine_instances().items():
                 if ginst is not None:
                     try:
@@ -1151,9 +1151,14 @@ def _can_hot_standby(target_engine: str) -> bool:
     current_vram: float = ENGINE_VRAM_REQUIREMENTS.get(registry.current_engine, 0.0)
     target_vram: float = ENGINE_VRAM_REQUIREMENTS.get(target_engine, 0.0)
 
-    # Need enough free VRAM for target engine (with 20% margin)
-    # Plus we keep current engine loaded
-    needed_gb: float = target_vram * 0.8
+    # 热待机 = 旧引擎常驻 + 再载入目标引擎，因此需要的是"当前空闲显存 ≥ 目标引擎
+    # 完整需求 + 20% 余量"。注意这里的 free_gb 已包含当前引擎占用（allocated 计入
+    # 当前引擎），所以目标引擎必须完整地塞进 free_gb 剩余空间。
+    #
+    # M-R1 fix: 原实现用 target_vram * 0.8（低估），会导致空闲显存本不足以双引擎
+    # 常驻时仍误判为热待机，跳过卸载直接加载新引擎 → OOM。改为完整需求 + 余量后，
+    # 显存不充裕时自然回退到"先卸载旧引擎再加载"的传统路径，避免 OOM。
+    needed_gb: float = target_vram * 1.2
     can_standby: bool = free_gb >= needed_gb
 
     if can_standby:
@@ -1266,10 +1271,31 @@ def _check_vram_prereq(engine_name: str, backend: Any, gpu_device: Any) -> float
     free: int = total - allocated
     free_gb: float = free / 1024**3
 
-    logger.info(f"[引擎切换] VRAM 检查: 需要 {needed_gb}GB, 可用 {free_gb:.2f}GB")
+    # M-R1 fix: 预检查需要把"卸载当前引擎可释放的显存"计入可用显存。
+    #
+    # WHY: switch_engine 的传统切换路径（非热待机）会先 unload_model() 再加载
+    # 目标引擎。若当前引擎已占用显存（例如正在使用 VoxCPM2 ~6.5GB），预检只看
+    # "当前空闲显存"会误判为显存不足而硬失败（InsufficientVRAMError），导致永远
+    # 走不到"先卸载再加载"的路径。因此把当前引擎的基线占用视为卸载后可回收的
+    # 显存，只有"卸载后仍装不下"才判定为硬失败。
+    current_engine: str | None = registry.current_engine
+    current_vram_gb: float = (
+        ENGINE_VRAM_REQUIREMENTS.get(current_engine, 0.0) if current_engine else 0.0
+    )
+    effective_free_gb: float = free_gb + current_vram_gb
 
-    if free_gb < needed_gb:
-        error_msg: str = f"显存不足，无法加载 {engine_name}。需要约 {needed_gb}GB，当前可用 {free_gb:.2f}GB。"
+    logger.info(
+        f"[引擎切换] VRAM 检查: 需要 {needed_gb}GB, "
+        f"可用 {effective_free_gb:.2f}GB (当前空闲 {free_gb:.2f}GB + "
+        f"卸载当前引擎 {current_engine or '无'} 可释放 {current_vram_gb:.2f}GB)"
+    )
+
+    if effective_free_gb < needed_gb:
+        error_msg: str = (
+            f"显存不足，无法加载 {engine_name}。即使卸载当前引擎"
+            f" {current_engine or '无'}后可用约 {effective_free_gb:.2f}GB，"
+            f"仍需要约 {needed_gb}GB。"
+        )
         logger.error(f"[引擎切换] {error_msg}")
         raise InsufficientVRAMError(error_msg)
 

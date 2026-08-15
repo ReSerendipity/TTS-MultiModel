@@ -748,17 +748,23 @@ def _register_builtin_engines() -> None:
     )
 
     # dots.tts - 48kHz 高保真零样本克隆引擎（纯懒导入）
-    engine_registry.register(
-        "dotstts",
-        lazy_module=".engines.dotstts_engine:DotsTTSEngine",
-        display_name="dots.tts",
-        vram_requirement=8.0,
-        languages=["zh", "en"],
-        supported_features=["clone", "streaming"],
-        sample_rate=48000,
-        requires_gpu=True,
-        quality="high",
-    )
+    # ⚠️ 2026-08-15 已停用：dots.tts 硬依赖 WeTextProcessing → pynini，
+    #    pynini 在原生 Windows 上无官方预编译包且源码编译失败（Cython/OpenFst），
+    #    且 dots.tts 需要很新的 transformers，与当前环境存在版本冲突风险。
+    #    移除注册后，引擎不再出现在切换列表，切换请求会以"不支持的引擎"失败，
+    #    而不是 503 ENGINE_LOAD_ERROR。如未来在兼容环境（Linux/WSL/conda）跑通
+    #    pynini，可取消注释恢复注册。
+    # engine_registry.register(
+    #     "dotstts",
+    #     lazy_module=".engines.dotstts_engine:DotsTTSEngine",
+    #     display_name="dots.tts",
+    #     vram_requirement=8.0,
+    #     languages=["zh", "en"],
+    #     supported_features=["clone", "streaming"],
+    #     sample_rate=48000,
+    #     requires_gpu=True,
+    #     quality="high",
+    # )
 
 
 _register_builtin_engines()

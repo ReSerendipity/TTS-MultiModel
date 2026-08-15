@@ -248,7 +248,7 @@ window.initMiniMonitor = function() {
 };
 
 // 模型内部 id → 用户可读名称（避免内部标识直接暴露给用户）
-var _MODEL_DISPLAY_NAMES = { voxcpm2: 'VoxCPM2', indextts2: 'IndexTTS 2.0', dotstts: 'dots.tts' };
+var _MODEL_DISPLAY_NAMES = { voxcpm2: 'VoxCPM2', indextts2: 'IndexTTS 2.0' };
 function _modelDisplayName(raw) {
     if (!raw) return '--';
     return _MODEL_DISPLAY_NAMES[raw] || raw;
@@ -282,3 +282,4 @@ window.HealthMonitor = {
     initMini: window.initMiniMonitor
 };
 })();
+

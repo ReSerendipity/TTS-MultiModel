@@ -4,7 +4,7 @@
 
 **支持端点**：
     - POST /generic/clone — 通用语音克隆：适配任何实现 ``generate_voice_clone``
-      的当前引擎（如 dotstts）。
+      的当前引擎（如 generic_tts_engine）。
 
 **设计说明**：
     VoxCPM2 / IndexTTS2 拥有各自专属的生成路由（参数丰富、引擎特定）。

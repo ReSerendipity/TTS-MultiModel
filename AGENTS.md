@@ -1,7 +1,7 @@
 # TTS_MultiModel AGENTS.md — AI 辅助开发指南
 
-> 🧬 **自进化协议版本**：v1.0  
-> 📅 **最后更新日期**：2026-08-10  
+> 🧬 **自进化协议版本**：v1.4  
+> 📅 **最后更新日期**：2026-08-15  
 > 🎯 **对应项目版本**：v1.0.0（Apache-2.0 开源协议）
 
 ---
@@ -439,6 +439,10 @@ pre-commit run -a
 | 6 | **`training/` 目录绝对不能被 API 启动路径 import** | `core/services/dataset_helper.py` 里写了 `from training.prepare_dataset import ...`（想复用一些音频切片工具） | API 启动时 import 到 `datasets`、`librosa`、`torchaudio` 等训练专用大依赖 → 冷启动时间 +45 秒 + 多占 2GB RAM，更惨的是训练代码可能改全局 torch dtype 导致推理精度错 | 把共享代码抽到 `common/audio_utils.py`，`training/` 和 `core/` 都从 common import，**API 启动链路的任何模块都不允许出现 `import training.*`** | 2026-07-02 |
 | 7 | **ChatTTS 长文本一次性推理会 CPU 内存爆 32GB** | 用户提交 5000 字一次性调 `chattts.synthesize(text)` | `torch.tensor(5000, mel_bins)` 中间张量 + attention matrix → 32GB 内存被吃完，OOM 被系统 kill | service 层自动按标点/段落分句（最长 500 chars / 句）→ 逐句调引擎 → 最后 `soundfile.concat(wav_parts)` 拼接成完整 WAV。Scheduler 层的 timeout 也要按句数 × 单句超时估算 | 2026-07-10 |
 | 8 | **release-please：绝对不要手动改版本号** | 图省事直接改 `pyproject.toml` 的 `version = "1.1.0"`，合了 main → release-please 的 PR 里版本号冲突 | CI 创建 Release 失败：`tag v1.1.0 already exists`，CHANGELOG 条目重复 | **完全放手给 release-please**：版本号和 CHANGELOG 一律它生成，你只需要 Approve release-please 自动开的 PR。真要手动改就先让 release-please 生成了，再改 release-please PR 里面的内容（合之前改 PR 就好） | 2026-07-20 |
+| 9 | **全局底部播放器不显示的根因=前端资源缓存** | 页面加载后生成音频，底部 `global-audio-player` 悬浮条（含波形+可拖动进度条）从未出现，结果卡也没有任何可见播放器 | `base.html` 的 JS/CSS 均带 `?v={{ app_version }}` 缓存参数；若版本号未变，浏览器复用旧版 JS，`window.globalAudioPlayer` 为 undefined，`tts_form.js` 的 `initAutoPlay` 里 `if (audioSrc && window.globalAudioPlayer)` 直接跳过 → 播放器永不弹出 | ① 发布新前端资源时务必递增 `app_version`（或改用内容 hash 命名）并硬刷新测试；② 播放器组件应**自包含**：不依赖全局单例。已落地：`routes/generate/utils.py` 的 `_EMBEDDED_PLAYER_HTML` + `static/js/embedded_player.js` + `static/css/embedded_player.css`，结果卡内嵌波形播放器，全部路由（design/clone/script/streaming/post-process/indextts2）自动生效 | 2026-08-15 |
+| 10 | **生成后自动播放 = 隐形播放 + 双音源叠加** | 生成成功自动调 `window.globalAudioPlayer.play()`（`tts_form.js` initAutoPlay / 各页面的 SSE done 分支 / `reprocess.js` / `prompt_continue.html`），同时结果卡内嵌播放器又是独立 Audio 实例 | ① 底部播放器 UI 未显示但音频在播（浏览器标签页喇叭亮），用户"看不见播放器却听见声音"；② 用户再点内嵌播放器 → 两路音频同时播放 | **统一约定：生成/流式/后处理成功后一律不自动播放**，由用户手动点结果卡内嵌播放器（`EmbeddedPlayer.html()`）试听；全局底部播放器仅保留给历史记录/音色库等**用户主动点击**的试听。`showPlayer()` 增加 `playerEl.style.display='flex'` 内联兜底，防止 CSS 未命中时 UI 不可见 | 2026-08-15 |
+| 11 | **引擎切换显存预检漏算"卸载当前引擎可释放的显存"** | 当前引擎已占显存时切到另一个引擎（如 VoxCPM2 → dotstts），`_check_vram_prereq` 在卸载前检查"当前空闲显存" | 日志 `[引擎切换] VRAM 检查: 需要 6.0GB, 可用 5.72GB` → `InsufficientVRAMError` 503，明明卸载旧引擎后显存足够，却永远走不到"先卸载再加载"路径；且 `_can_hot_standby` 用 `target*0.8`（乘反低估）会误判热待机 → 不卸载直接加载新引擎 → OOM | `_check_vram_prereq` 把 `registry.current_engine` 的基线 VRAM 计入有效可用（有效可用 = 当前空闲 + 当前引擎占用），只有"卸载后仍装不下"才硬失败；`_can_hot_standby` 改为 `target*1.2`（完整需求+余量），显存不充裕时自然回退到先卸载再加载的传统路径。见 `bin/integrated_app/model_manager.py` | 2026-08-15 |
+| 12 | **dots.tts 在原生 Windows 上无法安装（pynini 无 Windows 包）** | Windows + 纯 pip（无 conda）环境切换/加载 dotstts 引擎 | `switch_engine` 报 `ENGINE_LOAD_ERROR` 503：`No module named 'dots_tts'`；`pip install dots.tts` 在 `pynini` 步骤源码编译失败（无 Cython/OpenFst，Windows 无官方预编译 wheel） | dots.tts 硬依赖 `WeTextProcessing → pynini`，pynini 仅 Linux/macOS（conda-forge 或 WSL）。Windows 要在用，需装社区 wheel（`SystemPanic/pynini-windows`）或 conda/WSL，且有 transformers 版本冲突风险。本项目已**停用 dotstts**：注释掉 `engine_interface._register_builtin_engines()` 里的注册，引擎不再出现在切换列表，切换以"不支持的引擎"失败而非 503 | 2026-08-15 |
 
 ---
 
@@ -447,5 +451,9 @@ pre-commit run -a
 | 自进化版本 | 日期 | 触发原因 | 更新内容摘要 | 对应项目版本 |
 |:---------:|------|---------|------------|:------------:|
 | v1.0 | 2026-08-10 | 初始建立自进化协议 | 从 TTS_MultiModel 项目健康度评估报告建议补齐：建立自进化协议（5 条铁律 + 自检清单）+ 启动命令章节 + i18n 多语言规范章节（5 种语言 6 步流程 + check_i18n_keys.py）+ 版本号同步清单（万不得已手动改的 3 处）+ 集中化 8 条 Known Gotchas 表格 | v1.0.0 |
+| v1.1 | 2026-08-15 | 结果音频播放器需求（用户反馈：底部悬浮播放器完全未出现） | 排查根因（`window.globalAudioPlayer` 依赖 + 前端资源缓存 `?v=app_version`）并落地**结果卡内嵌播放器**：新增 `static/js/embedded_player.js` + `static/css/embedded_player.css`，在 `routes/generate/utils.py` 的 `_success_html`/`_partial_success_html` 注入 `_EMBEDDED_PLAYER_HTML`（波形+可拖动进度条+时间，自包含不依赖全局单例），streaming.py 的 SSE 完成片段与 post-process 片段同步注入；新增 Known Gotchas #9 | v1.0.0 |
+| v1.2 | 2026-08-15 | 用户反馈：生成后自动播放但看不见播放器（tab 喇叭亮）+ 点内嵌播放器后双音源叠加 | 定位：生成成功自动调 `globalAudioPlayer.play()`（多个路径）+ 内嵌播放器独立 Audio 实例 → 隐形播放 + 双音源。修复：**统一不自动播放**（`tts_form.js` initAutoPlay、voice_design/voice_clone 的 SSE done 分支、`reprocess.js`、`prompt_continue.html` 全部移除自动播放，改由内嵌播放器点播；voice_design 的 `EmbeddedPlayer.html()` 工厂方法统一换入逻辑）；`showPlayer()` 加 `display:flex` 内联兜底防 UI 不可见；删除 voice_design 死代码 createWavBlob/playStreamingAudio；新增 Known Gotchas #10 | v1.0.0 |
+| v1.3 | 2026-08-15 | 用户反馈：切换引擎报 `InsufficientVRAMError` 503，需先卸载旧引擎再加载 | 定位根因：`model_manager._check_vram_prereq` 在卸载前只查"当前空闲显存"，漏算卸载当前引擎可释放的显存；`_can_hot_standby` 用 `target*0.8` 乘反低估会误判热待机。修复：预检把当前引擎基线 VRAM 计入有效可用（仅"卸载后仍装不下"才硬失败）；热待机改为 `target*1.2`（完整需求+余量），显存不充裕时回退到"先卸载再加载"路径避免 OOM；新增 Known Gotchas #11 | v1.0.0 |
+| v1.4 | 2026-08-15 | 用户切换 dotstts 报 `ENGINE_LOAD_ERROR` 503（`No module named 'dots_tts'`），确认后决定暂不启用 | 确认 dots.tts 在原生 Windows 无法安装（硬依赖 WeTextProcessing → pynini 无 Windows 官方包）。应约在 `engine_interface._register_builtin_engines()` 注释掉 dotstts 注册（停用，可逆），同步更新 `test_dotstts_interface.test_registered_engines`（断言 `"dotstts" not in names`）；新增 Known Gotchas #12 | v1.0.0 |
 
 <!-- 🔄 下次更新 AGENTS.md 时，在上面表格末尾追加新一行，不要删除历史记录 -->

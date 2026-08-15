@@ -182,7 +182,19 @@ async def generate_voxcpm_script(
             safe_name: str = os.path.basename(pname)
             persona_data = load_persona_embedding(safe_name)
             if persona_data is not None:
-                wav_path, _ref_text = persona_data
+                # 兼容不同 .pt 缓存格式：
+                # 新格式：二元组 (wav_path, ref_text)；旧格式：dict {'items': [嵌入数据]}
+                wav_path = None
+                if isinstance(persona_data, tuple) and len(persona_data) == 2:
+                    wav_path, _ = persona_data
+                elif isinstance(persona_data, (str, os.PathLike)) and os.path.isfile(str(persona_data)):
+                    wav_path = str(persona_data)
+                else:
+                    # 嵌入缓存对象（张量等），wav 文件必然存在
+                    from ....persona_manager import PERSONA_DIR as _PD
+                    candidate = os.path.join(_PD, f"{safe_name}.wav")
+                    wav_path = candidate if os.path.isfile(candidate) else None
+
                 if wav_path and os.path.isfile(wav_path):
                     persona_map_with_wav[safe_name] = wav_path
                     logger.info(f"[VoxCPM剧本工坊] 已加载音色 '{safe_name}' 的参考音频")

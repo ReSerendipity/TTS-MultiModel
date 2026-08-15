@@ -52,12 +52,9 @@ var Reprocess = (function() {
         })
         .then(function(html) {
             if (resultEl) resultEl.innerHTML = html;
-            // Try to play the reprocessed audio
+            // 不再自动调用全局播放器播放：结果片段已含内嵌播放器（EmbeddedPlayer），
+            // 由用户手动点播，避免与全局播放器双音源叠加（见 AGENTS.md Known Gotchas #9）
             var audioSrc = resultEl ? resultEl.querySelector('audio') : null;
-            if (audioSrc && window.globalAudioPlayer) {
-                var filename = audioSrc.src.split('/').pop().split('?')[0];
-                window.globalAudioPlayer.play(audioSrc.src, filename);
-            }
             // Show audio element if hidden
             var audioEl = document.getElementById(config.audioElementId);
             if (audioSrc && audioEl) {

@@ -49,7 +49,7 @@ def batch_clone(
 
     Args:
         text: 要合成的文本。
-        engine: 引擎名称（voxcpm2 / indextts2 / dotstts）。
+        engine: 引擎名称（voxcpm2 / indextts2 / generic_tts_engine）。
         personas_dir: 音色目录。
         output_dir: 输出目录。
     """
@@ -109,7 +109,7 @@ def main():
     parser.add_argument(
         "--engine",
         default="voxcpm2",
-        choices=["voxcpm2", "indextts2", "dotstts"],
+        choices=["voxcpm2", "indextts2", "generic_tts_engine"],
         help="TTS 引擎",
     )
     parser.add_argument("--server", default=SERVER, help="服务器地址")

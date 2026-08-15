@@ -60,6 +60,7 @@ from ....gpu_utils import free_gpu_memory, is_oom_error
 from ....model_registry import registry
 from ....monitor import get_health_monitor
 from ..utils import (
+    _EMBEDDED_PLAYER_HTML,
     _GENERATION_HARD_TIMEOUT_S,
     _SEMAPHORE_ACQUIRE_TIMEOUT_S,
     _apply_post_processing_to_file,
@@ -744,6 +745,7 @@ async def streaming_audio_generation(
 <audio class="tts-audio-hidden" id="streaming-audio">
     <source src="/output/{safe_filename}" type="audio/wav">
 </audio>
+{_EMBEDDED_PLAYER_HTML.format(audio_url='/output/' + safe_filename)}
 <script>
 (function(){{
     var audio = document.getElementById('streaming-audio');
@@ -843,6 +845,7 @@ async def post_process_audio(
     return HTMLResponse(
         f'<div data-audio-filename="{html.escape(new_filename)}">'
         f'<audio class="tts-audio-hidden" src="/api/audio/{safe_new}"></audio>'
+        f"{_EMBEDDED_PLAYER_HTML.format(audio_url='/api/audio/' + safe_new)}"
         f'<div class="status-message success">Post-processing applied</div>'
         f"</div>"
     )

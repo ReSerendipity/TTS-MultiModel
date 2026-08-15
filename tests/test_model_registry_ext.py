@@ -47,17 +47,17 @@ class TestModelRegistry:
 
     def test_engine_instances_container(self):
         fake = object()
-        registry.set_engine_loaded("dotstts", fake)
-        assert registry.get_engine_instance("dotstts") is fake
-        assert "dotstts" in registry.get_all_engine_instances()
-        registry.clear_engine("dotstts")
-        assert registry.get_engine_instance("dotstts") is None
+        registry.set_engine_loaded("generic_test_engine", fake)
+        assert registry.get_engine_instance("generic_test_engine") is fake
+        assert "generic_test_engine" in registry.get_all_engine_instances()
+        registry.clear_engine("generic_test_engine")
+        assert registry.get_engine_instance("generic_test_engine") is None
 
     def test_clear_all(self):
         fake = object()
-        registry.set_engine_loaded("dotstts", fake)
+        registry.set_engine_loaded("generic_test_engine", fake)
         registry.clear_all()
-        assert registry.get_engine_instance("dotstts") is None
+        assert registry.get_engine_instance("generic_test_engine") is None
         assert registry.current_engine is None
 
 
@@ -65,3 +65,4 @@ class TestEngineSpec:
     def test_get_engine_spec(self):
         spec = get_engine_spec("voxcpm2")
         assert spec is None or spec is not None  # 取决于配置加载，不崩溃即可
+

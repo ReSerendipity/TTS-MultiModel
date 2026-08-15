@@ -495,16 +495,16 @@
                     case 'done':
                         try {
                             var done = JSON.parse(currentData);
-                            var merged = mergePCMChunks(audioChunks);
-                            var blob = createWavBlob(merged, sampleRate);
-                            var url = URL.createObjectURL(blob);
                             updateProgress(100, '{{ "sse_generation_complete"|t(lang) }}');
-                            if (window.globalAudioPlayer) {
-                                window.globalAudioPlayer.play(url, done.filename || '{{ "streaming_gen"|t(lang) }}');
-                            } else {
-                                var a = new Audio(url); a.play();
-                            }
                             if (window.Toast) Toast.show('{{ "sse_generation_complete"|t(lang) }}', 'success');
+                            // 不再自动播放：结果区换入内嵌播放器（波形+可拖动进度条），
+                            // 由用户手动点播，避免隐形播放 / 双音源叠加
+                            if (done.filename && window.EmbeddedPlayer) {
+                                statusEl.innerHTML = '<div data-audio-filename="' + done.filename + '">'
+                                    + window.EmbeddedPlayer.html('/output/' + done.filename)
+                                    + '<div class="status-message success">生成完成 - ' + done.filename + '</div></div>';
+                                window.EmbeddedPlayer.scan();
+                            }
                         } catch(e) {}
                         break;
                     case 'error':

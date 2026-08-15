@@ -116,9 +116,6 @@ LORA_DIR = os.path.join(ROOT_DIR, "lora")
 # --- IndexTTS 2.5 Model Paths ---
 INDEXTTS2_MODEL_PATH = os.path.join(PRETRAINED_DIR, "IndexTTS2")
 
-# --- dots.tts Model Paths ---
-DOTSTTS_MODEL_PATH = os.path.join(PRETRAINED_DIR, "dots.tts")
-
 
 # ---------------------------------------------------------------------------
 # P1-3: 模型路径 shared / portable 双模式（来源：Image_MultiModel）
@@ -165,11 +162,6 @@ def get_voxcpm2_denoiser_path() -> str:
 def get_indextts2_model_path() -> str:
     """获取 IndexTTS 2.5 模型路径（考虑 shared/portable 模式）。"""
     return os.path.join(get_pretrained_dir(), "IndexTTS2")
-
-
-def get_dotstts_model_path() -> str:
-    """获取 dots.tts 模型路径（考虑 shared/portable 模式）。"""
-    return os.path.join(get_pretrained_dir(), "dots.tts")
 
 
 def _ensure_dirs():

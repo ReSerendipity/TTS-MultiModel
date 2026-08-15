@@ -3,7 +3,7 @@
 **端点**：POST ``/api/generate/generic/clone``
 
 **适用引擎**：任何实现 ``TTSEngine.generate_voice_clone`` 的当前激活引擎，
-    典型为通过 config.yaml 声明式接入的 dotstts。
+    
 
 **表单参数（multipart/form-data）**：
     - text (str, 必填)：待合成文本。
@@ -14,8 +14,7 @@
     - tempo_factor / voice_enhancement / target_lufs：通用后处理参数。
 
 **引擎专属高级参数（折叠区，用户可视场景选择是否调整）**：
-    - dots.tts：num_steps / guidance_scale / seed / random_seed / language。
-
+    
     由于 ``TTSEngine.generate_voice_clone`` 协议定义为 ``**kwargs``，
     路由将这些参数透传给当前激活引擎，未匹配字段会被引擎忽略，
     因此一条端点可同时服务多个引擎。
@@ -48,7 +47,7 @@ logger = logging.getLogger("tts_multimodel")
 @router.post(
     "/generic/clone",
     summary="通用语音克隆",
-    description="调用当前激活引擎的 generate_voice_clone（适配 dotstts 等）",
+    description="调用当前激活引擎的 generate_voice_clone(通用引擎)",
 )
 async def generic_clone_endpoint(
     request: Request,
@@ -60,8 +59,7 @@ async def generic_clone_endpoint(
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
     target_lufs: float = Form(-16.0),
-    # --- dots.tts 高级参数 ---
-    num_steps: int = Form(10),
+        num_steps: int = Form(10),
     guidance_scale: float = Form(1.2),
     seed: int = Form(42),
     random_seed: str = Form("true"),
@@ -80,7 +78,7 @@ async def generic_clone_endpoint(
         voice_enhancement: 是否人声增强（"true"/"false"）。
         target_lufs: 目标响度 LUFS。
         num_steps/guidance_scale/seed/random_seed/language:
-            dots.tts 推理参数（其余引擎忽略）。
+            某些引擎可能支持额外的超参数配置。
 
     Returns:
         HTMLResponse: 成功/失败的 HTMX 片段。
@@ -104,8 +102,7 @@ async def generic_clone_endpoint(
     if not ref_path:
         return _error_html(request, "通用克隆需要参考音频（上传文件或选择音色）")
 
-    # dots.tts 在启用 random_seed 时把 seed 强制置为 -1（库内部使用随机种子）
-    effective_seed = -1 if (random_seed or "").lower() == "true" else seed
+        effective_seed = -1 if (random_seed or "").lower() == "true" else seed
 
     # 3. 构造生成闭包（在 executor 线程中执行 GPU 推理）
     def _run():
@@ -117,8 +114,7 @@ async def generic_clone_endpoint(
             text,
             reference_audio_path=ref_path,
             instruction=prompt_text,
-            # dots.tts 字段（其他引擎通过 kwargs.get 自动忽略未知键）
-            num_steps=num_steps,
+            # 自定义参数透传给引擎            num_steps=num_steps,
             guidance_scale=guidance_scale,
             seed=effective_seed,
             language=language,

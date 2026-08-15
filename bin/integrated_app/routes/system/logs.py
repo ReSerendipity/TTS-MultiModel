@@ -360,7 +360,7 @@ def _query_from_db(
 
     # total_count
     try:
-        cursor = db._execute(f"SELECT COUNT(*) FROM action_logs {where}", params)
+        cursor = db._execute(f"SELECT COUNT(*) FROM action_logs {where}", params)  # nosec B608: where 由 _build_filter_sql 硬编码字面量子句构造，值全部参数绑定
         total_row = cursor.fetchone()
         total_count = int(total_row[0]) if total_row else 0
     except sqlite3.OperationalError as exc:
@@ -373,7 +373,7 @@ def _query_from_db(
         offset = (page - 1) * page_size
         try:
             cursor = db._execute(
-                f"SELECT id, ts_ms, level, action, message, extra_json "
+                f"SELECT id, ts_ms, level, action, message, extra_json "  # nosec B608: where 由 _build_filter_sql 硬编码字面量子句构造，值全部参数绑定
                 f"FROM action_logs {where} "
                 f"ORDER BY ts_ms DESC, id DESC "
                 f"LIMIT ? OFFSET ?",

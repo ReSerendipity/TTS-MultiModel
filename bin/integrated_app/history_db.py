@@ -474,7 +474,7 @@ class HistoryDatabase:
                 if not search_filename:
                     # 仅匹配 text_preview 列：使用 FTS5 列过滤语法 ``col : phrase``
                     fts_query = f"text_preview : {fts_query}"
-                conditions.append(f"id IN (SELECT rowid FROM {_FTS_TABLE} WHERE {_FTS_TABLE} MATCH ?)")
+                conditions.append(f"id IN (SELECT rowid FROM {_FTS_TABLE} WHERE {_FTS_TABLE} MATCH ?)")  # nosec B608: 表名为模块常量 _FTS_TABLE，用户值经 ? 参数绑定
                 params.append(fts_query)
             else:
                 escaped = self._escape_like(search_text).lower()
@@ -555,7 +555,7 @@ class HistoryDatabase:
                 （如 ``"INTEGER NOT NULL DEFAULT 0"``）。
         """
         try:
-            cursor = self._execute(f"SELECT {column} FROM generation_history LIMIT 1")
+            cursor = self._execute(f"SELECT {column} FROM generation_history LIMIT 1")  # nosec B608: column 仅由内部迁移调用方传入字面量（hidden/created_timestamp/file_missing/prev_hash/record_hmac），无外部输入
             cursor.fetchall()
         except sqlite3.OperationalError:
             with self._transaction() as conn:
@@ -658,36 +658,30 @@ class HistoryDatabase:
                 )
                 # 同步触发器：INSERT / DELETE / UPDATE
                 conn.execute(
-                    f"""
-                    CREATE TRIGGER IF NOT EXISTS generation_history_ai
-                    AFTER INSERT ON generation_history BEGIN
-                        INSERT INTO {_FTS_TABLE}(rowid, filename, text_preview)
-                        VALUES (new.id, new.filename, new.text_preview);
-                    END
-                    """
+                    f"CREATE TRIGGER IF NOT EXISTS generation_history_ai "  # nosec B608: DDL 仅拼接模块常量 _FTS_TABLE
+                    f"AFTER INSERT ON generation_history BEGIN "
+                    f"INSERT INTO {_FTS_TABLE}(rowid, filename, text_preview) "
+                    f"VALUES (new.id, new.filename, new.text_preview); "
+                    f"END"
                 )
                 conn.execute(
-                    f"""
-                    CREATE TRIGGER IF NOT EXISTS generation_history_ad
-                    AFTER DELETE ON generation_history BEGIN
-                        INSERT INTO {_FTS_TABLE}({_FTS_TABLE}, rowid, filename, text_preview)
-                        VALUES('delete', old.id, old.filename, old.text_preview);
-                    END
-                    """
+                    f"CREATE TRIGGER IF NOT EXISTS generation_history_ad "  # nosec B608: DDL 仅拼接模块常量 _FTS_TABLE
+                    f"AFTER DELETE ON generation_history BEGIN "
+                    f"INSERT INTO {_FTS_TABLE}({_FTS_TABLE}, rowid, filename, text_preview) "
+                    f"VALUES('delete', old.id, old.filename, old.text_preview); "
+                    f"END"
                 )
                 conn.execute(
-                    f"""
-                    CREATE TRIGGER IF NOT EXISTS generation_history_au
-                    AFTER UPDATE ON generation_history BEGIN
-                        INSERT INTO {_FTS_TABLE}({_FTS_TABLE}, rowid, filename, text_preview)
-                        VALUES('delete', old.id, old.filename, old.text_preview);
-                        INSERT INTO {_FTS_TABLE}(rowid, filename, text_preview)
-                        VALUES (new.id, new.filename, new.text_preview);
-                    END
-                    """
+                    f"CREATE TRIGGER IF NOT EXISTS generation_history_au "  # nosec B608: DDL 仅拼接模块常量 _FTS_TABLE
+                    f"AFTER UPDATE ON generation_history BEGIN "
+                    f"INSERT INTO {_FTS_TABLE}({_FTS_TABLE}, rowid, filename, text_preview) "
+                    f"VALUES('delete', old.id, old.filename, old.text_preview); "
+                    f"INSERT INTO {_FTS_TABLE}(rowid, filename, text_preview) "
+                    f"VALUES (new.id, new.filename, new.text_preview); "
+                    f"END"
                 )
                 # 全量重建索引，保证与主表一致（含旧库回填）
-                conn.execute(f"INSERT INTO {_FTS_TABLE}({_FTS_TABLE}) VALUES('rebuild')")
+                conn.execute(f"INSERT INTO {_FTS_TABLE}({_FTS_TABLE}) VALUES('rebuild')")  # nosec B608: 仅拼接模块常量 _FTS_TABLE
             self._fts_enabled = True
             logger.info("[history_db] FTS5 全文索引已就绪（trigram 分词）")
         except sqlite3.OperationalError as e:
@@ -996,7 +990,7 @@ class HistoryDatabase:
         # H-R5: 批量查询仍受 SQLITE_MAX_VARIABLE_NUMBER 限制，
         # 调用方（routes/audio.py）已通过 _MAX_BATCH_EXPORT_COUNT 限制单次数量
         placeholders = ",".join("?" * len(ids))
-        sql = f"SELECT id, filename, filepath FROM generation_history WHERE id IN ({placeholders})"
+        sql = f"SELECT id, filename, filepath FROM generation_history WHERE id IN ({placeholders})"  # nosec B608: 占位符仅生成 ?，ids 全部参数绑定
         try:
             cursor = self._execute(sql, list(ids))
             return [dict(row) for row in cursor.fetchall()]
@@ -1050,7 +1044,7 @@ class HistoryDatabase:
         if search_keyword:
             # [H-R6] 与 _build_filter_conditions 一致：优先 FTS5，不可用时回退 LIKE。
             if self._can_use_fts(search_keyword):
-                conditions.append(f"id IN (SELECT rowid FROM {_FTS_TABLE} WHERE {_FTS_TABLE} MATCH ?)")
+                conditions.append(f"id IN (SELECT rowid FROM {_FTS_TABLE} WHERE {_FTS_TABLE} MATCH ?)")  # nosec B608: 表名为模块常量，用户值经 ? 参数绑定
                 params.append(self._build_fts_query(search_keyword))
             else:
                 kw_lower = self._escape_like(search_keyword).lower()
@@ -1080,17 +1074,15 @@ class HistoryDatabase:
         where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
 
         # Get total count
-        cursor = self._execute(f"SELECT COUNT(*) as count FROM generation_history {where_clause}", params)
+        cursor = self._execute(f"SELECT COUNT(*) as count FROM generation_history {where_clause}", params)  # nosec B608: where 子句由硬编码字面量拼接，值全部参数绑定
         total = cursor.fetchone()["count"]
 
         # Get paginated records
         cursor = self._execute(
-            f"""
-            SELECT * FROM generation_history
-            {where_clause}
-            ORDER BY created_timestamp DESC
-            LIMIT ? OFFSET ?
-        """,
+            f"SELECT * FROM generation_history "  # nosec B608: where 子句由硬编码字面量拼接，值全部参数绑定
+            f"{where_clause} "
+            f"ORDER BY created_timestamp DESC "
+            f"LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
 
@@ -1163,12 +1155,10 @@ class HistoryDatabase:
         where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
 
         cursor = self._execute(
-            f"""
-            SELECT * FROM generation_history
-            {where_clause}
-            ORDER BY {order_by}
-            LIMIT ? OFFSET ?
-        """,
+            f"SELECT * FROM generation_history "  # nosec B608: where 子句由硬编码字面量拼接，order_by 经 _ALLOWED_ORDER_BY 白名单校验
+            f"{where_clause} "
+            f"ORDER BY {order_by} "
+            f"LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         return [dict(row) for row in cursor.fetchall()]
@@ -1230,12 +1220,10 @@ class HistoryDatabase:
 
         # 多取一条用于判断 hasMore，不需额外 COUNT(*)
         cursor = self._execute(
-            f"""
-            SELECT * FROM generation_history
-            {where_clause}
-            ORDER BY created_timestamp DESC, id DESC
-            LIMIT ?
-            """,
+            f"SELECT * FROM generation_history "  # nosec B608: where 子句由硬编码字面量拼接，值全部参数绑定
+            f"{where_clause} "
+            f"ORDER BY created_timestamp DESC, id DESC "
+            f"LIMIT ?",
             (*params, limit + 1),
         )
         rows = [dict(row) for row in cursor.fetchall()]
@@ -1288,7 +1276,7 @@ class HistoryDatabase:
         where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
 
         cursor = self._execute(
-            f"SELECT COUNT(*) as count FROM generation_history {where_clause}",
+            f"SELECT COUNT(*) as count FROM generation_history {where_clause}",  # nosec B608: where 子句由硬编码字面量拼接，值全部参数绑定
             params,
         )
         return cursor.fetchone()["count"]
@@ -1462,14 +1450,14 @@ class HistoryDatabase:
             with self._transaction() as conn:
                 if delete_file:
                     cursor = conn.execute(
-                        f"SELECT filepath FROM generation_history WHERE id IN ({placeholders})",
+                        f"SELECT filepath FROM generation_history WHERE id IN ({placeholders})",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                         chunk,
                     )
                     for row in cursor.fetchall():
                         if row["filepath"]:
                             filepaths_to_delete.append(row["filepath"])
                 cursor = conn.execute(
-                    f"DELETE FROM generation_history WHERE id IN ({placeholders})",
+                    f"DELETE FROM generation_history WHERE id IN ({placeholders})",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 deleted_count += cursor.rowcount
@@ -1523,14 +1511,14 @@ class HistoryDatabase:
             with self._transaction() as conn:
                 if delete_files:
                     cursor = conn.execute(
-                        f"SELECT filepath FROM generation_history WHERE filename IN ({placeholders})",
+                        f"SELECT filepath FROM generation_history WHERE filename IN ({placeholders})",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                         chunk,
                     )
                     for row in cursor.fetchall():
                         if row["filepath"]:
                             filepaths_to_delete.append(row["filepath"])
                 cursor = conn.execute(
-                    f"DELETE FROM generation_history WHERE filename IN ({placeholders})",
+                    f"DELETE FROM generation_history WHERE filename IN ({placeholders})",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 count += cursor.rowcount
@@ -1569,7 +1557,7 @@ class HistoryDatabase:
             placeholders = ",".join("?" * len(chunk))
             with self._transaction() as conn:
                 cursor = conn.execute(
-                    f"UPDATE generation_history SET hidden = 1 WHERE filename IN ({placeholders}) AND hidden = 0",
+                    f"UPDATE generation_history SET hidden = 1 WHERE filename IN ({placeholders}) AND hidden = 0",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 total += cursor.rowcount
@@ -1596,7 +1584,7 @@ class HistoryDatabase:
             placeholders = ",".join("?" * len(chunk))
             with self._transaction() as conn:
                 cursor = conn.execute(
-                    f"UPDATE generation_history SET hidden = 0 WHERE filename IN ({placeholders}) AND hidden = 1",
+                    f"UPDATE generation_history SET hidden = 0 WHERE filename IN ({placeholders}) AND hidden = 1",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 total += cursor.rowcount
@@ -1623,7 +1611,7 @@ class HistoryDatabase:
             placeholders = ",".join("?" * len(chunk))
             with self._transaction() as conn:
                 cursor = conn.execute(
-                    f"UPDATE generation_history SET hidden = 1 WHERE id IN ({placeholders}) AND hidden = 0",
+                    f"UPDATE generation_history SET hidden = 1 WHERE id IN ({placeholders}) AND hidden = 0",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 total += cursor.rowcount
@@ -1650,7 +1638,7 @@ class HistoryDatabase:
             placeholders = ",".join("?" * len(chunk))
             with self._transaction() as conn:
                 cursor = conn.execute(
-                    f"UPDATE generation_history SET hidden = 0 WHERE id IN ({placeholders}) AND hidden = 1",
+                    f"UPDATE generation_history SET hidden = 0 WHERE id IN ({placeholders}) AND hidden = 1",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 total += cursor.rowcount
@@ -1759,7 +1747,7 @@ class HistoryDatabase:
                 placeholders = ",".join("?" * len(chunk))
                 with self._transaction() as conn:
                     cursor = conn.execute(
-                        f"DELETE FROM generation_history WHERE id IN ({placeholders})",
+                        f"DELETE FROM generation_history WHERE id IN ({placeholders})",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                         chunk,
                     )
                     deleted_count += cursor.rowcount
@@ -1876,7 +1864,7 @@ class HistoryDatabase:
                 placeholders = ",".join("?" * len(chunk))
                 with self._transaction() as conn:
                     conn.execute(
-                        f"UPDATE generation_history SET file_missing = 1 WHERE id IN ({placeholders})",
+                        f"UPDATE generation_history SET file_missing = 1 WHERE id IN ({placeholders})",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                         chunk,
                     )
             logger.info(f"已标记 {len(orphan_ids)} 条孤立记录为 file_missing")

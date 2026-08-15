@@ -201,7 +201,10 @@ window.TTSForm = (function() {
     }
 
     /**
-     * Setup auto-play for generated audio
+     * 生成完成后的结果处理（原"自动播放"逻辑已废弃）：
+     * 结果卡内嵌播放器（window.EmbeddedPlayer）负责试听，这里不再调用
+     * 全局播放器自动播放，避免"生成后隐形播放 / 双音源叠加"问题
+     * （见 AGENTS.md Known Gotchas #9）。
      * @param {Object} config
      * @param {string} config.formId - Form element ID
      * @param {string} config.resultId - Result container ID
@@ -213,13 +216,6 @@ window.TTSForm = (function() {
 
         form.addEventListener('htmx:afterSettle', function(e) {
             if (e.detail && e.detail.successful) {
-                var resultEl = document.getElementById(config.resultId);
-                if (!resultEl) return;
-                var audioSrc = resultEl.querySelector('audio');
-                if (audioSrc && window.globalAudioPlayer) {
-                    var filename = audioSrc.src.split('/').pop().split('?')[0];
-                    window.globalAudioPlayer.play(audioSrc.src, filename);
-                }
                 if (config.audioElementId) {
                     var audioEl = document.getElementById(config.audioElementId);
                     if (audioEl) audioEl.classList.remove('audio-hidden');

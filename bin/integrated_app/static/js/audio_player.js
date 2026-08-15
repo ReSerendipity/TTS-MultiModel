@@ -268,6 +268,9 @@ function updateVolumeIcon() {
 function showPlayer() {
     if (!playerEl) return;
     playerEl.classList.add('visible');
+    // 兜底：防止 CSS 规则未命中时播放器不可见（曾出现"音频在播但 UI 不显示"，
+    // 见 AGENTS.md Known Gotchas #9）
+    playerEl.style.display = 'flex';
     var mainContent = document.querySelector('.main-content');
     if (mainContent) mainContent.classList.add('has-audio');
 }

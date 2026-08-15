@@ -41,7 +41,7 @@ TTS MultiModel - 应用启动脚本
 注意事项:
     - 仅适用于 Windows 平台（使用 WinPython 便携环境）
     - 启动前会自动终止占用默认端口的进程
-    - 模型文件不完整时会提示下载并退出
+    - 模型文件不完整时打印下载提示，警告后自动继续启动
     - 支持 Ctrl+C 优雅关闭服务
 """
 
@@ -437,7 +437,9 @@ def start_app():
         print("=" * 60)
         print()
         print("  ℹ️ 提示：未下载的引擎将无法使用，不影响其他引擎正常运行")
-        input("  按 Enter 继续启动... (或 Ctrl+C 取消)")
+        print("  ℹ️ 服务将自动继续启动，如需中止请按 Ctrl+C")
+        # 不再使用 input() 阻塞等待回车：缺失引擎（如 IndexTTS 2.5）可能长期不下载，
+        # 每次启动都要求手动确认会造成无效阻塞。警告信息照常打印后自动继续。
         # Skip startup block | 跳过启动阻断 # sys.exit(1)
 
     threading.Thread(target=auto_open_browser, args=(ip, actual_port), daemon=True).start()

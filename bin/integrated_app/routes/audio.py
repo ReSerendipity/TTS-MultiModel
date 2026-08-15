@@ -64,9 +64,13 @@ _MAX_BATCH_EXPORT_COUNT = 100
 _MAX_BATCH_OPERATION_COUNT = 500
 _KEYWORD_MAX_LENGTH = 100
 
-# 非法字符正则：只允许字母数字、点、下划线、短横线
-_SAFE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
+# 非法字符正则：只允许字母数字、点、下划线、短横线（含 CJK 以支持中文音色名）
+# CJK 字符（U+4E00~U+9FFF）不包含任何路径分隔符 / \\ : .. 等，可安全参与文件名白名单
+_SAFE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._\-\u4e00-\u9fff]+$")
 _SPEAKER_KEY_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
+# Persona 名称校验：字符集与 config._PERSONA_NAME_RE 保持一致（允许中文），
+# 否则中文音色名（如"南宫婉"）的参考音频会被 403 拒绝，表现为"音频被禁用/用不了"
+_PERSONA_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\u4e00-\u9fff]{1,50}$")
 
 _AUDIO_MAGIC_BYTES = {
     b"RIFF": ".wav",
@@ -381,8 +385,9 @@ async def get_persona_audio(name: str) -> Response:
         ``FileResponse`` → ``PERSONA_DIR/{name}.wav``；
         403 / 404 / 500。
     """
-    # 先对 name 本身做字符白名单；再拼 .wav 传给 _safe_file_path
-    if not isinstance(name, str) or not _SPEAKER_KEY_PATTERN.match(name):
+    # 先对 name 本身做字符白名单（允许中文，与 persona_manager 保存规则一致）；
+    # 再拼 .wav 传给 _safe_file_path 做三重路径校验
+    if not isinstance(name, str) or not _PERSONA_NAME_PATTERN.match(name):
         logger.warning("get_persona_audio name 非法字符: %r", name[:120])
         return JSONResponse({"status": "error", "message": "Invalid persona name"}, status_code=403)
 

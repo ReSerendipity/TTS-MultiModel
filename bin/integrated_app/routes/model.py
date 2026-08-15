@@ -223,7 +223,7 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
         elif engine == "voxcpm2":
             load_fn = load_voxcpm2
         else:
-            # 通用新式引擎（dotstts 等）：通过 switch_engine 走声明式加载。
+            # 通用新式引擎（generic_tts_engine 等）：通过 switch_engine 走声明式加载。
             def load_fn() -> Any:  # type: ignore[no-redef]
                 return switch_engine(engine)
 
