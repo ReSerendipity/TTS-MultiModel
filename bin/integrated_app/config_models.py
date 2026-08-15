@@ -464,6 +464,13 @@ class SecurityConfig(BaseModel):
         description="输出音频自动嵌入可溯源水印",
     )
 
+    content_safety_threshold: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="文本内容安全检测置信度阈值（0.0~1.0），默认 0.3：单条强关键词命中（置信度≈0.333）即可拦截",
+    )
+
 
 class AppConfig(BaseModel):
     """根应用配置模型 — 整个配置树的顶层容器。

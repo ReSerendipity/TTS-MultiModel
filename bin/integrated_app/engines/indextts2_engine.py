@@ -602,10 +602,14 @@ class IndexTTS2Engine(TTSEngine):
             raise ValueError("合成文本 text 不能为空。")
 
         # 文本预处理：清理 Markdown/Emoji + 标点规范化 + 数字展开
+        # 注意：TTSError（含内容安全拦截 ContentSafetyError）必须向上传播，
+        # 禁止静默降级为原始文本，否则不安全文本会绕过过滤进入合成。
         try:
-            text = normalize_text(text)
+            text = normalize_text(text, lang if lang is not None else self.lang)
             if emo_text and use_emo_text:
-                emo_text = normalize_text(emo_text)
+                emo_text = normalize_text(emo_text, lang if lang is not None else self.lang)
+        except TTSError:
+            raise
         except Exception as e:
             logger.debug(f"[IndexTTS2] 文本预处理失败（使用原始文本）: {e}")
 

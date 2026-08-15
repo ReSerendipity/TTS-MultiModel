@@ -39,6 +39,8 @@ from ._base import (
     split_text_for_tts,
 )
 from .decorators import with_generation_context
+from ...exceptions import ContentSafetyError
+from ...security.content_safety import check_safety
 
 StreamingMode = Literal["sse", "binary"]
 
@@ -441,6 +443,14 @@ def fn_voxcpm_streaming(
     from ...model_registry import registry
 
     start_time = time.time()
+
+    # 内容安全门禁：流式路径不经过 normalize_text，需在推理前显式拦截
+    _safety_result = check_safety(text)
+    if not _safety_result.is_safe:
+        raise ContentSafetyError(
+            f"文本未通过内容安全检测（{_safety_result.category.value}，置信度 {_safety_result.confidence:.2f}），已拒绝合成。",
+            category=_safety_result.category.value,
+        )
 
     _progress_mgr.update_phase("文本分割中...")
     segments = split_text_for_tts(text)

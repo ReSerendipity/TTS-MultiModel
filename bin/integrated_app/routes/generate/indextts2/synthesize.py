@@ -208,7 +208,7 @@ async def generate_indextts2(
         return err
 
     # 延迟导入，避免模块加载时对 torch 等大依赖的硬耦合
-    from ....generation import split_text_for_tts
+    from ....generation import _save_wav_compatible, split_text_for_tts
     from ....model_registry import registry
 
     # 再次显式取 engine 引用：pre_validate 已检查过非空，这里再取一次用于 infer()
@@ -355,9 +355,7 @@ async def generate_indextts2(
         timestamp: int = int(time.time())
         filename: str = f"indextts2_{timestamp}.wav"
         output_path: str = os.path.join(SAVE_DIR, filename)
-        import scipy.io.wavfile as wavfile
-
-        wavfile.write(output_path, 44100, combined)
+        _save_wav_compatible(combined, output_path, sample_rate=44100)
         return (44100, "wav", filename), "IndexTTS 2.5 生成完成"
 
     # ------------------------------------------------------------------

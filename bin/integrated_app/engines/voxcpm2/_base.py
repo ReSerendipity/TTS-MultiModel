@@ -53,7 +53,7 @@ from ...bad_case_retry import (
 )
 from ...config import SAVE_DIR
 from ...config_models import AdvancedParamsConfig
-from ...exceptions import EngineSwitchError, GenerationError, tts_error_handler
+from ...exceptions import EngineSwitchError, GenerationError, TTSError, tts_error_handler
 from ...generation import (
     _save_wav_compatible,
     increment_seed,
@@ -63,7 +63,7 @@ from ...generation import (
 from ...model_manager import _gen_tracker, _progress_mgr
 from ...persona_manager import get_persona_map
 from ...ras_sampling import RASConfig, RASContext
-from ...text_frontend import normalize_text
+from ...text_frontend import detect_language, normalize_text
 from ...utils import cleanup_temp_files
 
 logger = logging.getLogger("tts_multimodel")
@@ -390,9 +390,12 @@ def generate_with_template(
     # 文本预处理：清理 Markdown/Emoji + 标点规范化 + 数字展开
     # 参考 Fish Speech / VoiceBox 最佳实践，提升 TTS 输入质量
     try:
-        text = normalize_text(text)
+        text = normalize_text(text, detect_language(text))
         if instruction and instruction.strip():
-            instruction = normalize_text(instruction)
+            instruction = normalize_text(instruction, detect_language(instruction))
+    except TTSError:
+        # 内容安全拦截（ContentSafetyError 等）必须向上传播，禁止静默降级
+        raise
     except Exception as e:
         logger.debug(f"[{phase_name}] 文本预处理失败（使用原始文本）: {e}")
 

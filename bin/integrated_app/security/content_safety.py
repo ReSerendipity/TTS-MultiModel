@@ -45,7 +45,9 @@ logger = logging.getLogger("tts_multimodel")
 # ---------------------------------------------------------------------------
 
 #: 默认安全检测置信度阈值（0.0~1.0）
-DEFAULT_THRESHOLD = 0.6
+#: 0.3：单条强关键词命中（置信度 1/(1+2)≈0.333）即判定不安全，
+#: 与 config.yaml ``security.content_safety_threshold`` 默认值保持一致。
+DEFAULT_THRESHOLD = 0.3
 
 #: 最大检测文本长度
 MAX_DETECTION_TEXT_LENGTH = 10000
@@ -656,22 +658,46 @@ _detector_lock = threading.Lock()
 
 
 def get_safety_detector(
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
 ) -> ContentSafetyDetector:
     """获取模块级 ContentSafetyDetector 单例。
 
     Args:
-        threshold: 检测阈值。
+        threshold: 检测阈值。``None`` 时优先读取 config.yaml
+            ``security.content_safety_threshold``，未配置/读取失败时
+            回退到 :data:`DEFAULT_THRESHOLD`。
 
     Returns:
         ContentSafetyDetector 实例。
     """
     global _detector_instance
+    if threshold is None:
+        threshold = _resolve_safety_threshold()
     if _detector_instance is None:
         with _detector_lock:
             if _detector_instance is None:
                 _detector_instance = ContentSafetyDetector(threshold=threshold)
     return _detector_instance
+
+
+def _resolve_safety_threshold() -> float:
+    """解析内容安全检测阈值：config.yaml → 模块默认值。
+
+    配置读取为"尽力而为"：任何异常（缺少依赖/配置文件缺失/类型非法）
+    都回退到 DEFAULT_THRESHOLD，绝不阻断主流程。
+    """
+    try:
+        from ..config import get_config
+
+        # 运行时配置门面（config.py AppConfig）经 pydantic_config 暴露强类型配置树
+        return float(get_config().pydantic_config.security.content_safety_threshold)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(
+            "读取 content_safety_threshold 配置失败，回退默认阈值 %.2f: %s",
+            DEFAULT_THRESHOLD,
+            exc,
+        )
+        return DEFAULT_THRESHOLD
 
 
 def check_safety(text: str) -> SafetyDetectionResult:

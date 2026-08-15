@@ -141,5 +141,6 @@ runtime:
 # P2-1: 安全配置（来源：Image_MultiModel 水印思路）
 security:
   audio_watermark_enabled: true   # 输出音频自动嵌入可溯源水印
+  content_safety_threshold: 0.3   # 文本内容安全置信度阈值：单条强关键词命中(≈0.333)即拦截；调高可减少误拦
 
 

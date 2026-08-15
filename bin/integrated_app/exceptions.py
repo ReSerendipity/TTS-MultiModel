@@ -325,6 +325,30 @@ class ValidationError(TTSError):
         super().__init__(message, code="VALIDATION_ERROR", status_code=400)
 
 
+class ContentSafetyError(TTSError):
+    """内容安全检测拦截异常。
+
+    **典型触发场景**：
+    - 合成文本命中内容安全关键词（暴力/仇恨/自残/色情/违法犯罪/骚扰）。
+    - 文本语义检测（CLIP，可选启用）判定为不安全内容。
+
+    对应 HTTP 状态码 ``400 Bad Request``，由文本前端
+    （``text_frontend.normalize_text``）在推理前抛出，
+    引擎层将其向上传播，禁止不安全文本进入合成管线。
+
+    Attributes:
+        category: 命中的安全类别标识（如 ``"violence"``），空串表示未知。
+
+    Args:
+        message: 拦截原因描述，必须提供。
+        category: 命中的安全类别标识，默认为空串。
+    """
+
+    def __init__(self, message: str, category: str = "") -> None:
+        self.category: str = category
+        super().__init__(message, code="CONTENT_SAFETY_ERROR", status_code=400)
+
+
 class ModelSwitchError(TTSError):
     """模型切换失败异常。
 

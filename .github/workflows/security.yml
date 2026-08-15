@@ -60,3 +60,24 @@ jobs:
           name: bandit-report
           path: bandit-report.json
           retention-days: 30
+
+  # 密钥泄露扫描 — 学习 Image_MultiModel 的 Trivy FS 模式
+  # 扫描仓库历史中的密钥/Token 泄露，防止凭据意外提交。
+  secret-scan:
+    name: Secret Scanning (Trivy FS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy secret scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          scanners: 'secret'
+          scan-ref: '.'

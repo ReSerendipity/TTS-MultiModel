@@ -17,6 +17,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from .exceptions import ContentSafetyError
+from .security.content_safety import check_safety
+
 logger = logging.getLogger("tts_multimodel")
 
 # ---------------------------------------------------------------------------
@@ -1798,11 +1801,42 @@ def detect_language(text: str) -> str:
 def normalize_text(text: str, lang: str) -> str:
     """便捷函数：规范化文本
 
+    内容安全门禁：IndexTTS2 / VoxCPM2 两族引擎在推理前都会调用本函数，
+    未通过安全检测的文本在此抛出 :class:`ContentSafetyError`（HTTP 400 语义），
+    由引擎层向上传播，禁止进入合成管线。
+
     Args:
         text: 输入文本
         lang: 语言代码
 
     Returns:
         规范化后的文本
+
+    Raises:
+        ContentSafetyError: 文本未通过内容安全检测。
     """
+    _check_content_safety(text)
     return get_frontend().normalize(text, lang)
+
+
+def _check_content_safety(text: str) -> None:
+    """内容安全门禁：不安全文本抛出 ContentSafetyError。
+
+    检测由 ``security.content_safety`` 模块完成（六类中英关键词正则
+    + 可选 CLIP 语义检测），阈值来自 config.yaml
+    ``security.content_safety_threshold``（默认 0.3，单条强关键词命中即拦截）。
+    """
+    if not text or not text.strip():
+        return
+    result = check_safety(text)
+    if not result.is_safe:
+        logger.warning(
+            "内容安全拦截: category=%s, confidence=%.4f, patterns=%s",
+            result.category.value,
+            result.confidence,
+            result.matched_patterns,
+        )
+        raise ContentSafetyError(
+            f"文本未通过内容安全检测（{result.category.value}，置信度 {result.confidence:.2f}），已拒绝合成。",
+            category=result.category.value,
+        )
