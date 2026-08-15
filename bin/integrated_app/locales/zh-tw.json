@@ -32,6 +32,7 @@
   "prompt_text_label": "參考音頻轉寫文本",
   "generate_prompt_continue": "Prompt 延續生成",
   "prompt_continue_legal_warning": "法律提示：本功能可基於已有音頻自動生成後續內容，可能產生衍生作品。請確保您擁有參考音頻的合法授權（如自有版權、公有領域或已獲版權方許可）。將受版權保護的歌曲、有聲書等音頻用於生成衍生內容可能構成侵權，使用者自行承擔全部法律責任。",
+    "script_legal_warning": "合規提示：禁止合成政治人物、公眾人物等受法律保護的聲音（IndexTTS 引擎 DISCLAIMER 要求）；請勿將本功能用於侵權、詐騙、偽造等違法用途。使用角色音色時請確保已取得合法授權，違規使用者自行承擔全部法律責任。",
   "enter_prompt_text": "請輸入引導文本",
   "voice_clone_desc": "輕量級語音克隆，適合快速測試和簡單場景",
   "ultimate_clone_desc": "高級語音克隆，提供完整的參數控制和精細調節",

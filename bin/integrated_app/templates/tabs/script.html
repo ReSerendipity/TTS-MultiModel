@@ -18,6 +18,10 @@
                         <span class="card-badge">{{ "multi_dialogue"|t(lang) }}</span>
                     </div>
                     <div class="card-body">
+    {# 合规:多角色剧本配音禁止合成政治人物/公众人物等受保护声音(IndexTTS DISCLAIMER) #}
+    <div class="legal-notice" style="margin-bottom:12px;padding:8px 12px;border-left:3px solid var(--warn, #f59e0b);background:var(--warn-bg, rgba(245,158,11,0.08));border-radius:4px;font-size:11px;color:var(--t3,#888);line-height:1.5;">
+        {{ "script_legal_warning"|t(lang) }}
+    </div>
                         <div class="hint-text" style="margin-bottom:12px;line-height:1.6">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                             <strong>{{ "format_desc"|t(lang) }}：</strong>{{ "script_example"|t(lang) }}

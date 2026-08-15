@@ -32,6 +32,7 @@
   "prompt_text_label": "Reference Audio Transcript",
   "generate_prompt_continue": "Prompt Continue Generate",
   "prompt_continue_legal_warning": "Legal Notice: This feature generates continuation content based on existing audio, which may create derivative works. Ensure you have legal authorization for the reference audio (e.g., self-owned copyright, public domain, or copyright holder's permission). Using copyrighted songs, audiobooks, etc. to generate derivative content may constitute infringement. Users bear full legal responsibility for misuse.",
+    "script_legal_warning": "Compliance Notice: Do not synthesize the voices of political figures, public figures, or other legally protected persons (as required by the IndexTTS engine DISCLAIMER); do not use this feature for infringement, fraud, forgery, or any other unlawful purpose. Ensure you have legal authorization for any character voice you use; users bear full legal responsibility for misuse.",
   "enter_prompt_text": "Please enter prompt text",
   "voice_clone_desc": "Lightweight voice cloning, suitable for quick testing and simple scenarios.",
   "ultimate_clone_desc": "Advanced voice cloning with complete parameter control and fine-tuning capabilities.",
