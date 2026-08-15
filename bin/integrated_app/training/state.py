@@ -468,7 +468,7 @@ class StateManager:
             try:
                 import torch as _torch
 
-                return _torch.load(str(bin_path), map_location="cpu")
+                return _torch.load(str(bin_path), map_location="cpu", weights_only=True)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("加载权重失败: %s", exc)
         return None

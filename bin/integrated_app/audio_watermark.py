@@ -158,7 +158,7 @@ def embed_watermark(audio_path: str, watermark_payload: dict[str, Any]) -> str:
     if dir_:
         os.makedirs(dir_, exist_ok=True)
 
-    tmp_path = audio_path + ".tmp.wm"
+    tmp_path = audio_path + ".tmp.wav"
     try:
         sf.write(tmp_path, watermarked, sr)
         os.replace(tmp_path, audio_path)

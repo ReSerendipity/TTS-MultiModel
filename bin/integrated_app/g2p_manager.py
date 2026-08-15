@@ -488,7 +488,7 @@ class G2PManager:
             缓存键字符串。
         """
         content = f"{lang}:{text}"
-        return hashlib.md5(content.encode("utf-8")).hexdigest()
+        return hashlib.md5(content.encode("utf-8"), usedforsecurity=False).hexdigest()
 
     def _do_convert(self, text: str, lang: str) -> tuple[str, str]:
         """执行实际的 G2P 转换。

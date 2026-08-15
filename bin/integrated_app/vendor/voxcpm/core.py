@@ -115,6 +115,7 @@ class VoxCPM:
         device: str | None = None,
         lora_config: Optional[LoRAConfig] = None,
         lora_weights_path: Optional[str] = None,
+        revision: Optional[str] = None,
         **kwargs,
     ):
         """Instantiate ``VoxCPM`` from a Hugging Face Hub snapshot.
@@ -137,6 +138,8 @@ class VoxCPM:
             lora_weights_path: Path to pre-trained LoRA weights (.pth file or directory
                 containing lora_weights.ckpt). If provided, LoRA weights will be loaded
                 after model initialization.
+            revision: Optional Hugging Face revision (commit sha / branch / tag) to pin
+                for hub downloads. Defaults to None (hub default revision).
         Kwargs:
             Additional keyword arguments passed to the ``VoxCPM`` constructor.
 
@@ -159,6 +162,7 @@ class VoxCPM:
             # Otherwise, try from_pretrained (Hub); exit on failure
             local_path = snapshot_download(
                 repo_id=repo_id,
+                revision=revision,
                 cache_dir=cache_dir,
                 local_files_only=local_files_only,
             )

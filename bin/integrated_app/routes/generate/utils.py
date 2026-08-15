@@ -521,6 +521,25 @@ def _safe_error_msg(exc: BaseException) -> str:
     return "生成失败，请稍后重试"
 
 
+# 结果卡内嵌播放器 HTML 模板（配合 static/js/embedded_player.js 自动初始化）：
+# - data-embedded-player 标记容器，data-src 为音频 URL
+# - .ep-play 播放/暂停按钮；canvas.ep-wave 波形；.ep-bar/.ep-bar-fill 可拖动进度条
+# - .ep-time-cur / .ep-time-dur 当前时间 / 总时长
+# 设计说明：完全自包含（内部 new Audio()），不依赖全局底部播放器
+# (window.globalAudioPlayer)，即使全局播放器因缓存等原因未加载也始终可用。
+_EMBEDDED_PLAYER_HTML = (
+    '<div class="ep-player" data-embedded-player data-src="{audio_url}">'
+    '<button type="button" class="ep-play" title="播放/暂停" aria-label="播放/暂停">'
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>'
+    '</button>'
+    '<div class="ep-body">'
+    '<canvas class="ep-wave" height="44" aria-hidden="true"></canvas>'
+    '<div class="ep-bar"><div class="ep-bar-fill"></div></div>'
+    '<div class="ep-time"><span class="ep-time-cur">00:00</span><span class="ep-time-dur">00:00</span></div>'
+    '</div></div>'
+)
+
+
 def _partial_success_html(filename: str, message: str, degraded_note: str) -> HTMLResponse:
     """渲染"部分成功"HTML 片段（降级重试成功，但质量下降）。
 
@@ -530,12 +549,13 @@ def _partial_success_html(filename: str, message: str, degraded_note: str) -> HT
         degraded_note: 降级说明（橙字提示）。
 
     Returns:
-        HTMLResponse（200），含 audio 标签 + 状态消息。
+        HTMLResponse（200），含内嵌播放器 + audio 标签 + 状态消息。
     """
     safe_filename: str = quote(filename, safe="")
     return HTMLResponse(
         f'<div data-audio-filename="{html.escape(filename)}">'
         f'<audio class="tts-audio-hidden" src="/api/audio/{safe_filename}"></audio>'
+        f"{_EMBEDDED_PLAYER_HTML.format(audio_url='/api/audio/' + safe_filename)}"
         f'<div class="status-message success">{html.escape(message)}</div>'
         f'<div class="status-message warning" style="margin-top:8px;color:#f59e0b;">{html.escape(degraded_note)}</div>'
         f"</div>"
@@ -650,6 +670,30 @@ def _apply_post_processing_to_file(
         base, ext = os.path.splitext(filename)
         new_filename: str = f"{base}_pp{ext}"
         new_path: str = new_filename if os.path.isabs(new_filename) else os.path.join(SAVE_DIR, new_filename)
+
+        # P2 安全修复（对齐 _save_wav_compatible）：后处理输出 *_pp.wav 同样嵌入
+        # FFT 扩频水印（16-20kHz，source_id=WATERMARK_SOURCE_ID），确保经后处理
+        # 导出的音频仍可溯源。水印失败仅记录 warning，不阻塞后处理（与主路径一致）。
+        try:
+            from ...watermark import WATERMARK_SOURCE_ID, watermark_audio
+
+            processed, wm_meta = watermark_audio(
+                processed.astype(np.float32),
+                sr,
+                enable=True,
+                source_id=WATERMARK_SOURCE_ID,
+            )
+            if wm_meta.get("watermarked"):
+                logger.debug(
+                    "后处理水印嵌入成功: source=%s, snr=%.1fdB, hash=%s",
+                    wm_meta.get("source_id", ""),
+                    wm_meta.get("snr_db", 0.0),
+                    wm_meta.get("content_hash", ""),
+                )
+            else:
+                logger.warning("后处理水印嵌入失败，*_pp.wav 已写入但无来源标识: %s", new_path)
+        except Exception as wm_exc:  # noqa: BLE001
+            logger.warning("后处理水印嵌入异常（已忽略，音频正常写入）: %s", wm_exc)
 
         output: np.ndarray = (processed * 32768.0).clip(-32768, 32767).astype(np.int16)
         wavfile.write(new_path, sr, output)
@@ -859,6 +903,7 @@ def _success_html(filename: str, status_message: str) -> HTMLResponse:
     return HTMLResponse(
         f'<div data-audio-filename="{html.escape(filename)}">'
         f'<audio class="tts-audio-hidden" src="/api/audio/{safe_filename}"></audio>'
+        f"{_EMBEDDED_PLAYER_HTML.format(audio_url='/api/audio/' + safe_filename)}"
         f'<div class="status-message success">{html.escape(status_message)}</div>'
         f"</div>"
     )

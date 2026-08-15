@@ -31,7 +31,7 @@ def load_audio_text_datasets(
     if val_manifest:
         data_files["validation"] = val_manifest
 
-    dataset_dict: DatasetDict = load_dataset("json", data_files=data_files)
+    dataset_dict: DatasetDict = load_dataset("json", data_files=data_files)  # nosec B615 - 仅本地 jsonl manifest（data_files 为本地路径），不涉及 HF Hub 下载
 
     def prepare(ds: Dataset) -> Dataset:
         if audio_column not in ds.column_names:

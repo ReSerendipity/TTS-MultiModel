@@ -650,7 +650,7 @@ def create_app() -> FastAPI:
 <p>缺失模型文件，请参照文档放置模型。</p></body></html>
 """,
             }
-            env = Environment(loader=DictLoader(minimal_templates))
+            env = Environment(loader=DictLoader(minimal_templates), autoescape=True)
             templates = Jinja2Templates(env=env)
             templates.env.globals["app_version"] = "fallback"
             logger.error("[create_app] 模板目录不可用，已回退到最小内置模板")

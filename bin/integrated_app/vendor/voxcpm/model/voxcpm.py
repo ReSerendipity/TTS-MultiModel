@@ -888,7 +888,7 @@ class VoxCPMModel(nn.Module):
     ):
         with open(os.path.join(path, "config.json"), "r", encoding="utf-8") as _cfg_f:
             config = VoxCPMConfig.model_validate_json(_cfg_f.read())
-        tokenizer = LlamaTokenizerFast.from_pretrained(path)
+        tokenizer = LlamaTokenizerFast.from_pretrained(path)  # nosec B615 - from_local 本地目录加载，无 HF revision 可固定
         audio_vae_config = getattr(config, "audio_vae_config", None)
         audio_vae = AudioVAE(config=audio_vae_config) if audio_vae_config else AudioVAE()
         # Try to load AudioVAE from safetensors first, fallback to pytorch

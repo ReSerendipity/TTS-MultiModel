@@ -50,19 +50,6 @@ models:
       supported_features: ["clone", "emotion_control"]
       sample_rate: 24000
       requires_gpu: true
-    dotstts:
-      name: "dotstts"
-      display_name: "dots.tts"
-      hf_repo: "dots-studio/dots.tts-base"
-      model_dir: "dots.tts"
-      vram_gb: 8.0
-      ram_gb: 16.0
-      languages: ["zh", "en"]
-      quality: "high"
-      license: "Apache-2.0"
-      supported_features: ["clone"]
-      sample_rate: 48000
-      requires_gpu: true
 
 generation:
   cfg_value: 2.0
@@ -83,7 +70,7 @@ generation:
   emotion_tags_enabled: true
   emotion_tags_strip_for_engine: false  # Keep tags in text for engine processing
   # Neural watermarking (inspired by Chatterbox Perth)
-  # P0 修复：水印现已强制接入生成管线（generation.py / dotstts_engine / streaming），
+  # P0 修复：水印现已强制接入生成管线（generation.py / voxcpm2 流式 / streaming），
   # source_id 为代码常量，不可通过配置禁用或篡改，确保所有生成音频可追溯来源。
   watermark_enabled: true  # 此字段保留用于文档参考，实际水印由代码强制启用
   watermark_source_id: "tts-multimodel"  # 此字段保留用于文档参考，实际值由代码常量决定

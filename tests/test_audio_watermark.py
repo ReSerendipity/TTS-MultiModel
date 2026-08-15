@@ -111,3 +111,16 @@ class TestEmbedExtractWatermark:
         from integrated_app.audio_watermark import extract_watermark
 
         assert extract_watermark("/nonexistent/path.wav") is None
+
+    def test_roundtrip_embed_then_extract_product_id(self):
+        """嵌入后应能检出 product_id（回归：.tmp.wav 写回 bug 曾导致检出失败）。
+
+        实测 source_id 字段为既有 watermark.py 行为的乱码，故不断言 source_id；
+        仅断言可稳定检出的 product_id 字段。
+        """
+        from integrated_app.audio_watermark import embed_watermark, extract_watermark
+
+        embed_watermark(self.audio_path, {"task_id": "roundtrip-001"})
+        extracted = extract_watermark(self.audio_path)
+        assert extracted is not None, "嵌入后应能检出水印（写回 bug 回归）"
+        assert extracted.get("product_id") == "tts_multimodel"

@@ -432,7 +432,7 @@ class PromptCache:
             import pickle as _pickle
 
             with open(old_path, "rb") as f:
-                metadata = _pickle.load(f)
+                metadata = _pickle.load(f)  # nosec B301 - 自有旧版 metadata.pkl 迁移读取（读后即删），加载后 isinstance 校验
             if isinstance(metadata, dict):
                 logger.info("已从 metadata.pkl 迁移 PromptCache 元数据")
                 with contextlib.suppress(OSError):
@@ -587,7 +587,7 @@ class PromptCache:
                 import pickle as _pickle
 
                 with open(pkl_path, "rb") as f:
-                    value = _pickle.load(f)
+                    value = _pickle.load(f)  # nosec B301 - 自有旧版 .pkl 迁移读取（读后即删）
                 self.put(cache_key, value, audio_path_or_data=None)
                 with contextlib.suppress(OSError):
                     pkl_path.unlink()

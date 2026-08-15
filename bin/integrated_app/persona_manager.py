@@ -424,7 +424,7 @@ def load_persona_embedding(name: str) -> Any | None:
         try:
             import torch
 
-            raw = torch.load(pt_path, map_location="cpu")
+            raw = torch.load(pt_path, map_location="cpu", weights_only=True)
             # P2 安全修复：校验 .pt 文件来源元数据
             # 新格式: {"data": payload, "_meta": {"origin": "TTS_MultiModel v2.x", ...}}
             # 旧格式: 直接存储 (wav_path, ref_text) 元组，无 _meta 键
