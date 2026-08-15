@@ -31,7 +31,8 @@ jobs:
 
       - name: Scan dependencies for known vulnerabilities
         run: |
-          pip-audit -r requirements.txt --desc || true
+          pip-audit -r requirements.txt --desc
+          # 2026-08-16 本地评估 0 已知漏洞，解锁为门禁；依赖升级由 dependabot 自动跟进
 
   bandit:
     name: Code Security Scan (bandit)

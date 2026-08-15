@@ -590,8 +590,14 @@ class ContentSafetyDetector:
             from transformers import AutoModel, AutoTokenizer
 
             model_name = "openai/clip-vit-base-patch32"
-            self._clip_tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self._clip_model = AutoModel.from_pretrained(model_name)
+            # 固定 HF revision（2024-02-29 官方提交），防止上游仓库被篡改导致供应链风险（bandit B615）
+            model_revision = "3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268"
+            self._clip_tokenizer = AutoTokenizer.from_pretrained(
+                model_name, revision=model_revision
+            )
+            self._clip_model = AutoModel.from_pretrained(
+                model_name, revision=model_revision
+            )
             self._clip_model.eval()
             logger.info("CLIP 安全检测模型加载成功: %s", model_name)
             return True

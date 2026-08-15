@@ -458,7 +458,7 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
       <div class="card">
         <div class="filter-row">
           <input id="histSearch" placeholder="搜索文本…">
-          <select id="histEngine"><option value="all">全部引擎</option><option value="voxcpm2">VoxCPM2</option><option value="indextts2">IndexTTS2</option><option value="dotstts">dots.tts</option></select>
+          <select id="histEngine"><option value="all">全部引擎</option><option value="voxcpm2">VoxCPM2</option><option value="indextts2">IndexTTS2</option></select>
           <button class="btn ghost sm" onclick="if(confirm('确定清空全部历史？')){histData=[];renderHist();showToast('历史已清空（模拟）')}">🗑 清空</button>
         </div>
         <div id="histList"></div>
@@ -782,7 +782,7 @@ $('#t-run').onclick=async()=>{
   const steps=['轻量引擎 · 加载参考音频…','端到端快速克隆…'];
   if(!ref)steps[0]='轻量引擎 · 直接端到端合成…';
   await runSteps('t-steps',steps,550);
-  buildPlayer('t-player',$('#t-text').value.trim()||'（空文本）',1.05,1,'自然','dotstts');
+  buildPlayer('t-player',$('#t-text').value.trim()||'（空文本）',1.05,1,'自然','voxcpm2');
   $('#t-run').disabled=false;showToast('快速合成完成（模拟）✓');
 };
 
