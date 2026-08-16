@@ -1,0 +1,12 @@
+{
+  "name": "tts-multimodel-webui-tests",
+  "version": "1.0.0",
+  "description": "Playwright screenshot capture for TTS MultiModel WebUI",
+  "private": true,
+  "scripts": {
+    "screenshots": "node capture-screenshots.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
