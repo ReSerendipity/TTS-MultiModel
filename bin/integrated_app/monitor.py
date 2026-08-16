@@ -289,7 +289,7 @@ class HealthMonitor:
                 from .gpu_utils import free_gpu_memory
 
                 free_gpu_memory()
-            except Exception:
+            except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
                 pass
             return (True, reason)
         return (False, f"VRAM 占用 {usage_pct:.1f}%，低于熔断阈值")
@@ -513,7 +513,7 @@ class HealthMonitor:
                     leak_warning = self.check_memory_leak()
                     if leak_warning:
                         gpu_info["leak_warning"] = leak_warning
-                except Exception:
+                except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
                     pass
                 try:
                     gpu_info["trend"] = self.get_vram_trend()

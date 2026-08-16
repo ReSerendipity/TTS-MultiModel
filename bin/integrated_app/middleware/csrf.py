@@ -116,7 +116,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
          - 任一失败返回 403 JSON，绝不抛 Python 异常中断 ASGI 链路。
     """
 
-    def __init__(
+    def __init__(  # nosec B107 - 空 secret_key 默认值=fail-closed（校验必失败返回 403），非硬编码密钥
         self,
         app: ASGIApp,
         secret_key: str = "",

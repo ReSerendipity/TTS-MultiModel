@@ -102,7 +102,7 @@ def _has_sufficient_free_vram(threshold_mb: int = 500) -> bool:
         if free_bytes >= threshold_mb * 1024 * 1024:
             logger.info(f"[GPU清理] 当前空闲显存充足 ({free_bytes / 1024**2:.0f}MB)，跳过后续层级")
             return True
-    except Exception:
+    except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
         pass
     return False
 

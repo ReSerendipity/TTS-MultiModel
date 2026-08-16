@@ -369,7 +369,7 @@ def generate_voice_from_description(
 
     resolved_seed: int = seed
     if seed == -1:
-        resolved_seed = random.randint(0, _DEFAULT_SEED_MAX)
+        resolved_seed = random.randint(0, _DEFAULT_SEED_MAX)  # nosec B311 - 音频生成 seed，非安全用途
         logger.info(f"[VoxCPM声音设计] 程序化 API 自动生成 seed={resolved_seed}")
 
     import torch

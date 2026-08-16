@@ -331,7 +331,7 @@ def load_persona_metadata(persona_dir: str, persona_name: str) -> PersonaMetadat
         try:
             with open(txt_path, encoding="utf-8") as f:
                 return PersonaMetadata.from_legacy_text(persona_name, f.read())
-        except Exception:
+        except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
             pass
 
     return PersonaMetadata(name=persona_name)

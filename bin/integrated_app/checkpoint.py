@@ -135,7 +135,8 @@ class TaskCheckpoint:
                 data = json.loads(p.read_text(encoding="utf-8"))
                 if data.get("completed", 0) < data.get("total", 0):
                     results.append(data)
-            except Exception:
+            except Exception as exc:
+                logger.warning("跳过损坏的 checkpoint 文件 %s: %s", p, exc)
                 continue
         return results
 

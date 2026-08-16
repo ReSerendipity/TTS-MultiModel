@@ -12,7 +12,7 @@
 
 import contextlib
 import logging
-import subprocess
+import subprocess  # nosec B404 - 本文件 subprocess 调用已逐处审计（nvidia-smi 固定可执行名、argv 列表、无 shell）
 import threading
 import time
 from typing import Any
@@ -253,7 +253,7 @@ def _get_gpu_temperature_from_nvml() -> float | None:
 def _get_gpu_utilization_from_nvidia_smi() -> int | None:
     """通过 nvidia-smi CLI 作为 NVML 不可用时的回退方案。"""
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603, B607 - nvidia-smi 固定可执行名，argv 列表无 shell
             ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
             capture_output=True,
             text=True,
@@ -348,7 +348,7 @@ def gpu_status() -> GPUStatusResponse:
     # --- 若 gpu_backend 没取到（如 pynvml-only 环境），再走 nvidia-smi ---
     if resp.vram_total_mb <= 0:
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603, B607 - nvidia-smi 固定可执行名，argv 列表无 shell
                 [
                     "nvidia-smi",
                     "--query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu",

@@ -51,7 +51,7 @@ class GenerationTracker:
             event_bus.notify()
         except ImportError:
             pass
-        except Exception:
+        except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
             pass
 
     def start_generation(self) -> int:

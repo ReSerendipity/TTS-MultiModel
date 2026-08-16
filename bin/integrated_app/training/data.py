@@ -149,7 +149,7 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
                 f"时长越界被跳过，0 个可用。"
             )
         # 固定种子切分，保证 train/eval 一致
-        rng = random.Random(seed)
+        rng = random.Random(seed)  # nosec B311 - 固定种子可复现数据集切分，非安全用途
         rng.shuffle(entries_raw)
         cutoff = max(1, int(len(entries_raw) * split_ratio))
         if split == "train":
@@ -267,7 +267,7 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
 
                 info = torchaudio.info(str(path))
                 return float(info.num_frames) / float(info.sample_rate)
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001  # nosec B110
                 pass
             # 兜底：直接用 librosa
             try:

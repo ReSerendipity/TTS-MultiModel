@@ -402,7 +402,7 @@ async def stop_training() -> JSONResponse:
     """
     global _training_process, _training_reader_task
     if _is_training_running():
-        assert _training_process is not None
+        assert _training_process is not None  # nosec B101 - 内部不变量断言（运行中则进程对象非空），非用户输入校验
         _training_process.terminate()
         try:
             await asyncio.wait_for(_training_process.wait(), timeout=10.0)

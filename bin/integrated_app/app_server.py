@@ -590,7 +590,7 @@ def create_app() -> FastAPI:
     import secrets as _secrets
 
     csrf_secret_path = os.path.join(_PROJECT_ROOT, "data", ".csrf_secret")
-    csrf_secret = ""
+    csrf_secret = ""  # nosec B105 - 占位初始化，随后立即被 secrets.token_urlsafe(48) 覆盖为强随机值
     try:
         os.makedirs(os.path.dirname(csrf_secret_path), exist_ok=True)
         if os.path.exists(csrf_secret_path):

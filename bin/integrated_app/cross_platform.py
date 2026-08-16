@@ -21,7 +21,7 @@ import contextlib
 import logging
 import os
 import platform
-import subprocess
+import subprocess  # nosec B404 - 本文件 subprocess 调用已逐处审计（argv 列表、无 shell、可执行名固定）
 import sys
 from pathlib import Path
 from typing import Any
@@ -310,11 +310,11 @@ def open_file_explorer(path: str | Path) -> bool:
     path_str = str(path)
     try:
         if IS_WINDOWS:
-            os.startfile(path_str)
+            os.startfile(path_str)  # nosec B606 - 系统文件管理器打开路径（path 仅作参数，无可执行注入面）
         elif IS_MACOS:
-            subprocess.Popen(["open", path_str])
+            subprocess.Popen(["open", path_str])  # nosec B603, B607 - macOS 固定系统工具，argv 列表无 shell，path 仅作参数
         else:
-            subprocess.Popen(["xdg-open", path_str])
+            subprocess.Popen(["xdg-open", path_str])  # nosec B603, B607 - Linux 固定系统工具，argv 列表无 shell，path 仅作参数
         return True
     except Exception as e:
         logger.warning(f"[cross_platform] 打开文件管理器失败: {e}")
@@ -388,7 +388,7 @@ def supports_color() -> bool:
                 mode.value |= 0x0004
                 kernel32.SetConsoleMode(h, mode)
                 return True
-        except Exception:
+        except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
             pass
         return False
     return True
@@ -422,7 +422,7 @@ def get_default_audio_output_device() -> str | None:
         if IS_WINDOWS:
             return "Default Windows Audio Device"
         elif IS_MACOS:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603, B607 - macOS 固定系统工具 system_profiler，argv 列表无 shell
                 ["system_profiler", "SPAudioDataType"],
                 capture_output=True,
                 text=True,
@@ -432,7 +432,7 @@ def get_default_audio_output_device() -> str | None:
                 if "Default Output Device" in line:
                     return line.split(":")[-1].strip()
         else:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603, B607 - Linux 固定系统工具 pactl，argv 列表无 shell
                 ["pactl", "get-default-sink"],
                 capture_output=True,
                 text=True,

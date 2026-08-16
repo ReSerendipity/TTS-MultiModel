@@ -489,7 +489,7 @@ def load_persona_embedding(name: str) -> Any | None:
 
 def pickle_error_cls() -> type:
     """延迟获取 pickle.UnpicklingError，避免顶层 import 开销。"""
-    import pickle
+    import pickle  # nosec B403 - 仅用于获取 UnpicklingError 异常类做 isinstance 判断，不反序列化不可信数据
 
     return pickle.UnpicklingError
 

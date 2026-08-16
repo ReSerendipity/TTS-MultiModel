@@ -371,7 +371,7 @@ def clone_from_audio(
 
     resolved_seed: int = seed
     if seed == -1:
-        resolved_seed = random.randint(0, _DEFAULT_SEED_MAX)
+        resolved_seed = random.randint(0, _DEFAULT_SEED_MAX)  # nosec B311 - 音频生成 seed，非安全用途
 
     meta: dict[str, Any] = {
         "embedding_used": False,
@@ -462,7 +462,7 @@ def clone_from_audio(
                     _meta_ok, _meta_dur = _validate_reference_duration(_probe_wav, _probe_sr)
                     meta["reference_duration_sec"] = _meta_dur
                     del _probe_wav
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001  # nosec B110
                     pass
 
         _generation_kwargs: dict[str, Any] = dict(
@@ -566,7 +566,7 @@ def clone_from_audio(
         if progress_cb is not None:
             progress_cb(steps, steps)
 
-        assert _wav_out is not None
+        assert _wav_out is not None  # nosec B101 - 内部不变量断言（生成结果非空），非用户输入校验
         return _wav_out, _sr_out, meta
     except (ValidationError, InsufficientVRAMError, GenerationError):
         raise

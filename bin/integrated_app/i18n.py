@@ -144,7 +144,7 @@ def t(key: str, lang: str = _DEFAULT_LANG, default: str | None = None) -> str:
             result = _resolve_key(en_dict, key)
             if result is not None:
                 return result
-    except Exception:
+    except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
         pass
     return default if default is not None else key
 

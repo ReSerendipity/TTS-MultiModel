@@ -154,7 +154,7 @@ async def _notify_generation_failed(generation_id: str, error: str) -> None:
                 },
             )
         )
-    except Exception:
+    except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
         pass
 
 

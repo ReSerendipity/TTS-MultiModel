@@ -565,7 +565,7 @@ class TrainingAccelerator:
                 with impl.autocast(*args, **kwargs):
                     yield
                 return
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001  # nosec B110
                 pass
         enabled = self._precision != "fp32"
         device_type = "cuda" if self.device.type == "cuda" else ("mps" if self.device.type == "mps" else "cpu")

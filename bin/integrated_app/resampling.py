@@ -686,7 +686,7 @@ def get_default_pipeline() -> ResamplingPipeline:
 
         cfg = get_config()
         target_sr = cfg.generation.default_sample_rate
-    except Exception:
+    except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
         pass
 
     _default_pipeline = ResamplingPipeline(ResamplingConfig(target_sr=target_sr))

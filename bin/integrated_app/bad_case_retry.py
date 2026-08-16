@@ -335,7 +335,7 @@ def adjust_params_for_retry(
             new_params["seed"] = (current_seed * 1103515245 + 12345 + attempt * 7919) & 0x7FFFFFFF
         else:
             # 原先是随机生成，现在也随机生成新 seed
-            new_params["seed"] = random.randint(0, 0x7FFFFFFF)
+            new_params["seed"] = random.randint(0, 0x7FFFFFFF)  # nosec B311 - 重试用生成 seed，非安全用途
         strategies_applied.append(RetryStrategy.SEED_CHANGE)
 
     logger.info(

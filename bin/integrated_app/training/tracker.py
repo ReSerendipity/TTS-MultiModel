@@ -170,7 +170,7 @@ class TrainingTracker:
                         f.write(message + "\n")
                 except OSError as exc:
                     logger.debug("写 log_file 失败（忽略）: %s", exc)
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001  # nosec B110
             # print 本身绝不能抛异常，否则训练中断
             pass
 
@@ -191,14 +191,14 @@ class TrainingTracker:
                 self._last_log_time = now
                 formatted = ", ".join(f"{k}: {v:.6f}" for k, v in metrics.items())
                 self.print(f"[{split}] step {self.step}: {formatted}{dt_str}")
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001  # nosec B110
                 pass
         if self._writer is not None:
             try:
                 for key, value in metrics.items():
                     if isinstance(value, (int, float)):
                         self._writer.add_scalar(f"{split}/{key}", float(value), self.step)
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001  # nosec B110
                 # TensorBoard 写失败绝不影响训练
                 pass
 
@@ -347,7 +347,7 @@ class TrainingTracker:
                         self._writer.add_scalar("train/grad_norm", float(grad_norm), self.step)
                     if isinstance(gpu_util_pct, (int, float)):
                         self._writer.add_scalar("train/gpu_util_pct", float(gpu_util_pct), self.step)
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001  # nosec B110
                     pass
         except Exception as exc:  # noqa: BLE001
             # 任何统计 / 推送异常都不能中断训练
@@ -409,7 +409,7 @@ class TrainingTracker:
                         state.best_epoch = int(epoch)
                 best_eval_loss = state.best_eval_loss
                 best_epoch = state.best_epoch
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001  # nosec B110
                 pass
         # 重置 epoch 累计
         self._current_epoch_loss_sum = 0.0
@@ -443,7 +443,7 @@ class TrainingTracker:
                         self._writer.add_scalar("epoch/eval_loss", float(eval_loss), int(epoch))
                     if epoch_sec is not None:
                         self._writer.add_scalar("epoch/time_sec", float(epoch_sec), int(epoch))
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001  # nosec B110
                     pass
             self.print(
                 f"[epoch {epoch}] train_loss={avg_train_loss:.6f}, "
@@ -496,7 +496,7 @@ class TrainingTracker:
                 try:
                     self._writer.flush()
                     self._writer.close()
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001  # nosec B110
                     pass
             status_word = "成功完成" if success else "异常中断"
             msg = (
@@ -688,5 +688,5 @@ class TrainingTracker:
             try:
                 if hasattr(w, "close"):
                     w.close()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001  # nosec B110
                 pass

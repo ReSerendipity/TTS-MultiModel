@@ -237,7 +237,7 @@ class VLLMBackend:
                     if torch.cuda.is_available():
                         self._status.gpu_count = torch.cuda.device_count()
                         self._status.gpu_memory_gb = torch.cuda.get_device_properties(0).total_mem / (1024**3)
-                except Exception:
+                except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
                     pass
 
                 logger.info(

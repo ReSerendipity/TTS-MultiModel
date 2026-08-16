@@ -118,7 +118,7 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
     )
     _BEARER_SCHEME: str = "Bearer"
 
-    def __init__(self, app: ASGIApp, enabled: bool = False, token: str = "") -> None:
+    def __init__(self, app: ASGIApp, enabled: bool = False, token: str = "") -> None:  # nosec B107 - 空 token 默认值=fail-closed（拒绝全部 /api/ 请求），非硬编码口令
         """初始化 API 认证中间件。
 
         安全警告逻辑：

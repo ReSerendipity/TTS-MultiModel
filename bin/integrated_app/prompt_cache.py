@@ -429,7 +429,7 @@ class PromptCache:
         if not old_path.exists():
             return {}
         try:
-            import pickle as _pickle
+            import pickle as _pickle  # nosec B403 - 自有旧版 metadata.pkl 迁移读取（读后即删），加载处已有 B301 nosec
 
             with open(old_path, "rb") as f:
                 metadata = _pickle.load(f)  # nosec B301 - 自有旧版 metadata.pkl 迁移读取（读后即删），加载后 isinstance 校验
@@ -584,7 +584,7 @@ class PromptCache:
         pkl_path = self._old_pkl_path(cache_key)
         if pkl_path.exists():
             try:
-                import pickle as _pickle
+                import pickle as _pickle  # nosec B403 - 自有旧版 .pkl 迁移读取（读后即删），加载处已有 B301 nosec
 
                 with open(pkl_path, "rb") as f:
                     value = _pickle.load(f)  # nosec B301 - 自有旧版 .pkl 迁移读取（读后即删）

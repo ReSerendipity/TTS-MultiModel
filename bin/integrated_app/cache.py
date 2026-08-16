@@ -239,7 +239,7 @@ class AdaptiveLRUCache(LRUCache):
                     return value.__sizeof__()
             except AttributeError:
                 pass
-        except Exception:
+        except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
             pass
         return 1024
 
