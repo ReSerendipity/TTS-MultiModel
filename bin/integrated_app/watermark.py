@@ -35,14 +35,31 @@ logger = logging.getLogger("tts_multimodel.watermark")
 #: 此常量定义在 watermark 模块中，供 generation / generic_tts_engine / streaming 等写盘点统一引用。
 WATERMARK_SOURCE_ID: str = "tts-multimodel"
 
+#: v2 载荷 source_id 枚举映射（枚举码 1-255）。
+#: 检测端未知枚举码解析为 "unknown"；嵌入端未知 source_id 使用通用码 255。
+_SOURCE_ID_TO_CODE: dict[str, int] = {WATERMARK_SOURCE_ID: 1}
+_SOURCE_CODE_TO_ID: dict[int, str] = {code: sid for sid, code in _SOURCE_ID_TO_CODE.items()}
+_SOURCE_CODE_UNKNOWN = 255
+
 # 水印参数
 _WATERMARK_VERSION = 1
+_WATERMARK_VERSION_V2 = 2  # 紧凑 8 字节载荷版本（64 bit 容量完全利用）
 _WATERMARK_BITS = 64  # 水印载荷的比特数
-_WATERMARK_STRENGTH = 0.008  # 嵌入强度（水印信号幅度）
+_WATERMARK_STRENGTH = 0.062  # 嵌入强度（水印信号幅度）
 _WATERMARK_FREQ_LOW = 16000  # 嵌入频率下限（Hz）
 _WATERMARK_FREQ_HIGH = 20000  # 嵌入频率上限（Hz）
 _WATERMARK_FRAME_SIZE = 2048  # FFT 帧大小
 _WATERMARK_REPEAT = 4  # 水印重复次数以增强鲁棒性
+
+#: v2 载波相位表（对齐零相位，crest 因子最低）与 v1 兼容表（旧 RandomState(42) 均匀相位）。
+#: 嵌入端使用 v2 对齐相位表；检测端多假设检测同时尝试两表，旧格式样本 presence 仍可检出。
+def _carrier_phases_v2(n_bins):
+    return np.zeros(n_bins, dtype=np.float64)
+
+
+def _carrier_phases_v1(n_bins):
+    return np.random.RandomState(42).uniform(0, 2 * np.pi, size=n_bins)
+
 
 
 @dataclass
@@ -108,7 +125,8 @@ def _generate_watermark_key(source_id: str, timestamp: float) -> np.ndarray:
 def _bits_to_payload_bytes(source_id: str, timestamp: float, content_hash: str) -> bytes:
     """将水印载荷编码为字节序列，用于嵌入。
 
-    编码格式：version(1B) + source_id_len(1B) + source_id + timestamp(8B) + content_hash(8B)
+    编码格式（v1 旧格式，仅保留用于旧文件兼容验证；当前嵌入使用 v2 紧凑格式）：
+    version(1B) + source_id_len(1B) + source_id + timestamp(8B) + content_hash(8B)
 
     Args:
         source_id: 来源标识符。
@@ -127,6 +145,37 @@ def _bits_to_payload_bytes(source_id: str, timestamp: float, content_hash: str) 
         timestamp,
         content_hash[:8].encode("utf-8"),
     )
+
+
+def _build_payload_v2(source_id: str, timestamp: float, content_hash: str) -> bytes:
+    """构建 v2 紧凑载荷（8 字节 = 64 bit，完全利用嵌入容量）。
+
+    格式：
+      byte0:    version = 2
+      byte1:    source_id 枚举码（1-255，见 _SOURCE_ID_TO_CODE；未知 source 用 255）
+      byte2-5:  timestamp 秒级 uint32（大端，覆盖至 2106 年）
+      byte6-7:  content_hash 前 2 字节（sha256 前 16 bit hex）
+
+    Args:
+        source_id: 来源标识符。
+        timestamp: Unix 时间戳。
+        content_hash: 内容哈希（16 位 hex 字符串，取前 4 字符）。
+
+    Returns:
+        8 字节紧凑载荷。
+    """
+    code = _SOURCE_ID_TO_CODE.get(source_id)
+    if code is None:
+        logger.warning(
+            f"source_id '{source_id}' 不在 v2 枚举表，使用通用码 {_SOURCE_CODE_UNKNOWN}"
+        )
+        code = _SOURCE_CODE_UNKNOWN
+    ts_sec = int(timestamp) & 0xFFFFFFFF
+    hash_hex = (content_hash or "")[:4]
+    if len(hash_hex) < 4:
+        hash_hex = (hash_hex + "0000")[:4]
+    hash_bytes = bytes.fromhex(hash_hex)
+    return struct.pack(">BBI2s", _WATERMARK_VERSION_V2, code, ts_sec, hash_bytes)
 
 
 def _payload_bytes_to_bits(payload_bytes: bytes) -> np.ndarray:
@@ -202,7 +251,7 @@ def embed_watermark(
         audio: 输入音频数组（float32，单声道或立体声）。
         sample_rate: 采样率（Hz）。
         source_id: 水印来源标识符。
-        strength: 嵌入强度（0.001-0.05，默认 0.008）。
+        strength: 嵌入强度（0.001-0.062，默认 0.062）。
         timestamp: Unix 时间戳（默认使用当前时间）。
 
     Returns:
@@ -217,7 +266,8 @@ def embed_watermark(
 
     content_hash = _compute_content_hash(audio_mono, sample_rate)
 
-    payload_bytes = _bits_to_payload_bytes(source_id, timestamp, content_hash)
+    # v2 紧凑载荷：8 字节完整进入 64 bit 信号（version/source/timestamp/hash 全部可恢复）
+    payload_bytes = _build_payload_v2(source_id, timestamp, content_hash)
     payload_bits = _payload_bytes_to_bits(payload_bytes)
 
     n_samples = len(audio_mono)
@@ -243,8 +293,7 @@ def embed_watermark(
     hop_size = frame_size // 2
     n_frames = max(1, (n_samples - frame_size) // hop_size + 1)
 
-    rng = np.random.RandomState(42)
-    carrier_phases = rng.uniform(0, 2 * np.pi, size=effective_bits)
+    carrier_phases = _carrier_phases_v2(effective_bits)
 
     for _rep in range(_WATERMARK_REPEAT):
         for frame_idx in range(n_frames):
@@ -267,6 +316,13 @@ def embed_watermark(
                     # 判定应改为 `> 0`（等价于恢复原实现 `payload_bits[bit_idx] * strength`）。
                     bit_value = 1.0 if payload_bits[bit_idx] > 0 else -1.0
                     modulation = bit_value * strength * np.exp(1j * carrier_phases[bit_idx])
+                    # 奇数 bin 逐帧相位翻转（2026-08-16，噪声 payload 修复）：
+                    # hop=N/2 使相邻帧在 bin fb 的相位差为 π·fb，fb 为奇数时相邻帧
+                    # 贡献相位相反完全抵消（水印信号仅存首/尾帧）；对奇数 bin 在
+                    # 奇数帧取反后，跨帧贡献由相位相消变为相位相干（等效 +10~13dB）。
+                    # 检测端同步按 (-1)^frame_idx 解除翻转（见 detect_watermark）。
+                    if freq_bin % 2 == 1 and frame_idx % 2 == 1:
+                        modulation = -modulation
                     fft[freq_bin] += modulation
                     mirror_bin = frame_size - freq_bin
                     if mirror_bin < len(fft):
@@ -290,7 +346,7 @@ def embed_watermark(
         watermarked = np.stack([watermarked] * audio.shape[-1], axis=-1)
 
     payload = WatermarkPayload(
-        version=_WATERMARK_VERSION,
+        version=_WATERMARK_VERSION_V2,
         source_id=source_id,
         timestamp=timestamp,
         content_hash=content_hash,
@@ -309,6 +365,55 @@ def embed_watermark(
 # ============================================================================
 # 水印检测
 # ============================================================================
+
+
+def _parse_payload_v2(bit_bytes: bytes) -> WatermarkPayload:
+    """按 v2 紧凑格式解析载荷（8 字节）。
+
+    格式：version(1B)=2 + source枚举码(1B) + timestamp秒uint32(4B) + hash前2字节(2B)
+    """
+    if len(bit_bytes) < 8:
+        raise ValueError(f"v2 载荷字节不足: {len(bit_bytes)}")
+    version = bit_bytes[0]
+    if version != _WATERMARK_VERSION_V2:
+        raise ValueError(f"v2 版本不合法: {version}")
+    code = bit_bytes[1]
+    if not 1 <= code <= 255:
+        raise ValueError(f"source 枚举码不合法: {code}")
+    (ts_sec,) = struct.unpack(">I", bytes(bit_bytes[2:6]))
+    hash_hex = bytes(bit_bytes[6:8]).hex()
+    source_id = _SOURCE_CODE_TO_ID.get(code, "unknown")
+    return WatermarkPayload(
+        version=version,
+        source_id=source_id,
+        timestamp=float(ts_sec),
+        content_hash=hash_hex,
+    )
+
+
+def _parse_payload_v1(bit_bytes: bytes) -> WatermarkPayload:
+    """按 v1 旧格式解析载荷（64-bit 截断语义，保持旧文件兼容）。
+
+    v1 完整载荷为 version + source_len + source + timestamp(8B) + hash(8B)，
+    但嵌入容量仅 64 bit = 8 字节（version + source_len + source 前 6 字节），
+    timestamp/content_hash 从未进入信号 → 置默认值。
+    """
+    if len(bit_bytes) < 2:
+        raise ValueError("载荷字节不足")
+    version = bit_bytes[0]
+    source_len = bit_bytes[1]
+    if version != _WATERMARK_VERSION:
+        raise ValueError(f"水印版本不合法: {version}")
+    if not 1 <= source_len <= 32:
+        raise ValueError(f"source_id 长度不合法: {source_len}")
+    avail = len(bit_bytes) - 2
+    source = bytes(bit_bytes[2 : 2 + min(source_len, avail)]).decode("utf-8")
+    return WatermarkPayload(
+        version=version,
+        source_id=source,
+        timestamp=0.0,
+        content_hash="",
+    )
 
 
 def detect_watermark(
@@ -357,9 +462,6 @@ def detect_watermark(
             payload=None,
         )
 
-    rng = np.random.RandomState(42)
-    carrier_phases = rng.uniform(0, 2 * np.pi, size=effective_bits)
-
     best_score = 0.0
     best_bits = np.zeros(effective_bits)
 
@@ -372,55 +474,83 @@ def detect_watermark(
     #    依据（实测）：440Hz 正弦在 16-20kHz 的泄漏在载波方向投影 std≈0.36/帧，
     #    大于单帧水印信号（偶数 bin ~0.30、奇数 bin 边缘帧 ~0.05-0.10），不抑制无法可靠判定。
     n_fft = frame_size // 2 + 1
-    low_refs = [b for b in range(freq_low_bin - 2, freq_low_bin) if b >= 0]
-    high_refs = [b for b in range(freq_high_bin + 1, freq_high_bin + 3) if b < n_fft]
+    low_refs = [b for b in range(freq_low_bin - 4, freq_low_bin) if b >= 0]
+    high_refs = [b for b in range(freq_high_bin + 1, freq_high_bin + 5) if b < n_fft]
     use_content_suppression = bool(low_refs) and bool(high_refs)
     ref_lo_center = float(np.mean(low_refs)) if low_refs else 0.0
     ref_hi_center = float(np.mean(high_refs)) if high_refs else 0.0
 
-    # 2) 重叠相加结构感知加权：hop=N/2 时相邻帧在 bin fb 的相位差为 π·fb，
-    #    fb 为奇数时相邻帧贡献完全抵消，水印仅存在于首/尾帧 → 奇数 bin 只取首/尾帧；
-    #    fb 为偶数时全帧相干叠加 → 内帧（双帧覆盖区）权重 2×、首/尾边帧 1.5×。
+    # 2) 重叠相加结构感知解翻转+加权（2026-08-16，噪声 payload 修复）：
+    #    hop=N/2 时相邻帧在 bin fb 的相位差为 π·fb。嵌入端已对奇数 bin 做逐帧
+    #    相位翻转（frame_idx 为奇数时调制取反），使奇数 bin 跨帧相干累积；
+    #    检测端对奇数 bin 相关值同步乘 (-1)^frame_idx 解除翻转后再累加。
+    #    边帧（仅与 1 个邻帧重叠）信号 1.5×、内帧（与 2 个邻帧重叠）2×，
+    #    全部 bin 统一权重（修复前奇数 bin 内帧权重为 0，仅取边帧）。
     bit_bins = freq_low_bin + np.arange(effective_bits)
     odd_bin_mask = bit_bins % 2 == 1
-    carriers = np.exp(1j * carrier_phases)
 
-    for _timestamp in candidates:
-        correlations = np.zeros(effective_bits)
-        counts = np.zeros(effective_bits)
+    # 多假设检测（2026-08-16）：v2 嵌入使用对齐零相位表（crest 最低、能量最高），
+    # 旧版（v1/早期 v2）样本使用 RandomState(42) 均匀相位表。两表同时尝试、
+    # 取 presence 分最高者，保证旧格式样本仍可检出（向后兼容）。
+    phase_tables = (_carrier_phases_v2(effective_bits), _carrier_phases_v1(effective_bits))
+    for carrier_phases in phase_tables:
+        carriers = np.exp(1j * carrier_phases)
 
-        for frame_idx in range(n_frames):
-            start = frame_idx * hop_size
-            end = min(start + frame_size, n_samples)
-            if end - start < frame_size:
-                break
+        for _timestamp in candidates:
+            correlations = np.zeros(effective_bits)
+            whitened_correlations = np.zeros(effective_bits)
+            counts = np.zeros(effective_bits)
 
-            frame = audio_mono[start:end]
-            fft = np.fft.rfft(frame)
+            for frame_idx in range(n_frames):
+                start = frame_idx * hop_size
+                end = min(start + frame_size, n_samples)
+                if end - start < frame_size:
+                    break
 
-            bin_vals = fft[bit_bins]
-            if use_content_suppression:
-                ref_lo = np.mean(fft[low_refs])
-                ref_hi = np.mean(fft[high_refs])
-                t = (bit_bins - ref_lo_center) / (ref_hi_center - ref_lo_center)
-                bin_vals = bin_vals - (ref_lo + (ref_hi - ref_lo) * t)
+                frame = audio_mono[start:end]
+                fft = np.fft.rfft(frame)
 
-            corr = np.real(bin_vals * np.conj(carriers))
+                bin_vals = fft[bit_bins]
+                if use_content_suppression:
+                    ref_lo = np.mean(fft[low_refs])
+                    ref_hi = np.mean(fft[high_refs])
+                    t = (bit_bins - ref_lo_center) / (ref_hi_center - ref_lo_center)
+                    bin_vals = bin_vals - (ref_lo + (ref_hi - ref_lo) * t)
 
-            is_edge = frame_idx == 0 or frame_idx == n_frames - 1
-            weights = np.where(odd_bin_mask, 1.5 if is_edge else 0.0, 1.5 if is_edge else 2.0)
-            correlations += corr * weights
-            counts += weights
+                # 奇数 bin 解翻转：frame_idx 为奇数时相关值取反，
+                # 与嵌入端 (-1)^frame_idx 相位翻转同步；偶数 bin 不变。
+                flip_sign = np.where(odd_bin_mask, -1.0, 1.0) if frame_idx % 2 == 1 else 1.0
 
-        valid = counts > 0
-        if np.any(valid):
-            avg_correlations = np.where(valid, correlations / counts, 0)
-            detected_bits = np.sign(avg_correlations)
-            score = np.mean(np.abs(avg_correlations))
+                # 原始相关：presence 判分用（保持能量量纲，阈值 0.001 语义不变）
+                corr = np.real(bin_vals * np.conj(carriers)) * flip_sign
 
-            if score > best_score:
-                best_score = score
-                best_bits = detected_bits
+                # 频域白化（噪声鲁棒性增强，2026-08-16）：按帧内频带幅度中位数归一化后
+                # 再与载波相关，抑制噪声/突发频谱帧间能量方差对判决的支配；
+                # 白化相关仅用于比特判决，不参与 presence 判分。
+                med = np.median(np.abs(bin_vals))
+                if med > 0:
+                    corr_white = np.real((bin_vals / med) * np.conj(carriers)) * flip_sign
+                else:
+                    corr_white = corr
+
+                is_edge = frame_idx == 0 or frame_idx == n_frames - 1
+                weights = np.full(effective_bits, 1.5 if is_edge else 2.0)
+                correlations += corr * weights
+                whitened_correlations += corr_white * weights
+                counts += weights
+
+            valid = counts > 0
+            if np.any(valid):
+                avg_correlations = np.where(valid, correlations / counts, 0)
+                avg_whitened = np.where(valid, whitened_correlations / counts, 0)
+                detected_bits = np.sign(avg_whitened)
+                detected_bits = np.where(detected_bits == 0, 1.0, detected_bits)
+                score = np.mean(np.abs(avg_correlations))
+
+                if score > best_score:
+                    best_score = score
+                    best_bits = detected_bits
+
 
     detection_threshold = 0.001
     if best_score < detection_threshold:
@@ -439,31 +569,17 @@ def detect_watermark(
         bit_bytes.append(byte_val)
 
     try:
-        # 载荷有效性校验（64-bit 截断语义）：嵌入端 _payload_bytes_to_bits 将完整
-        # 载荷截断到 _WATERMARK_BITS=64 bit = 8 字节（version + source_len + source
-        # 前 6 字节），timestamp/content_hash 从未进入信号。校验必须与嵌入容量匹配：
-        # 只校验可恢复的前缀字段，避免把噪声/乱码当合法载荷返回。
         if len(bit_bytes) < 2:
             raise ValueError("载荷字节不足")
         version = bit_bytes[0]
-        source_len = bit_bytes[1]
-        if version != _WATERMARK_VERSION:
+        if version == _WATERMARK_VERSION_V2:
+            # v2 紧凑格式：8 字节完整载荷（source 枚举 / timestamp 秒 / hash 2 字节）
+            payload = _parse_payload_v2(bit_bytes)
+        elif version == _WATERMARK_VERSION:
+            # v1 旧格式：64-bit 截断语义（timestamp/content_hash 置默认值）
+            payload = _parse_payload_v1(bit_bytes)
+        else:
             raise ValueError(f"水印版本不合法: {version}")
-        if not 1 <= source_len <= 32:
-            raise ValueError(f"source_id 长度不合法: {source_len}")
-        avail = len(bit_bytes) - 2
-        source = bytes(bit_bytes[2 : 2 + min(source_len, avail)]).decode("utf-8")
-        # timestamp/content_hash 超出 64-bit 嵌入容量，检测端无法恢复，置默认值；
-        # 嵌入端保持截断设计（已产出文件兼容），后续如扩展嵌入位数需另行升级。
-        timestamp = 0.0
-        content_hash = ""
-
-        payload = WatermarkPayload(
-            version=version,
-            source_id=source,
-            timestamp=timestamp,
-            content_hash=content_hash,
-        )
 
         return WatermarkResult(
             success=True,
