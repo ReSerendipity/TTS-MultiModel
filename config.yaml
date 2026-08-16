@@ -3,7 +3,7 @@ version: "2.2.0"
 server:
   host: "127.0.0.1"
   port: 7869
-  auto_load_model: true
+  auto_load_model: false
   # SSL configuration (currently not active - server runs on HTTP)
   # To enable HTTPS, configure uvicorn in clean_launch.py with ssl_certfile/ssl_keyfile
   ssl:
@@ -48,86 +48,17 @@ models:
       quality: "high"
       license: "bilibili Model Use License（商用需向 bilibili 登记书面授权）"
       supported_features: ["clone", "emotion_control"]
-      sample_rate: 24000
+      sample_rate: 48000
       requires_gpu: true
-
-generation:
-  cfg_value: 2.0
-  inference_timesteps: 10
-  normalize: true
-  denoise: true
-  retry_badcase: true
-  retry_badcase_max_times: 3
-  retry_badcase_ratio_threshold: 6.0
-  min_len: 2
-  max_len: 4096
-  split_max_chars: 200
-  # RAS 段级重复检测（参考 Fish Speech Repetition Aware Sampling）
-  enable_ras: false
-  ras_max_retries: 2
-  ras_cfg_increase: 0.5
-  # Emotion tag system (inspired by Fish Speech)
-  emotion_tags_enabled: true
-  emotion_tags_strip_for_engine: false  # Keep tags in text for engine processing
-  # Neural watermarking (inspired by Chatterbox Perth)
-  # P0 修复：水印现已强制接入生成管线（generation.py / voxcpm2 流式 / streaming），
-  # source_id 为代码常量，不可通过配置禁用或篡改，确保所有生成音频可追溯来源。
-  watermark_enabled: true  # 此字段保留用于文档参考，实际水印由代码强制启用
-  watermark_source_id: "tts-multimodel"  # 此字段保留用于文档参考，实际值由代码常量决定
-  watermark_strength: 0.008
-
-# vLLM acceleration (optional, requires pip install vllm>=0.6.0)
-vllm:
-  enabled: false
-  tensor_parallel_size: 1
-  gpu_memory_utilization: 0.85
-  max_model_len: 4096
-  dtype: "auto"
-  enable_prefix_caching: true
-
-cache:
-  persona_max_size: 50
-  persona_max_vram_mb: 512
-  idle_timeout_s: 300
-
-environment:
-  TRANSFORMERS_OFFLINE: "1"
-  HF_HUB_OFFLINE: "1"
-  MODELSCOPE_OFFLINE: "1"
-
-api_auth:
-  enabled: false
-  token: ""
-
-# SSE 事件流配置
-sse:
-  active_interval: 0.3
-  idle_base_interval: 0.5
-  idle_max_interval: 3.0
-  idle_step: 0.5
-  heartbeat_interval: 30.0
-
-# 音频播放器配置
-audio_player:
-  waveform_steps: 300
-  default_sample_rate: 44100
-  progress_update_ms: 100
-
-# UI 布局配置
 ui:
-  sidebar_width: 240
-  sidebar_collapsed_width: 52
-
-# P1-2: 运行时任务队列与断点续跑配置（来源：Image_MultiModel）
-runtime:
-  task:
-    checkpoint_dir: "data/checkpoints"   # checkpoint 文件存储目录
-    checkpoint_every: 5                  # 每隔多少个子任务写一次 checkpoint
-    auto_recover: false                 # 启动时是否自动恢复未完成的批量任务
-
-# P2-1: 安全配置（来源：Image_MultiModel 水印思路）
-security:
-  audio_watermark_enabled: true   # 输出音频自动嵌入可溯源水印
-  content_safety_threshold: 0.3   # 文本内容安全置信度阈值：单条强关键词命中(≈0.333)即拦截；调高可减少误拦
-
-
+  theme: dark
+  language: zh-CN
+  show_onboarding: true
+history:
+  db_path: data/tts_history.db
+  keep_days: 0
+logging:
+  level: INFO
+  file_size_mb: 10
+  file_count: 3
+  format: "[%(asctime)s] [%(levelname)s] [PID:%(process)d TID:%(thread)d] [%(name)s:%(filename)s:%(lineno)d] [req=%(request_id)s] %(message)s"
