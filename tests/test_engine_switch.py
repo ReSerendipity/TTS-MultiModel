@@ -16,7 +16,7 @@ class TestEngineSwitch:
             mock_gpu.detect_backend.return_value = MagicMock(value="cuda")
             mock_gpu.get_device_properties.return_value = {"total_memory": 8 * 1024**3}
             mock_gpu.memory_allocated.return_value = 7 * 1024**3
-            with patch("integrated_app.model_manager.get_gpu_device", return_value=0):
+            with patch("integrated_app.model_manager_core.state.get_gpu_device", return_value=0):
                 with pytest.raises(InsufficientVRAMError):
                     from integrated_app.model_manager import switch_engine
                     gen = switch_engine("voxcpm2")
