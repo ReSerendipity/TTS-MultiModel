@@ -14,7 +14,9 @@ on:
     paths:
       - 'bin/integrated_app/templates/**'
       - 'bin/integrated_app/static/**'
+      - 'bin/integrated_app/routes/**'
       - 'tests/e2e/**'
+      - '.github/workflows/e2e.yml'
   schedule:
     # Run nightly at 02:00 UTC
     - cron: '0 2 * * *'
