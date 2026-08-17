@@ -318,3 +318,26 @@ references/
 personas/
 # e2e regression baseline screenshots (align with SeedVR2 policy)
 tests/e2e/screenshots/*.png
+# ===== Local-only content (restored locally, not on remote — 2026-08-17) =====
+CHANGELOG.md
+CI-LESSONS.md
+CONTRIBUTING.md
+capture-screenshots.bat
+examples/
+perf/README.md
+perf/monitoring_plan.md
+docs/ADJUSTABLE_PARAMETERS.md
+docs/ARCHITECTURE.md
+docs/COMPLIANCE_CHECKLIST.md
+docs/DEPLOYMENT.md
+docs/GPU_RUNNER_SETUP.md
+docs/INSTALLATION_FALLBACKS.md
+docs/LOGGING_AUDIT_REPORT.md
+docs/MODEL_DOWNLOADS.md
+docs/MODEL_DOWNLOAD_GUIDE.md
+docs/OPENAI_COMPATIBLE_API.md
+docs/SECURITY.md
+docs/SHA256SUMS.models
+docs/TRAINING_GUIDE.md
+docs/WATERMARK_LIMITATIONS.md
+docs/repo-analysis/

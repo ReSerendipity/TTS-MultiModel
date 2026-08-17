@@ -1,0 +1,25 @@
+---
+name: Question
+about: Ask a question about TTS MultiModel setup or usage
+title: "[QUESTION] "
+labels: question
+assignees: ""
+---
+
+## Your Question
+A clear description of your question.
+
+## Context
+What are you trying to achieve?
+
+## What You've Tried
+Describe any steps you've already taken to resolve this.
+
+## Environment
+- OS: [e.g., Windows 11, Ubuntu 22.04]
+- Python version: [e.g., 3.12.0]
+- GPU: [e.g., NVIDIA RTX 3060]
+- TTS MultiModel version: [e.g., 2.0.0]
+
+## Additional Context
+Any other context, screenshots, or references.

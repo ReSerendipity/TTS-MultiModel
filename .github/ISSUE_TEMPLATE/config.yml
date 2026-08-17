@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Questions & Discussions"
+    url: https://github.com/ReSerendipity/TTS_MultiModel/discussions
+    about: "Ask questions, share ideas, or get help from the community"
+  - name: "Documentation"
+    url: https://github.com/ReSerendipity/TTS_MultiModel/tree/master/docs
+    about: "Read the project documentation before filing an issue"

@@ -1,0 +1,86 @@
+# Pre-commit hooks for TTS MultiModel
+# Install: pip install pre-commit && pre-commit install
+# Run: pre-commit run --all-files
+
+repos:
+  # Ruff linter + formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^(bin/integrated_app|scripts|tests)/
+      - id: ruff-format
+        files: ^(bin/integrated_app|scripts|tests)/
+
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+        exclude: \.md$
+      - id: check-yaml
+        files: \.(yaml|yml)$
+        exclude: ^\.github/workflows/
+      - id: check-json
+        files: \.json$
+        exclude: ^locales/
+      - id: check-toml
+        files: ^pyproject\.toml$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+        exclude: ^pretrained_models/|^models/|^\.ruff_cache/
+      - id: detect-private-key
+      - id: check-ast
+        files: \.py$
+        exclude: ^tests/training/
+
+  # Python import sort (isort compatible with ruff)
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--profile, black, --filter-files]
+        files: ^(bin/integrated_app|scripts)/.*\.py$
+        exclude: ^bin/integrated_app/vendor/
+
+  # Shell scripts
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.1.0
+    hooks:
+      - id: shellcheck
+        files: \.sh$
+
+  # 3-engine compatibility check (local hook)
+  - repo: local
+    hooks:
+      - id: check-3engine-compat
+        name: 3-Engine Compatibility Check
+        entry: python scripts/check_3engine_compat.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+      # P1 安全修复：禁止提交包含 PRIVATE KEY 标记的 .env 或其他文件
+      - id: forbid-private-key-in-env
+        name: Forbid PRIVATE KEY in .env files
+        entry: python -c "import sys; [sys.exit(1) for f in sys.argv[1:] if any(b'PRIVATE KEY' in open(f,'rb').read()[:4096] for _ in [0])]" 
+        language: system
+        files: \.env$
+        pass_filenames: true
+
+# Configuration
+default_language_version:
+  python: python3.12
+
+ci:
+  autofix_commit_msg: "[pre-commit] auto-fix: trailing whitespace, EOL, etc."
+  autofix_prs: true
+  autoupdate_branch: dev
+  autoupdate_commit_msg: "[pre-commit] auto-update hooks"
+  autoupdate_schedule: weekly
+  skip: [shellcheck]  # Windows CI doesn't have shellcheck
+  submodules: false

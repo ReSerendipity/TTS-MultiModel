@@ -1,0 +1,130 @@
+name: E2E (Playwright)
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'bin/integrated_app/templates/**'
+      - 'bin/integrated_app/static/**'
+      - 'bin/integrated_app/routes/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'bin/integrated_app/templates/**'
+      - 'bin/integrated_app/static/**'
+      - 'bin/integrated_app/routes/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/e2e.yml'
+  schedule:
+    # Run nightly at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: Playwright E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+          # 固定 playwright 版本：未固定会导致跨 run chromium 版本漂移，
+          # 引起视觉回归截图渲染差异（像素级对比敏感）
+          pip install playwright==1.62.0
+          playwright install --with-deps chromium
+
+      - name: Start TTS MultiModel server
+        env:
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_OFFLINE: "1"
+          MODELSCOPE_OFFLINE: "1"
+          CUDA_VISIBLE_DEVICES: ""
+          TTS_AUTO_LOAD_MODEL: "0"
+        run: |
+          cd bin
+          # -u 无缓冲输出；stdout/stderr 落盘，便于失败时诊断
+          python -u -m integrated_app.app_server --host 127.0.0.1 --port 7869 > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+          # Wait for server to be ready (max 150s)
+          READY=0
+          for i in $(seq 1 75); do
+            if curl -s http://127.0.0.1:7869/ > /dev/null 2>&1; then
+              echo "Server is ready"
+              READY=1
+              break
+            fi
+            if ! kill -0 $(cat /tmp/server.pid) 2>/dev/null; then
+              echo "Server process exited early (iteration $i)"
+              break
+            fi
+            echo "Waiting for server... ($i/75)"
+            sleep 2
+          done
+          if [ "$READY" != "1" ]; then
+            echo "===== server.log (tail) ====="
+            tail -100 /tmp/server.log || true
+            echo "Server failed to start"
+            exit 1
+          fi
+
+      - name: Diagnose tab endpoint
+        run: |
+          echo "===== HX-Request /tab/voice_design ====="
+          curl -s -H "HX-Request: true" -o /tmp/tab.html -w "HTTP %{http_code} size %{size_download}\n" "http://127.0.0.1:7869/tab/voice_design?lang=zh-CN" || true
+          head -c 800 /tmp/tab.html || true
+          echo ""
+          echo "===== server.log (head) ====="
+          head -50 /tmp/server.log || true
+          echo "===== server.log (tail) ====="
+          tail -50 /tmp/server.log || true
+
+      # 视觉回归必须在干净服务器状态上对比（其他 E2E 测试会污染页面状态），
+      # baseline 为 CI (Linux) 环境生成并入库；UI 改动后需重新生成 baseline：
+      #   TTS_SNAPSHOT_UPDATE=1 pytest tests/e2e/test_visual_regression.py -q
+      - name: Run Visual Regression gate (clean state)
+        env:
+          TTS_SERVER_URL: "http://127.0.0.1:7869"
+        run: |
+          pytest tests/e2e/test_visual_regression.py -q
+
+      - name: Run Playwright E2E tests (required gate)
+        env:
+          TTS_SERVER_URL: "http://127.0.0.1:7869"
+        run: |
+          pytest tests/e2e/ -v --tb=short --ignore=tests/e2e/test_visual_regression.py
+
+      - name: Upload E2E screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: |
+            tests/e2e/screenshots/
+            server-ci.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop server
+        if: always()
+        run: |
+          cp /tmp/server.log ./server-ci.log 2>/dev/null || true
+          if [ -f /tmp/server.pid ]; then
+            kill $(cat /tmp/server.pid) || true
+          fi

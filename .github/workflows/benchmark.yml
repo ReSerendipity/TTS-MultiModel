@@ -1,0 +1,96 @@
+name: Performance Benchmark
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bin/integrated_app/**'
+      - 'tests/benchmarks/**'
+      - '.github/workflows/benchmark.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'bin/integrated_app/**'
+      - 'tests/benchmarks/**'
+  schedule:
+    # Run weekly on Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-benchmark
+
+      - name: Run performance benchmarks
+        env:
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_OFFLINE: "1"
+          MODELSCOPE_OFFLINE: "1"
+          CUDA_VISIBLE_DEVICES: ""
+        run: |
+          pytest tests/benchmarks/ -v --tb=short -m "benchmark" \
+            --benchmark-only \
+            --benchmark-columns=rounds,iterations,mean,median,stddev,min,max \
+            --benchmark-sort=mean \
+            --benchmark-storage=output/benchmarks \
+            --benchmark-save=ci-${{ github.sha }}
+
+      - name: Compare benchmark results
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        run: |
+          echo "## Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Install pytest-benchmark to compare with previous runs
+          pip install pytest-benchmark
+          
+          # Try to compare with baseline (may fail if no baseline exists)
+          if [ -d "output/benchmarks/last_run" ]; then
+            pytest tests/benchmarks/ \
+              --benchmark-only \
+              --benchmark-compare \
+              --benchmark-compare-fail=mean:20% \
+              --benchmark-storage=output/benchmarks
+          else
+            echo "No baseline found. First benchmark run saved."
+          fi
+
+      - name: Save baseline for next comparison
+        if: always()
+        run: |
+          mkdir -p output/benchmarks/last_run
+          cp -r output/benchmarks/* output/benchmarks/last_run/ || true
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: output/benchmarks/
+          retention-days: 30
+
+      - name: Upload GPU benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-benchmark-results-${{ github.sha }}
+          path: output/gpu-benchmarks/
+          retention-days: 60
