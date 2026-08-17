@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -83,10 +84,20 @@ jobs:
           if ! git diff --quiet tests/e2e/screenshots/; then
             git add tests/e2e/screenshots/
             git commit -m "chore(e2e): update visual regression baselines"
-            git push origin HEAD:master || {
-              echo "push failed (branch protection or race) - baselines committed locally only"
-              git log --oneline -1
-            }
+            # Create a PR instead of direct push to main
+            BRANCH="update-baselines-$(date +%Y%m%d%H%M%S)"
+            git checkout -b "$BRANCH"
+            git push origin HEAD:$BRANCH
+            
+            # Create PR using GitHub CLI
+            gh pr create \
+              --title "chore(e2e): update visual regression baselines" \
+              --body "Automated baseline update from CI environment. Review the changed screenshots before merging." \
+              --base main \
+              --head "$BRANCH" || {
+                echo "Failed to create PR - check if gh CLI is configured"
+                echo "Manual step required: create PR from $BRANCH -> main"
+              }
           else
             echo "no baseline changes"
           fi

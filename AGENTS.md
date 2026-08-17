@@ -1,7 +1,7 @@
 # TTS_MultiModel AGENTS.md — AI 辅助开发指南
 
-> 🧬 **自进化协议版本**：v1.4  
-> 📅 **最后更新日期**：2026-08-15  
+> 🧬 **自进化协议版本**：v1.5  
+> 📅 **最后更新日期**：2026-08-17  
 > 🎯 **对应项目版本**：v1.0.0（Apache-2.0 开源协议）
 
 ---
@@ -134,21 +134,29 @@ TTS_MultiModel/
 ### 4.1 6 层测试分层表
 | 层级 | 测试类型 | 框架 | 目录 | 说明 |
 |:----:|---------|------|------|------|
-| L1 | 单元测试 | pytest + pytest-asyncio | `tests/unit/` | 纯函数、utils、Registry、Scheduler（不加载 GPU） |
+| L0 | **Smoke Tests** | pytest + marker | `tests/test_smoke.py` | 最小集快速验证（9 tests, <30s），CI 独立触发 `-m smoke` |
+| L1 | 单元测试 | pytest + pytest-asyncio | `tests/*.py`（根目录 92 个扁平文件） | 纯函数、utils、Registry、Scheduler（不加载 GPU）。*注：项目未采用 unit/ 子目录分包，按文件名查找* |
 | L2 | 引擎接口测试 | pytest（@pytest.mark.engine） | `tests/engines/` | BaseTTSProtocol 合规性（3 引擎都跑一遍），默认跳过 |
-| L3 | Service 层集成测试 | pytest + TestClient | `tests/integration/` | SynthesisService 走 DB + Scheduler 全流程（用 mock engine，不加载 GPU） |
-| L4 | API 端点测试 | pytest + httpx.AsyncClient | `tests/api/` | `/health`、`/synthesize`、`/voices`、`/history` HTTP 层 |
-| L5 | 安全测试（路径/注入/DoS） | pytest 手工攻击用例 | `tests/security/` | 路径穿越 / prompt 注入 / 长文本 DoS |
-| L6 | 性能测试（手动） | perf/ 目录 5 个脚本 | `perf/` | 冷启动 / VRAM / 基准 / 压力 / 报告生成器 |
+| L3 | Service 层集成测试 | pytest + TestClient | `tests/integration/`（6 个文件） | SynthesisService 走 DB + Scheduler 全流程（用 mock engine，不加载 GPU） |
+| L4 | API 端点测试 | pytest + httpx.AsyncClient | `tests/api/`, `tests/test_auth*.py` | `/health`、`/synthesize`、`/voices`、`/history` HTTP 层 |
+| L5 | 安全测试（路径/注入/DoS） | pytest 手工攻击用例 | `tests/security/`, `tests/test_path_traversal.py` 等 | path traversal / prompt injection / CSRF / 认证绕过 |
+| L6 | E2E/UI 测试 | Playwright | `tests/e2e/`（4 个文件） | 视觉回归（5 baseline）、mock 引擎流、截图工具；*注意：test_screenshot_capture_extended.py 曾截断损坏于 2026-08-17 修复* |
+
+**实际资产分布（2026-08-17）**：
+- 总测试文件：107 个（92 个扁平 + 5 个子目录）
+- 测试函数总数：~1,560 个
+- 代码行数：~17,600 行（含注释）
+- 覆盖率：**40.11%**（目标分阶段：v1:20% → v2:30% → v3:40% → v4:50% → v5:60%）
+- 覆盖率范围：仅统计 `bin/integrated_app/`（omit: tests/, templates/, static/）
 
 ### 4.2 覆盖率分阶段路线图（诚实设定，逐步提升）
 | 阶段 | 目标 fail_under | 说明 |
 |------|:---------------:|------|
-| 当前 | 20% | 先让 common/、core/scheduler 的基础单元测试跑起来 |
-| M1 里程碑 | 30% | 补上所有 engines 的 BaseTTSProtocol 合规性测试（用 mock） |
-| M2 里程碑 | 40% | services + routes 层测试覆盖 50%+ 核心路径 |
-| M3 里程碑 | 50% | 加 SSE 流式响应的时序测试（pytest-asyncio + anyio） |
-| 最终目标 | 60% | 加上安全攻击测试回归用例（path traversal / DoS 向量） |
+| 当前 | **40%** ✅ | 已达成！覆盖 common/、core/scheduler、utils、progress、task_queue 等基础模块 |
+| M1 里程碑 | 50% | 补上所有 engines 的 BaseTTSProtocol 合规性测试（用 mock）、auth/middleware 行为级验证 |
+| M2 里程碑 | 60% | services + routes 层测试覆盖 70%+ 核心路径、安全回归用例完整化 |
+| M3 里程碑 | 70% | 加 SSE 流式响应的时序测试（pytest-asyncio + anyio） |
+| 最终目标 | 80% | 加上完整攻击测试回归用例（path traversal / DoS vector / SQL injection / XSS / SSRF），GPU 功能全矩阵覆盖 |
 
 ### 4.3 测试命名规范
 ```python
@@ -161,19 +169,30 @@ class TestTTSScheduler:
 
 ### 4.4 常用测试命令
 ```bash
-# 全量（L1+L3+L4+L5，不含引擎/性能）
-pytest tests/ -q
+# Smoke tests (fastest, <30s) - verify build is not broken
+pytest tests/test_smoke.py -m smoke -v
 
-# 只跑单元 + 覆盖率（CI 默认）
-pytest tests/unit tests/integration tests/api tests/security --cov=common --cov=core --cov=engines.base --cov-fail-under=20 -q
+# Full suite (unit + integration + api + security, exclude e2e/GPU)
+pytest tests/ -q --ignore=tests/e2e
 
-# 跑引擎接口测试（要本地装了 3 个引擎模型）
-pytest tests/engines -v --run-engine
+# With coverage report (CI default)
+pytest tests/ --cov=bin/integrated_app --cov-branch --cov-report=term-missing --cov-fail-under=40 -q --ignore=tests/e2e \
+  -m "not integration and not gpu and not cuda and not vram"
 
-# 跑完整性能基准（perf/ 目录脚本，生产前）
-python perf/cold-start.py
-python perf/generation-benchmark.py --engine all
-python perf/report_generator.py   # → 生成 perf/reports/benchmark-YYYYMMDD.html
+# Integration tests only (Linux only, no GPU models)
+pytest tests/integration/ -v --tb=short -q
+
+# E2E visual regression (requires Playwright + real server)
+pytest tests/e2e/test_visual_regression.py -v
+
+# Engine interface tests (need GPU + model weights loaded)
+pytest tests/engines/ -v --run-engine
+
+# Performance benchmarks
+pytest tests/benchmarks/ -m benchmark
+
+# Run all non-GPU tests with timeout protection
+pytest tests/ --timeout=180 -v --tb=short
 ```
 
 ---
@@ -443,6 +462,9 @@ pre-commit run -a
 | 10 | **生成后自动播放 = 隐形播放 + 双音源叠加** | 生成成功自动调 `window.globalAudioPlayer.play()`（`tts_form.js` initAutoPlay / 各页面的 SSE done 分支 / `reprocess.js` / `prompt_continue.html`），同时结果卡内嵌播放器又是独立 Audio 实例 | ① 底部播放器 UI 未显示但音频在播（浏览器标签页喇叭亮），用户"看不见播放器却听见声音"；② 用户再点内嵌播放器 → 两路音频同时播放 | **统一约定：生成/流式/后处理成功后一律不自动播放**，由用户手动点结果卡内嵌播放器（`EmbeddedPlayer.html()`）试听；全局底部播放器仅保留给历史记录/音色库等**用户主动点击**的试听。`showPlayer()` 增加 `playerEl.style.display='flex'` 内联兜底，防止 CSS 未命中时 UI 不可见 | 2026-08-15 |
 | 11 | **引擎切换显存预检漏算"卸载当前引擎可释放的显存"** | 当前引擎已占显存时切到另一个引擎（如 VoxCPM2 → dotstts），`_check_vram_prereq` 在卸载前检查"当前空闲显存" | 日志 `[引擎切换] VRAM 检查: 需要 6.0GB, 可用 5.72GB` → `InsufficientVRAMError` 503，明明卸载旧引擎后显存足够，却永远走不到"先卸载再加载"路径；且 `_can_hot_standby` 用 `target*0.8`（乘反低估）会误判热待机 → 不卸载直接加载新引擎 → OOM | `_check_vram_prereq` 把 `registry.current_engine` 的基线 VRAM 计入有效可用（有效可用 = 当前空闲 + 当前引擎占用），只有"卸载后仍装不下"才硬失败；`_can_hot_standby` 改为 `target*1.2`（完整需求+余量），显存不充裕时自然回退到先卸载再加载的传统路径。见 `bin/integrated_app/model_manager.py` | 2026-08-15 |
 | 12 | **dots.tts 在原生 Windows 上无法安装（pynini 无 Windows 包）** | Windows + 纯 pip（无 conda）环境切换/加载 dotstts 引擎 | `switch_engine` 报 `ENGINE_LOAD_ERROR` 503：`No module named 'dots_tts'`；`pip install dots.tts` 在 `pynini` 步骤源码编译失败（无 Cython/OpenFst，Windows 无官方预编译 wheel） | dots.tts 硬依赖 `WeTextProcessing → pynini`，pynini 仅 Linux/macOS（conda-forge 或 WSL）。Windows 要在用，需装社区 wheel（`SystemPanic/pynini-windows`）或 conda/WSL，且有 transformers 版本冲突风险。本项目已**停用 dotstts**：注释掉 `engine_interface._register_builtin_engines()` 里的注册，引擎不再出现在切换列表，切换以"不支持的引擎"失败而非 503 | 2026-08-15 |
+| 13 | **E2E 测试文件被截断损坏导致 CI 门禁必然失败** | 编辑/合并 PR 时文件意外截断（如 `test_screenshot_capture_extended.py` 从 487 行只剩 25 字节） | pytest 收集阶段报 `IndentationError` / `SyntaxError`，e2e.yml workflow 的 required gate 直接失败，所有 PR 合不进 main | ① 提交前本地跑 `pytest tests/e2e/ --collect-only` 验证语法；② 使用 IDE 的 lint-on-save；③ CI 加 pre-commit hook 跑 `python -m py_compile tests/**/*.py`；**2026-08-17 已恢复该文件并修复** | 2026-08-17 |
+| 14 | **永真断言与零断言测试制造虚假安全感** | 测试写成 `assert task in set or task not in set`（集合论恒真）、`pass` 函数体、只调用不验证结果 | CI 全部 green 但代码有 bug，因为这些测试**根本不验证任何行为**；覆盖率虚高到 40%+ 仍可能漏核心功能 | ① 审查 assert 语句是否真正验证预期结果；② 用 `pytest --assert=always` 看详细断言输出；③ CI 加 `--strict-markers` 和 ruff flake8-assertive；**2026-08-17 已修复 4 处永真 +4 处零断言** | 2026-08-17 |
+| 15 | **认证/安全测试只是构造对象而从未发起真实请求** | `test_auth.py` 只写 `middleware = APIAuthMiddleware(...)` + `assert middleware is not None` | 文档声称 "should reject all authenticated requests" 但**没有一条 HTTP 请求验证**，中间件逻辑是否正确完全未测 | 安全相关测试必须用 `TestClient` 发起真实 HTTP 请求，验证 status_code + response body；禁用 auth/有效 token/无效 token/缺少 header/错误 scheme 全覆盖；**2026-08-17 test_auth.py 重写为 8 个行为级测试** | 2026-08-17 |
 
 ---
 
@@ -455,5 +477,6 @@ pre-commit run -a
 | v1.2 | 2026-08-15 | 用户反馈：生成后自动播放但看不见播放器（tab 喇叭亮）+ 点内嵌播放器后双音源叠加 | 定位：生成成功自动调 `globalAudioPlayer.play()`（多个路径）+ 内嵌播放器独立 Audio 实例 → 隐形播放 + 双音源。修复：**统一不自动播放**（`tts_form.js` initAutoPlay、voice_design/voice_clone 的 SSE done 分支、`reprocess.js`、`prompt_continue.html` 全部移除自动播放，改由内嵌播放器点播；voice_design 的 `EmbeddedPlayer.html()` 工厂方法统一换入逻辑）；`showPlayer()` 加 `display:flex` 内联兜底防 UI 不可见；删除 voice_design 死代码 createWavBlob/playStreamingAudio；新增 Known Gotchas #10 | v1.0.0 |
 | v1.3 | 2026-08-15 | 用户反馈：切换引擎报 `InsufficientVRAMError` 503，需先卸载旧引擎再加载 | 定位根因：`model_manager._check_vram_prereq` 在卸载前只查"当前空闲显存"，漏算卸载当前引擎可释放的显存；`_can_hot_standby` 用 `target*0.8` 乘反低估会误判热待机。修复：预检把当前引擎基线 VRAM 计入有效可用（仅"卸载后仍装不下"才硬失败）；热待机改为 `target*1.2`（完整需求+余量），显存不充裕时回退到"先卸载再加载"路径避免 OOM；新增 Known Gotchas #11 | v1.0.0 |
 | v1.4 | 2026-08-15 | 用户切换 dotstts 报 `ENGINE_LOAD_ERROR` 503（`No module named 'dots_tts'`），确认后决定暂不启用 | 确认 dots.tts 在原生 Windows 无法安装（硬依赖 WeTextProcessing → pynini 无 Windows 官方包）。应约在 `engine_interface._register_builtin_engines()` 注释掉 dotstts 注册（停用，可逆），同步更新 `test_dotstts_interface.test_registered_engines`（断言 `"dotstts" not in names`）；新增 Known Gotchas #12 | v1.0.0 |
+| v1.5 | 2026-08-17 | **测试体系完整性修复**（基于评估报告 P0/P1 级任务全量执行） | ①恢复截断损坏的 test_screenshot_capture_extended.py (486 行)；②重构 test_auth.py 为完整行为级测试（8 个 HTTP 认证场景）；③修复 4 处永真断言 +4+ 处零断言测试；④pytest.raises(Exception)→ValidationError（5 处）；⑤test_progress.py 改用公共接口 get_state()；⑥conftest.py 新增隔离 fixture；⑦CI: ruff 覆盖 tests/、integration 过滤修正、benchmark 回归实化、update-baselines 改 PR；⑧新增 smoke marker 与 test_smoke.py；⑨Known Gotchas #13~#15；AGENTS.md 第 4 节测试章节同步实际结构 + 覆盖率提升至 40% | v1.0.0 |
 
 <!-- 🔄 下次更新 AGENTS.md 时，在上面表格末尾追加新一行，不要删除历史记录 -->

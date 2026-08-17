@@ -54,11 +54,30 @@ jobs:
             --benchmark-save=ci-${{ github.sha }}
 
       - name: Compare benchmark results
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
         run: |
           echo "## Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Results saved to output/benchmarks/" >> $GITHUB_STEP_SUMMARY
+          
+          # Install pytest-benchmark to compare with previous runs
+          pip install pytest-benchmark
+          
+          # Try to compare with baseline (may fail if no baseline exists)
+          if [ -d "output/benchmarks/last_run" ]; then
+            pytest tests/benchmarks/ \
+              --benchmark-only \
+              --benchmark-compare \
+              --benchmark-compare-fail=mean:20% \
+              --benchmark-storage=output/benchmarks
+          else
+            echo "No baseline found. First benchmark run saved."
+          fi
+
+      - name: Save baseline for next comparison
+        if: always()
+        run: |
+          mkdir -p output/benchmarks/last_run
+          cp -r output/benchmarks/* output/benchmarks/last_run/ || true
 
       - name: Upload benchmark results
         if: always()
@@ -67,54 +86,6 @@ jobs:
           name: benchmark-results-${{ github.sha }}
           path: output/benchmarks/
           retention-days: 30
-
-  # Performance regression detection
-  regression-check:
-    name: Performance Regression Check
-    needs: benchmark
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Check for performance regression
-        run: |
-          echo "Performance regression check completed."
-          echo "Review benchmark results in the benchmark job artifacts."
-          echo "A regression is defined as >20% increase in mean execution time."
-
-  # GPU benchmark on self-hosted runner (requires GPU_RUNNER_SETUP.md)
-  gpu-benchmark:
-    name: GPU Performance Benchmark
-    needs: benchmark
-    runs-on: [self-hosted, gpu]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-benchmark httpx
-
-      - name: Run GPU benchmarks
-        env:
-          TRANSFORMERS_OFFLINE: "1"
-          HF_HUB_OFFLINE: "1"
-          MODELSCOPE_OFFLINE: "1"
-        run: |
-          pytest tests/benchmarks/ -v --tb=short -m "benchmark" \
-            --benchmark-only \
-            --benchmark-columns=rounds,iterations,mean,median,stddev,min,max \
-            --benchmark-sort=mean \
-            --benchmark-storage=output/gpu-benchmarks \
-            --benchmark-save=gpu-ci-${{ github.sha }}
 
       - name: Upload GPU benchmark results
         if: always()

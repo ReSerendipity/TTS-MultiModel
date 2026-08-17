@@ -30,10 +30,12 @@ jobs:
         run: pip install ruff mypy
 
       - name: Run ruff check
-        run: ruff check bin/integrated_app/ scripts/
+        run: |
+          ruff check bin/integrated_app/ scripts/ tests/
 
       - name: Run ruff format check
-        run: ruff format bin/integrated_app/ scripts/ --check --diff
+        run: |
+          ruff format bin/integrated_app/ scripts/ tests/ --check --diff
 
       - name: Run mypy type check
         run: mypy bin/integrated_app/ --ignore-missing-imports || true
@@ -114,7 +116,8 @@ jobs:
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
         run: |
-          pytest tests/integration/ -v --tb=short -m "integration or not integration" --no-header -q
+          pytest tests/integration/ -v --tb=short --no-header -q \
+            -m "not gpu and not cuda and not vram"
 
       - name: Upload coverage report
         if: always() && runner.os == 'Linux'
