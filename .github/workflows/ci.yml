@@ -162,3 +162,23 @@ jobs:
         with:
           name: dist
           path: dist/
+
+  # ── 安全断言（部署安全红线，2026-08-17 新增） ──────────────────
+  security-assertions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: 禁止 0.0.0.0 监听
+        run: |
+          HITS=$(grep -rn --include='*.py' --include='*.bat' --include='*.sh' --include='*.yml' \
+            -E "host[[:space:]]*=[[:space:]]*['\"]0\.0\.0\.0|--host[[:space:]]+0\.0\.0\.0" \
+            bin backend config.yaml start.bat start.sh 2>/dev/null | grep -v tests || true)
+          if [ -n "$HITS" ]; then echo "FAIL: 发现 0.0.0.0 监听配置"; echo "$HITS"; exit 1; fi
+          echo "PASS: 无 0.0.0.0 监听配置"
+      - name: 入口文件一致性
+        run: |
+          test -f bin/clean_launch.py || test -f backend/main.py || exit 1
+          test -f requirements.txt
+          echo "PASS: 入口与依赖清单存在"
