@@ -113,7 +113,7 @@ def _deserialize_payload(serialized: str) -> dict[str, Any] | None:
 
         actual_crc = zlib.crc32(json_bytes) & 0xFFFFFFFF
         if actual_crc != expected_crc:
-            logger.warning("[AudioWatermark] CRC32 校验失败，payload 可能被篡改")
+            logger.debug("[AudioWatermark] CRC32 校验失败，payload 可能被篡改")
             return None
 
         payload = json.loads(json_bytes.decode("utf-8"))
@@ -151,7 +151,7 @@ def embed_watermark(audio_path: str, watermark_payload: dict[str, Any]) -> str:
     watermarked, result = _embed_np(audio, sr, source_id=WATERMARK_SOURCE_ID)
 
     if not result.success:
-        logger.warning(f"[AudioWatermark] 水印嵌入失败: {result.message}")
+        logger.debug(f"[AudioWatermark] 水印嵌入失败: {result.message}")
         return audio_path
 
     dir_ = os.path.dirname(audio_path)
@@ -162,9 +162,9 @@ def embed_watermark(audio_path: str, watermark_payload: dict[str, Any]) -> str:
     try:
         sf.write(tmp_path, watermarked, sr)
         os.replace(tmp_path, audio_path)
-        logger.info(f"[AudioWatermark] 水印嵌入成功: {audio_path}, SNR={result.snr_db:.1f}dB")
+        logger.debug(f"[AudioWatermark] 水印嵌入成功: {audio_path}, SNR={result.snr_db:.1f}dB")
     except Exception as e:
-        logger.warning(f"[AudioWatermark] 水印写回失败: {e}")
+        logger.debug(f"[AudioWatermark] 水印写回失败: {e}")
         with contextlib.suppress(OSError):
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
@@ -184,7 +184,7 @@ def extract_watermark(audio_path: str) -> dict[str, Any] | None:
     try:
         audio, sr = sf.read(audio_path, dtype="float32")
     except Exception as e:
-        logger.warning(f"[AudioWatermark] 读取音频失败: {e}")
+        logger.debug(f"[AudioWatermark] 读取音频失败: {e}")
         return None
 
     if not isinstance(audio, np.ndarray):
@@ -203,5 +203,5 @@ def extract_watermark(audio_path: str) -> dict[str, Any] | None:
         "version": result.payload.version,
         "product_id": _PRODUCT_ID,
     }
-    logger.info(f"[AudioWatermark] 水印检测成功: {payload}")
+    logger.debug(f"[AudioWatermark] 水印检测成功: {payload}")
     return payload

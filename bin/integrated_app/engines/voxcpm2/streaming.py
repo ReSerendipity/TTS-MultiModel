@@ -173,7 +173,7 @@ def _wav_to_bytes(wav: np.ndarray, sample_rate: int) -> bytes:
             logger.debug("[streaming] 水印嵌入成功: snr=%.1fdB", wm_meta.get("snr_db", 0.0))
         wav = wav_wm
     except Exception as wm_exc:
-        logger.warning("[streaming] 水印嵌入异常（已忽略）: %s", wm_exc)
+        logger.debug("[streaming] 水印嵌入异常（已忽略）: %s", wm_exc)
 
     buf = io.BytesIO()
     sf.write(buf, wav, sample_rate, format="WAV")

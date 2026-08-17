@@ -200,7 +200,6 @@ python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.
 - **API 认证**: `api_auth` 区域配置 token 认证
 - **模型路径模式**: `models.model_source_mode`（portable/shared 双模式，见下方说明）
 - **断点续跑**: `runtime.task.checkpoint_dir` 配置 checkpoint 存储目录
-- **音频水印**: `security.audio_watermark_enabled` 控制水印开关
 
 详见 [参数调整指南](docs/ADJUSTABLE_PARAMETERS.md)。
 
@@ -240,13 +239,6 @@ shared 模式下，路径结构须与 portable 一致（`{shared_root}/VoxCPM2/`
 
 - checkpoint 存储目录：`data/checkpoints/`（可通过 `runtime.task.checkpoint_dir` 配置）
 - 启动时自动扫描未完成的 checkpoint 并记录日志
-
-### 输出音频水印可溯源（来源：Image_MultiModel DCT 水印思路）
-
-所有通过 TTS_MultiModel 生成的音频自动嵌入不可感知的 FFT 频域水印（16-20kHz 高频段），用于内容来源追溯。水印嵌入 source_id 为代码常量（`WATERMARK_SOURCE_ID`），不可通过配置篡改。
-
-- numpy 级水印：`bin/integrated_app/watermark.py`（`embed_watermark` / `detect_watermark`）
-- 文件级水印：`bin/integrated_app/audio_watermark.py`（`embed_watermark` / `extract_watermark`），支持 CRC32 + Base62 payload 校验
 
 ### 差异化静态文件缓存（来源：Seedvr2）
 

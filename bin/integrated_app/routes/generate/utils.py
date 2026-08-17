@@ -691,9 +691,9 @@ def _apply_post_processing_to_file(
                     wm_meta.get("content_hash", ""),
                 )
             else:
-                logger.warning("后处理水印嵌入失败，*_pp.wav 已写入但无来源标识: %s", new_path)
+                logger.debug("后处理水印嵌入失败，*_pp.wav 已写入但无来源标识: %s", new_path)
         except Exception as wm_exc:  # noqa: BLE001
-            logger.warning("后处理水印嵌入异常（已忽略，音频正常写入）: %s", wm_exc)
+            logger.debug("后处理水印嵌入异常（已忽略，音频正常写入）: %s", wm_exc)
 
         output: np.ndarray = (processed * 32768.0).clip(-32768, 32767).astype(np.int16)
         wavfile.write(new_path, sr, output)

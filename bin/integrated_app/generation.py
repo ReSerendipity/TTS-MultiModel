@@ -123,9 +123,9 @@ def save_audio(wav: np.ndarray, sr: int, prefix: str = "audio", format: str = "w
                 source_id=WATERMARK_SOURCE_ID,
             )
             if not wm_meta.get("watermarked"):
-                logger.warning("水印嵌入失败: %s", file_path)
+                logger.debug("水印嵌入失败: %s", file_path)
         except Exception as wm_exc:
-            logger.warning("水印嵌入异常（已忽略）: %s", wm_exc)
+            logger.debug("水印嵌入异常（已忽略）: %s", wm_exc)
 
         # 原子写入 WAV：先写临时文件，再 os.replace
         # 注意：临时文件以 .tmp 结尾，soundfile 无法从扩展名推断格式，
@@ -924,9 +924,9 @@ def _save_wav_compatible(
                 wm_meta.get("content_hash", ""),
             )
         else:
-            logger.warning("水印嵌入失败，音频已写入但无来源标识: %s", out_path)
+            logger.debug("水印嵌入失败，音频已写入但无来源标识: %s", out_path)
     except Exception as wm_exc:
-        logger.warning("水印嵌入异常（已忽略，音频正常写入）: %s", wm_exc)
+        logger.debug("水印嵌入异常（已忽略，音频正常写入）: %s", wm_exc)
 
     wav_int16 = (wav_data * 32767).astype(np.int16)
 
