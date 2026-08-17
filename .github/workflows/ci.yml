@@ -182,3 +182,7 @@ jobs:
           test -f bin/clean_launch.py || test -f backend/main.py || exit 1
           test -f requirements.txt
           echo "PASS: 入口与依赖清单存在"
+      - name: 依赖锁存在性
+        run: |
+          test -f requirements-lock.txt || (echo "FAIL: 缺少 requirements-lock.txt" && exit 1)
+          echo "PASS: 依赖锁存在"

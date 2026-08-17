@@ -1,0 +1,24 @@
+# requirements-lock.txt — 依赖锁（环境快照生成，2026-08-17）
+# 生成方式：本机 Python 3.12 (C:\Python312) 已装环境的 pip freeze 过滤顶层依赖
+# 重新生成（网络良好时）：pip-compile requirements.txt -o requirements-lock.txt
+
+aiofiles==25.1.0
+cryptography==50.0.0
+fastapi==0.141.1
+funasr==1.4.1
+httpx==0.28.1
+Jinja2==3.1.6
+modelscope==1.39.1
+numpy==2.4.6
+opencc-python-reimplemented==0.1.7
+psutil==7.2.2
+pydantic==2.13.4
+pydub==0.25.1
+python-multipart==0.0.32
+PyYAML==6.0.3
+scipy==1.18.0
+soundfile==0.14.0
+tokenizers==0.22.2
+torchaudio==2.11.0
+transformers==5.14.1
+uvicorn==0.52.1
