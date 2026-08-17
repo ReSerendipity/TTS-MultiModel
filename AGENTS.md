@@ -1,6 +1,6 @@
 # TTS_MultiModel AGENTS.md — AI 辅助开发指南
 
-> 🧬 **自进化协议版本**：v1.6  
+> 🧬 **自进化协议版本**：v1.7  
 > 📅 **最后更新日期**：2026-08-17  
 > 🎯 **对应项目版本**：v1.0.0（Apache-2.0 开源协议）
 
@@ -33,7 +33,7 @@ AI Agent 打开本文件后的 **第一件事** 是执行下面的「🧪 自进
 > 核心特色：**三引擎热插拔**（CosyVoice2 情感 / ChatTTS 口语化 / F5-TTS 多说话人）+ 统一 API + 单 Worker 串行调度防 GPU OOM。  
 > 开源协议：**Apache-2.0**  
 > 技术栈：**Python 3.11+ + FastAPI 0.115+ + Uvicorn + Pydantic v2 + AioSQLite + PyYAML + NumPy + SoundFile + Torch 2.x（CUDA）**  
-> 代码入口：`api/clean_launch.py`（推荐，含引擎健康预热）  
+> 代码入口：`bin/clean_launch.py`（推荐，含引擎健康预热）  
 > 默认端口：**`http://127.0.0.1:7869`**（禁止 0.0.0.0 监听，见第 13 节陷阱）  
 > 默认路由前缀：`/api/v1/tts/...`  
 > 依赖管理：requirements.txt（生产）+ requirements-dev.txt（开发）+ requirements-lock.txt（锁定）+ pyproject.toml（工具配置）
@@ -123,7 +123,7 @@ TTS_MultiModel/
 ### 🔴 5 条硬约束（违反一条直接导致生产事故）
 1. **`routes/` 目录永远不写业务逻辑**：路由只能做：参数校验（Pydantic）+ 调 `core.services.*` + 返回响应。**路由文件里不允许出现 `torch.*` / `numpy.*` / 任何推理相关代码**。
 2. **`engines/` 只是接口适配层**：不做业务编排、不写 DB、不写日志（只抛异常给上层）。引擎实现只做一件事：接收输入 → 调模型 → 返回音频 bytes。
-3. **`training/` 完全独立**：API 启动路径（`clean_launch.py` / `api.main`）**绝对不 import training/** 任何模块。如果 training 和 core 共享代码 → 抽到 `common/`。
+3. **`training/` 完全独立**：API 启动路径（`bin/clean_launch.py` / `bin/integrated_app/app_server.py`）**绝对不 import training/** 任何模块。如果 training 和 core 共享代码 → 抽到 `common/`。
 4. **所有推理任务单 Worker 串行执行**（`core.scheduler.TTSScheduler`，信号量=1）。严禁路由层直接并发 `await engine.synthesize()`——哪怕 GPU 空闲也不行。3 个引擎 + 大 batch 并发 GPU VRAM 直接爆 OOM。
 5. **所有外部资源（模型权重 / 音频文件 / 缓存文件）必须能离线工作**：不允许运行时请求外部 API 下载模型 / tokenizer / 音色 embedding。所有资源必须在 install.sh / install.bat 阶段一次性拉好。
 
@@ -218,17 +218,14 @@ pytest tests/ --timeout=180 -v --tb=short
 ### 6.2 手动启动命令
 ```bash
 # 推荐方式（含 CUDA 检测 + VRAM 预估 + 引擎预热）
-python api/clean_launch.py
+python bin/clean_launch.py
 # → 监听 http://127.0.0.1:7869
-# 成功标志：日志最后出现 "All 3 engines loaded. Health endpoint: GET /api/v1/tts/health"
+# 成功标志：日志最后出现 "All engines loaded. Health endpoint: GET /api/v1/tts/health"
 
-# 纯 Uvicorn 前台调试
-uvicorn api.main:app --host 127.0.0.1 --port 7869 --reload
-# ⚠️ --reload 仅限开发！生产禁用（会重复加载 3 个引擎，VRAM 直接翻倍 → OOM）
-
-# 生产守护进程（建议 systemd）
-uvicorn api.main:app --host 127.0.0.1 --port 7869 --workers 1
-# ⚠️ workers 只能 = 1！Scheduler 是全局单例，多 worker 会绕过串行队列并发推理 → OOM
+# 方式 B（纯 Uvicorn 前台调试，需在 bin/ 目录下）
+cd bin
+uvicorn integrated_app.app_server:create_app --factory --host 127.0.0.1 --port 7869 --workers 1
+# ⚠️ --workers 只能 = 1！Scheduler 是全局单例，多 worker 会绕过串行队列并发推理 → OOM
 ```
 
 ### 6.3 启动后验证
@@ -479,5 +476,6 @@ pre-commit run -a
 | v1.4 | 2026-08-15 | 用户切换 dotstts 报 `ENGINE_LOAD_ERROR` 503（`No module named 'dots_tts'`），确认后决定暂不启用 | 确认 dots.tts 在原生 Windows 无法安装（硬依赖 WeTextProcessing → pynini 无 Windows 官方包）。应约在 `engine_interface._register_builtin_engines()` 注释掉 dotstts 注册（停用，可逆），同步更新 `test_dotstts_interface.test_registered_engines`（断言 `"dotstts" not in names`）；新增 Known Gotchas #12 | v1.0.0 |
 | v1.5 | 2026-08-17 | **测试体系完整性修复**（基于评估报告 P0/P1 级任务全量执行） | ①恢复截断损坏的 test_screenshot_capture_extended.py (486 行)；②重构 test_auth.py 为完整行为级测试（8 个 HTTP 认证场景）；③修复 4 处永真断言 +4+ 处零断言测试；④pytest.raises(Exception)→ValidationError（5 处）；⑤test_progress.py 改用公共接口 get_state()；⑥conftest.py 新增隔离 fixture；⑦CI: ruff 覆盖 tests/、integration 过滤修正、benchmark 回归实化、update-baselines 改 PR；⑧新增 smoke marker 与 test_smoke.py；⑨Known Gotchas #13~#15；AGENTS.md 第 4 节测试章节同步实际结构 + 覆盖率提升至 40% | v1.0.0 |
 | v1.6 | 2026-08-17 | **安全测试补盲与 M1 里程碑达成** | ①新增 test_security_expanded.py（SQL/XSS/SSRF 盲区补测，8 用例）；②新增 tests/engines/test_protocol_compliance.py（L2 引擎协议合规性测试，7 用例）；③e2e.yml PR 触发补 routes/**；④Security Scan 已纳入 PR 门禁（exit-code:1）。M1 里程碑：覆盖率 40%→目标 50%，L2 引擎测试已实现 | v1.0.0 |
+| v1.7 | 2026-08-17 | **AGENTS.md 自检：修正陈旧入口引用** | 自检发现第 1 节「代码入口」、硬约束 #3、第 6 节「手动启动命令」仍引用不存在的旧入口 `api/clean_launch.py` / `uvicorn api.main:app`（项目实际结构为 `bin/` + `bin/integrated_app/`）。修正：入口统一为 `bin/clean_launch.py`（推荐）与 `uvicorn integrated_app.app_server:create_app --factory`（bin/ 下手动调试）；硬约束 #3 启动路径同步为 `bin/clean_launch.py` / `bin/integrated_app/app_server.py` | v1.0.0 |
 
 <!-- 🔄 下次更新 AGENTS.md 时，在上面表格末尾追加新一行，不要删除历史记录 -->
