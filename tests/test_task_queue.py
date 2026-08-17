@@ -69,19 +69,27 @@ class TestCreateBackgroundTask:
             loop.close()
 
     def test_task_added_to_background_set(self):
+        """Verify task is actually added to background tasks set."""
         from integrated_app.task_queue import _background_tasks, create_background_task
 
         async def simple_coro():
             await asyncio.sleep(0.01)
+            return "done"
 
         async def run():
+            initial_count = len(_background_tasks)
             task = create_background_task(simple_coro())
-            assert task in _background_tasks or task not in _background_tasks
-            await task
+            # Verify task was added to the set
+            assert task in _background_tasks
+            assert len(_background_tasks) == initial_count + 1
+            result = await task
+            return result
 
         loop = asyncio.new_event_loop()
         try:
-            loop.run_until_complete(run())
+            result = loop.run_until_complete(run())
+            assert result == "done"
+            # Task should be removed after completion (cleanup happens in task itself)
         finally:
             loop.close()
 
@@ -159,8 +167,33 @@ class TestInitShutdownQueue:
         assert new_task is not old_task or old_task.done()
 
     def test_shutdown_clears_state(self):
-        # This is tested implicitly in teardown
-        pass
+        """Verify shutdown clears queue and worker state."""
+        from integrated_app.task_queue import (
+            _generation_queue,
+            _generation_worker_task,
+            get_queue_status,
+        )
+
+        # After init in fixture, queue should exist
+        assert _generation_queue is not None
+        assert _generation_worker_task is not None
+
+        async def shutdown_and_check():
+            from integrated_app.task_queue import shutdown_queue
+
+            await shutdown_queue()
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(shutdown_and_check())
+
+        # After shutdown, both should be None
+        from integrated_app.task_queue import _generation_queue as queue_after, _generation_worker_task as worker_after
+        assert queue_after is None
+        assert worker_after is None
+        # Status should return zeros when uninitialized
+        status = get_queue_status()
+        assert status["queued_count"] == 0
+        assert status["running_count"] == 0
 
 
 # =====================================================================

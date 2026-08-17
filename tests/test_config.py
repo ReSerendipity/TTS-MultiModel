@@ -74,30 +74,35 @@ class TestConfigValidation:
 
     def test_generation_config_invalid_chars_per_segment_raises(self):
         """测试生成配置无效字符数抛出异常"""
+        from pydantic import ValidationError
         from integrated_app.config_models import GenerationConfig
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             GenerationConfig(max_chars_per_segment=10)
 
     def test_generation_defaults_invalid_timesteps_raises(self):
         """测试生成默认配置无效步数抛出异常"""
+        from pydantic import ValidationError
         from integrated_app.config_models import GenerationDefaultsConfig
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             GenerationDefaultsConfig(inference_timesteps=0)
 
     def test_server_config_invalid_port_raises(self):
         """测试服务器配置无效端口抛出异常"""
+        from pydantic import ValidationError
         from integrated_app.config_models import ServerConfig
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ServerConfig(port=0)
 
     def test_memory_config_invalid_cache_size_raises(self):
         """测试内存配置无效缓存大小抛出异常"""
+        from pydantic import ValidationError
         from integrated_app.config_models import MemoryConfig
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             MemoryConfig(max_cache_size=0)
 
     def test_server_config_workers_gt1_raises(self):
         """测试服务器配置 workers > 1 抛出异常"""
+        from pydantic import ValidationError
         from integrated_app.config_models import AppConfig, ServerConfig
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AppConfig(server=ServerConfig(workers=2))

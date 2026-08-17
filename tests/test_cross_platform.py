@@ -78,11 +78,16 @@ class TestAtomicWrite:
 
 class TestFileLock:
     def test_lock_acquire_release(self, tmp_path):
+        """Verify file lock mechanism works correctly."""
+        import os
         lock_path = tmp_path / "test.lock"
         with file_lock(str(lock_path)):
-            assert lock_path.exists() or True  # Windows 锁文件可能被清理
+            # Lock file should exist while holding lock (or be created in parent dir on some platforms)
+            lock_exists = lock_path.exists() or any(p.is_file() for p in lock_path.parent.glob("*.lock"))
+            assert lock_exists
+        # After exit, lock should be released (file may still exist but not blocking)
         with file_lock(str(lock_path)):
-            pass
+            pass  # Should acquire without blocking
 
     def test_lock_is_exclusive(self, tmp_path):
         import threading

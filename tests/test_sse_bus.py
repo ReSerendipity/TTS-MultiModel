@@ -38,10 +38,12 @@ class TestSSEEventBus:
         asyncio.run(run())
 
     def test_notify_none_only_wakes_event(self, bus):
+        """Notify with None should wake up the internal event."""
         async def run():
             await bus.subscribe()
-            bus.notify(None)  # 旧模式：仅 Event 唤醒
-            assert bus._event.is_set() or True
+            bus.notify(None)  # Old pattern: only wakes Event
+            # Verify the event was actually set (not just always-true)
+            assert bus._event.is_set()
 
         asyncio.run(run())
 
