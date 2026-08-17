@@ -345,3 +345,6 @@ docs/repo-analysis/
 docs/全功能实施指南.md
 docs/功能实现状态分析报告.md
 docs/项目健康度评估报告.md
+
+# Local management rules (owner-only, not on remote)
+LOCAL_RULES.md
