@@ -341,3 +341,7 @@ docs/SHA256SUMS.models
 docs/TRAINING_GUIDE.md
 docs/WATERMARK_LIMITATIONS.md
 docs/repo-analysis/
+
+docs/全功能实施指南.md
+docs/功能实现状态分析报告.md
+docs/项目健康度评估报告.md
