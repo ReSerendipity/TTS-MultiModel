@@ -65,10 +65,6 @@ build/
 *.onnx
 *.gguf
 
-# Allow persona files
-!personas/*.pt
-!personas/*.wav
-
 # HuggingFace cache
 .huggingface/
 
@@ -316,3 +312,9 @@ docs/UI_RESTRUCTURE_IMPLEMENTATION.md
 
 # Cloned learning repos (research reference only, not part of project)
 references/
+
+# ===== 2026-08-17 审计执行（HEAD 层瘦身） =====
+# voice personas moved out of public repo (privacy), 2026-08-17
+personas/
+# e2e regression baseline screenshots (align with SeedVR2 policy)
+tests/e2e/screenshots/*.png
