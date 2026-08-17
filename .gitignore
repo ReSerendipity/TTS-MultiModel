@@ -286,6 +286,12 @@ scripts/test_sse.py
 
 # Screenshots: keep only the ones referenced by README
 docs/screenshots/*
+!docs/screenshots/voxcpm2_01_voice_design_viewport.png
+!docs/screenshots/voxcpm2_02_voice_clone_viewport.png
+!docs/screenshots/voxcpm2_03_ultimate_clone_viewport.png
+!docs/screenshots/voxcpm2_04_script_workshop_viewport.png
+!docs/screenshots/voxcpm2_06_lora_viewport.png
+!docs/screenshots/voxcpm2_08_settings_viewport.png
 
 # ---------------------------------------------------------------------------
 # Performance monitoring results (generated artifacts, keep directory tracked)
