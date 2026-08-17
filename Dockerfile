@@ -63,4 +63,5 @@ ENV TTS_AUTO_LOAD_ENGINE=voxcpm2
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:7869/api/health/ping')" || exit 1
 
+# 0.0.0.0 仅在 config.yaml 配置 api_auth.enabled=true + token 时被安全网放行（否则容器拒绝启动）
 CMD ["python3", "-c", "from integrated_app.app_server import run_server; run_server('0.0.0.0', 7869)"]

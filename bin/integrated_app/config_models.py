@@ -106,12 +106,16 @@ class ServerConfig(BaseModel):
     workers: int = Field(default=1, ge=1, le=4, description="Worker count (1 for GPU)")
     @field_validator("host")
     @classmethod
-    def host_must_be_loopback(cls, v: str) -> str:
-        """安全强制：host 只允许回环地址，禁止 0.0.0.0 公网暴露。"""
-        allowed = {"127.0.0.1", "localhost", "::1"}
+    def host_must_be_loopback_or_docker(cls, v: str) -> str:
+        """安全强制：host 只允许回环地址或 0.0.0.0（容器场景）。
+
+        0.0.0.0 仅在 run_server 安全网放行时生效：必须配置
+        api_auth.enabled=true + token，否则启动即拒绝（见 app_server.run_server）。
+        """
+        allowed = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
         if v not in allowed:
             raise ValueError(
-                f"host must be loopback (127.0.0.1 / localhost / ::1), got: {v}"
+                f"host must be loopback (127.0.0.1 / localhost / ::1) or 0.0.0.0, got: {v}"
             )
         return v
 
