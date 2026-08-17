@@ -9,6 +9,8 @@ P0-1 改造：新增 ``save_config()`` 原子写入函数（来源：Seedvr2）�
 
 P0-2 改造：新增 ``load_config()`` 宽松接口（来源：Seedvr2），
 Pydantic 验证失败时回退到原始 YAML 加载，保证启动不被配置错误阻塞。
+【职责】config.yaml 读写与访问入口（原子写入、宽松加载、环境变量 setup）。【边界】字段 schema 定义在 config_models，本模块不做校验。
+
 """
 
 import contextlib

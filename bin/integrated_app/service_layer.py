@@ -11,6 +11,8 @@
 - 所有异常统一转换为 TTSError 层次结构，便于路由层处理
 - 日志统一使用 logging.getLogger("tts_multimodel")
 - 线程安全：共享状态通过 registry 的 RLock 保护
+【职责】业务服务层（跨路由/引擎的用例编排）。【边界】不直接碰模型加载细节；路由层经本层访问业务能力。
+
 """
 
 import logging

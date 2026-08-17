@@ -29,6 +29,8 @@
 **向后兼容策略：**
     所有模型均使用 ``extra="ignore"``，config.yaml 中存在的未知字段会被
     Pydantic 静默丢弃，保证旧配置文件在新版本代码上仍可正常加载。
+【职责】配置 Pydantic 模式与默认值（Server/Generation/API 等全部字段契约）。【边界】不做文件读写；环境覆盖逻辑在 config.py。
+
 """
 
 from typing import Any, Literal

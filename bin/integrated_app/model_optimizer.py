@@ -16,6 +16,8 @@
   - 预热使用极短文本（"你好"），耗时通常在 2~5 秒内
   - 首次编译缓存到磁盘（model_manager 中已配置 _TORCH_COMPILE_CACHE_DIR）
   - 预热失败不影响模型正常加载和使用（fail-soft）
+【职责】模型显存/精度优化策略（量化、offload 等）。【边界】只产出优化建议与执行，不改变模型注册状态。
+
 """
 
 from __future__ import annotations

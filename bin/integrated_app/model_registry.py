@@ -52,6 +52,8 @@ Singleton 实现方式
     # 就绪查询
     if registry.is_engine_ready():
         engine = registry.get_current_engine()
+【职责】模型加载状态与规格登记（EngineName 枚举、VRAM 规格、已加载标记）。【边界】不执行加载动作（动作在 model_manager）；不做 YAML 读写。
+
 """
 
 from __future__ import annotations

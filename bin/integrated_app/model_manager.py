@@ -46,6 +46,8 @@ Sub-modules:
     generator 的迭代调度到线程池，避免阻塞事件循环。
     persona_manager 等同步模块可直接 `with _model_lock:` 获取锁。
     严禁在 async 上下文中直接 `with _model_lock:` 调用同步代码。
+【职责】模型加载/卸载/引擎切换生命周期编排。【边界】不存状态（状态在 model_registry）；不解析配置（配置在 config/config_models）。
+
 """
 
 import contextlib
