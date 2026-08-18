@@ -7,12 +7,12 @@ server:
   # SSL configuration (currently not active - server runs on HTTP)
   # To enable HTTPS, configure uvicorn in clean_launch.py with ssl_certfile/ssl_keyfile
   ssl:
-    certfile: "bin/cert.pem"
-    keyfile: "bin/key.pem"
+    certfile: "app/cert.pem"
+    keyfile: "app/key.pem"
 
 models:
   # P1-3: 模型路径模式（来源：Image_MultiModel）
-  # - portable（默认）：使用项目内 pretrained_models/ 目录，自包含
+  # - portable（默认）：使用项目内 model/ 目录，自包含
   # - shared：使用 shared_models_root 指定的外部共享目录，
   #   可与 Seedvr2 / Image_MultiModel 共享模型文件，节省磁盘
   # 注意：shared 模式下路径结构须与 portable 一致：
@@ -20,9 +20,9 @@ models:
   model_source_mode: portable
   shared_models_root: ""   # 例如：C:/AI_Shared_Models
   voxcpm2:
-    model_path: "pretrained_models/VoxCPM2"
-    asr_path: "pretrained_models/SenseVoiceSmall"
-    denoiser_path: "pretrained_models/speech_zipenhancer"
+    model_path: "model/VoxCPM2"
+    asr_path: "model/SenseVoiceSmall"
+    denoiser_path: "model/speech_zipenhancer"
   # 声明式引擎注册表（对齐 VoiceBox ModelConfig 设计）
   # 新引擎只需在此声明即可自动注册、显存预检和 UI 渲染
   engines:
@@ -62,3 +62,19 @@ logging:
   file_size_mb: 10
   file_count: 3
   format: "[%(asctime)s] [%(levelname)s] [PID:%(process)d TID:%(thread)d] [%(name)s:%(filename)s:%(lineno)d] [req=%(request_id)s] %(message)s"
+
+
+# P1-2: 断点续跑任务队列运行时配置（对应 config_models.RuntimeTaskConfig）
+runtime:
+  task:
+    checkpoint_dir: "data/checkpoints"
+    checkpoint_every: 5
+    auto_recover: false
+
+watermark:
+  enabled_in_code: true
+  method: dct_frequency
+  product_id: TTSMULTI-1
+  embed_timestamp: true
+  embed_task_id: true
+  strength: 0.008

@@ -1,6 +1,6 @@
 """音频水印文件级嵌入与提取单元测试（P2-1）。
 
-覆盖目标模块: bin/integrated_app/audio_watermark.py
+覆盖目标模块: app/integrated_app/audio_watermark.py
 """
 
 import os
@@ -11,9 +11,9 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")

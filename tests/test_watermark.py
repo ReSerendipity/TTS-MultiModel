@@ -1,6 +1,6 @@
 """watermark 模块单元测试 — 音频水印嵌入与检测。
 
-覆盖目标模块: bin/integrated_app/watermark.py
+覆盖目标模块: app/integrated_app/watermark.py
 """
 
 import numpy as np
