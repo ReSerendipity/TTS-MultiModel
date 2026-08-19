@@ -1,12 +1,12 @@
 """覆盖率提升测试 — 针对低覆盖模块补充单元测试。
 
 覆盖目标模块:
-  - bin/integrated_app/persona_manager.py (34.77% → 目标 50%+)
-  - bin/integrated_app/model_manager.py (17.42% → 目标 30%+)
-  - bin/integrated_app/exceptions.py
-  - bin/integrated_app/monitor.py
-  - bin/integrated_app/emotion_tags.py
-  - bin/integrated_app/estimator.py
+  - app/integrated_app/persona_manager.py (34.77% → 目标 50%+)
+  - app/integrated_app/model_manager.py (17.42% → 目标 30%+)
+  - app/integrated_app/exceptions.py
+  - app/integrated_app/monitor.py
+  - app/integrated_app/emotion_tags.py
+  - app/integrated_app/estimator.py
 """
 
 import os
@@ -16,9 +16,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 
 # =====================================================================
@@ -194,23 +194,29 @@ class TestModelManagerReExports:
 
     def test_lru_cache_exported(self):
         from integrated_app.model_manager import LRUCache
-        assert LRUCache is not None
+        assert hasattr(LRUCache, 'put')
+        assert hasattr(LRUCache, 'get')
 
     def test_adaptive_lru_cache_exported(self):
         from integrated_app.model_manager import AdaptiveLRUCache
-        assert AdaptiveLRUCache is not None
+        assert hasattr(AdaptiveLRUCache, 'put')
+        assert hasattr(AdaptiveLRUCache, 'get')
 
     def test_progress_manager_exported(self):
         from integrated_app.model_manager import ProgressManager
-        assert ProgressManager is not None
+        assert hasattr(ProgressManager, 'start')
+        assert hasattr(ProgressManager, 'complete')
+        assert hasattr(ProgressManager, 'get_state')
 
     def test_generation_tracker_exported(self):
         from integrated_app.model_manager import GenerationTracker
-        assert GenerationTracker is not None
+        assert hasattr(GenerationTracker, 'start_generation')
+        assert hasattr(GenerationTracker, 'end_generation')
 
     def test_gpu_memory_monitor_exported(self):
         from integrated_app.model_manager import GPUMemoryMonitor
-        assert GPUMemoryMonitor is not None
+        assert hasattr(GPUMemoryMonitor, 'get_vram_info')
+        assert hasattr(GPUMemoryMonitor, 'can_load_model')
 
     def test_is_oom_error_exported(self):
         from integrated_app.model_manager import is_oom_error

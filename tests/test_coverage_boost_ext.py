@@ -1,17 +1,17 @@
 """覆盖率提升扩展测试 — L5 补充，目标 60%+。
 
 补充以下模块的测试覆盖:
-  - bin/integrated_app/routes/audio.py
-  - bin/integrated_app/routes/sse.py
-  - bin/integrated_app/routes/tabs.py
-  - bin/integrated_app/routes/training.py
-  - bin/integrated_app/routes/persona.py
-  - bin/integrated_app/cache.py
-  - bin/integrated_app/progress.py
-  - bin/integrated_app/tracker.py
-  - bin/integrated_app/gpu_utils.py
-  - bin/integrated_app/history_db.py
-  - bin/integrated_app/generation.py
+  - app/integrated_app/routes/audio.py
+  - app/integrated_app/routes/sse.py
+  - app/integrated_app/routes/tabs.py
+  - app/integrated_app/routes/training.py
+  - app/integrated_app/routes/persona.py
+  - app/integrated_app/cache.py
+  - app/integrated_app/progress.py
+  - app/integrated_app/tracker.py
+  - app/integrated_app/gpu_utils.py
+  - app/integrated_app/history_db.py
+  - app/integrated_app/generation.py
 """
 
 import os
@@ -20,9 +20,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 
 # =====================================================================
@@ -36,7 +36,8 @@ class TestLRUCache:
     def test_create_cache(self):
         from integrated_app.cache import LRUCache
         cache = LRUCache(maxsize=5)
-        assert cache is not None
+        assert cache._maxsize == 5
+        assert cache.get("nonexistent") is None  # Empty cache returns None
 
     def test_put_and_get(self):
         from integrated_app.cache import LRUCache
@@ -101,7 +102,9 @@ class TestAdaptiveLRUCache:
     def test_create_adaptive_cache(self):
         from integrated_app.cache import AdaptiveLRUCache
         cache = AdaptiveLRUCache(default_maxsize=10)
-        assert cache is not None
+        assert cache.get("nonexistent") is None  # Empty cache returns None
+        cache.put("k", "v")
+        assert cache.get("k") == "v"
 
     def test_adaptive_put_and_get(self):
         from integrated_app.cache import AdaptiveLRUCache
@@ -128,14 +131,18 @@ class TestProgressManager:
     def test_create_progress_manager(self):
         from integrated_app.progress import ProgressManager
         pm = ProgressManager()
-        assert pm is not None
+        state = pm.get_state()
+        assert isinstance(state, dict)
+        assert state["phase"] == ""  # Initial phase is empty
 
     def test_start_progress(self):
         from integrated_app.progress import ProgressManager
         pm = ProgressManager()
         pm.start(total_segments=1)
         state = pm.get_state()
-        assert state is not None
+        assert isinstance(state, dict)
+        assert state["is_active"] is True
+        assert state["total_segments"] == 1
 
     def test_complete_progress(self):
         from integrated_app.progress import ProgressManager
@@ -164,7 +171,10 @@ class TestGenerationTracker:
     def test_create_tracker(self):
         from integrated_app.tracker import GenerationTracker
         tracker = GenerationTracker()
-        assert tracker is not None
+        info = tracker.get_info()
+        assert isinstance(info, dict)
+        assert info["queue_depth"] == 0  # No items in queue initially
+        assert info["phase"] != ""  # Phase should be initialized (e.g. '空闲')
 
     def test_start_generation_returns_id(self):
         from integrated_app.tracker import GenerationTracker
@@ -178,8 +188,11 @@ class TestGenerationTracker:
         tracker = GenerationTracker()
         tracker.start_generation()
         info = tracker.get_info()
-        assert info is not None
         assert isinstance(info, dict)
+        assert "queue_depth" in info
+        assert "avg_gen_time" in info
+        assert "phase" in info
+        assert "status_text" in info
 
     def test_end_generation(self):
         from integrated_app.tracker import GenerationTracker
@@ -187,7 +200,8 @@ class TestGenerationTracker:
         tracker.start_generation()
         tracker.end_generation(elapsed=1.5)
         info = tracker.get_info()
-        assert info is not None
+        assert isinstance(info, dict)
+        assert info["avg_gen_time"] > 0  # EMA should reflect the elapsed time
 
 
 # =====================================================================
@@ -227,7 +241,11 @@ class TestGPUUtils:
     def test_gpu_memory_monitor_creation(self):
         from integrated_app.gpu_utils import GPUMemoryMonitor
         monitor = GPUMemoryMonitor()
-        assert monitor is not None
+        assert hasattr(GPUMemoryMonitor, 'get_vram_info')
+        assert hasattr(GPUMemoryMonitor, 'can_load_model')
+        # On CPU-only systems, should return zeros without crashing
+        info = GPUMemoryMonitor.get_vram_info()
+        assert isinstance(info, dict)
 
 
 # =====================================================================
@@ -240,13 +258,19 @@ class TestHistoryDB:
 
     def test_history_db_importable(self):
         from integrated_app.history_db import HistoryDatabase
-        assert HistoryDatabase is not None
+        assert hasattr(HistoryDatabase, "insert")
+        assert hasattr(HistoryDatabase, "query")
+        assert hasattr(HistoryDatabase, "count")
 
     def test_history_db_creation(self, tmp_path):
         from integrated_app.history_db import HistoryDatabase
         db_path = str(tmp_path / "test_history.db")
         db = HistoryDatabase(db_path)
-        assert db is not None
+        assert hasattr(db, "insert")
+        assert hasattr(db, "query")
+        # Verify DB file was created
+        import os
+        assert os.path.exists(db_path)
 
     def test_history_db_add_record(self, tmp_path):
         from integrated_app.history_db import HistoryDatabase
