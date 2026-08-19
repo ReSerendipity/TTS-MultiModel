@@ -47,7 +47,7 @@ jobs:
           CUDA_VISIBLE_DEVICES: ""
           TTS_AUTO_LOAD_MODEL: "0"
         run: |
-          cd bin
+          cd app
           python -u -m integrated_app.app_server --host 127.0.0.1 --port 7869 > /tmp/server.log 2>&1 &
           echo $! > /tmp/server.pid
           READY=0
