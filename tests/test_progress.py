@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """progress 模块单元测试 — 生成进度管理（使用公共接口）。
 
-覆盖目标模块：bin/integrated_app/progress.py
+覆盖目标模块：app/integrated_app/progress.py
 
 重构说明:
 - 原有测试直接断言 _phase/_total_segments 等私有属性 (test_progress_ext.py 也用)
@@ -121,7 +121,7 @@ class TestProgressManagerPublicInterface:
         """Duration formatting (internal implementation verified manually)."""
         # Skip direct assertion on _format_duration output format
         # The actual implementation returns "{N}秒" or "{M}分{S}秒" without spaces
-        # Verified by inspection of bin/integrated_app/progress.py:_format_duration()
+        # Verified by inspection of app/integrated_app/progress.py:_format_duration()
         pytest.skip("Internal formatting logic not part of public API")
 
     def test_schedule_reset(self):
@@ -139,8 +139,14 @@ class TestProgressManagerPublicInterface:
         # Schedule reset with very short delay
         pm.schedule_reset(delay_seconds=0.01)
 
-        # Wait briefly for the background thread
-        time.sleep(0.05)
+        # Poll for reset completion instead of fixed sleep
+        import time as _time
+        deadline = _time.time() + 1.0  # 1s timeout
+        while _time.time() < deadline:
+            status = pm.get_status()
+            if not status["is_complete"]:
+                break
+            _time.sleep(0.01)
 
         # Verify reset happened
         status = pm.get_status()
