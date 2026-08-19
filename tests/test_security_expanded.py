@@ -6,9 +6,9 @@ import os
 import sys
 import pytest
 
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 os.environ.setdefault("TTS_SKIP_MODEL_LOAD", "1")
 
@@ -24,7 +24,7 @@ class TestHistoryDBSQLInjectionPrevention:
         """FTS5 MATCH queries should use parameterized bindings, not string interpolation.
 
         Regression test for CVE-style injection via search_text parameter.
-        See bin/integrated_app/history_db.py:_build_filter_conditions() line 477,1047
+        See app/integrated_app/history_db.py:_build_filter_conditions() line 477,1047
         """
         from integrated_app.history_db import HistoryDatabase
         import tempfile
@@ -70,7 +70,7 @@ class TestHistoryDBSQLInjectionPrevention:
         """Unknown filter keys should be rejected/logged, not passed to SQL.
 
         Prevents injection via filter key names (e.g., {"engine"); DROP TABLE..." : "x"}).
-        See bin/integrated_app/history_db.py line 446-449
+        See app/integrated_app/history_db.py line 446-449
         """
         from integrated_app.history_db import HistoryDatabase
         import tempfile
@@ -151,15 +151,12 @@ class TestXSSPrevention:
 
         Attack vector: User submits "<script>stealCookies()</script>" expecting it to
         be echoed back in an error message or progress display.
-        
-        Note: This is a placeholder test documenting the security requirement.
-        Actual XSS protection happens at the HTTP response rendering layer (Jinja2 auto-escape).
         """
         from integrated_app.text_frontend import TextFrontend
 
         frontend = TextFrontend()
 
-        # Malicious script injection attempts - document expected behavior
+        # Malicious script injection attempts
         xss_payloads = [
             "<script>alert('XSS')</script>",
             "<img src=x onerror=alert('XSS')>",
@@ -168,19 +165,27 @@ class TestXSSPrevention:
 
         for payload in xss_payloads:
             # The key security guarantee: user input must NEVER be rendered as raw HTML
-            # in any server-sent responses. Jinja2 templates with autoescape=True provide
-            # this protection automatically.
-            
-            # For now, just verify the module can process text without crashing
-            # Actual XSS prevention testing belongs in E2E tests that inspect HTML responses
+            # in any server-sent responses.
             try:
                 result = frontend.process(payload)
-                # If process() returns segments, they should not contain executable HTML
+                # If process() returns segments, verify no executable HTML survives
                 assert result is not None
-            except Exception:
-                # Some payloads might cause processing errors - that's OK as long as
-                # the error message itself doesn't leak executable code
+                # If result is a string, verify script tags are not preserved verbatim
+                if isinstance(result, str):
+                    assert "<script>" not in result.lower(), \
+                        f"XSS payload survived processing: {result}"
+                elif isinstance(result, list):
+                    for segment in result:
+                        if isinstance(segment, str):
+                            assert "<script>" not in segment.lower(), \
+                                f"XSS payload survived in segment: {segment}"
+            except ValueError:
+                # Rejecting malicious input is also acceptable
                 pass
+            except Exception as e:
+                # Unexpected exceptions should not contain the raw XSS payload
+                assert "<script>" not in str(e).lower(), \
+                    f"Error message leaked XSS payload: {e}"
 
     def test_html_progress_bar_escaping(self):
         """Progress bar HTML generation should escape user-provided text fields.
@@ -347,3 +352,151 @@ class TestSSRFPrevention:
         assert is_safe_url("http://localhost/test.wav") is False
         assert is_safe_url("file:///etc/passwd") is False
         assert is_safe_url("ftp://internal-server/file") is False
+
+
+# ============================================================================
+# HTTP Behavior-Level XSS Prevention Tests
+# ============================================================================
+
+class TestXSSHTTPBehavior:
+    """Test XSS prevention through actual HTTP responses.
+
+    These tests verify that user-supplied text containing XSS payloads
+    is properly escaped when returned in HTTP responses from real endpoints.
+    """
+
+    def test_error_response_does_not_contain_raw_script_tag(self, client):
+        """Error responses must not echo back raw <script> tags from user input.
+
+        Attack vector: Submit XSS payload as text parameter; if the error
+        response includes the raw payload, a browser would execute it.
+        """
+        xss_payload = "<script>alert('XSS')</script>"
+        resp = client.get(f"/api/nonexistent-{xss_payload}")
+
+        # Regardless of status code, the response body must not contain
+        # the raw, unescaped <script> tag
+        body = resp.text
+        assert "<script>alert" not in body, \
+            f"Raw XSS payload found in response body: {body[:200]}"
+
+    def test_404_response_escapes_html(self, client):
+        """404 responses should escape HTML entities in any echoed path."""
+        xss_path = "/api/<img src=x onerror=alert(1)>"
+        resp = client.get(xss_path)
+        assert resp.status_code == 404
+
+        body = resp.text
+        # The raw onerror attribute must not appear unescaped
+        assert "onerror=alert" not in body, \
+            f"Unescaped HTML event handler in 404 body: {body[:200]}"
+
+    def test_csrf_rejection_message_is_safe(self, client):
+        """CSRF rejection response should not contain executable HTML."""
+        # POST without CSRF token to trigger 403
+        resp = client.post("/api/training/stop")
+        assert resp.status_code == 403
+
+        body = resp.text
+        assert "<script>" not in body.lower()
+        assert "onerror=" not in body.lower()
+
+    def test_history_table_response_is_safe(self, client):
+        """History table endpoint should not contain unescaped script tags."""
+        resp = client.get("/api/history/table")
+        assert resp.status_code == 200
+
+        body = resp.text
+        assert "<script>alert" not in body.lower()
+
+    def test_tab_content_does_not_leak_html(self, client):
+        """Tab content responses should be properly escaped."""
+        # Request a tab with a path that could contain XSS
+        resp = client.get("/tab/settings")
+        assert resp.status_code == 200
+
+        body = resp.text
+        # No raw script tags should appear in tab content
+        assert "<script>alert" not in body.lower()
+
+
+# ============================================================================
+# HTTP Behavior-Level SSRF Prevention Tests
+# ============================================================================
+
+class TestSSRFHTTPBehavior:
+    """Test SSRF prevention through actual HTTP endpoint behavior.
+
+    These tests verify that no API endpoint can be abused to make the
+    server fetch arbitrary internal URLs.
+    """
+
+    def test_no_endpoint_accepts_url_parameter_for_fetching(self, client):
+        """No API endpoint should accept a 'url' parameter that causes server-side fetching."""
+        # Try common SSRF vectors across all registered routes
+        ssrf_vectors = [
+            "/api/audio/?url=http://169.254.169.254/latest/meta-data/",
+            "/api/generate/?url=http://127.0.0.1:8080/admin",
+            "/api/download/?url=file:///etc/passwd",
+            "/api/proxy/?url=http://127.0.0.1:7869/api/health/ping",
+        ]
+
+        for vector in ssrf_vectors:
+            resp = client.get(vector)
+            # These should all return 404 (endpoint doesn't exist) or 422 (parameter not accepted)
+            # The key assertion: no 200 response with content from the target URL
+            assert resp.status_code in (404, 422, 400, 405), \
+                f"SSRF vector {vector} returned {resp.status_code} - possible SSRF vulnerability"
+
+    def test_audio_upload_rejects_url_scheme(self, client):
+        """Audio upload endpoint should reject URL-based file references."""
+        # Attempt to upload a URL instead of a file
+        resp = client.post(
+            "/api/audio/upload",
+            data={"file_url": "http://127.0.0.1/test.wav"},
+        )
+        # Should reject (400/403/404/422), not fetch the URL
+        # 403 = CSRF or auth rejection (still safe - request was denied)
+        assert resp.status_code in (400, 403, 404, 422, 405, 415), \
+            f"Audio upload accepted URL reference: {resp.status_code}"
+
+    def test_model_load_rejects_url_path(self, client):
+        """Model loading should not accept URL-based paths."""
+        resp = client.post(
+            "/api/model/load",
+            data={"engine": "voxcpm2", "model_url": "http://169.254.169.254/"},
+        )
+        # Should not fetch the URL - reject or ignore the url parameter
+        assert resp.status_code in (200, 400, 422, 405, 403), \
+            f"Model load endpoint may have fetched URL: {resp.status_code}"
+
+    def test_generate_endpoint_rejects_remote_reference(self, client):
+        """Generate endpoint should not accept remote reference audio URLs."""
+        resp = client.post(
+            "/api/generate/voice_clone",
+            data={
+                "text": "test",
+                "reference_audio_url": "http://127.0.0.1:7869/api/health/ping",
+            },
+        )
+        # Should reject or return error (no model loaded), not fetch the URL
+        assert resp.status_code in (400, 422, 405, 503, 403), \
+            f"Generate endpoint may have fetched remote URL: {resp.status_code}"
+
+    def test_internal_ip_not_reachable_via_api(self, client):
+        """Verify no API endpoint proxies requests to internal IPs."""
+        # Attempt to use any endpoint as a proxy
+        internal_targets = [
+            "http://127.0.0.1:8080",
+            "http://127.0.0.1:9000",
+            "http://169.254.169.254",
+            "http://[::1]:8080",
+        ]
+
+        for target in internal_targets:
+            # Try common proxy/fetch parameter names
+            for param_name in ("url", "target", "dest", "redirect", "next", "fetch"):
+                resp = client.get(f"/api/nonexistent?{param_name}={target}")
+                # Nonexistent endpoint should return 404
+                assert resp.status_code == 404, \
+                    f"Unexpected {resp.status_code} for nonexistent endpoint with {param_name}={target}"
