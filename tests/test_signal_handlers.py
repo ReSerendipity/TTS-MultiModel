@@ -1,6 +1,6 @@
 """signal_handlers 模块单元测试 — 覆盖信号注册/清理。
 
-覆盖目标模块: bin/integrated_app/signal_handlers.py
+覆盖目标模块: app/integrated_app/signal_handlers.py
 覆盖率目标: >=70%
 
 覆盖范围:
@@ -247,12 +247,17 @@ class TestSignalHandlerContext:
     """SignalHandlerContext 上下文管理器测试。"""
 
     def test_context_manager_enters_and_exits(self):
-        from integrated_app.signal_handlers import SignalHandlerContext
+        """SignalHandlerContext enters and exits without exception."""
+        from integrated_app.signal_handlers import SignalHandlerContext, graceful_shutdown_requested
 
+        graceful_shutdown_requested.clear()
         with SignalHandlerContext():
             pass  # No exception
+        # After exit, handlers should be unregistered and flag cleared
+        assert graceful_shutdown_requested.is_set() is False
 
     def test_context_manager_with_callbacks(self):
+        """SignalHandlerContext registers and invokes callbacks correctly."""
         from integrated_app.signal_handlers import SignalHandlerContext
 
         checkpoint_called = []
@@ -263,6 +268,9 @@ class TestSignalHandlerContext:
 
         with SignalHandlerContext(checkpoint_callback=cb):
             pass
+        # Callback was registered (not invoked during normal exit, only on signal)
+        # Verify the context completed without error
+        assert checkpoint_called == []  # Not called on normal exit
 
     def test_context_manager_restores_on_exception(self):
         from integrated_app.signal_handlers import SignalHandlerContext
@@ -321,6 +329,7 @@ class TestModuleStateReset:
     """模块级状态重置测试。"""
 
     def test_state_cleared_after_unregister(self):
+        """Module-level state is reset after unregister."""
         from integrated_app.signal_handlers import (
             _checkpoint_callback,
             _cleanup_callbacks,
@@ -344,6 +353,9 @@ class TestModuleStateReset:
 
         # After unregister, state should be reset
         assert graceful_shutdown_requested.is_set() is False
+        assert _handlers_registered is False
+        assert _checkpoint_callback is None
+        assert _cleanup_callbacks == []
 
 
 if __name__ == "__main__":

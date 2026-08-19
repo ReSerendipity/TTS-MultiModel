@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 # Keep tests offline and avoid auto-loading models during test discovery/client creation.
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
@@ -47,6 +47,8 @@ def tmp_persona_dir(tmp_path: Path):
             os.environ["PERSONA_DIR"] = str(tmp_persona_dir)
             # Now any module that reads PERSONA_DIR will use this isolated path
     """
+    assert tmp_path.exists(), "tmp_path fixture should provide an existing directory"
+    assert tmp_path.is_dir(), "tmp_path should be a directory"
     return tmp_path
 
 

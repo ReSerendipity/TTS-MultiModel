@@ -197,28 +197,28 @@ class TestSignalHandlers:
         assert is_shutdown_requested() is False
 
     def test_register_unregister_signal_handlers(self):
-        """信号处理器注册与注销。"""
-        from integrated_app.signal_handlers import (
-            register_signal_handlers,
-            unregister_signal_handlers,
-        )
+        """Signal handlers register and unregister idempotently."""
+        import integrated_app.signal_handlers as sig
 
         # 注册
-        register_signal_handlers()
+        sig.register_signal_handlers()
+        assert sig._handlers_registered is True
         # 重复注册（幂等）
-        register_signal_handlers()
+        sig.register_signal_handlers()
+        assert sig._handlers_registered is True
         # 注销
-        unregister_signal_handlers()
+        sig.unregister_signal_handlers()
+        assert sig._handlers_registered is False
         # 重复注销（幂等）
-        unregister_signal_handlers()
+        sig.unregister_signal_handlers()
+        assert sig._handlers_registered is False
 
     def test_register_with_callbacks(self):
         """带回调的信号处理器注册。"""
-        from integrated_app.signal_handlers import (
-            graceful_shutdown_requested,
-            register_signal_handlers,
-            unregister_signal_handlers,
-        )
+        import integrated_app.signal_handlers as sig
+
+        # 先注销以确保干净状态
+        sig.unregister_signal_handlers()
 
         callback_called = []
 
@@ -229,19 +229,17 @@ class TestSignalHandlers:
         def cleanup_cb():
             callback_called.append("cleanup")
 
-        register_signal_handlers(
+        sig.register_signal_handlers(
             checkpoint_callback=checkpoint_cb,
             cleanup_callbacks=[cleanup_cb],
         )
         # 手动触发信号处理器
-        from integrated_app.signal_handlers import _signal_handler
-
-        _signal_handler(signal.SIGINT, None)
+        sig._signal_handler(signal.SIGINT, None)
         assert "checkpoint" in callback_called
         assert "cleanup" in callback_called
-        assert graceful_shutdown_requested.is_set() is True
-        graceful_shutdown_requested.clear()
-        unregister_signal_handlers()
+        assert sig.graceful_shutdown_requested.is_set() is True
+        sig.graceful_shutdown_requested.clear()
+        sig.unregister_signal_handlers()
 
     def test_wait_for_shutdown_timeout(self):
         """wait_for_shutdown 超时返回 False。"""
@@ -255,11 +253,17 @@ class TestSignalHandlers:
         assert result is False
 
     def test_signal_handler_context(self):
-        """SignalHandlerContext 上下文管理器。"""
-        from integrated_app.signal_handlers import SignalHandlerContext
+        """SignalHandlerContext enters/exits cleanly and restores state."""
+        from integrated_app.signal_handlers import (
+            SignalHandlerContext,
+            graceful_shutdown_requested,
+        )
 
+        graceful_shutdown_requested.clear()
         with SignalHandlerContext():
             pass  # 进出上下文不抛异常
+        # After context exit, flag should still be cleared (no signal was sent)
+        assert graceful_shutdown_requested.is_set() is False
 
 
 # =====================================================================

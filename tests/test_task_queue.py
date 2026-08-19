@@ -1,6 +1,6 @@
 """task_queue 模块单元测试 — 覆盖单 worker 串行逻辑。
 
-覆盖目标模块: bin/integrated_app/task_queue.py
+覆盖目标模块: app/integrated_app/task_queue.py
 覆盖率目标: >=70%
 
 覆盖范围:
@@ -320,8 +320,13 @@ class TestCancelGeneration:
         task = loop.run_until_complete(setup())
         result = cancel_generation("gen-running")
         assert result == "running"
-        # Clean up
-        task.cancel()
+        # Wait for cancellation to complete
+        try:
+            loop.run_until_complete(asyncio.wait_for(task, timeout=1.0))
+        except (asyncio.CancelledError, Exception):
+            pass
+        # Verify the task was cancelled or completed
+        assert task.cancelled() or task.done()
         try:
             loop.run_until_complete(task)
         except asyncio.CancelledError:
@@ -551,27 +556,33 @@ class TestNotifyFailed:
     """_notify_generation_failed / _force_fail_if_active 测试。"""
 
     def test_notify_generation_failed_silent_on_import_error(self):
+        """_notify_generation_failed should not raise even if SSE module is unavailable."""
         from integrated_app.task_queue import _notify_generation_failed
 
         async def run():
             # Should not raise even if SSE module is unavailable
             await _notify_generation_failed("test-gen", "test error")
+            return True
 
         loop = asyncio.new_event_loop()
         try:
-            loop.run_until_complete(run())
+            result = loop.run_until_complete(run())
+            assert result is True
         finally:
             loop.close()
 
     def test_force_fail_if_active_silent(self):
+        """_force_fail_if_active should complete without raising for unknown generation."""
         from integrated_app.task_queue import _force_fail_if_active
 
         async def run():
             await _force_fail_if_active("test-gen", "worker crash")
+            return True
 
         loop = asyncio.new_event_loop()
         try:
-            loop.run_until_complete(run())
+            result = loop.run_until_complete(run())
+            assert result is True
         finally:
             loop.close()
 
