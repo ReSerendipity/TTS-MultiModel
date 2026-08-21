@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'bin/integrated_app/**'
+      - 'app/integrated_app/**'
       - 'tests/benchmarks/**'
       - '.github/workflows/benchmark.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'bin/integrated_app/**'
+      - 'app/integrated_app/**'
       - 'tests/benchmarks/**'
   schedule:
     # Run weekly on Sunday at 00:00 UTC

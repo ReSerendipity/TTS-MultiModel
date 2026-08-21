@@ -1,6 +1,6 @@
 # TTS_MultiModel AGENTS.md — AI 辅助开发指南
 
-> 🧬 **自进化协议版本**：v1.7  
+> 🧬 **自进化协议版本**：v1.9  
 > 📅 **最后更新日期**：2026-08-17  
 > 🎯 **对应项目版本**：v1.0.0（Apache-2.0 开源协议）
 
@@ -33,7 +33,7 @@ AI Agent 打开本文件后的 **第一件事** 是执行下面的「🧪 自进
 > 核心特色：**三引擎热插拔**（CosyVoice2 情感 / ChatTTS 口语化 / F5-TTS 多说话人）+ 统一 API + 单 Worker 串行调度防 GPU OOM。  
 > 开源协议：**Apache-2.0**  
 > 技术栈：**Python 3.11+ + FastAPI 0.115+ + Uvicorn + Pydantic v2 + AioSQLite + PyYAML + NumPy + SoundFile + Torch 2.x（CUDA）**  
-> 代码入口：`bin/clean_launch.py`（推荐，含引擎健康预热）  
+> 代码入口：`app/clean_launch.py`（推荐，含引擎健康预热）  
 > 默认端口：**`http://127.0.0.1:7869`**（禁止 0.0.0.0 监听，见第 13 节陷阱）  
 > 默认路由前缀：`/api/v1/tts/...`  
 > 依赖管理：requirements.txt（生产）+ requirements-dev.txt（开发）+ requirements-lock.txt（锁定）+ pyproject.toml（工具配置）
@@ -108,7 +108,7 @@ TTS_MultiModel/
 ├── training/            ← 数据处理 & 微调脚本（独立，不参与 API 启动路径）
 │   ├── prepare_dataset.py
 │   └── finetune_cosyvoice.sh
-├── models/              ← 模型权重（🚫 禁区，AI 不允许自动修改）
+├── model/               ← 模型权重（🚫 禁区，AI 不允许自动修改）
 ├── tests/               ← 测试体系（6 层，第 4 节详细说明）
 ├── perf/                ← 性能监控脚本（冷启动 / VRAM / 生成基准 / 压力测试 / 报告生成器）
 ├── scripts/             ← 辅助脚本（模型下载 / integrity check / i18n keys 校验）
@@ -123,7 +123,7 @@ TTS_MultiModel/
 ### 🔴 5 条硬约束（违反一条直接导致生产事故）
 1. **`routes/` 目录永远不写业务逻辑**：路由只能做：参数校验（Pydantic）+ 调 `core.services.*` + 返回响应。**路由文件里不允许出现 `torch.*` / `numpy.*` / 任何推理相关代码**。
 2. **`engines/` 只是接口适配层**：不做业务编排、不写 DB、不写日志（只抛异常给上层）。引擎实现只做一件事：接收输入 → 调模型 → 返回音频 bytes。
-3. **`training/` 完全独立**：API 启动路径（`bin/clean_launch.py` / `bin/integrated_app/app_server.py`）**绝对不 import training/** 任何模块。如果 training 和 core 共享代码 → 抽到 `common/`。
+3. **`training/` 完全独立**：API 启动路径（`app/clean_launch.py` / `app/integrated_app/app_server.py`）**绝对不 import training/** 任何模块。如果 training 和 core 共享代码 → 抽到 `common/`。
 4. **所有推理任务单 Worker 串行执行**（`core.scheduler.TTSScheduler`，信号量=1）。严禁路由层直接并发 `await engine.synthesize()`——哪怕 GPU 空闲也不行。3 个引擎 + 大 batch 并发 GPU VRAM 直接爆 OOM。
 5. **所有外部资源（模型权重 / 音频文件 / 缓存文件）必须能离线工作**：不允许运行时请求外部 API 下载模型 / tokenizer / 音色 embedding。所有资源必须在 install.sh / install.bat 阶段一次性拉好。
 
@@ -147,7 +147,7 @@ TTS_MultiModel/
 - 测试函数总数：~1,560 个
 - 代码行数：~17,600 行（含注释）
 - 覆盖率：**40.11%**（目标分阶段：v1:20% → v2:30% → v3:40% → v4:50% → v5:60%）
-- 覆盖率范围：仅统计 `bin/integrated_app/`（omit: tests/, templates/, static/）
+- 覆盖率范围：仅统计 `app/integrated_app/`（omit: tests/, templates/, static/）
 
 ### 4.2 覆盖率分阶段路线图（诚实设定，逐步提升）
 | 阶段 | 目标 fail_under | 说明 |
@@ -176,7 +176,7 @@ pytest tests/test_smoke.py -m smoke -v
 pytest tests/ -q --ignore=tests/e2e
 
 # With coverage report (CI default)
-pytest tests/ --cov=bin/integrated_app --cov-branch --cov-report=term-missing --cov-fail-under=40 -q --ignore=tests/e2e \
+pytest tests/ --cov=app/integrated_app --cov-branch --cov-report=term-missing --cov-fail-under=40 -q --ignore=tests/e2e \
   -m "not integration and not gpu and not cuda and not vram"
 
 # Integration tests only (Linux only, no GPU models)
@@ -218,12 +218,12 @@ pytest tests/ --timeout=180 -v --tb=short
 ### 6.2 手动启动命令
 ```bash
 # 推荐方式（含 CUDA 检测 + VRAM 预估 + 引擎预热）
-python bin/clean_launch.py
+python app/clean_launch.py
 # → 监听 http://127.0.0.1:7869
 # 成功标志：日志最后出现 "All engines loaded. Health endpoint: GET /api/v1/tts/health"
 
-# 方式 B（纯 Uvicorn 前台调试，需在 bin/ 目录下）
-cd bin
+# 方式 B（纯 Uvicorn 前台调试，需在 app/ 目录下）
+cd app
 uvicorn integrated_app.app_server:create_app --factory --host 127.0.0.1 --port 7869 --workers 1
 # ⚠️ --workers 只能 = 1！Scheduler 是全局单例，多 worker 会绕过串行队列并发推理 → OOM
 ```
@@ -325,11 +325,11 @@ CI workflow（`.github/workflows/release-please.yml`）会自动做所有版本�
 > - ❌ 不要手动写 CHANGELOG（release-please 自动生成，你可以手动补充细节但不要自己写结构）
 > - ❌ 不要自己 `git tag`，会和 release-please 的 tag 冲突导致重复版本
 
-### 9.3 本地需要知道的版本号同步位置（万不得已要手动改的话，3 处一起改）
+### 9.3 本地需要知道的版本号同步位置（万不得已要手动改的话，一起改）
 | # | 文件 | 字段 |
 |---|------|------|
 | 1 | `pyproject.toml` | `[project] version = "x.x.x"` |
-| 2 | `common/config.py` | `APP_VERSION: Final[str] = "x.x.x"` |
+| 2 | `config.yaml`（**当前唯一权威版本源**） | 顶层 `version: "x.x.x"`，由 `app/integrated_app/config.py` 读取（旧 `common/config.py` 的 `APP_VERSION` 常量已删除，勿再引用） |
 | 3 | `CHANGELOG.md`（release-please 自动维护，手动改的话要对应 `## [x.x.x] - YYYY-MM-DD`） | |
 
 ---
@@ -457,7 +457,7 @@ pre-commit run -a
 | 8 | **release-please：绝对不要手动改版本号** | 图省事直接改 `pyproject.toml` 的 `version = "1.1.0"`，合了 main → release-please 的 PR 里版本号冲突 | CI 创建 Release 失败：`tag v1.1.0 already exists`，CHANGELOG 条目重复 | **完全放手给 release-please**：版本号和 CHANGELOG 一律它生成，你只需要 Approve release-please 自动开的 PR。真要手动改就先让 release-please 生成了，再改 release-please PR 里面的内容（合之前改 PR 就好） | 2026-07-20 |
 | 9 | **全局底部播放器不显示的根因=前端资源缓存** | 页面加载后生成音频，底部 `global-audio-player` 悬浮条（含波形+可拖动进度条）从未出现，结果卡也没有任何可见播放器 | `base.html` 的 JS/CSS 均带 `?v={{ app_version }}` 缓存参数；若版本号未变，浏览器复用旧版 JS，`window.globalAudioPlayer` 为 undefined，`tts_form.js` 的 `initAutoPlay` 里 `if (audioSrc && window.globalAudioPlayer)` 直接跳过 → 播放器永不弹出 | ① 发布新前端资源时务必递增 `app_version`（或改用内容 hash 命名）并硬刷新测试；② 播放器组件应**自包含**：不依赖全局单例。已落地：`routes/generate/utils.py` 的 `_EMBEDDED_PLAYER_HTML` + `static/js/embedded_player.js` + `static/css/embedded_player.css`，结果卡内嵌波形播放器，全部路由（design/clone/script/streaming/post-process/indextts2）自动生效 | 2026-08-15 |
 | 10 | **生成后自动播放 = 隐形播放 + 双音源叠加** | 生成成功自动调 `window.globalAudioPlayer.play()`（`tts_form.js` initAutoPlay / 各页面的 SSE done 分支 / `reprocess.js` / `prompt_continue.html`），同时结果卡内嵌播放器又是独立 Audio 实例 | ① 底部播放器 UI 未显示但音频在播（浏览器标签页喇叭亮），用户"看不见播放器却听见声音"；② 用户再点内嵌播放器 → 两路音频同时播放 | **统一约定：生成/流式/后处理成功后一律不自动播放**，由用户手动点结果卡内嵌播放器（`EmbeddedPlayer.html()`）试听；全局底部播放器仅保留给历史记录/音色库等**用户主动点击**的试听。`showPlayer()` 增加 `playerEl.style.display='flex'` 内联兜底，防止 CSS 未命中时 UI 不可见 | 2026-08-15 |
-| 11 | **引擎切换显存预检漏算"卸载当前引擎可释放的显存"** | 当前引擎已占显存时切到另一个引擎（如 VoxCPM2 → dotstts），`_check_vram_prereq` 在卸载前检查"当前空闲显存" | 日志 `[引擎切换] VRAM 检查: 需要 6.0GB, 可用 5.72GB` → `InsufficientVRAMError` 503，明明卸载旧引擎后显存足够，却永远走不到"先卸载再加载"路径；且 `_can_hot_standby` 用 `target*0.8`（乘反低估）会误判热待机 → 不卸载直接加载新引擎 → OOM | `_check_vram_prereq` 把 `registry.current_engine` 的基线 VRAM 计入有效可用（有效可用 = 当前空闲 + 当前引擎占用），只有"卸载后仍装不下"才硬失败；`_can_hot_standby` 改为 `target*1.2`（完整需求+余量），显存不充裕时自然回退到先卸载再加载的传统路径。见 `bin/integrated_app/model_manager.py` | 2026-08-15 |
+| 11 | **引擎切换显存预检漏算"卸载当前引擎可释放的显存"** | 当前引擎已占显存时切到另一个引擎（如 VoxCPM2 → dotstts），`_check_vram_prereq` 在卸载前检查"当前空闲显存" | 日志 `[引擎切换] VRAM 检查: 需要 6.0GB, 可用 5.72GB` → `InsufficientVRAMError` 503，明明卸载旧引擎后显存足够，却永远走不到"先卸载再加载"路径；且 `_can_hot_standby` 用 `target*0.8`（乘反低估）会误判热待机 → 不卸载直接加载新引擎 → OOM | `_check_vram_prereq` 把 `registry.current_engine` 的基线 VRAM 计入有效可用（有效可用 = 当前空闲 + 当前引擎占用），只有"卸载后仍装不下"才硬失败；`_can_hot_standby` 改为 `target*1.2`（完整需求+余量），显存不充裕时自然回退到先卸载再加载的传统路径。见 `app/integrated_app/model_manager.py` | 2026-08-15 |
 | 12 | **dots.tts 在原生 Windows 上无法安装（pynini 无 Windows 包）** | Windows + 纯 pip（无 conda）环境切换/加载 dotstts 引擎 | `switch_engine` 报 `ENGINE_LOAD_ERROR` 503：`No module named 'dots_tts'`；`pip install dots.tts` 在 `pynini` 步骤源码编译失败（无 Cython/OpenFst，Windows 无官方预编译 wheel） | dots.tts 硬依赖 `WeTextProcessing → pynini`，pynini 仅 Linux/macOS（conda-forge 或 WSL）。Windows 要在用，需装社区 wheel（`SystemPanic/pynini-windows`）或 conda/WSL，且有 transformers 版本冲突风险。本项目已**停用 dotstts**：注释掉 `engine_interface._register_builtin_engines()` 里的注册，引擎不再出现在切换列表，切换以"不支持的引擎"失败而非 503 | 2026-08-15 |
 | 13 | **E2E 测试文件被截断损坏导致 CI 门禁必然失败** | 编辑/合并 PR 时文件意外截断（如 `test_screenshot_capture_extended.py` 从 487 行只剩 25 字节） | pytest 收集阶段报 `IndentationError` / `SyntaxError`，e2e.yml workflow 的 required gate 直接失败，所有 PR 合不进 main | ① 提交前本地跑 `pytest tests/e2e/ --collect-only` 验证语法；② 使用 IDE 的 lint-on-save；③ CI 加 pre-commit hook 跑 `python -m py_compile tests/**/*.py`；**2026-08-17 已恢复该文件并修复** | 2026-08-17 |
 | 14 | **永真断言与零断言测试制造虚假安全感** | 测试写成 `assert task in set or task not in set`（集合论恒真）、`pass` 函数体、只调用不验证结果 | CI 全部 green 但代码有 bug，因为这些测试**根本不验证任何行为**；覆盖率虚高到 40%+ 仍可能漏核心功能 | ① 审查 assert 语句是否真正验证预期结果；② 用 `pytest --assert=always` 看详细断言输出；③ CI 加 `--strict-markers` 和 ruff flake8-assertive；**2026-08-17 已修复 4 处永真 +4 处零断言** | 2026-08-17 |
@@ -476,6 +476,19 @@ pre-commit run -a
 | v1.4 | 2026-08-15 | 用户切换 dotstts 报 `ENGINE_LOAD_ERROR` 503（`No module named 'dots_tts'`），确认后决定暂不启用 | 确认 dots.tts 在原生 Windows 无法安装（硬依赖 WeTextProcessing → pynini 无 Windows 官方包）。应约在 `engine_interface._register_builtin_engines()` 注释掉 dotstts 注册（停用，可逆），同步更新 `test_dotstts_interface.test_registered_engines`（断言 `"dotstts" not in names`）；新增 Known Gotchas #12 | v1.0.0 |
 | v1.5 | 2026-08-17 | **测试体系完整性修复**（基于评估报告 P0/P1 级任务全量执行） | ①恢复截断损坏的 test_screenshot_capture_extended.py (486 行)；②重构 test_auth.py 为完整行为级测试（8 个 HTTP 认证场景）；③修复 4 处永真断言 +4+ 处零断言测试；④pytest.raises(Exception)→ValidationError（5 处）；⑤test_progress.py 改用公共接口 get_state()；⑥conftest.py 新增隔离 fixture；⑦CI: ruff 覆盖 tests/、integration 过滤修正、benchmark 回归实化、update-baselines 改 PR；⑧新增 smoke marker 与 test_smoke.py；⑨Known Gotchas #13~#15；AGENTS.md 第 4 节测试章节同步实际结构 + 覆盖率提升至 40% | v1.0.0 |
 | v1.6 | 2026-08-17 | **安全测试补盲与 M1 里程碑达成** | ①新增 test_security_expanded.py（SQL/XSS/SSRF 盲区补测，8 用例）；②新增 tests/engines/test_protocol_compliance.py（L2 引擎协议合规性测试，7 用例）；③e2e.yml PR 触发补 routes/**；④Security Scan 已纳入 PR 门禁（exit-code:1）。M1 里程碑：覆盖率 40%→目标 50%，L2 引擎测试已实现 | v1.0.0 |
-| v1.7 | 2026-08-17 | **AGENTS.md 自检：修正陈旧入口引用** | 自检发现第 1 节「代码入口」、硬约束 #3、第 6 节「手动启动命令」仍引用不存在的旧入口 `api/clean_launch.py` / `uvicorn api.main:app`（项目实际结构为 `bin/` + `bin/integrated_app/`）。修正：入口统一为 `bin/clean_launch.py`（推荐）与 `uvicorn integrated_app.app_server:create_app --factory`（bin/ 下手动调试）；硬约束 #3 启动路径同步为 `bin/clean_launch.py` / `bin/integrated_app/app_server.py` | v1.0.0 |
+| v1.7 | 2026-08-17 | **AGENTS.md 自检：修正陈旧入口引用** | 自检发现第 1 节「代码入口」、硬约束 #3、第 6 节「手动启动命令」仍引用不存在的旧入口 `api/clean_launch.py` / `uvicorn api.main:app`（项目实际结构为 `app/` + `app/integrated_app/`）。修正：入口统一为 `app/clean_launch.py`（推荐）与 `uvicorn integrated_app.app_server:create_app --factory`（app/ 下手动调试）；硬约束 #3 启动路径同步为 `app/clean_launch.py` / `app/integrated_app/app_server.py` | v1.0.0 |
+| v1.8 | 2026-08-17 | **目录重命名 bin→app** | 将项目目录 `bin` 重命名为 `app` 并同步全部引用（start.bat、pyproject.toml、.github/workflows、AGENTS.md、README.md、Dockerfile、config.yaml、scripts、tests、docs 等），同时将模型目录 token `pretrained_models` 全部替换为 `model`（config.yaml / install.bat / README.md / docker-compose.yml / .gitignore / .pre-commit-config.yaml / scripts / app 内部 / start.sh 等）；同步更新代码入口、覆盖率路径、CI 命令与文档引用 | v1.0.0 |
+
+| v1.9 | 2026-08-17 | **统一权重目录 model/** | 解决 `model/` 与 `models/` 重名歧义：`config_models.py` 的 `ModelConfig.base_dir` 默认值 `models` → `model`（运行时实际路径为 `config.py` 的 `PRETRAINED_DIR=ROOT/model`）；5 种语言 locales 的 `download_guide_note` 由 `models/` 目录改为 `model/` 目录；docs/MODEL_DOWNLOADS.md 与 docs/INDEXTTS2_INTEGRATION_GUIDE.md 的权重路径 `models/` → `model/`；第 3 节目录树 `models/` → `model/`；删除遗留的 `models/` 运行时缓存目录 | v1.0.0 |
 
 <!-- 🔄 下次更新 AGENTS.md 时，在上面表格末尾追加新一行，不要删除历史记录 -->
+
+
+## 路线图落地新增模块（2026-08-18，未提交）
+- app/integrated_app/watermark.py — 音频域数字水印（移植自 Image_MultiModel）
+- app/integrated_app/spec.py — 领域公式契约层
+- app/integrated_app/batch_inference.py — 新增 register_resume_inference_fn / make_checkpoint_resume_handler（断点续跑引擎注册表 + 默认 handler）
+- app/integrated_app/app_server.py — lifespan 注册默认 checkpoint_resume_handler
+- scripts/init_watermark_key.py、scripts/verify_watermark.py、scripts/render_pages.py
+- tests/test_watermark.py、tests/test_spec.py、tests/test_checkpoint_resume.py、tests/test_resume_handler.py、tests/frontend/
+- config.yaml 新增 watermark、runtime.task 节

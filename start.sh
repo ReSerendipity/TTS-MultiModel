@@ -17,10 +17,10 @@ if [ "$1" = "--download" ]; then
     pip install modelscope -q 2>/dev/null || true
     echo ""
     echo "VoxCPM2:"
-    echo "  modelscope download OpenBMB/VoxCPM2 --local_dir pretrained_models/VoxCPM2"
+    echo "  modelscope download OpenBMB/VoxCPM2 --local_dir model/VoxCPM2"
     echo ""
     echo "IndexTTS2:"
-    echo "  modelscope download IndexTeam/IndexTTS-2 --local_dir pretrained_models/IndexTTS2"
+    echo "  modelscope download IndexTeam/IndexTTS-2 --local_dir model/IndexTTS2"
     echo ""
     echo "After downloading, run: ./start.sh"
     exit 0
@@ -28,10 +28,10 @@ fi
 
 # Check if models exist
 MISSING=""
-if [ ! -d "pretrained_models/VoxCPM2" ] || [ -z "$(ls pretrained_models/VoxCPM2 2>/dev/null)" ]; then
+if [ ! -d "model/VoxCPM2" ] || [ -z "$(ls model/VoxCPM2 2>/dev/null)" ]; then
     MISSING="VoxCPM2"
 fi
-if [ ! -d "pretrained_models/IndexTTS2" ] || [ -z "$(ls pretrained_models/IndexTTS2 2>/dev/null)" ]; then
+if [ ! -d "model/IndexTTS2" ] || [ -z "$(ls model/IndexTTS2 2>/dev/null)" ]; then
     MISSING="$MISSING IndexTTS2"
 fi
 

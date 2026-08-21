@@ -64,7 +64,7 @@ jobs:
       # P1 安全修复：生成关键脚本 SHA256 校验文件
       - name: Generate SHA256SUMS for scripts
         run: |
-          sha256sum start.bat bin/start_app.bat bin/clean_launch.py > SHA256SUMS.scripts
+          sha256sum start.bat app/start_app.bat app/clean_launch.py > SHA256SUMS.scripts
           cat SHA256SUMS.scripts
 
       # P1 安全修复：GPG 签名校验文件（如配置了签名密钥）

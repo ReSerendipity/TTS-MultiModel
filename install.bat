@@ -169,7 +169,7 @@ echo   Step 2: Creating Required Directories
 echo ============================================================
 echo.
 
-if not exist "pretrained_models" mkdir "pretrained_models"
+if not exist "model" mkdir "model"
 if not exist "personas" mkdir "personas"
 if not exist "outputs" mkdir "outputs"
 if not exist "cache" mkdir "cache"
@@ -185,16 +185,16 @@ echo ============================================================
 echo.
 echo IMPORTANT: You need to download the following models before using this app.
 echo.
-echo Models should be placed in the pretrained_models folder:
+echo Models should be placed in the model folder:
 echo.
 echo   1. VoxCPM2 (Main TTS model)
-echo      - Place in: pretrained_models\VoxCPM2\
+echo      - Place in: model\VoxCPM2\
 echo.
 echo   2. SenseVoiceSmall (ASR model)
-echo      - Place in: pretrained_models\SenseVoiceSmall\
+echo      - Place in: model\SenseVoiceSmall\
 echo.
 echo   3. speech_zipenhancer (Audio denoiser)
-echo      - Place in: pretrained_models\speech_zipenhancer\
+echo      - Place in: model\speech_zipenhancer\
 echo.
 echo Download links:
 echo   - HuggingFace: https://huggingface.co
@@ -217,21 +217,21 @@ echo.
 
 set "ALL_MODELS_OK=1"
 
-if exist "pretrained_models\VoxCPM2" (
+if exist "model\VoxCPM2" (
     echo [OK] VoxCPM2 model found
 ) else (
     echo [MISSING] VoxCPM2 model not found
     set "ALL_MODELS_OK=0"
 )
 
-if exist "pretrained_models\SenseVoiceSmall" (
+if exist "model\SenseVoiceSmall" (
     echo [OK] SenseVoiceSmall model found
 ) else (
     echo [MISSING] SenseVoiceSmall model not found
     set "ALL_MODELS_OK=0"
 )
 
-if exist "pretrained_models\speech_zipenhancer" (
+if exist "model\speech_zipenhancer" (
     echo [OK] speech_zipenhancer model found
 ) else (
     echo [MISSING] speech_zipenhancer model not found

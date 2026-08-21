@@ -86,9 +86,9 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 | Python | **两种方式均可**：<br>• **推荐**：系统 Python 3.10+（3.12 最佳），需勾选 "Add Python to PATH"<br>• **备选**：Windows 内置 WinPython（`WPy64-312101/`），完全隔离无需系统 Python |
 | GPU | NVIDIA (CUDA) / Apple Silicon (MPS)，推荐 6.5GB+ VRAM |
 | VC 运行库 | Windows 需安装 Visual C++ Redistributable（项目内含） |
-| SoX（音频效果处理） | Windows 需下载 SoX 14.4.2 并解压到 `bin/sox-14.4.2-win32/sox-14.4.2/`（见下方说明） |
+| SoX（音频效果处理） | Windows 需下载 SoX 14.4.2 并解压到 `app/sox-14.4.2-win32/sox-14.4.2/`（见下方说明） |
 
-> **SoX 下载（Windows）**：从 https://sourceforge.net/projects/sox/files/sox/14.4.2/ 下载 `sox-14.4.2-win32.zip`，解压后确保目录结构为 `bin/sox-14.4.2-win32/sox-14.4.2/sox.exe`（`clean_launch.py` 会自动将其加入 PATH）。Linux/macOS 可通过包管理器安装（`apt install sox` / `brew install sox`）。
+> **SoX 下载（Windows）**：从 https://sourceforge.net/projects/sox/files/sox/14.4.2/ 下载 `sox-14.4.2-win32.zip`，解压后确保目录结构为 `app/sox-14.4.2-win32/sox-14.4.2/sox.exe`（`clean_launch.py` 会自动将其加入 PATH）。Linux/macOS 可通过包管理器安装（`apt install sox` / `brew install sox`）。
 
 ## 快速开始
 
@@ -165,7 +165,7 @@ docker compose up -d
 # 或手动构建
 docker build -t tts-multimodel .
 docker run -d --gpus all -p 7869:7869 \
-  -v ./pretrained_models:/app/pretrained_models \
+  -v ./model:/app/model \
   -v ./outputs:/app/outputs \
   -v ./personas:/app/personas \
   tts-multimodel
@@ -175,7 +175,7 @@ docker run -d --gpus all -p 7869:7869 \
 
 ## 模型下载
 
-模型需单独下载并放入 `pretrained_models/` 目录：
+模型需单独下载并放入 `model/` 目录：
 
 ### VoxCPM2 引擎所需模型
 
@@ -219,7 +219,7 @@ python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.
 
 启动时自动计算核心模块（`app_server.py`、`config.py`、`config_models.py`、`engine_interface.py`、`model_manager.py`、`middleware/*.py`、`security/*.py` 等 16 个文件）的 SHA-256 哈希值并与清单比对，检测代码是否被篡改（CWE-912 防御）。自检失败只告警不阻塞启动。
 
-- 哈希清单：`bin/integrated_app/security/integrity_manifest.json`
+- 哈希清单：`app/integrated_app/security/integrity_manifest.json`
 - 重新生成清单：`python scripts/generate_integrity_manifest.py`
 
 ### 模型路径 shared / portable 双模式（来源：Image_MultiModel）
@@ -228,7 +228,7 @@ python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.
 
 | 模式 | 说明 | 适用场景 |
 |------|------|----------|
-| `portable`（默认） | 使用项目内 `pretrained_models/` 目录 | 单独部署、自包含 |
+| `portable`（默认） | 使用项目内 `model/` 目录 | 单独部署、自包含 |
 | `shared` | 使用 `shared_models_root` 指定的外部目录 | 多项目共享模型，节省磁盘 |
 
 shared 模式下，路径结构须与 portable 一致（`{shared_root}/VoxCPM2/`、`{shared_root}/SenseVoiceSmall/` 等）。
@@ -281,7 +281,7 @@ shared 模式下，路径结构须与 portable 一致（`{shared_root}/VoxCPM2/`
 
 ```
 TTS_MultiModel/
-├── bin/                          # 应用程序代码
+├── app/                          # 应用程序代码
 │   ├── integrated_app/          # 主应用模块
 │   │   ├── routes/             # API 路由处理
 │   │   │   └── system/         # 系统路由 (健康检查，GPU, 设置)
@@ -311,7 +311,7 @@ TTS_MultiModel/
 | 问题 | 解决方案 |
 |------|----------|
 | VC 运行库错误 (Windows) | 安装 `VC 运行库\VC_redist.x64.exe` |
-| 模型未找到 | 确保模型下载到 `pretrained_models/` 且目录结构正确 |
+| 模型未找到 | 确保模型下载到 `model/` 且目录结构正确 |
 | GPU 未检测到 | 安装对应 PyTorch 版本 (CUDA/MPS)，更新驱动 |
 | 端口被占用 | 应用会自动选择可用端口，查看控制台输出 |
 | Docker GPU 访问 | 确保安装 nvidia-docker runtime |

@@ -17,7 +17,7 @@ RUN git lfs install
 WORKDIR /build
 
 COPY pyproject.toml requirements.txt ./
-COPY bin ./bin
+COPY app ./app
 
 # Install build tooling and project dependencies, then build the wheel.
 RUN pip3 install --no-cache-dir --user -r requirements.txt \

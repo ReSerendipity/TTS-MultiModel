@@ -6,7 +6,7 @@ services:
     ports:
       - "7869:7869"
     volumes:
-      - ./pretrained_models:/app/pretrained_models
+      - ./model:/app/model
       - ./outputs:/app/outputs
       - ./personas:/app/personas
       - ./cache:/app/cache

@@ -105,7 +105,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["bin"]
+where = ["app"]
 # vendor/ 包含 tn stub 等本地 fallback 实现，需被 setuptools 发现
 include = ["integrated_app*", "integrated_app.vendor*"]
 
@@ -115,7 +115,7 @@ include = ["integrated_app*", "integrated_app.vendor*"]
 [tool.ruff]
 target-version = "py310"
 line-length = 120
-src = ["bin/integrated_app", "tests", "scripts"]
+src = ["app/integrated_app", "tests", "scripts"]
 exclude = [
     "**/node_modules",
     "**/__pycache__",
@@ -137,9 +137,9 @@ select = ["E", "W", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501", "B008", "B905"]
 
 [tool.ruff.lint.per-file-ignores]
-"bin/clean_launch.py" = ["E402", "I001"]
-"bin/integrated_app/training/config.py" = ["F821"]
-"bin/integrated_app/training/data.py" = ["F821"]
+"app/clean_launch.py" = ["E402", "I001"]
+"app/integrated_app/training/config.py" = ["F821"]
+"app/integrated_app/training/data.py" = ["F821"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["integrated_app"]
@@ -177,7 +177,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["bin/integrated_app"]
+source = ["app/integrated_app"]
 branch = true
 omit = ["*/tests/*", "*/templates/*", "*/static/*"]
 
