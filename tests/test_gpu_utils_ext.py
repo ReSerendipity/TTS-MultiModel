@@ -1,6 +1,6 @@
 """gpu_utils 模块单元测试 — OOM 检测与显存工具。
 
-覆盖目标模块: bin/integrated_app/gpu_utils.py
+覆盖目标模块: app/integrated_app/gpu_utils.py
 """
 
 import pytest

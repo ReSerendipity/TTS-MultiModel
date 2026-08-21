@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 TTS_MultiModel 性能监控脚本
 测量：SSE 连接稳定性、文本转语音响应时间
@@ -49,7 +49,7 @@ def benchmark():
             
     except requests.exceptions.ConnectionError:
         print("[TTS_MultiModel] ⚠️ 服务未运行")
-        print("请先启动：python -m uvicorn bin.integrated_app.app_server:app --host 127.0.0.1 --port 8000")
+        print("请先启动：python -m uvicorn app.integrated_app.app_server:app --host 127.0.0.1 --port 8000")
         return {"error": "Service not running"}
     except Exception as e:
         print(f"[TTS_MultiModel] ❌ 异常：{e}")

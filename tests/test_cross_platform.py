@@ -1,6 +1,6 @@
 """cross_platform 模块单元测试 — 跨平台工具函数。
 
-覆盖目标模块: bin/integrated_app/cross_platform.py
+覆盖目标模块: app/integrated_app/cross_platform.py
 """
 
 import os

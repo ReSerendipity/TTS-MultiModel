@@ -3,7 +3,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from bin.integrated_app.auth import APIAuthMiddleware
+from app.integrated_app.auth import APIAuthMiddleware
 
 
 @pytest.fixture

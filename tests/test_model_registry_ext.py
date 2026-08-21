@@ -1,6 +1,6 @@
 """model_registry 模块单元测试 — 引擎状态注册表。
 
-覆盖目标模块: bin/integrated_app/model_registry.py
+覆盖目标模块: app/integrated_app/model_registry.py
 """
 
 from integrated_app.model_registry import (

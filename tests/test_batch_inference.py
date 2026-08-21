@@ -1,6 +1,6 @@
 """batch_inference 模块单元测试 — 批量推理调度器。
 
-覆盖目标模块: bin/integrated_app/batch_inference.py
+覆盖目标模块: app/integrated_app/batch_inference.py
 """
 
 import pytest

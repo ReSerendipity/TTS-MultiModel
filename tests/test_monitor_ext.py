@@ -1,6 +1,6 @@
 """monitor 模块单元测试 — 健康监控与显存熔断。
 
-覆盖目标模块: bin/integrated_app/monitor.py
+覆盖目标模块: app/integrated_app/monitor.py
 """
 
 from integrated_app.monitor import HealthMonitor, get_health_monitor

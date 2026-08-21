@@ -1,6 +1,6 @@
 """generation.py 单元测试补充 — 文本分段、音频合并与工具函数。
 
-覆盖目标模块: bin/integrated_app/generation.py
+覆盖目标模块: app/integrated_app/generation.py
 """
 
 import os

@@ -1,6 +1,6 @@
 """emotion_tags 模块单元测试 — 情感标签解析与转换。
 
-覆盖目标模块: bin/integrated_app/emotion_tags.py
+覆盖目标模块: app/integrated_app/emotion_tags.py
 """
 
 import pytest

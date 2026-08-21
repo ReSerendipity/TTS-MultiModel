@@ -1,6 +1,6 @@
 """routes/system/settings.py 单元测试 — 设置合并、黑名单与范围校验。
 
-覆盖目标模块: bin/integrated_app/routes/system/settings.py
+覆盖目标模块: app/integrated_app/routes/system/settings.py
 """
 
 from integrated_app.routes.system.settings import (

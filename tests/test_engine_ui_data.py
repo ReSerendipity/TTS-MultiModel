@@ -1,6 +1,6 @@
 """engine_ui_data 模块单元测试 — 引擎 UI 元数据注册与查询。
 
-覆盖目标模块: bin/integrated_app/engine_ui_data.py
+覆盖目标模块: app/integrated_app/engine_ui_data.py
 """
 
 from integrated_app.engine_ui_data import (

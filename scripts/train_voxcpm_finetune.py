@@ -35,7 +35,7 @@ TTS MultiModel - VoxCPM LoRA 微调训练脚本
 
     方式 2: 命令行参数
         python scripts/train_voxcpm_finetune.py \
-            --pretrained_path=pretrained_models/VoxCPM2 \
+            --pretrained_path=model/VoxCPM2 \
             --train_manifest=data/train_manifest.json \
             --val_manifest=data/val_manifest.json \
             --lora.rank=8 \

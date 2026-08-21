@@ -1,6 +1,6 @@
 """轻量路由冒烟测试 — 页面、标签页与音色路由。
 
-覆盖目标模块: bin/integrated_app/routes/pages.py / tabs.py / persona.py
+覆盖目标模块: app/integrated_app/routes/pages.py / tabs.py / persona.py
 """
 
 

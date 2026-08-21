@@ -1,6 +1,6 @@
 """resampling 模块单元测试 — 音频重采样。
 
-覆盖目标模块: bin/integrated_app/resampling.py
+覆盖目标模块: app/integrated_app/resampling.py
 """
 
 import numpy as np

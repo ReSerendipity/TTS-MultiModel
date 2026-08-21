@@ -1,6 +1,6 @@
 """tracker 模块单元测试 — 生成任务队列追踪。
 
-覆盖目标模块: bin/integrated_app/tracker.py
+覆盖目标模块: app/integrated_app/tracker.py
 """
 
 import pytest

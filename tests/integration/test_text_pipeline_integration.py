@@ -16,11 +16,11 @@ import sys
 import numpy as np
 import pytest
 
-_BIN_DIR = os.path.join(
+_APP_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "bin"
 )
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 from integrated_app.g2p_manager import G2PManager
 from integrated_app.prompt_expander import PromptExpander, TemplateCategory

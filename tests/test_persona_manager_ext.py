@@ -1,6 +1,6 @@
 """persona_manager 模块单元测试 — 音色管理。
 
-覆盖目标模块: bin/integrated_app/persona_manager.py
+覆盖目标模块: app/integrated_app/persona_manager.py
 """
 
 from integrated_app.persona_manager import (

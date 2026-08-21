@@ -1,6 +1,6 @@
 """voice_clone_utils 模块单元测试 — 参考音频验证与预处理工具。
 
-覆盖目标模块: bin/integrated_app/voice_clone_utils.py
+覆盖目标模块: app/integrated_app/voice_clone_utils.py
 """
 
 import numpy as np

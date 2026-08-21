@@ -1,6 +1,6 @@
 """提示词扩展模块单元测试。
 
-覆盖目标模块: bin/integrated_app/prompt_expander.py
+覆盖目标模块: app/integrated_app/prompt_expander.py
 测试内容:
     1. 模板加载与检索
     2. 模板渲染（变量替换）
@@ -16,11 +16,11 @@ import sys
 
 import pytest
 
-_BIN_DIR = os.path.join(
+_APP_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin"
 )
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 from integrated_app.prompt_expander import (
     PromptExpander,

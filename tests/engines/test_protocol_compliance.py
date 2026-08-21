@@ -15,9 +15,9 @@ from typing import Any
 
 import pytest
 
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 os.environ.setdefault("TTS_SKIP_MODEL_LOAD", "1")
 
@@ -150,7 +150,7 @@ class TestRealEngineDetection:
 
     def test_engines_directory_structure(self):
         """engines/ directory should contain engine implementations."""
-        engines_dir = os.path.join(_BIN_DIR, "integrated_app", "engines")
+        engines_dir = os.path.join(_APP_DIR, "integrated_app", "engines")
         
         if os.path.exists(engines_dir):
             files = os.listdir(engines_dir)

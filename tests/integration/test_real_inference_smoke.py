@@ -7,7 +7,7 @@ CI 离线环境自动跳过。
     pytest tests/integration/test_real_inference_smoke.py -v -m integration
 
 环境要求:
-    - 模型已下载到 pretrained_models/
+    - 模型已下载到 model/
     - GPU 可用（CUDA 或 MPS）
     - TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 MODELSCOPE_OFFLINE=1
 """

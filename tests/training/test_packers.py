@@ -1,6 +1,6 @@
 """training/packers.py 模块单元测试 — 覆盖数据打包逻辑。
 
-覆盖目标模块: bin/integrated_app/training/packers.py
+覆盖目标模块: app/integrated_app/training/packers.py
 覆盖率目标: >=60%
 
 覆盖范围:

@@ -1,6 +1,6 @@
 """routes/audio.py 单元测试 — 音频服务路由辅助函数。
 
-覆盖目标模块: bin/integrated_app/routes/audio.py
+覆盖目标模块: app/integrated_app/routes/audio.py
 """
 
 import pytest

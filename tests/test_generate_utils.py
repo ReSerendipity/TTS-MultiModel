@@ -1,6 +1,6 @@
 """routes/generate/utils.py 单元测试 — 生成辅助工具。
 
-覆盖目标模块: bin/integrated_app/routes/generate/utils.py
+覆盖目标模块: app/integrated_app/routes/generate/utils.py
 """
 
 from integrated_app.routes.generate.utils import (

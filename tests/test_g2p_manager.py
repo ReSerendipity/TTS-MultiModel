@@ -1,6 +1,6 @@
 """G2P 管理器单元测试。
 
-覆盖目标模块: bin/integrated_app/g2p_manager.py
+覆盖目标模块: app/integrated_app/g2p_manager.py
 测试内容:
     1. G2PManager 基本转换功能（多语言）
     2. LRU 缓存命中与淘汰
@@ -15,11 +15,11 @@ import sys
 
 import pytest
 
-_BIN_DIR = os.path.join(
+_APP_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin"
 )
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 from integrated_app.g2p_manager import (
     DEFAULT_CACHE_SIZE,

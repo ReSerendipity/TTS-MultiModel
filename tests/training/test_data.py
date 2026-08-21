@@ -1,6 +1,6 @@
 """training/data.py 模块单元测试 — 覆盖 HFVoxCPMDataset 边界。
 
-覆盖目标模块: bin/integrated_app/training/data.py
+覆盖目标模块: app/integrated_app/training/data.py
 覆盖率目标: >=60%
 
 覆盖范围:

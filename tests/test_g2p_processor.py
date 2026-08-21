@@ -1,6 +1,6 @@
 """text_frontend G2P 处理器单元测试。
 
-覆盖目标模块: bin/integrated_app/text_frontend.py (G2PProcessor / TextFrontend)
+覆盖目标模块: app/integrated_app/text_frontend.py (G2PProcessor / TextFrontend)
 """
 
 from integrated_app.text_frontend import G2PProcessor, TextFrontend

@@ -1,6 +1,6 @@
 """middleware/error_handler 单元测试 — 统一异常响应。
 
-覆盖目标模块: bin/integrated_app/middleware/error_handler.py
+覆盖目标模块: app/integrated_app/middleware/error_handler.py
 """
 
 from fastapi import FastAPI

@@ -1,6 +1,6 @@
 """TaskCheckpoint 断点续跑单元测试（P1-2）。
 
-覆盖目标模块: bin/integrated_app/checkpoint.py
+覆盖目标模块: app/integrated_app/checkpoint.py
 """
 
 import json
@@ -10,9 +10,9 @@ import tempfile
 
 import pytest
 
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")

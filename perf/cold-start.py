@@ -38,7 +38,7 @@ import httpx
 _PERF_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _PERF_DIR.parent
 _RESULTS_DIR = _PERF_DIR / "results"
-_LAUNCH_SCRIPT = _PROJECT_ROOT / "bin" / "clean_launch.py"
+_LAUNCH_SCRIPT = _PROJECT_ROOT / "app" / "clean_launch.py"
 
 # ── 默认参数 ──────────────────────────────────────────────────
 _DEFAULT_HOST = "127.0.0.1"

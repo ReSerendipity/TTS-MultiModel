@@ -1,6 +1,6 @@
 """generation_versioning 模块单元测试 — 生成版本管理。
 
-覆盖目标模块: bin/integrated_app/generation_versioning.py
+覆盖目标模块: app/integrated_app/generation_versioning.py
 """
 
 from integrated_app.generation_versioning import (

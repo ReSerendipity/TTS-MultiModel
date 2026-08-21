@@ -1,6 +1,6 @@
 """integrated_app/utils.py 单元测试 — 通用工具函数。
 
-覆盖目标模块: bin/integrated_app/utils.py
+覆盖目标模块: app/integrated_app/utils.py
 """
 
 import os

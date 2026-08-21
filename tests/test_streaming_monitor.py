@@ -1,6 +1,6 @@
 """streaming_monitor 模块单元测试 — 流式音频质量监测。
 
-覆盖目标模块: bin/integrated_app/streaming_monitor.py
+覆盖目标模块: app/integrated_app/streaming_monitor.py
 """
 
 import numpy as np

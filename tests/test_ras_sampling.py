@@ -1,6 +1,6 @@
 """ras_sampling 模块单元测试 — RAS 重复感知采样。
 
-覆盖目标模块: bin/integrated_app/ras_sampling.py
+覆盖目标模块: app/integrated_app/ras_sampling.py
 """
 
 import pytest

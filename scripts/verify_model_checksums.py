@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).parent.parent
 _CHECKSUM_FILE = _PROJECT_ROOT / "docs" / "SHA256SUMS.models"
-_MODELS_DIR = _PROJECT_ROOT / "pretrained_models"
+_MODELS_DIR = _PROJECT_ROOT / "model"
 
 
 def compute_sha256(file_path: Path, chunk_size: int = 8192) -> str:
@@ -47,7 +47,7 @@ def compute_sha256(file_path: Path, chunk_size: int = 8192) -> str:
 
 
 def verify_checksums() -> bool:
-    """校验 pretrained_models 目录下所有模型的 SHA256 哈希值。
+    """校验 model 目录下所有模型的 SHA256 哈希值。
 
     Returns:
         True 表示所有校验通过，False 表示有校验失败。

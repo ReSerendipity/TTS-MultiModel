@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -68,11 +68,11 @@ class TestModelChecksums:
         assert isinstance(VOXCPM2_MODEL_PATH, str)
         assert isinstance(INDEXTTS2_MODEL_PATH, str)
 
-    def test_pretrained_models_dir_exists(self):
-        """pretrained_models 目录可访问（运行时自动创建，CI checkout 不含模型目录）。"""
-        pretrained_dir = _REPO_ROOT / "pretrained_models"
+    def test_model_dir_exists(self):
+        """model 目录可访问（运行时自动创建，CI checkout 不含模型目录）。"""
+        pretrained_dir = _REPO_ROOT / "model"
         pretrained_dir.mkdir(parents=True, exist_ok=True)
-        assert pretrained_dir.is_dir(), f"pretrained_models dir not usable at {pretrained_dir}"
+        assert pretrained_dir.is_dir(), f"model dir not usable at {pretrained_dir}"
 
     def test_config_has_model_paths(self):
         """配置包含所有必要的模型路径。"""
@@ -119,29 +119,29 @@ class TestUIOptimizations:
 
     def test_templates_dir_exists(self):
         """模板目录存在。"""
-        templates_dir = _REPO_ROOT / "bin" / "integrated_app" / "templates"
+        templates_dir = _REPO_ROOT / "app" / "integrated_app" / "templates"
         assert templates_dir.exists()
 
     def test_base_html_exists(self):
         """base.html 模板存在。"""
-        base_html = _REPO_ROOT / "bin" / "integrated_app" / "templates" / "base.html"
+        base_html = _REPO_ROOT / "app" / "integrated_app" / "templates" / "base.html"
         assert base_html.exists()
 
     def test_static_dir_exists(self):
         """静态资源目录存在。"""
-        static_dir = _REPO_ROOT / "bin" / "integrated_app" / "static"
+        static_dir = _REPO_ROOT / "app" / "integrated_app" / "static"
         assert static_dir.exists()
 
     def test_locales_exist(self):
         """国际化文件存在。"""
-        locales_dir = _REPO_ROOT / "bin" / "integrated_app" / "locales"
+        locales_dir = _REPO_ROOT / "app" / "integrated_app" / "locales"
         assert locales_dir.exists()
         zh_json = locales_dir / "zh.json"
         assert zh_json.exists()
 
     def test_tab_templates_exist(self):
         """核心 tab 模板文件存在。"""
-        tabs_dir = _REPO_ROOT / "bin" / "integrated_app" / "templates" / "tabs"
+        tabs_dir = _REPO_ROOT / "app" / "integrated_app" / "templates" / "tabs"
         assert tabs_dir.exists()
         # Check for core tabs
         core_tabs = ["voice_design.html", "voice_clone.html", "settings.html"]

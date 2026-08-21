@@ -1,6 +1,6 @@
 """长文本智能分块与音频交叉淡入淡出单元测试。
 
-覆盖目标模块: bin/integrated_app/text_segmenter.py
+覆盖目标模块: app/integrated_app/text_segmenter.py
 测试内容:
     1. TextSegmenter 基本分块功能（多语言）
     2. 分块边界在标点处准确率
@@ -17,11 +17,11 @@ import sys
 import numpy as np
 import pytest
 
-_BIN_DIR = os.path.join(
+_APP_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin"
 )
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 from integrated_app.text_segmenter import (
     DEFAULT_FADE_DURATION_MS,

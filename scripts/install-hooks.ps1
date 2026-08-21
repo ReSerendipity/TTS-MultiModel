@@ -13,7 +13,7 @@ if (-not (Test-Path $hooksDir)) {
 # pre-push: sh wrapper（git 用 sh 执行 hook）→ 调 python check_local.py
 $prePush = Join-Path $hooksDir "pre-push"
 $wrapper = @'
-#!/bin/sh
+#!/app/sh
 # 本地提交前检查（快检）：ruff / format / compileall / UTF-8 扫描
 # 完整检查请手动运行: python scripts/check_local.py --full
 # CI 是唯一权威门禁；此 hook 为辅助提醒，可 git push --no-verify 绕过（不推荐）。

@@ -1,6 +1,6 @@
 """audio_processing 模块单元测试 — 响度归一化、变速、增强与 VAD 裁切。
 
-覆盖目标模块: bin/integrated_app/audio_processing.py
+覆盖目标模块: app/integrated_app/audio_processing.py
 """
 
 import numpy as np

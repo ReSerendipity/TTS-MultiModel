@@ -1,6 +1,6 @@
 """text_frontend 模块单元测试 — 语言检测与文本规范化。
 
-覆盖目标模块: bin/integrated_app/text_frontend.py
+覆盖目标模块: app/integrated_app/text_frontend.py
 """
 
 from integrated_app.text_frontend import (

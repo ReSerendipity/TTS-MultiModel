@@ -1,6 +1,6 @@
 """routes/sse.py SSEEventBus 单元测试 — 订阅/发布机制。
 
-覆盖目标模块: bin/integrated_app/routes/sse.py
+覆盖目标模块: app/integrated_app/routes/sse.py
 """
 
 import asyncio

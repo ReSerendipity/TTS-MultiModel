@@ -1,6 +1,6 @@
 """engine_interface 注册表扩展测试 — 自定义引擎注册。
 
-覆盖目标模块: bin/integrated_app/engine_interface.py
+覆盖目标模块: app/integrated_app/engine_interface.py
 """
 
 import pytest

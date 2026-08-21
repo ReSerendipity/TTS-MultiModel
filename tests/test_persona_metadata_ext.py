@@ -1,6 +1,6 @@
 """persona_metadata 模块单元测试 — 音色元数据与导入导出。
 
-覆盖目标模块: bin/integrated_app/persona_metadata.py
+覆盖目标模块: app/integrated_app/persona_metadata.py
 """
 
 from integrated_app.persona_metadata import (

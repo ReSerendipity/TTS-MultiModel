@@ -1,6 +1,6 @@
 """fts_tokenizer 模块单元测试 — FTS5 中文分词预处理。
 
-覆盖目标模块: bin/integrated_app/fts_tokenizer.py
+覆盖目标模块: app/integrated_app/fts_tokenizer.py
 """
 
 import pytest

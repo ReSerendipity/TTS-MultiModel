@@ -1,9 +1,9 @@
 """rate_limit / error_handler / request_id 中间件单元测试。
 
 覆盖目标模块:
-  - bin/integrated_app/middleware/rate_limit.py
-  - bin/integrated_app/middleware/error_handler.py
-  - bin/integrated_app/middleware/request_id.py
+  - app/integrated_app/middleware/rate_limit.py
+  - app/integrated_app/middleware/error_handler.py
+  - app/integrated_app/middleware/request_id.py
 """
 
 import asyncio

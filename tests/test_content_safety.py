@@ -1,6 +1,6 @@
 """内容安全检测模块单元测试。
 
-覆盖目标模块: bin/integrated_app/security/content_safety.py
+覆盖目标模块: app/integrated_app/security/content_safety.py
 测试内容:
     1. 安全文本通过检测
     2. 各类别不安全文本被拦截（暴力/仇恨/自残/色情/违法/骚扰）
@@ -15,11 +15,11 @@ import sys
 
 import pytest
 
-_BIN_DIR = os.path.join(
+_APP_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin"
 )
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 from integrated_app.security.content_safety import (
     ContentSafetyDetector,

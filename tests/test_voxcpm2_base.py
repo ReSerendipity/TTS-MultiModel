@@ -1,6 +1,6 @@
 """engines/voxcpm2/_base.py 单元测试 — 高级参数构建与模板生成。
 
-覆盖目标模块: bin/integrated_app/engines/voxcpm2/_base.py
+覆盖目标模块: app/integrated_app/engines/voxcpm2/_base.py
 """
 
 import numpy as np

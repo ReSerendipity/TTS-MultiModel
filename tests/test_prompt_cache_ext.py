@@ -1,6 +1,6 @@
 """prompt_cache 模块单元测试补充 — prompt 缓存序列化与存取。
 
-覆盖目标模块: bin/integrated_app/prompt_cache.py
+覆盖目标模块: app/integrated_app/prompt_cache.py
 """
 
 import numpy as np

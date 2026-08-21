@@ -1,6 +1,6 @@
 """emotion_control 模块单元测试 — 情感向量、韵律标签、CFG 控制与指令解析。
 
-覆盖目标模块: bin/integrated_app/emotion_control.py
+覆盖目标模块: app/integrated_app/emotion_control.py
 """
 
 import pytest

@@ -1,6 +1,6 @@
 """bad_case_retry 模块单元测试 — 坏案例检测与参数重试。
 
-覆盖目标模块: bin/integrated_app/bad_case_retry.py
+覆盖目标模块: app/integrated_app/bad_case_retry.py
 """
 
 import numpy as np

@@ -1,6 +1,6 @@
 """routes/audio 与 routes/training 路由补充测试 — 精确状态码断言。
 
-覆盖目标模块: bin/integrated_app/routes/audio.py / training.py
+覆盖目标模块: app/integrated_app/routes/audio.py / training.py
 """
 
 

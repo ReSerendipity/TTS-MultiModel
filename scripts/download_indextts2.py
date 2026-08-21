@@ -36,7 +36,7 @@ CAMPPlus 说话人模型、w2v-bert-2.0 特征提取器）。这些辅助模型*
     python scripts/download_indextts2.py
 
 下载目标目录:
-    pretrained_models/IndexTTS2/
+    model/IndexTTS2/
 
 下载完成后:
     1. 安装 IndexTTS 2.5 依赖: pip install indextts
@@ -64,7 +64,7 @@ def download_indextts2_model():
 
     功能说明:
         使用 modelscope 的 snapshot_download 函数下载 IndexTeam/IndexTTS-2.5 仓库
-        到本地 pretrained_models/IndexTTS2 目录。下载完成后验证所有必需文件是否存在，
+        到本地 model/IndexTTS2 目录。下载完成后验证所有必需文件是否存在，
         并打印每个文件的大小信息。
 
     Returns:
@@ -83,7 +83,7 @@ def download_indextts2_model():
         - modelscope 未安装时直接退出，返回码 1
 
     注意事项:
-        - 缓存目录位于 pretrained_models/.cache/indextts2
+        - 缓存目录位于 model/.cache/indextts2
         - 支持断点续传，重复运行不会重复下载已有文件
         - 下载完成后检查的必需文件共 8 个
     """
@@ -94,7 +94,7 @@ def download_indextts2_model():
         sys.exit(1)
 
     project_root = Path(__file__).parent.parent
-    model_dir = project_root / "pretrained_models" / "IndexTTS2"
+    model_dir = project_root / "model" / "IndexTTS2"
 
     logger.info(f"目标目录: {model_dir}")
     logger.info("开始下载 IndexTTS 2.5 模型...")

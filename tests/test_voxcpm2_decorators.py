@@ -1,6 +1,6 @@
 """engines/voxcpm2/decorators.py 单元测试 — 生成上下文装饰器。
 
-覆盖目标模块: bin/integrated_app/engines/voxcpm2/decorators.py
+覆盖目标模块: app/integrated_app/engines/voxcpm2/decorators.py
 """
 
 import pytest

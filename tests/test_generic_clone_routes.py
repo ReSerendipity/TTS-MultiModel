@@ -1,6 +1,6 @@
 """routes/generate/generic 路由冒烟测试。
 
-覆盖目标模块: bin/integrated_app/routes/generate/generic/clone.py
+覆盖目标模块: app/integrated_app/routes/generate/generic/clone.py
 """
 
 

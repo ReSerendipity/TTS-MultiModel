@@ -1,6 +1,6 @@
 """system/model/sse 路由冒烟测试 — 精确状态码断言。
 
-覆盖目标模块: bin/integrated_app/routes/system/health.py / gpu.py / model.py
+覆盖目标模块: app/integrated_app/routes/system/health.py / gpu.py / model.py
 """
 
 

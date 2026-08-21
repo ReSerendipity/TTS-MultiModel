@@ -1,6 +1,6 @@
 """service_layer 模块单元测试 — 覆盖请求生命周期编排。
 
-覆盖目标模块: bin/integrated_app/service_layer.py
+覆盖目标模块: app/integrated_app/service_layer.py
 覆盖率目标: >=70%
 
 覆盖范围:

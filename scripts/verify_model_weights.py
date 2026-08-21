@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """模型权重下载完整性校验脚本。
 
-检查 pretrained_models/ 下所有引擎的权重文件是否完整。
+检查 model/ 下所有引擎的权重文件是否完整。
 
 用法：
     python scripts/verify_model_weights.py [--model generic_tts_engine|all]
@@ -15,15 +15,15 @@ import sys
 # 各引擎权重文件清单（文件名 → 预期大小（字节），0 表示不校验大小）
 WEIGHT_MANIFESTS = {
     "generic_tts_engine": {
-        "dir": "pretrained_models/通用 TTS 引擎",
+        "dir": "model/通用 TTS 引擎",
         "files": {},
     },
     "voxcpm2": {
-        "dir": "pretrained_models/VoxCPM2",
+        "dir": "model/VoxCPM2",
         "files": {},
     },
     "indextts2": {
-        "dir": "pretrained_models/IndexTTS2",
+        "dir": "model/IndexTTS2",
         "files": {},
     },
 }

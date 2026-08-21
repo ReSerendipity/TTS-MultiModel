@@ -1,4 +1,4 @@
-"""Tests for the CLI module (bin/integrated_app/cli.py).
+"""Tests for the CLI module (app/integrated_app/cli.py).
 
 Covers:
 - File validators (validate_file_exists, require_file_exists, validate_output_path)
@@ -23,10 +23,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Ensure bin/ is on sys.path so we can import integrated_app.cli
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+# Ensure app/ is on sys.path so we can import integrated_app.cli
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 
 # ---------------------------------------------------------------------------

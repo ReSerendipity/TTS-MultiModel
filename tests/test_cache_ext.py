@@ -1,6 +1,6 @@
 """cache 模块单元测试补充 — 自适应 LRU 缓存容量调整。
 
-覆盖目标模块: bin/integrated_app/cache.py
+覆盖目标模块: app/integrated_app/cache.py
 """
 
 from integrated_app.cache import AdaptiveLRUCache, LRUCache

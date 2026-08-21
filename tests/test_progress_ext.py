@@ -1,6 +1,6 @@
 """progress 模块单元测试 — 生成进度管理。
 
-覆盖目标模块: bin/integrated_app/progress.py
+覆盖目标模块: app/integrated_app/progress.py
 """
 
 from integrated_app.progress import ProgressManager

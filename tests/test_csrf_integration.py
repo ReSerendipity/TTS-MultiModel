@@ -3,7 +3,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from bin.integrated_app.middleware.csrf import CSRFMiddleware
+from app.integrated_app.middleware.csrf import CSRFMiddleware
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 """estimator 模块单元测试 — 生成时间估算器（线性回归）。
 
-覆盖目标模块: bin/integrated_app/estimator.py
+覆盖目标模块: app/integrated_app/estimator.py
 """
 
 import json

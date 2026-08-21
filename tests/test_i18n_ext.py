@@ -1,6 +1,6 @@
 """i18n 模块单元测试 — 翻译加载、键解析与语言检测。
 
-覆盖目标模块: bin/integrated_app/i18n.py
+覆盖目标模块: app/integrated_app/i18n.py
 """
 
 from integrated_app.i18n import (

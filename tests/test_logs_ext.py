@@ -1,6 +1,6 @@
 """routes/system/logs.py 单元测试 — 操作日志查询与清理。
 
-覆盖目标模块: bin/integrated_app/routes/system/logs.py
+覆盖目标模块: app/integrated_app/routes/system/logs.py
 """
 
 

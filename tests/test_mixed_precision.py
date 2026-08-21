@@ -1,6 +1,6 @@
 """mixed_precision 模块单元测试 — 混合精度配置与推理上下文。
 
-覆盖目标模块: bin/integrated_app/mixed_precision.py
+覆盖目标模块: app/integrated_app/mixed_precision.py
 """
 
 import pytest

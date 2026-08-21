@@ -12,7 +12,7 @@ file can be removed without side effects.
 Run like::
 
     # Start UI-only test server first (no real model required)
-    .\\WPy64-312101\\python\\python.exe bin\\start_ui_test.py
+    .\\WPy64-312101\\python\\python.exe app\\start_ui_test.py
 
     # Then in another terminal
     .\\WPy64-312101\\python\\python.exe -m pytest tests/e2e/test_screenshot_capture_extended.py -v

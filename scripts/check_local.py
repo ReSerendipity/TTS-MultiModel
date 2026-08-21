@@ -78,7 +78,7 @@ def utf8_scan() -> None:
 
 def compile_all() -> None:
     """compileall 抓语法错误（乱码导致 SyntaxError 的最直接检测）。"""
-    dirs = [d for d in ("bin", "tests", "examples", "scripts") if check_dir(d)]
+    dirs = [d for d in ("app", "tests", "examples", "scripts") if check_dir(d)]
     if not dirs:
         print("== compileall：无可检查目录 ==", flush=True)
         return
@@ -106,7 +106,7 @@ def e2e_preflight() -> None:
             print(
                 f"FAIL: {mod} ({desc}) 不可导入: {e}\n"
                 f"  提示：若 PATH 里的 python 缺 fastapi，用装了依赖的解释器"
-                f"  （如 C:\\Python312\\python.exe）手动启动 bin/integrated_app/app_server.py，"
+                f"  （如 C:\\Python312\\python.exe）手动启动 app/integrated_app/app_server.py，"
                 f"  测试会复用已启动的服务器（playwright.config.ts 的 reuseExistingServer）。",
                 flush=True,
             )
@@ -153,7 +153,7 @@ def main() -> None:
     utf8_scan()
 
     if args.mypy:
-        mypy_dirs = [d for d in ("bin/integrated_app",) if check_dir(d)]
+        mypy_dirs = [d for d in ("app/integrated_app",) if check_dir(d)]
         if mypy_dirs:
             run([sys.executable, "-m", "mypy", *mypy_dirs], "mypy 类型检查")
 

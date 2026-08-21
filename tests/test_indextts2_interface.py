@@ -1,6 +1,6 @@
 """IndexTTS2 引擎接口级单元测试（不加载模型）。
 
-覆盖目标模块: bin/integrated_app/engines/indextts2_engine.py
+覆盖目标模块: app/integrated_app/engines/indextts2_engine.py
 """
 
 import inspect

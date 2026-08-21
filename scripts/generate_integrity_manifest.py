@@ -3,7 +3,7 @@
 
 遍历 ``integrity_selfcheck.py`` 中定义的核心模块列表，
 计算每个文件的 SHA-256 哈希值，输出为 JSON 格式保存到
-``bin/integrated_app/security/integrity_manifest.json``。
+``app/integrated_app/security/integrity_manifest.json``。
 
 每次修改核心模块代码后，重新运行此脚本更新清单：
     python scripts/generate_integrity_manifest.py
@@ -15,14 +15,14 @@ import os
 import sys
 
 # 确保可以导入 integrated_app 包
-_BIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
-if _BIN_DIR not in sys.path:
-    sys.path.insert(0, _BIN_DIR)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 from integrated_app.security.integrity_selfcheck import _CORE_MODULES  # noqa: E402
 
-# bin/integrated_app/ 目录
-_APP_DIR = os.path.join(_BIN_DIR, "integrated_app")
+# app/integrated_app/ 目录
+_APP_DIR = os.path.join(_APP_DIR, "integrated_app")
 # 清单输出路径
 _MANIFEST_PATH = os.path.join(_APP_DIR, "security", "integrity_manifest.json")
 
