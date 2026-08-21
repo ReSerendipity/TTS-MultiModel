@@ -1,0 +1,300 @@
+{# LoRA Training tab - rewritten with prototype_v4 visual design
+   Full-width layout with 1.2fr/0.8fr grid: training config form + training log/status panel.
+   All element IDs, JS function names preserved. #}
+<div class="pv-theme">
+    <div class="full-width">
+        <div class="card">
+            <div class="card-hdr">
+                <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+                {{ "lora_fine_tuning"|t(lang) }}
+            </div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:24px" id="ft-layout">
+                    <!-- ============ Training Config Column (1.2fr) ============ -->
+                    <div>
+                        <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t1)">{{ "training_config"|t(lang) }}</div>
+
+                        <div class="fg">
+                            <label class="fl" for="ft-pretrained-model">{{ "pretrained_model_path"|t(lang) }}</label>
+                            <input type="text" id="ft-pretrained-model" class="fi" value="model/VoxCPM2" placeholder="{{ 'pretrained_model_path'|t(lang) }}">
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="ft-train-manifest">{{ "train_manifest"|t(lang) }} (JSONL)</label>
+                            <input type="text" id="ft-train-manifest" class="fi" placeholder="{{ 'train_manifest_placeholder'|t(lang) }}">
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="ft-val-manifest">{{ "val_manifest"|t(lang) }} <span style="font-size:10px;color:var(--t3);font-weight:400">({{ 'optional'|t(lang) }})</span></label>
+                            <input type="text" id="ft-val-manifest" class="fi" placeholder="{{ 'val_manifest_placeholder'|t(lang) }}">
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="ft-save-path">{{ "output_dir"|t(lang) }}</label>
+                            <input type="text" id="ft-save-path" class="fi" value="lora/my_lora" placeholder="{{ 'output_dir_placeholder'|t(lang) }}">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label class="fl" for="ft-learning-rate">{{ "learning_rate"|t(lang) }}</label>
+                                <input type="number" id="ft-learning-rate" class="fi" value="0.0001" step="0.00001">
+                            </div>
+                            <div class="form-col">
+                                <label class="fl" for="ft-num-iters">{{ "max_iters"|t(lang) }}</label>
+                                <input type="number" id="ft-num-iters" class="fi" value="10000" step="1000">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label class="fl" for="ft-batch-size">{{ "batch_size"|t(lang) }}</label>
+                                <input type="number" id="ft-batch-size" class="fi" value="1" min="1">
+                            </div>
+                            <div class="form-col">
+                                <label class="fl" for="ft-grad-accum">{{ "grad_accum"|t(lang) }}</label>
+                                <input type="number" id="ft-grad-accum" class="fi" value="1" min="1">
+                            </div>
+                        </div>
+
+                        <div style="font-size:13px;font-weight:600;margin:12px 0;color:var(--t1)">{{ "lora_params"|t(lang) }}</div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label class="fl" for="ft-lora-r">{{ "lora_rank"|t(lang) }} (R)</label>
+                                <input type="number" id="ft-lora-r" class="fi" value="8" min="1">
+                            </div>
+                            <div class="form-col">
+                                <label class="fl" for="ft-lora-alpha">{{ "lora_alpha"|t(lang) }}</label>
+                                <input type="number" id="ft-lora-alpha" class="fi" value="16" min="1">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label class="fl" for="ft-save-interval">{{ "save_interval"|t(lang) }}</label>
+                                <input type="number" id="ft-save-interval" class="fi" value="1000" step="500">
+                            </div>
+                            <div class="form-col">
+                                <label class="fl" for="ft-log-interval">{{ "log_interval"|t(lang) }}</label>
+                                <input type="number" id="ft-log-interval" class="fi" value="100" step="50">
+                            </div>
+                        </div>
+
+                        <div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--t2);flex-wrap:wrap">
+                            <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="{{ 'lora_module_hint'|t(lang, default='选择要微调的模型模块') }}">
+                                <input type="checkbox" id="ft-lora-enable-lm" checked style="accent-color:var(--p500)"> {{ "enable_lm"|t(lang) }}
+                            </label>
+                            <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="{{ 'lora_module_hint'|t(lang, default='选择要微调的模型模块') }}">
+                                <input type="checkbox" id="ft-lora-enable-dit" checked style="accent-color:var(--p500)"> {{ "enable_dit"|t(lang) }}
+                            </label>
+                            <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="{{ 'lora_module_hint'|t(lang, default='选择要微调的模型模块') }}">
+                                <input type="checkbox" id="ft-lora-enable-proj" style="accent-color:var(--p500)"> {{ "enable_proj"|t(lang) }}
+                            </label>
+                        </div>
+
+                        <div style="display:flex;gap:8px;margin-top:16px">
+                            <button type="button" class="btn btn-p" onclick="startTraining()" style="flex:1;padding:10px;font-size:14px;font-weight:600">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                {{ "start_training"|t(lang) }}
+                            </button>
+                            <button type="button" class="btn btn-o" onclick="stopTraining()" style="flex:1;padding:10px;font-size:14px;font-weight:600">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+                                {{ "stop_training"|t(lang) }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ============ Training Log/Status Column (0.8fr) ============ -->
+                    <div style="display:flex;flex-direction:column;gap:12px">
+                        <div>
+                            <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:8px">{{ "training_log"|t(lang) }}</div>
+                            <div id="ft-training-log" style="background:var(--bg3);border-radius:6px;height:240px;padding:12px;font-family:var(--mono,monospace);font-size:12px;color:var(--t2);overflow-y:auto;white-space:pre-wrap;line-height:1.6">{{ "waiting"|t(lang) }}</div>
+                        </div>
+
+                        <div>
+                            <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:8px">{{ "training_status"|t(lang) }}</div>
+                            <div id="ft-training-status" style="background:var(--bg3);border-radius:6px;padding:10px 14px" aria-live="polite">
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <span id="ft-status-dot" style="width:8px;height:8px;border-radius:50%;background:var(--t3);display:inline-block"></span>
+                                    <span id="ft-status-text" style="font-size:12px;color:var(--t2)">{{ "idle"|t(lang) }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:8px">{{ "training_metrics"|t(lang) }}</div>
+                            <div style="background:var(--bg3);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--t2);line-height:1.8">
+                                <div>{{ "current_iter"|t(lang) }}: <span id="ft-metric-iter">0</span> / <span id="ft-metric-total">0</span></div>
+                                <div>{{ "loss"|t(lang) }}: <span id="ft-metric-loss">-</span></div>
+                                <div>{{ "lr"|t(lang) }}: <span id="ft-metric-lr">-</span></div>
+                                <div>{{ "progress"|t(lang) }}: <span id="ft-metric-progress">0%</span></div>
+                                <div style="margin-top:6px">
+                                    <div style="background:var(--bg);border-radius:4px;height:6px;overflow:hidden">
+                                        <div id="ft-progress-bar" style="background:var(--p500);height:100%;width:0%;transition:width 0.3s"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Training Guide -->
+        <div class="card" style="margin-top:12px">
+            <div class="card-hdr">
+                <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+                {{ "training_guide"|t(lang) }}
+            </div>
+            <div class="card-body">
+                <div class="hint-text" style="line-height:1.7">
+                    <strong>{{ "data_preparation"|t(lang) }}</strong>{{ "data_prep_desc"|t(lang) }}<br>
+                    <strong>{{ "param_tuning"|t(lang) }}</strong>{{ "param_tuning_desc"|t(lang) }}<br>
+                    <strong>{{ "output_location"|t(lang) }}</strong>{{ "output_location_desc"|t(lang) }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media (max-width: 900px) {
+    .pv-theme #ft-layout {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
+
+<script>
+var _trainingProcessId = null;
+var _trainingTotalIters = 0;
+
+function startTraining() {
+    var logEl = document.getElementById('ft-training-log');
+    var statusDot = document.getElementById('ft-status-dot');
+    var statusText = document.getElementById('ft-status-text');
+
+    var pretrainedModel = document.getElementById('ft-pretrained-model').value;
+    var trainManifest = document.getElementById('ft-train-manifest').value;
+    var valManifest = document.getElementById('ft-val-manifest').value;
+    var savePath = document.getElementById('ft-save-path').value;
+
+    if (!trainManifest) {
+        alert('{{ "enter_train_manifest"|t(lang) }}');
+        return;
+    }
+
+    var loraConfig = {
+        r: parseInt(document.getElementById('ft-lora-r').value) || 8,
+        lora_alpha: parseInt(document.getElementById('ft-lora-alpha').value) || 16,
+        enable_lm: document.getElementById('ft-lora-enable-lm').checked,
+        enable_dit: document.getElementById('ft-lora-enable-dit').checked,
+        enable_proj: document.getElementById('ft-lora-enable-proj').checked,
+    };
+
+    var numIters = parseInt(document.getElementById('ft-num-iters').value) || 10000;
+    _trainingTotalIters = numIters;
+
+    var payload = {
+        pretrained_path: pretrainedModel,
+        train_manifest: trainManifest,
+        val_manifest: valManifest,
+        save_path: savePath,
+        learning_rate: parseFloat(document.getElementById('ft-learning-rate').value) || 0.0001,
+        num_iters: numIters,
+        batch_size: parseInt(document.getElementById('ft-batch-size').value) || 1,
+        grad_accum_steps: parseInt(document.getElementById('ft-grad-accum').value) || 1,
+        save_interval: parseInt(document.getElementById('ft-save-interval').value) || 1000,
+        log_interval: parseInt(document.getElementById('ft-log-interval').value) || 100,
+        lora: loraConfig,
+    };
+
+    statusDot.style.background = 'var(--orange)';
+    statusText.textContent = '{{ "starting_training"|t(lang) }}';
+    logEl.textContent = '{{ "starting_training"|t(lang) }}\n';
+    document.getElementById('ft-metric-total').textContent = numIters;
+
+    var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+    var startHeaders = {'Content-Type': 'application/json'};
+    if (csrfToken) startHeaders['X-CSRF-Token'] = csrfToken;
+    fetch('/api/training/start', {
+        method: 'POST',
+        headers: startHeaders,
+        body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.status === 'ok') {
+            _trainingProcessId = data.process_id;
+            statusDot.style.background = 'var(--green)';
+            statusText.textContent = '{{ "training"|t(lang) }} (PID: ' + data.process_id + ')';
+            pollTrainingLog();
+        } else {
+            statusDot.style.background = 'var(--red)';
+            statusText.textContent = '{{ "start_failed"|t(lang) }}: ' + (data.message || '{{ "unknown_error"|t(lang) }}');
+            logEl.textContent += '{{ "error"|t(lang) }}: ' + (data.message || '{{ "unknown_error"|t(lang) }}') + '\n';
+        }
+    })
+    .catch(function(e) {
+        statusDot.style.background = 'var(--red)';
+        statusText.textContent = '{{ "start_error"|t(lang) }}';
+        logEl.textContent += '{{ "exception"|t(lang) }}: ' + e.message + '\n';
+    });
+}
+
+function stopTraining() {
+    var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+    var stopHeaders = csrfToken ? {'X-CSRF-Token': csrfToken} : {};
+    fetch('/api/training/stop', {method: 'POST', headers: stopHeaders})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        document.getElementById('ft-status-dot').style.background = 'var(--t3)';
+        document.getElementById('ft-status-text').textContent = '{{ "stopped"|t(lang) }}';
+        document.getElementById('ft-training-log').textContent += '\n{{ "training_stopped"|t(lang) }}\n';
+    })
+    .catch(function(e) {
+        alert('{{ "stop_failed"|t(lang) }}: ' + e.message);
+    });
+}
+
+function pollTrainingLog() {
+    if (!_trainingProcessId) return;
+    fetch('/api/training/log')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var logEl = document.getElementById('ft-training-log');
+        if (data.log) {
+            logEl.textContent = data.log;
+            logEl.scrollTop = logEl.scrollHeight;
+            // Parse metrics from log (best-effort)
+            parseTrainingMetrics(data.log);
+        }
+        if (data.running) {
+            setTimeout(pollTrainingLog, 2000);
+        } else {
+            document.getElementById('ft-status-dot').style.background = 'var(--t3)';
+            document.getElementById('ft-status-text').textContent = '{{ "training_complete"|t(lang) }}';
+            _trainingProcessId = null;
+        }
+    })
+    .catch(function(e) {
+        setTimeout(pollTrainingLog, 5000);
+    });
+}
+
+function parseTrainingMetrics(log) {
+    // Best-effort parse: look for iter/loss/lr pattern in last few lines
+    var lines = log.split('\n').slice(-20);
+    var iter = 0, loss = '-', lr = '-';
+    for (var i = lines.length - 1; i >= 0; i--) {
+        var line = lines[i];
+        var iterMatch = line.match(/iter[=: ]+(\d+)/i);
+        var lossMatch = line.match(/loss[=: ]+([0-9.]+)/i);
+        var lrMatch = line.match(/lr[=: ]+([0-9.eE-]+)/i);
+        if (iterMatch) iter = parseInt(iterMatch[1]);
+        if (lossMatch) loss = lossMatch[1];
+        if (lrMatch) lr = lrMatch[1];
+        if (iterMatch && lossMatch) break;
+    }
+    document.getElementById('ft-metric-iter').textContent = iter;
+    document.getElementById('ft-metric-loss').textContent = loss;
+    document.getElementById('ft-metric-lr').textContent = lr;
+    var progress = _trainingTotalIters > 0 ? Math.min(100, Math.round(iter / _trainingTotalIters * 100)) : 0;
+    document.getElementById('ft-metric-progress').textContent = progress + '%';
+    document.getElementById('ft-progress-bar').style.width = progress + '%';
+}
+</script>

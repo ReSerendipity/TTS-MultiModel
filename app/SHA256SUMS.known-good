@@ -1,0 +1,25 @@
+# TTS_MultiModel — 关键二进制文件 SHA256 校验清单
+#
+# P2 安全修复：防止关键 DLL/EXE 被替换（DLL 劫持、挖矿程序注入等）。
+# 使用方法: python app/clean_launch.py --verify-binaries
+#
+# 格式：<SHA256哈希>  <相对路径>
+# 路径相对于 app/ 目录
+#
+# 如何生成校验值（仅维护者执行）：
+#   cd bin
+#   find sox-14.4.2-win32/sox-14.4.2 -type f \( -name "*.dll" -o -name "*.exe" \) -exec sha256sum {} \; > SHA256SUMS.known-good
+#   # 手动添加 start_app.bat 等
+#
+# 验证命令（用户执行）：
+#   python app/clean_launch.py --verify-binaries
+#
+# 注意：WinPython 目录下的二进制不在校验范围内（体积过大且频繁更新）。
+# 仅校验 sox 和项目自带的关键脚本。
+
+# === sox 二进制 (app/sox-14.4.2-win32/sox-14.4.2/) ===
+# 请在首次部署后运行 sha256sum 生成实际值并填入下方
+
+# === 项目脚本 ===
+# start.bat 和 start_app.bat 的校验值由 GitHub Release 流程生成
+# 参见 .github/workflows/release-please.yml 中的 SHA256SUMS.scripts
