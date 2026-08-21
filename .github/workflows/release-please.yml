@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -21,13 +24,15 @@ jobs:
           # Use Conventional Commits
           include-component-in-tag: false
           # Don't release automatically; create PR for review
-          target-branch: master
+          target-branch: main
           # Release as draft for manual approval
           draft: false
           # PR labels
           label: release
           # Skip CI on release commits
           prerelease: false
+          # Use PAT (GITHUB_TOKEN 在该 org 无法创建 PR)
+          token: ${{ secrets.GH_PAT }}
 
   # After release is created, build and upload artifacts
   build-release:
