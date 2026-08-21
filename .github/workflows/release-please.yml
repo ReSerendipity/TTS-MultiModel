@@ -31,8 +31,7 @@ jobs:
           label: release
           # Skip CI on release commits
           prerelease: false
-          # Use PAT (GITHUB_TOKEN 在该 org 无法创建 PR)
-          token: ${{ secrets.GH_PAT }}
+          # Now using GITHUB_TOKEN after workflow permissions set to write
 
   # After release is created, build and upload artifacts
   build-release:
