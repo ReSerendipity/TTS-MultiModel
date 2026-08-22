@@ -5,7 +5,7 @@
 #    pip-compile --no-annotate --output-file=requirements-lock.txt requirements.txt
 #
 aiofiles==25.1.0
-aliyun-python-sdk-core==2.16.0
+aliyun-python-sdk-core==2.16.1
 aliyun-python-sdk-kms==2.16.5
 annotated-doc==0.0.5
 annotated-types==0.8.0
