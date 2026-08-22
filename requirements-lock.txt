@@ -45,7 +45,7 @@ markupsafe==3.0.3
 mdurl==0.1.2
 modelscope==1.39.1
 modelscope-hub==0.2.0
-mpmath==1.3.0
+mpmath==1.4.1
 msgpack==1.2.1
 narwhals==2.24.0
 networkx==3.6.1
