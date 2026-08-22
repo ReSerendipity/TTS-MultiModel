@@ -51,10 +51,10 @@ class TestTTSGenerationServiceReadyPaths:
 
     def test_generate_voice_design_success(self, mock_registry):
         """Voice design generation should succeed when engine is ready."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import TTSGenerationService
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = TTSGenerationService()
             
             result = svc.generate_voice_design(
@@ -67,10 +67,10 @@ class TestTTSGenerationServiceReadyPaths:
 
     def test_generate_voice_clone_success(self, mock_registry):
         """Voice clone generation should succeed with valid reference audio."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import TTSGenerationService
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = TTSGenerationService()
             
             result = svc.generate_voice_clone(
@@ -83,10 +83,10 @@ class TestTTSGenerationServiceReadyPaths:
 
     def test_generate_with_valid_params(self, mock_registry):
         """Generation with custom params should pass them to engine."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import TTSGenerationService
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = TTSGenerationService()
             
             result = svc.generate_voice_design(
@@ -104,12 +104,12 @@ class TestTTSGenerationServiceErrorPaths:
     def test_engine_not_loaded_raises(self, mock_registry):
         """Should raise EngineNotLoadedError when engine is not ready."""
         from integrated_app.exceptions import EngineNotLoadedError
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import TTSGenerationService
         
         mock_registry.is_engine_ready.return_value = False
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = TTSGenerationService()
             
             with pytest.raises(EngineNotLoadedError):
@@ -118,11 +118,11 @@ class TestTTSGenerationServiceErrorPaths:
     def test_vram_circuit_breaker_triggers(self, mock_registry):
         """Should raise InsufficientVRAMError when VRAM usage exceeds threshold."""
         from integrated_app.exceptions import InsufficientVRAMError
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import TTSGenerationService
         
         with patch("integrated_app.service_layer._check_vram_circuit_breaker", return_value=True):
-            with patch.object(EngineRegistry, "_instance", mock_registry):
+            with patch.object(ModelRegistry, "_instance", mock_registry):
                 svc = TTSGenerationService()
                 
                 with pytest.raises(InsufficientVRAMError):
@@ -130,10 +130,10 @@ class TestTTSGenerationServiceErrorPaths:
 
     def test_empty_text_handling(self, mock_registry):
         """Empty text should either raise or be handled gracefully."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import TTSGenerationService
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = TTSGenerationService()
             
             try:
@@ -144,12 +144,12 @@ class TestTTSGenerationServiceErrorPaths:
 
     def test_exception_from_engine_propagates(self, mock_registry):
         """Engine exceptions should propagate correctly."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import TTSGenerationService
         
         mock_registry.get_current_engine().generate_voice_design.side_effect = RuntimeError("Engine crash")
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = TTSGenerationService()
             
             with pytest.raises(RuntimeError):
@@ -165,7 +165,7 @@ class TestModelServiceLoadUnload:
 
     def test_load_model_success(self, mock_registry):
         """Model loading should succeed and report success."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import ModelService
         
         mock_result = MagicMock()
@@ -174,7 +174,7 @@ class TestModelServiceLoadUnload:
         mock_result.load_time = 5.0
         mock_registry.load_model.return_value = mock_result
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = ModelService()
             
             result = svc.load_model(engine_name="voxcpm2", model_path="/path/to/model")
@@ -185,7 +185,7 @@ class TestModelServiceLoadUnload:
 
     def test_load_model_failure(self, mock_registry):
         """Model loading failure should report failure reason."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import ModelService
         
         mock_result = MagicMock()
@@ -194,7 +194,7 @@ class TestModelServiceLoadUnload:
         mock_result.load_time = 0.0
         mock_registry.load_model.return_value = mock_result
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = ModelService()
             
             result = svc.load_model(engine_name="invalid", model_path="/nonexistent")
@@ -204,12 +204,12 @@ class TestModelServiceLoadUnload:
 
     def test_unload_model_success(self, mock_registry):
         """Model unloading should succeed."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import ModelService
         
         mock_registry.unload_model.return_value = True
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = ModelService()
             
             result = svc.unload_model()
@@ -219,13 +219,13 @@ class TestModelServiceLoadUnload:
 
     def test_get_model_status(self, mock_registry):
         """Model status query should return current state."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import ModelService
         
         mock_registry.is_engine_ready.return_value = True
         mock_registry.current_engine = "voxcpm2"
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = ModelService()
             
             result = svc.get_model_status()
@@ -239,7 +239,7 @@ class TestModelServiceSwitchEngine:
 
     def test_switch_engine_success(self, mock_registry):
         """Engine switching should unload old and load new."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import ModelService
         
         mock_result = MagicMock()
@@ -251,7 +251,7 @@ class TestModelServiceSwitchEngine:
         
         mock_registry.switch_engine.return_value = mock_result
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = ModelService()
             
             result = svc.switch_engine(target_engine="chattts")
@@ -262,12 +262,12 @@ class TestModelServiceSwitchEngine:
 
     def test_switch_to_same_engine(self, mock_registry):
         """Switching to current engine should handle gracefully."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import ModelService
         
         mock_registry.current_engine = "voxcpm2"
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = ModelService()
             
             result = svc.switch_engine(target_engine="voxcpm2")
@@ -328,16 +328,17 @@ class TestServiceLayerErrorPropagation:
 
     def test_nested_exception_preserves_context(self, mock_registry):
         """Nested exceptions should preserve original error context."""
-        from integrated_app.model_registry import EngineRegistry
+        from integrated_app.model_registry import ModelRegistry
         from integrated_app.service_layer import TTSGenerationService
         
         original_error = ValueError("Original error message")
         mock_registry.get_current_engine().generate_voice_design.side_effect = original_error
         
-        with patch.object(EngineRegistry, "_instance", mock_registry):
+        with patch.object(ModelRegistry, "_instance", mock_registry):
             svc = TTSGenerationService()
             
             with pytest.raises(ValueError) as exc_info:
                 svc.generate_voice_design(text="test")
             
             assert "Original error message" in str(exc_info.value)
+
