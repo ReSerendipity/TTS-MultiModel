@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.1](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.0...v2.2.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* **tests:** 修复 EngineRegistry 导入错误 ([82f6ae5](https://github.com/ReSerendipity/TTS_MultiModel/commit/82f6ae5a37a1623fcbd864e9d8faf98a1ce0f624))
+
+
+### Documentation
+
+* 顶部补齐 CI 徽章，移除底部重复徽章 ([1205d8a](https://github.com/ReSerendipity/TTS_MultiModel/commit/1205d8a76c9f68d0653a0ddee9a847ffeb8893a2))
+
 ## [2.2.0](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.1.0...v2.2.0) (2026-08-21)
 
 

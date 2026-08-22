@@ -1,6 +1,6 @@
 [project]
 name = "tts-multimodel"
-version = "2.2.0"
+version = "2.2.1"
 description = "TTS MultiModel - Multi-engine Text-to-Speech platform with voice cloning, voice design, and LoRA fine-tuning"
 readme = "README.md"
 license = "Apache-2.0"
