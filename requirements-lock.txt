@@ -63,7 +63,7 @@ psutil==7.2.2
 pycparser==3.0
 pycryptodome==3.23.0
 pydantic==2.13.4
-pydantic-core==2.46.4
+pydantic-core==2.48.0
 pydub==0.25.1
 pygments==2.21.0
 pynndescent==0.6.0
