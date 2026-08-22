@@ -85,7 +85,7 @@ starlette==1.6.0
 sympy==1.14.0
 tensorboardx==2.6.5
 threadpoolctl==3.6.0
-tiktoken==0.13.0
+tiktoken==0.14.0
 tokenizers==0.23.1
 torch==2.13.0+cu132
 torch-complex==0.4.4
