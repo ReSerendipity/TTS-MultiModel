@@ -9,7 +9,7 @@ aliyun-python-sdk-core==2.16.1
 aliyun-python-sdk-kms==2.16.5
 annotated-doc==0.0.5
 annotated-types==0.8.0
-antlr4-python3-runtime==4.9.3
+antlr4-python3-runtime==4.13.2
 anyio==4.14.2
 certifi==2026.7.22
 cffi==2.1.1
