@@ -14,6 +14,7 @@ jobs:
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: googleapis/release-please-action@v4
         with:
