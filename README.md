@@ -189,7 +189,7 @@ docker run -d --gpus all -p 7869:7869 \
 python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.5（IndexTeam/IndexTTS-2.5）
 ```
 
-详细说明见[模型下载指南](docs/MODEL_DOWNLOADS.md)。
+详细说明见[模型下载指南](docs/plans/MODEL_DOWNLOADS.md)。
 
 ## 配置
 
@@ -201,7 +201,7 @@ python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.
 - **模型路径模式**: `models.model_source_mode`（portable/shared 双模式，见下方说明）
 - **断点续跑**: `runtime.task.checkpoint_dir` 配置 checkpoint 存储目录
 
-详见 [参数调整指南](docs/ADJUSTABLE_PARAMETERS.md)。
+详见 [参数调整指南](docs/project/ADJUSTABLE_PARAMETERS.md)。
 
 ## 安全与可靠性
 
@@ -354,13 +354,13 @@ Copyright (c) 2026 ReSerendipity
 
 ## 文档
 
-- [模型下载指南](docs/MODEL_DOWNLOADS.md) - 模型下载与配置
-- [模型扩展指南](docs/MODEL_EXTENSION_GUIDE.md) - 添加新 TTS 引擎
-- [IndexTTS 2.5 集成指南](docs/INDEXTTS2_INTEGRATION_GUIDE.md) - IndexTTS 2.5 集成详情
-- [项目架构](docs/PROJECT_ARCHITECTURE.md) - 系统架构概览
-- [参数调整](docs/ADJUSTABLE_PARAMETERS.md) - 配置参数参考
-- [UI 开发指南](docs/UI 开发指南_README.md) - Web UI 开发指南
-- [改进手册](docs/IMPROVEMENT_GUIDBOOK.md) - 优化和改进建议
+- [模型下载指南](docs/plans/MODEL_DOWNLOADS.md) - 模型下载与配置
+- [模型扩展指南](docs/plans/MODEL_EXTENSION_GUIDE.md) - 添加新 TTS 引擎
+- [IndexTTS 2.5 集成指南](docs/plans/INDEXTTS2_INTEGRATION_GUIDE.md) - IndexTTS 2.5 集成详情
+- [项目架构](docs/project/PROJECT_ARCHITECTURE.md) - 系统架构概览
+- [参数调整](docs/project/ADJUSTABLE_PARAMETERS.md) - 配置参数参考
+- [UI 开发指南](docs/plans/UI开发指南_README.md) - Web UI 开发指南
+- [改进手册](docs/plans/IMPROVEMENT_GUIDEBOOK.md) - 优化和改进建议
 
 ## 相关项目
 
