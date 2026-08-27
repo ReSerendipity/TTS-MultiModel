@@ -57,7 +57,7 @@ VIEWPORT = {"width": 1366, "height": 900}
 #   "sidebar_close" → 点击侧栏折叠按钮，关闭侧栏后截图
 #   "help_drawer" → 打开帮助抽屉模态框
 #   "health_panel"→ 打开系统监控模态框
-#   "model_tab"   → 切换顶部引擎标签（voxcpm2 / indextts2 / dotstts）
+#   "model_tab"   → 切换顶部引擎标签（voxcpm2 / indextts2）
 #   "none"        → 仅执行默认初始态（baseline 状态不在这里重复）
 
 TAB_DEFS: list[dict] = [
@@ -174,15 +174,6 @@ TAB_DEFS: list[dict] = [
         "name": "indextts2_duration",
         "actions": [],
     },
-    # dots.tts 家族
-    {
-        "num": "15",
-        "tab": "dotstts_clone",
-        "name": "dotstts_clone",
-        "actions": [
-            ("details", "#dots-advanced-params", "adv_open"),
-        ],
-    },
 ]
 
 # 全局模态框（不依赖特定 tab 切换，在首页直接触发）
@@ -192,7 +183,6 @@ GLOBAL_STATES: list[tuple[str, str]] = [
     ("health_panel", "系统监控模态框"),
     ("model_voxcpm2", "顶部引擎 VoxCPM2 高亮"),
     ("model_indextts2", "顶部引擎 IndexTTS2 高亮"),
-    ("model_dotstts", "顶部引擎 dots.tts 高亮"),
 ]
 
 
@@ -301,6 +291,18 @@ def _click_tab(page: Page, tab_name: str) -> bool:
     button = page.locator(f".sidebar-item[data-tab='{tab_name}']")
     if button.count() == 0:
         return False
+    # 若按钮位于折叠分组（.sidebar-nav-section.section-collapsed）内，
+    # 先点击分组标题 .sidebar-nav-label 展开，否则 max-height:0 无法点击
+    page.evaluate("""(t) => {
+        const btn = document.querySelector(`.sidebar-item[data-tab="${t}"]`);
+        if (!btn) return;
+        const sec = btn.closest('.sidebar-nav-section');
+        if (sec && sec.classList.contains('section-collapsed')) {
+            const label = sec.querySelector('.sidebar-nav-label');
+            if (label) label.click();
+        }
+    }""", tab_name)
+    page.wait_for_timeout(400)
     button.first.click()
     try:
         page.wait_for_load_state("networkidle", timeout=5000)
