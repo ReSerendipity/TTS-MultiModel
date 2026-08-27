@@ -1,0 +1,28 @@
+name: Stale 自动清理
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 每天 UTC 03:00（北京时间 11:00）
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-issue-stale: 60
+          days-before-pr-stale: 60
+          days-before-issue-close: 7
+          days-before-pr-close: 7
+          stale-issue-message: "该 issue 已 60 天无活动，将在 7 天后自动关闭。如仍需处理请回复。"
+          stale-pr-message: "该 PR 已 60 天无活动，将在 7 天后自动关闭。如仍需处理请回复。"
+          close-issue-message: "因长期无活动，此 issue 已自动关闭。"
+          close-pr-message: "因长期无活动，此 PR 已自动关闭。"
+          exempt-issue-labels: "pinned,security,bug,enhancement"
+          exempt-pr-labels: "pinned,security,dependencies"
+          operations-per-run: 100
