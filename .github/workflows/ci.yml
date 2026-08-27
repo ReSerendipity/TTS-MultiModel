@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master, dev]
+    branches: [main, dev]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -32,15 +32,15 @@ jobs:
 
       - name: Run ruff check
         run: |
-          ruff check app/integrated_app/ scripts/ tests/ || true
+          ruff check app/integrated_app/ scripts/ tests/
 
       - name: Run ruff format check
         run: |
-          ruff format app/integrated_app/ scripts/ tests/ --check --diff || true
+          ruff format app/integrated_app/ scripts/ tests/ --check --diff
 
       - name: Run mypy type check
         run: |
-          mypy app/integrated_app/ --ignore-missing-imports || true
+          mypy app/integrated_app/ --ignore-missing-imports
         if: always()
 
   test:
