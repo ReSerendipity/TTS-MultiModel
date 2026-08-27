@@ -1,16 +1,29 @@
 # TTS_MultiModel AGENTS.md — AI 辅助开发指南
 
-> 🧬 **自进化协议版本**：v1.11  
+> 🧬 **自进化协议版本**：v1.12  
 > 📅 **最后更新日期**：2026-08-27  
-> 🎯 **对应项目版本**：v2.2.1（`pyproject.toml` 与 `CHANGELOG.md` 一致）  
-> ⚠️ **实测版本漂移待处理**：`config.yaml` 顶层 `version` 仍为 `"2.2.0"`，落后一个 patch。
-> release-please 不会自动同步该文件，需人工补齐（它会驱动前端 `?v=app_version` 缓存参数，见陷阱 #9）。
+> 🎯 **对应项目版本**：v2.2.1（`config.yaml` / `pyproject.toml` 与 `CHANGELOG.md` 一致）
+> release-please 不会自动同步 `config.yaml`——它会驱动前端 `?v=app_version` 缓存参数（见陷阱 #9），升级版本时需人工补齐。
+
+---
+
+## 0. 文档优先级（单一事实来源）
+
+当以下文档相互矛盾时，**以此顺序为准**，并立即按铁律 #1 修正靠后者：
+
+1. 代码与配置本身（`pyproject.toml` / `package.json` / `.pre-commit-config.yaml` / 源码）
+2. `docs/official_spec.md`（若本仓存在；当前本仓无此文件）
+3. `AGENTS.md`
+4. `README.md` / `docs/**`
+5. `CHANGELOG.md`
+
+> 判据：**能被机器验证的事实永远优先于自然语言描述。**
 
 ---
 
 ## ⚠️ 🤖 Agent 行为契约（自进化协议 · 必须严格遵守）
 
-AI Agent 打开本文件后的 **第一件事** 是执行下面的「🧪 自进化自检清单」，并遵守以下 6 条铁律：
+AI Agent 打开本文件后的**第一件事**是执行下面的「🧪 自进化自检清单」，并遵守以下 6 条铁律：
 
 ### 🔴 6 条自进化铁律
 1. **🔄 同步规则（Synchronize First）**：如果发现项目实际情况（目录结构、依赖版本、技术栈、配置文件名等）与本文件描述 **不一致** → **立即更新本文件**，不要只改代码不改 AGENTS.md。这是最高优先级的规则。
@@ -137,7 +150,7 @@ TTS_MultiModel/
 ├── perf/                    ← cold-start.py  vram-usage.py  generation-benchmark.py
 │                              stress-test.py  report_generator.py
 ├── scripts/                 ← 辅助脚本（下载 / 校验 / 兼容性 / 水印密钥 / 依赖同步，见 §5、§11）
-├── docs/                    ← 项目文档（索引见 docs/README.md，分类归档见 §10.2）
+├── docs/                    ← 项目文档（索引见 docs/README.md（本地文档，未随仓库发布），分类归档见 §10.2）
 ├── install.bat / start.bat        ← Windows 一键
 ├── install.sh  / start.sh         ← Linux/macOS 一键
 ├── config.yaml              ← 唯一权威配置源（顶层键：version / server / models / ui /
@@ -173,6 +186,14 @@ TTS_MultiModel/
 5. **所有外部资源（模型权重 / 音频文件 / 缓存文件）必须能离线工作**：不允许运行时请求外部 API 下载模型 / tokenizer / 音色 embedding。所有资源必须在 install.sh / install.bat 阶段一次性拉好。
 
 ---
+
+## 🚫 禁区目录（禁止 AI 自动修改，必须人工确认）
+
+| 路径 | 为什么禁 | 改动需什么 |
+|---|---|---|
+| `model/` | 权重误改导致推理结果静默劣化 | 人工逐项确认 + SHA-256 复验 |
+| `dist/`、`outputs/` | 生成物，手改即失效 | 只通过构建/生成命令更新 |
+| `docs/_devarchive/` | 归档不可回写 | 只新增，不修改 |
 
 ## 4. 测试约定（测试体系 = 6 层 + 分阶段覆盖率路线图）
 
@@ -336,41 +357,7 @@ curl http://127.0.0.1:7869/api/model/status
 
 ## 7. 依赖注入 & 单例获取方式清单
 
-> **⚠️ 2026-08-27 重大更正**：本节此前规定"所有跨层访问必须通过 FastAPI `Depends` 或 `get_xxx()`
-> 工厂，禁止直接从模块 import 全局变量实例"，并列出了 `get_settings` / `get_engine_registry` /
-> `get_scheduler` / `get_db_pool` / `get_synthesis_service` / `get_history_service` 六个工厂。
-> **实测：`Depends(` 在全仓 `app/integrated_app/` 下出现 0 次，上述六个函数有五个不存在**
-> （仅 `get_history_db()` 真实存在）。也就是说，旧规则与本仓实际架构方向相反——
-> 项目实际采用的正是"模块级单例 + 直接 import"。照旧规则编码会找不到工厂函数，
-> 并自行发明一套 DI，与既有 55 个顶层模块的风格冲突。
-> 以下按实际代码重写。**若未来真的要引入 DI，请先写一条 ADR 再改本节。**
-
-| 共享状态 | 真实获取方式 | 定义位置 | 作用域 |
-|------|--------------------------------|--------|--------|
-| 引擎注册表（**能力声明**） | `from .engine_interface import engine_registry` | `app/integrated_app/engine_interface.py:669`<br>`engine_registry: InMemoryEngineRegistry = InMemoryEngineRegistry()` | 模块级单例，`_register_builtin_engines()` 于导入时填充 |
-| 模型注册表（**运行时加载态**） | `from .model_registry import registry` | `app/integrated_app/model_registry.py`（`class ModelRegistry` L164） | 模块级单例 + `RLock`；持 `voxcpm_model` / `indextts2_engine` / `current_engine`，批量原子更新走 `set_voxcpm_loaded()` / `set_indextts2_loaded()` |
-| 引擎声明式规格 | `app/integrated_app/config_models.py`（与上述注册表协作） | `config_models.py` | 只读声明源 |
-| 配置项 | 函数式访问器：`get_project_root()` / `get_pretrained_dir()` / `get_voxcpm2_model_path()` / `get_voxcpm2_asr_path()` / `get_voxcpm2_denoiser_path()` / `get_indextts2_model_path()` | `app/integrated_app/config.py` L94-L169 | 每次调用读取；底层为 YAML + Pydantic 双重加载 |
-| 历史库 | `get_history_db() -> HistoryDatabase`；建库 `create_history_db(output_dir)`；释放 `close_all_connections()` | `app/integrated_app/history_db.py` L1984 / L2009 / L2024 | 连接按路径缓存（标准库 sqlite3，`check_same_thread=False`） |
-| 推理串行 | `_generation_semaphores`（per-engine `asyncio.Semaphore`，默认容量 1），经 `_execute_generation()` 取用 | `app/integrated_app/routes/generate/utils.py` | 进程内字典，按引擎 key 分桶 |
-| 权重完整性 | `integrity_check.py` / `integrity_selfcheck.py` + 清单 `security/integrity_manifest.json` | `app/integrated_app/security/` | 只读 |
-
-**测试中替换共享状态的正确姿势**（因无 DI，不能依赖 `app.dependency_overrides`）：
-```python
-# 引擎注册表：monkeypatch 模块属性，而不是覆盖 FastAPI 依赖
-monkeypatch.setattr("integrated_app.engine_interface.engine_registry", FakeRegistry())
-
-# 历史库：monkeypatch 工厂函数本身
-monkeypatch.setattr("integrated_app.history_db.get_history_db", lambda: fake_db)
-
-# 配置路径：patch 访问器
-monkeypatch.setattr("integrated_app.config.get_voxcpm2_model_path", lambda: str(tmp_path))
-```
-
-> 新增共享状态时，请沿用「模块级单例 + `get_xxx()` 访问器」的既有约定，不要混用 `Depends`，
-> 也不要在函数内部重复 `import` 后即时构造实例。
-
----
+> 完整内容已移至 [docs/project/DI_SINGLETONS.md](docs/project/DI_SINGLETONS.md)（本地文档，未随仓库发布），移出时逐字保留；核心纪律见 §0/§3 硬约束。
 
 ## 8. i18n 多语言规范（5 种语言：中 / 繁 / 英 / 日 / 韩）
 
@@ -501,217 +488,15 @@ pre-commit run -a
 
 ## 11. 安全注意事项
 
-> **⚠️ 2026-08-27 更正**：本节 1/2/3/5 条此前引用了 `common.path_guard.safe_join`、
-> `config.yaml → synthesis.max_chars`、`scripts/verify_engine.py`、`configs/model_checksums.yaml`、
-> `TTSScheduler 队列满返回 503` —— **这五个标识符/配置项在本仓库全部不存在**。
-> 安全类幻影比其他类幻影更危险：它会让开发者误以为防护已由公共模块提供，
-> 于是不复用真实实现、也不自建校验，直接裸写 `os.path.join`。以下按实际代码重写。
-
-1. **路径安全（无公共封装，务必复用已有实现）**
-   本仓库**没有** `common/path_guard.py`，也**没有** `safe_join()` 函数（全仓搜索零命中）。
-   路径防护是**分散内联实现**的，共同手法为 `os.path.realpath()` 解析 + 基目录前缀比对
-   （比对基目录时要带尾部 `os.sep`，否则 `/persona` 可被 `/personaxxx` 绕过）。现有实现：
-
-   | 实现 | 位置 | 适用 |
-   |---|---|---|
-   | `_safe_file_path(root_dir, user_input)` | `app/integrated_app/routes/audio.py:137` | 音频/历史文件读取（含 symlink 攻击防护） |
-   | `_validate_path(base_dir, user_path)` | `app/integrated_app/routes/training.py:62` | 训练数据目录 |
-   | realpath + `startswith` 前缀比对 | `app/integrated_app/persona_manager.py:168` `:562`、`persona_metadata.py:290` | 音色 wav 与打包元数据 |
-   | realpath 前缀比对（禁 symlink 逃出） | `app/integrated_app/routes/generate/voxcpm2/streaming.py:821` | 流式生成写盘 |
-
-   **新增涉及用户输入路径的代码时**：优先复用上述函数；跨模块不便复用时按同一手法实现，
-   并**禁止** `os.path.join(base, 用户输入)` 后直接 `open()`。
-2. **文本长度与 prompt 注入防护**
-   - **不存在** `config.yaml → synthesis.max_chars`。`config.yaml` 顶层键只有
-     `version` / `server` / `models` / `ui` / `history` / `logging` / `runtime` / `watermark`。
-   - 实际长度上限在 `app/integrated_app/routes/tabs.py` 按引擎给出（8192 / 4096 / 3072 量级），
-     分段默认值取 `get_config().generation_defaults.split_max_chars`（读取失败回退 200）。
-     **改上限要改这里，不要新增一个文档里的配置键。**
-   - 控制 token 白名单在 `app/integrated_app/emotion_control.py:281`：
-     `_CHAT_TTS_TAG_PATTERN = re.compile(r"\[(?P<tag>laugh|uv_break|oral_(?P<oral_idx>\d))\]")`
-     ——注意是方括号形式 `[laugh]` / `[uv_break]` / `[oral_N]`（此前文档写的 `<laugh>` 是错的），
-     且该 token 集源自已下线的 ChatTTS，现为兼容保留。
-   - 内容风险审查在 `app/integrated_app/security/content_safety.py`，
-     阈值经 Pydantic 配置项 `security.content_safety_threshold` 读取，未配置时回退内置默认值。
-3. **模型完整性校验（时机是"下载后"，不是"启动时"）**
-   - 校验脚本：`scripts/verify_model_checksums.py`（下载模型后比对 SHA-256，防权重被篡改）
-   - 辅助脚本：`scripts/verify_model_weights.py`、`scripts/check_model_paths.py`（防目录移动导致路径漂移）
-   - 清单文件：**`app/integrated_app/security/integrity_manifest.json`**（不是 `configs/model_checksums.yaml`，
-     后者不存在；`configs/` 目录本身也不存在）
-   - 清单生成器：`scripts/generate_integrity_manifest.py`
-   - 运行期自检：`app/integrated_app/security/integrity_check.py`、`integrity_selfcheck.py`
-   - 权重水印密钥初始化：`scripts/init_watermark_key.py`
-   > 此前文档写的"启动时 `scripts/verify_engine.py` 对 3 个引擎权重跑 SHA-256，
-   > 不匹配立即终止启动"——脚本名、清单路径、触发时机三者皆错，勿照此排查问题。
-4. **网络安全**：生产环境 **绝对不能 `host="0.0.0.0"`**，只监听 `127.0.0.1`
-   （`config.yaml → server.host` 已是该值，`server.port` = 7869）。
-   外网访问必须套 Nginx（HTTPS + Basic Auth + IP 白名单 + 反向代理限频 `/synthesize`）。
-   `config.yaml` 的 `server.ssl.certfile` 目前**未生效**（配置内注释已说明 server 跑 HTTP），
-   要上 HTTPS 需在 `app/clean_launch.py` 的 uvicorn 启动处配 `ssl_certfile`/`ssl_keyfile`。
-5. **并发与 DoS 防护（实际机制）**
-   - **限流**：`app/integrated_app/middleware/rate_limit.py`，超限返回 **`429 Too Many Requests`**。
-   - **串行**：per-engine `asyncio.Semaphore`（默认容量 1），见 §3 硬约束 4 与 §7。
-   - **`503` 的真实来源不是"队列满"**，而是：
-     `EngineNotLoadedError`（引擎未加载，引导用户去 Settings 加载）与
-     `InsufficientVRAMError`（CUDA OOM，由 `_run_with_oom_retry` 捕获降级）。
-   > 此前文档写的"`TTSScheduler` 队列满（默认 10）返回 503"没有对应实现，
-   > 按它去排查 503 会找错方向——遇到 503 请先看是哪个异常类抛的。
-
----
+> 完整内容已移至 [docs/project/SECURITY_NOTES.md](docs/project/SECURITY_NOTES.md)（本地文档，未随仓库发布），移出时逐字保留；核心纪律见 §0/§3 硬约束。
 
 ## 12. 典型 AI 开发场景 SOP（照着做，少踩坑）
 
-<!-- 📥 新SOP追加模板（AI 完成新类型任务后复制填好追加到这里）：
-#### SOP-X: [场景名称]
-**适用条件**：什么情况下走这个流程
-**步骤**：
-1. 第一步...
-2. 第二步...
-3. 第三步...
-**验证**：怎么确认操作成功
-**关联文件**：
-- path/to/file1.py
-- path/to/file2.py
--->
-
-#### SOP-1: 添加新的 TTS 引擎（比如新增 XTTS v2）
-
-> **⚠️ 2026-08-27 重大更正**：本节此前 7 步里有 5 步指向不存在的实现——
-> `engines/auto_register.py`（**不存在，本仓没有任何目录扫描式自动注册**）、
-> `BaseTTSProtocol`（**不存在这个名字**，真实 Protocol 是 `TTSEngine` / `ControllableTTSEngine`）、
-> `configs/config.example.yaml`（**`configs/` 目录不存在**，唯一配置文件是根的 `config.yaml`）、
-> `core/prompt_templates/`（**不存在**，prompt 逻辑内联在引擎包内）、
-> `perf/engine-benchmark.py`（真实文件名是 `perf/generation-benchmark.py`）、
-> pytest 参数 `--run-engine`（**不是本仓 marker**，真实 marker 见步骤 6）。
-> 照旧步骤执行会在第 3 步就停下来找 `auto_register.py`，然后自行发明一套扫描机制。
->
-> **本仓终态是多引擎，注册机制是「显式注册」而非「自动扫描」**——这是有意设计：
-> 显式注册让每个引擎的导入策略（立即导入 / 懒导入）在代码里可读、可单独 try/except，
-> 自动扫描会把某个引擎的 ImportError 直接升级为全站启动失败。新增引擎请沿用显式注册。
-
-**适用条件**：需要新增一种 TTS 引擎实现，通过统一注册表与 `/api/model/*` 契约暴露
-
-**步骤**：
-1. 在 `app/integrated_app/engines/` 下新建引擎实现。两种既有形态任选：
-   - 依赖多、需要分文件 → 建**包** `xttsv2/`（参照 `engines/voxcpm2/`：`engine.py` + `prompt.py` + `clone.py` + `design.py` + …）
-   - 单文件可容纳 → 建模块 `xttsv2_engine.py`（参照 `engines/indextts2_engine.py` / `engines/voxcpm2_engine.py`）
-2. 实现引擎类，满足 `app/integrated_app/engine_interface.py:35` 的 `TTSEngine` Protocol（**结构化子类型，不用显式继承**）；
-   若需要情感/时长等可控能力，参照 `ControllableTTSEngine`（L208）。
-   类标识用 `name`（Registry key，全局唯一）+ `display_name`。
-3. **在 `_register_builtin_engines()`（`engine_interface.py:672`）里显式调用 `engine_registry.register(...)`**。
-   按引擎重要性选导入策略（这是既有三引擎的真实分工）：
-
-   | 策略 | 适用 | 写法 |
-   |------|------|------|
-   | 立即导入 + 懒导入回退 | **核心引擎**（现状：VoxCPM2） | `try: from .engines.xttsv2.engine import XTTSv2Engine; engine_registry.register("xttsv2", engine_class=XTTSv2Engine, ...) except ImportError: engine_registry.register("xttsv2", lazy_module="engines.xttsv2.engine:XTTSv2Engine", ...)` |
-   | 纯懒导入 | **可选引擎**（现状：IndexTTS2） | `engine_registry.register("indextts2", lazy_module="...:IndexTTS2Engine", ...)` —— 启动期绝不 import，依赖缺失时不影响核心引擎 |
-   | 注释掉注册 | **停用**（现状：dots.tts，见 Gotcha #12） | 保留注册代码但注释 + 写明原因，可逆 |
-
-   `register()` 完整签名（L483）：
-   `name, engine_class=None, display_name="", vram_requirement=6.0, lazy_module="", languages=None, supported_features=None, sample_rate=24000, requires_gpu=True, quality="high"`；
-   `lazy_module` 格式必须是 `"package.module:ClassName"`。
-4. 在 `model_registry.py` 的 `EngineName` 枚举（L70）加值（当前仅 `VOXCPM2="voxcpm2"` / `INDEXTTS2="indextts2"`），
-   并补对应的 `_<engine>_loaded` 加载位与 `set_<engine>_loaded()` 原子更新方法；
-   同步在 `config.yaml → models.engines.<key>` 加声明式配置（**不要新建 `configs/` 目录**）。
-5. Prompt / 模板逻辑内联在引擎包内（参照 `engines/voxcpm2/prompt.py`），**不引入 `core/prompt_templates/` 这类新目录层级**。
-6. **测试**：
-   - 合规性：`pytest tests/engines/test_protocol_compliance.py -v`（L2 层，校验 Protocol 契约）
-   - 新引擎用例放 `tests/engines/test_<engine>_engine.py`
-   - 需要真 GPU 的用 marker 标注，**真实可用 marker**：`integration` / `benchmark` / `gpu` / `cuda` / `vram` / `smoke`
-     （`pyproject.toml` 的 `markers`；**`--run-engine` 不存在**，不要臆造参数，pytest 会报 unrecognized）
-   - 免 GPU 的依赖层兼容性：`python scripts/check_3engine_compat.py`（9 项检测，含 torch/transformers/numpy/pydantic 版本与各引擎可 import 性；该钩子已挂 pre-commit + pre-push，见 §10）
-7. （可选）性能基准：`python perf/generation-benchmark.py`（对比既有引擎 RTF），基线产物落 `perf/results/`。
-
-**验证**：启动服务 → `GET /api/model/status` 的 `voxcpm2_loaded` / `indextts2_loaded` 不受新引擎影响且 `loaded` 为 `true`
-→ `POST /api/model/switch` 切到新引擎返回 `{"status":"ok","engine":"xttsv2"}`
-→ `GET /api/persona/table` 能返回该引擎可见音色（旧文档的 `GET /api/v1/tts/voices` 端点不存在）。
-
-**关联文件**（下例以占位符 `<new_engine>` 表示待新增引擎的注册名，实际请替换）：
-- `app/integrated_app/engines/<new_engine>/engine.py`（或 `engines/<new_engine>_engine.py`）
-- `app/integrated_app/engine_interface.py`（`_register_builtin_engines()` L672）
-- `app/integrated_app/model_registry.py`（`EngineName` L70 / `ModelRegistry` L164）
-- `config.yaml`（`models.engines.<key>`）
-- `app/integrated_app/config_models.py`（声明式规格）
-- `tests/engines/test_<new_engine>_engine.py`
-- `scripts/check_3engine_compat.py`
-
-#### SOP-2: 修改现有引擎的生成逻辑（比如调整 IndexTTS2 的情感向量默认值）
-**适用条件**：不新增引擎，只调参数 / prompt 逻辑 / 后处理
-
-**步骤**：
-1. 改对应引擎的实现与 prompt 模块：`engines/voxcpm2/prompt.py`、`engines/voxcpm2/engine.py`、
-   `engines/indextts2_engine.py`，或路由层参数默认值 `routes/generate/{voxcpm2,indextts2,generic}/`
-   （**不存在 `core/prompt_templates/<engine>/*.txt`**，模板不是独立 txt 资产）
-2. 跑回归：`pytest tests/engines/ -v` + `pytest tests/ -m "not gpu and not cuda and not benchmark" -v`，
-   确认接口兼容（`TTSEngine` Protocol 的返回结构字段一个没少）
-3. 跑性能对比：改前改后各跑一次 `python perf/generation-benchmark.py`，确认 RTF 劣化不超过 10%
-4. **改了契约就要同步全部实现方**：若动了 `engine_interface.py` 的 `TTSEngine` / `ControllableTTSEngine` Protocol
-   或 `SynthesisResult` 字段 → **必须同步另一现役引擎**（voxcpm2 ↔ indextts2）与通用引擎 vendor stub，
-   并跑 `python scripts/check_3engine_compat.py` 确认三个实现都仍可 import
-   （旧文档写"更新 `engines/base.py` 的 Protocol"——**不存在 `engines/base.py`**，Protocol 就在 `engine_interface.py`）
-
-#### SOP-3: 添加新的 API 端点
-**适用条件**：在既有 `/api/*` 前缀体系下加新路由
-
-**步骤**：
-1. 在 `app/integrated_app/routes/`（或其子包 `routes/generate/`、`routes/system/`）下新建模块。
-   **文件名无任何约束**——真实发现契约是**模块级 `router` 变量**：
-   `app_server.py` 的 `_discover_routes()`（L179）+ `_auto_discover_routers()`（L220）
-   用 `pkgutil.iter_modules` 递归遍历 `routes` 包，凡 `hasattr(mod, "router")` 即收集并挂载。
-   （旧文档要求文件名必须以 `*_router.py` 结尾且由 `auto_register` 扫描——**两条都不成立**；
-   现有真实文件如 `routes/persona.py`、`routes/model.py`、`routes/system/health.py` 均无 `_router` 后缀。）
-2. 文件内定义（**prefix 与 tag 都写在 `APIRouter(...)` 上，本仓未使用 `openapi_tags`，全仓零命中**）：
-   ```python
-   from fastapi import APIRouter, Request
-   from .generate.utils import _generation_semaphores   # 模块级单例直接 import，本仓不用 Depends
-
-   router = APIRouter(prefix="/api/xxx", tags=["xxx"])   # 变量名必须是 router！
-
-   @router.get("/table")
-   async def list_xxx(request: Request) -> dict:
-       ...
-   ```
-   既有 prefix 只有：`/api/generate`、`/api/system`、`/api/model`、`/api/persona`、`/api/training`、`/api`（audio）；
-   `pages` / `sse` / `tabs` 三个 router 无 prefix。**`/api/v1/tts/*` 前缀全仓零命中，不要新开 v1 前缀**。
-3. **不允许**在路由模块里写具体业务逻辑，逻辑下沉到同层能力模块（`history_db.py`、`persona_manager.py`、
-   `model_manager.py`、`gpu_backend.py` 等）。
-   注意：旧文档写的 `core.services.*` 分层**不存在**，本仓是 `app/integrated_app/` 下的扁平能力模块。
-4. 测试放**扁平** `tests/test_xxx_api.py`（用 `TestClient` 或 `httpx.AsyncClient` 发真实请求，
-   覆盖状态码、响应字段、错误场景）。
-   **`tests/api/` 目录不存在**（见 §4.1）；且本仓无 DI，不能靠 `app.dependency_overrides`，
-   共享状态用 `monkeypatch.setattr` 打模块属性（见 §7）。
-5. 若需 Swagger 分组说明：tag 描述只能靠 `APIRouter(tags=[...])` + 各端点的 `summary` / `description`
-   自行写清（既有做法），**不要去 `create_app()` 里找 `openapi_tags` 列表加描述——那里没有**。
-
----
+> 完整内容已移至 [docs/project/AI_DEV_SOPS.md](docs/project/AI_DEV_SOPS.md)（本地文档，未随仓库发布），移出时逐字保留；核心纪律见 §0/§3 硬约束。
 
 ## 13. 常见陷阱（Known Gotchas）— 血泪教训汇总
 
-<!-- 📥 新坑追加模板（AI 踩坑后复制填好追加到表格最后）：
-| # | 坑点标题 | 触发场景 | 现象/报错 | 正确做法 | 首次发现日期 |
-|---|---------|---------|---------|---------|------------|
-| X | 简短标题 | 什么操作会触发 | 具体报错信息或现象 | 正确代码/配置/步骤 | YYYY-MM-DD |
--->
-
-| # | 坑点标题 | 触发场景 | 现象/报错 | 正确做法 | 首次发现日期 |
-|---|---------|---------|---------|---------|------------|
-| 1 | **引擎注册/模型加载不得在 import 阶段触碰 GPU** | 在模块导入时就构造模型实例并加载权重（旧文档误记为 `engines/__init__.py` 里 `EngineRegistry()` + `load_all()`） | import 阶段 CUDA 初始化失败、fork 子进程时 CUDA context 泄漏、测试 import 时也加载 GPU → 本地跑单测 10GB VRAM 先占满 | **2026-08-27 按实际代码更正**：本仓不存在 `api/main.py`、也不存在 `engine_registry.load_all()`。真实的防泄漏机制是：① `engine_interface._register_builtin_engines()` 于导入时**只登记类引用或 `lazy_module` 字符串路径**，不实例化、不加载权重；② 真正的权重加载由 `model_manager` 在 `POST /api/model/load` 或 lifespan 预加载时执行；③ `app_server.py:255` 的 `async def lifespan(app)` 负责生命周期，且仅当 `config.yaml → server.auto_load_model=true` 时才在启动阶段后台预加载（**当前配置为 false**）。新引擎请沿用「懒导入路径注册」，不要在注册时构造模型 | 2026-05-05 |
-| 2 | **Uvicorn workers 只能 1，多 worker 必 OOM** | 为了提升并发，`uvicorn ... --workers 4` 或 Gunicorn 多 worker | 每个 worker 都独立初始化引擎注册表 + 各自加载一份模型到 GPU，VRAM 占用 ×worker 数 → 直接 OOM 崩溃 | workers 永远 = 1。**2026-08-27 更正串行机制的表述**：本仓不存在 `TTSScheduler`，真实串行靠 `routes/generate/utils.py` 的 `_generation_semaphores`（per-engine `asyncio.Semaphore`，默认容量 1），它是**进程内**字典，多 worker 各持一份 → 并发度 = worker 数 → 显存叠加。真要水平扩展 → 多实例 + 前面 Nginx 负载均衡（每台机器 GPU 1 份模型） | 2026-05-15 |
-| 3 | **SSE StreamingResponse 的生成器不能是 async def** | 在 StreamingResponse(content=xxx) 里传 `async def generate(): async for chunk in ...: yield chunk` | Uvicorn/Lifespan 的事件循环不一致 → `RuntimeError: async generator ignored StopAsyncIteration`，进度流推到 30% 左右就卡死 | content 用普通 `def generate()`，内部 `loop = asyncio.new_event_loop(); loop.run_until_complete(coro)` 或用 `asyncio.run_coroutine_threadsafe(...).result(timeout=30)` 同步取 chunk | 2026-06-01 |
-| 4 | **不要在引擎层调 logger 静默兜底**（必须抛异常给上层） | 可选引擎内部 `logger.warning("voice not found, fallback to default")` 然后返回空音频 bytes | 上层路由不知道这次是 fallback 还是正常合成，`result.success` 永远 = True，metrics 和监控都废了 | 引擎层只抛异常。**2026-08-27 更正异常名与出处**：本仓不存在 `VoiceNotFoundError`，异常统一在 `app/integrated_app/exceptions.py`（基类 `TTSError` L49）。音色/Persona 找不到请用 `PersonaNotFoundError`（L139，继承 `PersonaError`），引擎未加载用 `EngineNotLoadedError`（L244），显存不足用 `InsufficientVRAMError`（L99）；由路由层统一 catch → 记日志 + 决定 fallback + 写 metrics | 2026-06-10 |
-| 5 | **NumPy / Torch Tensor 不要直接当 FastAPI Response 返回** | `return wav_numpy_array`（shape=(samples,) dtype=np.int16）期望前端能直接当 WAV 播 | FastAPI 的 JSONResponse 会把 numpy 数组尝试序列化成 List[float]，1 秒音频（24000 samples）→ 24000 个 JSON number，10 秒就 24 万 → 响应体 10MB+ 且序列化 2-5 秒 | 先转 WAV 字节：`buf = io.BytesIO(); soundfile.write(buf, wav_np, samplerate=24000, format="WAV"); buf.seek(0); return Response(content=buf.read(), media_type="audio/wav")` | 2026-06-20 |
-| 6 | **`training/` 目录绝对不能被 API 启动路径 import** | 在启动链路的模块里 `from training.prepare_dataset import ...`（想复用一些音频切片工具） | API 启动时 import 到 `datasets`、`librosa`、`torchaudio` 等训练专用大依赖 → 冷启动时间 +45 秒 + 多占 2GB RAM，更惨的是训练代码可能改全局 torch dtype 导致推理精度错 | **2026-08-27 更正共享代码归属**：本仓不存在 `common/` 目录（旧写的 `common/audio_utils.py`、`core/services/dataset_helper.py` 均不存在），也没有 `core/` 分层。共享工具的真实归属是 `app/integrated_app/utils.py`，训练侧在 `app/integrated_app/training/`（`data.py` / `accelerator.py` / `config.py` …）。把共享代码抽到 `utils.py`，API 侧与训练侧都从它 import。**该约束当前成立**：实测 `app/integrated_app/` 下（除 `training/` 自身）对 `training` 的顶层 import 为 0 处 | 2026-07-02 |
-| 7 | **长文本一次性推理会内存爆 32GB** | 用户提交 5000 字一次性交给单个引擎推理 | 超长中间张量 + attention matrix → 32GB 内存被吃完，OOM 被系统 kill | 路由/引擎层**先按标点与段落分句**再逐句推理，最后拼接。**2026-08-27 更正实现细节**：分句上限取自 `config.yaml → generation_defaults.split_max_chars`（默认 200，允许区间 50–500，见 `routes/system/settings.py` L80）；拼接用 **`numpy.concatenate`**（`soundfile` 根本没有 `concat` 函数，旧写法照抄会 AttributeError），见 `engines/voxcpm2/_base.py` L593、`routes/generate/indextts2/synthesize.py` L354、`routes/generate/voxcpm2/streaming.py` L209。超时预算按「句数 × 单句超时」估算，且要按 §7 的 per-engine 信号量理解排队（不存在 Scheduler 层） | 2026-07-10 |
-| 8 | **release-please：绝对不要手动改版本号** | 图省事直接改 `pyproject.toml` 的 `version = "1.1.0"`，合了 main → release-please 的 PR 里版本号冲突 | CI 创建 Release 失败：`tag v1.1.0 already exists`，CHANGELOG 条目重复 | **完全放手给 release-please**：版本号和 CHANGELOG 一律它生成，你只需要 Approve release-please 自动开的 PR。真要手动改就先让 release-please 生成了，再改 release-please PR 里面的内容（合之前改 PR 就好） | 2026-07-20 |
-| 9 | **全局底部播放器不显示的根因=前端资源缓存** | 页面加载后生成音频，底部 `global-audio-player` 悬浮条（含波形+可拖动进度条）从未出现，结果卡也没有任何可见播放器 | `base.html` 的 JS/CSS 均带 `?v={{ app_version }}` 缓存参数；若版本号未变，浏览器复用旧版 JS，`window.globalAudioPlayer` 为 undefined，`tts_form.js` 的 `initAutoPlay` 里 `if (audioSrc && window.globalAudioPlayer)` 直接跳过 → 播放器永不弹出 | ① 发布新前端资源时务必递增 `app_version`（或改用内容 hash 命名）并硬刷新测试；② 播放器组件应**自包含**：不依赖全局单例。已落地：`routes/generate/utils.py` 的 `_EMBEDDED_PLAYER_HTML` + `static/js/embedded_player.js` + `static/css/embedded_player.css`，结果卡内嵌波形播放器，全部路由（design/clone/script/streaming/post-process/indextts2）自动生效 | 2026-08-15 |
-| 10 | **生成后自动播放 = 隐形播放 + 双音源叠加** | 生成成功自动调 `window.globalAudioPlayer.play()`（`tts_form.js` initAutoPlay / 各页面的 SSE done 分支 / `reprocess.js` / `prompt_continue.html`），同时结果卡内嵌播放器又是独立 Audio 实例 | ① 底部播放器 UI 未显示但音频在播（浏览器标签页喇叭亮），用户"看不见播放器却听见声音"；② 用户再点内嵌播放器 → 两路音频同时播放 | **统一约定：生成/流式/后处理成功后一律不自动播放**，由用户手动点结果卡内嵌播放器（`EmbeddedPlayer.html()`）试听；全局底部播放器仅保留给历史记录/音色库等**用户主动点击**的试听。`showPlayer()` 增加 `playerEl.style.display='flex'` 内联兜底，防止 CSS 未命中时 UI 不可见 | 2026-08-15 |
-| 11 | **引擎切换显存预检漏算"卸载当前引擎可释放的显存"** | 当前引擎已占显存时切到另一个引擎（如 VoxCPM2 → dotstts），`_check_vram_prereq` 在卸载前检查"当前空闲显存" | 日志 `[引擎切换] VRAM 检查: 需要 6.0GB, 可用 5.72GB` → `InsufficientVRAMError` 503，明明卸载旧引擎后显存足够，却永远走不到"先卸载再加载"路径；且 `_can_hot_standby` 用 `target*0.8`（乘反低估）会误判热待机 → 不卸载直接加载新引擎 → OOM | `_check_vram_prereq` 把 `registry.current_engine` 的基线 VRAM 计入有效可用（有效可用 = 当前空闲 + 当前引擎占用），只有"卸载后仍装不下"才硬失败；`_can_hot_standby` 改为 `target*1.2`（完整需求+余量），显存不充裕时自然回退到先卸载再加载的传统路径。见 `app/integrated_app/model_manager.py` | 2026-08-15 |
-| 12 | **dots.tts 在原生 Windows 上无法安装（pynini 无 Windows 包）** | Windows + 纯 pip（无 conda）环境切换/加载 dotstts 引擎 | `switch_engine` 报 `ENGINE_LOAD_ERROR` 503：`No module named 'dots_tts'`；`pip install dots.tts` 在 `pynini` 步骤源码编译失败（无 Cython/OpenFst，Windows 无官方预编译 wheel） | dots.tts 硬依赖 `WeTextProcessing → pynini`，pynini 仅 Linux/macOS（conda-forge 或 WSL）。Windows 要在用，需装社区 wheel（`SystemPanic/pynini-windows`）或 conda/WSL，且有 transformers 版本冲突风险。本项目已**停用 dotstts**：注释掉 `engine_interface._register_builtin_engines()` 里的注册，引擎不再出现在切换列表，切换以"不支持的引擎"失败而非 503 | 2026-08-15 |
-| 13 | **E2E 测试文件被截断损坏导致 CI 门禁必然失败** | 编辑/合并 PR 时文件意外截断（如 `test_screenshot_capture_extended.py` 从 487 行只剩 25 字节） | pytest 收集阶段报 `IndentationError` / `SyntaxError`，e2e.yml workflow 的 required gate 直接失败，所有 PR 合不进 main | ① 提交前本地跑 `pytest tests/e2e/ --collect-only` 验证语法；② 使用 IDE 的 lint-on-save；③ CI 加 pre-commit hook 跑 `python -m py_compile tests/**/*.py`；**2026-08-17 已恢复该文件并修复** | 2026-08-17 |
-| 14 | **永真断言与零断言测试制造虚假安全感** | 测试写成 `assert task in set or task not in set`（集合论恒真）、`pass` 函数体、只调用不验证结果 | CI 全部 green 但代码有 bug，因为这些测试**根本不验证任何行为**；覆盖率虚高到 40%+ 仍可能漏核心功能 | ① 审查 assert 语句是否真正验证预期结果；② 用 `pytest --assert=always` 看详细断言输出；③ CI 加 `--strict-markers` 和 ruff flake8-assertive；**2026-08-17 已修复 4 处永真 +4 处零断言** | 2026-08-17 |
-| 15 | **认证/安全测试只是构造对象而从未发起真实请求** | `test_auth.py` 只写 `middleware = APIAuthMiddleware(...)` + `assert middleware is not None` | 文档声称 "should reject all authenticated requests" 但**没有一条 HTTP 请求验证**，中间件逻辑是否正确完全未测 | 安全相关测试必须用 `TestClient` 发起真实 HTTP 请求，验证 status_code + response body；禁用 auth/有效 token/无效 token/缺少 header/错误 scheme 全覆盖；**2026-08-17 test_auth.py 重写为 8 个行为级测试** | 2026-08-17 |
-
----
+> 完整内容已移至 [docs/project/KNOWN_GOTCHAS.md](docs/project/KNOWN_GOTCHAS.md)（本地文档，未随仓库发布），移出时逐字保留；核心纪律见 §0/§3 硬约束。
 
 ## 📋 自进化修订记录表（AGENTS.md 进化史）
 
@@ -730,6 +515,7 @@ pre-commit run -a
 | v1.9 | 2026-08-17 | **统一权重目录 model/** | 解决 `model/` 与 `models/` 重名歧义：`config_models.py` 的 `ModelConfig.base_dir` 默认值 `models` → `model`（运行时实际路径为 `config.py` 的 `PRETRAINED_DIR=ROOT/model`）；5 种语言 locales 的 `download_guide_note` 由 `models/` 目录改为 `model/` 目录；docs/MODEL_DOWNLOADS.md 与 docs/INDEXTTS2_INTEGRATION_GUIDE.md 的权重路径 `models/` → `model/`；第 3 节目录树 `models/` → `model/`；删除遗留的 `models/` 运行时缓存目录 | v1.0.0  | — |
 | v1.10 | 2026-08-27 | **家族规范完整性审计（Phase A · T5）：按实测代码修正主干事实** | 依「多引擎为终态」的确认，对 §1/§2/§3/§4/§7/§8/§9.1/§10/§11/§12/§13/自检清单逐节与文件系统、代码实测对账：① 目录树以 `app/integrated_app/` 为根重写，删除顶层 `api/`、`common/`、`core/` 等不存在分层的引用；② 引擎叙述改为实测的显式注册机制（核心引擎立即导入 + 懒导入回退、可选引擎纯懒导入），并说明「多引擎 = 能力注册与切换契约多引擎、同一时刻单一激活引擎」的准确语义；③ §7 撤销「必须用 `Depends` 工厂」规则——本仓 DI 零命中，旧规则与实现方向相反，改为「模块级单例 + `get_xxx()` 访问器 + `monkeypatch` 替换」；④ §8 撤销 gettext/babel 六步流程与「CI 阻断」虚构门禁，改为 JSON 词表 + `t()` + 两层回退 + 4 步流程；⑤ §11 撤销集中式路径守卫、`synthesis.max_chars`、启动时权重校验、队列满返回 503 四项无对应实现的声明，逐条给出真实分散实现与真实异常来源；⑥ §10 钩子表由 6 条补至与配置双向一致的 15 条（含 `always_run` 且挂 push 阶段的兼容性硬门禁），并移除 `black`/`mypy`/i18n 三个假钩子；⑦ §12 三条 SOP 全量重写（自动扫描、`*_router.py` 命名约束、`core.services` 分层、`--run-engine` 参数、示例端点均无实现）；⑧ §13 陷阱 #1/#2/#4/#6/#7 的「正确做法」列改指向真实文件与真实异常类；⑨ 依赖表删除两个不存在的清单/脚本并补正确同步顺序；⑩ README 9 处文档链接重定向至实际所在子目录（含一处文件名拼写错误），CONTRIBUTING 删除重复的 DCO 标题；顶部「对应项目版本」校正，并记录 `config.yaml` 落后一个 patch 的实测版本漂移。**以上各项均只更正与事实不符的表述，未新增任何未实现的承诺** | v2.2.1  | — |
 | v1.11 | 2026-08-27 | **家族规范完整性审计（Phase B · B4）：自进化协议打补丁（第 6 条铁律 + 修订表已校验列）** | ① 新增第 6 条铁律「证据绑定（Evidence Binding）」：可执行路径必须当时可验证存在、未实现项须显式标注、禁止虚构 CI 门禁；② 自检清单追加两项：路径真实存在校验（跑 `python scripts/check_spec_refs.py`）与 pre-commit 双向一致校验；③ 修订记录表增加「已校验」列，历史行统一填 `—`（未校验），新条目须填 `✓ (check_spec_refs)` 或 `✗`；④ 本仓新增 `scripts/check_spec_refs.py` 家族审计 wrapper 与 `.github/workflows/docs-consistency.yml`（本地/含审计器环境强校验，纯 CI 环境找不到审计器时降级跳过保持绿）。本行即首个填写「已校验」的条目 | v2.2.1| ✓ (check_spec_refs) |
+| v1.12 | 2026-08-27 | **家族规范治理 Phase C/D/E 落地（一致性·补齐·账本）** | C1 SECURITY.md 单一位置；C2 合规文档统一命名；C0 未入库 docs 链接标注；D1 §0 仲裁节；D3 FILEMAP+同步脚本；D4 禁区章节；D8 安全审计报告；D9 覆盖率路线图+版本对齐；E3 AGENTS 体量拆分 74.7KB→46.4KB；E4 迁移报告。以上各项均只更正与事实不符的表述，未新增任何未实现的承诺 | v2.2.1 | ✓ (check_spec_refs) |
 
 <!-- 🔄 下次更新 AGENTS.md 时，在上面表格末尾追加新一行，不要删除历史记录 -->
 
@@ -745,7 +531,7 @@ pre-commit run -a
 
 ## 📂 文件归档与放置规范（重要：新增文件必须遵守）
 
-> 本仓库目录已于 2026-08-23 系统整理（见 `docs/整理记录_20260823.md`）。后续任何新增/生成文件，**先判断类型再放置**，不要随意丢在仓库根目录或其他位置。
+> 本仓库目录已于 2026-08-23 系统整理（见 `docs/整理记录_20260823.md`（本地文档，未随仓库发布））。后续任何新增/生成文件，**先判断类型再放置**，不要随意丢在仓库根目录或其他位置。
 
 **docs/ 分类（项目文档）**
 - `docs/project/`：需求(PRD)、架构、API、技术选型、设计上下文
