@@ -24,8 +24,9 @@ jobs:
           changelog-path: CHANGELOG.md
           # Use Conventional Commits
           include-component-in-tag: false
-          # Don't release automatically; create PR for review
+          # 跳过 release PR，直接发版（2026-08-27 调整）
           target-branch: main
+          skip-github-pull-request: true
           # Release as draft for manual approval
           draft: false
           # PR labels
