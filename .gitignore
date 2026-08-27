@@ -381,3 +381,12 @@ tests/frontend/_rendered/
 !logs/.gitkeep
 !data/uploads/.gitkeep
 !outputs/.gitkeep
+
+# AI 规范与内部工作文档（仅本地保留，不上传远程，2026-08-27）
+AGENTS.md
+docs/FILEMAP.md
+docs/README.md
+docs/_devarchive/
+docs/plans/
+docs/project/
+docs/整理记录_20260823.md
