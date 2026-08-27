@@ -2,7 +2,7 @@ name: E2E (Playwright)
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
     paths:
       - 'app/integrated_app/templates/**'
       - 'app/integrated_app/static/**'
@@ -10,7 +10,7 @@ on:
       - 'tests/e2e/**'
       - '.github/workflows/e2e.yml'
   pull_request:
-    branches: [main, master]
+    branches: [main]
     paths:
       - 'app/integrated_app/templates/**'
       - 'app/integrated_app/static/**'
@@ -27,7 +27,6 @@ jobs:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    continue-on-error: true
     permissions:
       contents: read
 
