@@ -54,12 +54,12 @@ repos:
       - id: shellcheck
         files: \.sh$
 
-  # 3-engine compatibility check (local hook)
+  # Engine compatibility check (local hook)
   - repo: local
     hooks:
-      - id: check-3engine-compat
-        name: 3-Engine Compatibility Check
-        entry: python scripts/check_3engine_compat.py
+      - id: check-engine-compat
+        name: Engine Compatibility Check
+        entry: python scripts/check_engine_compat.py
         language: system
         pass_filenames: false
         always_run: true

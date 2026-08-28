@@ -78,7 +78,7 @@ _VOXCPM2_TABS: frozenset[str] = frozenset(
 # IndexTTS2 专属 Tab（字符上限 3072）
 _INDEXTTS2_TABS: frozenset[str] = frozenset({"indextts2", "indextts2_clone", "indextts2_emotion", "indextts2_duration"})
 
-# 通用新式引擎专属 Tab（字符上限 4096；dotstts 引擎已移除，集合留空供未来通用引擎 Tab 复用）
+# 通用新式引擎专属 Tab（字符上限 4096；当前无成员，留空供未来通用引擎 Tab 复用）
 _GENERIC_ENGINE_TABS: frozenset[str] = frozenset()
 
 

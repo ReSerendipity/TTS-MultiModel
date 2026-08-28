@@ -23,7 +23,7 @@ WEIGHT_MANIFESTS = {
         "files": {},
     },
     "indextts2": {
-        "dir": "model/IndexTTS2",
+        "dir": "model/IndexTTS-2.5",
         "files": {},
     },
 }

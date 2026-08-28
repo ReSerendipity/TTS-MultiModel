@@ -136,7 +136,7 @@
                         <span class="sidebar-label-text">{{ "tab_lora_training" | t(lang) }}</span>
                     </button>
                 </div>
-                <div class="sidebar-nav-section" data-section-model="indextts2" data-engine-name="IndexTTS 2.5">
+                <div class="sidebar-nav-section" data-section-model="indextts2" data-engine-name="IndexTTS 2.x">
                     <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "indextts2_section"|t(lang) }}</span></div>
                     <button class="sidebar-item" data-tab="indextts2_clone" data-model="indextts2"
                             hx-get="/tab/indextts2_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
@@ -232,8 +232,12 @@
                             <span class="model-tab-label">VoxCPM2</span>
                         </button>
                         <button class="model-tab" data-model="indextts2" onclick="window.switchModel('indextts2')" role="tab" aria-selected="false" title="{{ "load_model_with_shortcut"|t(lang) }}">
-                            <svg class="model-tab-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                            <svg class="model-tab-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8v0a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
                             <span class="model-tab-label">IndexTTS 2.5</span>
+                        </button>
+                        <button class="model-tab" data-model="indextts20" onclick="window.switchModel('indextts20')" role="tab" aria-selected="false" title="{{ "load_model_with_shortcut"|t(lang) }}">
+                            <svg class="model-tab-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+                            <span class="model-tab-label">IndexTTS 2.0</span>
                         </button>
                     </div>
                 </div>
@@ -533,8 +537,8 @@
     <script src="/static/js/keyboard_manager.js?v={{ app_version }}"></script>
     <script src="/static/js/icon_converter.js?v={{ app_version }}"></script>
     <script src="/static/js/micro_interactions.js?v={{ app_version }}"></script>
-    <script src="/static/js/model_switcher.js?v={{ app_version }}"></script>
-    <script src="/static/js/health_monitor.js?v={{ app_version }}"></script>
+    <script src="/static/js/model_switcher.js?v={{ app_version }}-idx20"></script>
+    <script src="/static/js/health_monitor.js?v={{ app_version }}-idx20"></script>
     <script src="/static/js/sidebar.js?v={{ app_version }}"></script>
     <script src="/static/js/help_drawer.js?v={{ app_version }}"></script>
     <script src="/static/js/sse_manager.js?v={{ app_version }}"></script>
@@ -604,7 +608,7 @@
     <!-- Global Toast Container -->
     <div id="toast-container" class="tts-toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
 
-    <script src="/static/js/command_palette.js?v={{ app_version }}"></script>
+    <script src="/static/js/command_palette.js?v={{ app_version }}-idx20"></script>
 
     <!-- Font popup inline script (runs last, all DOM ready) -->
     <script>

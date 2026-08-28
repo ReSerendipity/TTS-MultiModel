@@ -31,7 +31,7 @@ from .tracker import GenerationTracker
 from .model_manager_core.state import *  # noqa: F401,F403
 from .model_manager_core.load import (
     PersonaWarmupService, PreloadService, get_persona_cache_stats,
-    get_preload_status, load_indextts2, load_voxcpm2, preload_model,
+    get_preload_status, load_indextts2, load_indextts20, load_voxcpm2, preload_model,
     warmup_persona_cache, _do_load_voxcpm2_internal, _warmup_persona_cache_compat,
 )  # noqa: F401
 from .model_manager_core.unload import _check_voxcpm2_lock, unload_model  # noqa: F401

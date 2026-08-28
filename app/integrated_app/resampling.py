@@ -37,6 +37,7 @@ COMMON_SAMPLE_RATES: frozenset[int] = frozenset({16000, 22050, 24000, 44100, 480
 ENGINE_SAMPLE_RATES: dict[str, int] = {
     "voxcpm2": 24000,
     "indextts2": 16000,
+    "indextts20": 16000,
 }
 
 # 默认统一目标采样率

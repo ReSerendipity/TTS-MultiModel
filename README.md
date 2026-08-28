@@ -370,8 +370,6 @@ Copyright (c) 2026 ReSerendipity
 |------|------|-------|
 | [VoxCPM](https://github.com/OpenBMB/VoxCPM) | OpenBMB 多语言 TTS，本项目 VoxCPM2 引擎的上游 | ~29.6k |
 | [Fish Speech](https://github.com/fishaudio/fish-speech) | Fish Audio 多语言 TTS，80+ 语言支持，RL 对齐 | ~70k+ |
-| [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | 少样本 TTS，完整训练工具链 | ~50k |
-| [ChatTTS](https://github.com/2noise/ChatTTS) | 对话式 TTS，精细韵律控制 | ~37.5k |
 | [OpenVoice](https://github.com/myshell-ai/OpenVoice) | MyShell 即时语音克隆，风格控制 | ~25k+ |
 | [CosyVoice](https://github.com/FunAudioLLM/CosyVoice) | 阿里多语言 TTS，Flow Matching + vLLM 加速 | ~18.6k |
 | [Chatterbox](https://github.com/resemble-ai/chatterbox) | Resemble AI 低延迟 TTS，模型分级策略 | ~19.2k |

@@ -117,10 +117,16 @@ window.switchModel = function(modelName) {
             tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
 
+        // IndexTTS 2.0/2.5 共用同一套生成 tab 与后端端点（复用同一引擎槽位），
+        // 因此选中 indextts20 时，侧栏按 indextts2 的 tab 集渲染；
+        // 但 2.0 不支持显式时长控制，需隐藏 *_duration 项。
+        var tabModel = (modelName === 'indextts20') ? 'indextts2' : modelName;
+        var hideDuration = (modelName === 'indextts20');
+
         var sections = document.querySelectorAll('.sidebar-nav-section[data-section-model]');
         sections.forEach(function(sec) {
             var secModel = sec.dataset.sectionModel;
-            var isVisible = (secModel === modelName || modelName === 'none');
+            var isVisible = (secModel === tabModel || modelName === 'none');
             sec.classList.toggle('section-hidden', !isVisible);
             // 引擎维度已收敛到顶部栏：已加载状态仅显示功能语义；未加载（none）状态补充引擎名便于浏览
             var engName = sec.dataset.engineName;
@@ -140,11 +146,14 @@ window.switchModel = function(modelName) {
         var items = document.querySelectorAll('.sidebar-item[data-model]');
         items.forEach(function(item) {
             var itemModel = item.dataset.model;
-            var shouldShow = (itemModel === modelName || itemModel === 'all');
+            var shouldShow = (itemModel === tabModel || itemModel === 'all');
+            if (shouldShow && hideDuration && item.dataset.tab && item.dataset.tab.slice(-9) === '_duration') {
+                shouldShow = false; // 2.0 无显式时长控制
+            }
             item.classList.toggle('sidebar-item-hidden', !shouldShow);
         });
 
-        var firstVisible = document.querySelector('.sidebar-item[data-model="' + modelName + '"]:not(.sidebar-item-hidden)');
+        var firstVisible = document.querySelector('.sidebar-item[data-model="' + tabModel + '"]:not(.sidebar-item-hidden)');
         if (firstVisible) {
             TTSApp.sidebar.activateTab(firstVisible);
         }

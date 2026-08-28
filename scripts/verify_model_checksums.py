@@ -145,8 +145,8 @@ def main() -> int:
     print("[1/2] 目录完整性检查...")
     model_dirs = [
         ("VoxCPM2", _MODELS_DIR / "VoxCPM2"),
-        ("IndexTTS2", _MODELS_DIR / "IndexTTS2"),
-        ("dots.tts", _MODELS_DIR / "dots.tts"),
+        ("IndexTTS-2.5", _MODELS_DIR / "IndexTTS-2.5"),
+        ("IndexTTS-2.0", _MODELS_DIR / "IndexTTS-2.0"),
         ("SenseVoiceSmall", _MODELS_DIR / "SenseVoiceSmall"),
         ("speech_zipenhancer", _MODELS_DIR / "speech_zipenhancer"),
     ]

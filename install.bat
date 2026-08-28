@@ -206,7 +206,7 @@ if exist "scripts\download_indextts2.py" (
     echo Running download scripts...
     "%PYTHON_CMD%" scripts\download_indextts2.py
 ) else (
-    echo [INFO] Scripts available: scripts\download_indextts2.py scripts\download_dotstts.py
+    echo [INFO] Download script available: scripts\download_indextts2.py
 )
 
 echo.

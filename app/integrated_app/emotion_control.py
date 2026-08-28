@@ -711,7 +711,7 @@ class InstructParser:
         result = self.parse(instruction)
         params: dict[str, Any] = {}
 
-        if engine == "indextts2":
+        if engine in ("indextts2", "indextts20"):
             # IndexTTS2: 情感通过 emo_vector 或 emo_text 传递
             if result.emotion is not None and not result.emotion.is_neutral():
                 params["emo_vector"] = result.emotion.to_list()

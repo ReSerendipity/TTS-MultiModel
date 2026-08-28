@@ -55,7 +55,7 @@ dependencies = [
     "torch>=2.5.1",
     "torchvision>=0.20.1",
     "torchaudio>=2.5.1",
-    # 版本策略：dots.tts 要求 >=4.57。
+    # 版本策略：VoxCPM2 / IndexTTS2 的 tokenizer 与 modeling 需要较新 transformers API。
     "transformers>=4.57.0",
     "tokenizers>=0.19.0",
     # === AI 生态 ===
@@ -70,7 +70,6 @@ dependencies = [
     "soundfile>=0.12.1",
     "pydub>=0.25.1",
     # === 数值计算 ===
-    # numpy：dots.tts 要求 >=2.2.6。
     "numpy>=1.24.0",
     "scipy>=1.11.0",
     # === 工具库 ===
@@ -81,7 +80,6 @@ dependencies = [
     # === 繁简转换（纯 Python 替代 opencc 源码编译）===
     "opencc-python-reimplemented>=0.1.0",
     # === 数据校验 ===
-    # pydantic：dots.tts 要求 >=2.12.5。
     "pydantic>=2.0",
 ]
 

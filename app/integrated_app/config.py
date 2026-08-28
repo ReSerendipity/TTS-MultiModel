@@ -116,7 +116,9 @@ VOXCPM2_DENOISER_PATH = os.path.join(PRETRAINED_DIR, "speech_zipenhancer")
 LORA_DIR = os.path.join(ROOT_DIR, "lora")
 
 # --- IndexTTS 2.5 Model Paths ---
-INDEXTTS2_MODEL_PATH = os.path.join(PRETRAINED_DIR, "IndexTTS2")
+INDEXTTS2_MODEL_PATH = os.path.join(PRETRAINED_DIR, "IndexTTS-2.5")
+# --- IndexTTS 2.0 Model Paths（独立权重目录，与 2.5 不通用）---
+INDEXTTS20_MODEL_PATH = os.path.join(PRETRAINED_DIR, "IndexTTS-2.0")
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +165,12 @@ def get_voxcpm2_denoiser_path() -> str:
 
 def get_indextts2_model_path() -> str:
     """获取 IndexTTS 2.5 模型路径（考虑 shared/portable 模式）。"""
-    return os.path.join(get_pretrained_dir(), "IndexTTS2")
+    return os.path.join(get_pretrained_dir(), "IndexTTS-2.5")
+
+
+def get_indextts20_model_path() -> str:
+    """获取 IndexTTS 2.0 模型路径（考虑 shared/portable 模式）。"""
+    return os.path.join(get_pretrained_dir(), "IndexTTS-2.0")
 
 
 def _ensure_dirs():
@@ -537,7 +544,16 @@ def get_download_hints() -> dict[str, str]:
             "IndexTTS 2.5 模型未找到。下载命令:\n"
             "  pip install modelscope\n"
             "  python scripts/download_indextts2.py\n"
-            "  或: modelscope download IndexTeam/IndexTTS-2.5 --local_dir model/IndexTTS2"
+            "  或: modelscope download IndexTeam/IndexTTS-2.5 --local_dir model/IndexTTS-2.5"
+        )
+    # IndexTTS 2.0 为可选变体（不进必检 missing 清单），仅在缺权重时给下载指引
+    indextts20_path = get_indextts20_model_path()
+    if not os.path.isdir(indextts20_path) or not _has_model_weights(indextts20_path):
+        hints["indextts20"] = (
+            "IndexTTS 2.0 模型未找到（可选引擎）。下载命令:\n"
+            "  modelscope download IndexTeam/IndexTTS-2 --local_dir model/IndexTTS-2.0\n"
+            "  或: python scripts/download_indextts20.py\n"
+            "  依赖代码包与 2.5 共用（同一 index-tts 仓库，安装一次即可）"
         )
     return hints
 

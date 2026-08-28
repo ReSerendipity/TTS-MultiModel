@@ -60,10 +60,13 @@
                         <div class="fg">
                             <label class="fl" for="it2c-lang-select">{{ "language"|t(lang) }}</label>
                             <select name="lang" id="it2c-lang-select" class="fs">
+                                {% set is20 = (current_engine == 'indextts20') %}
                                 {% for l in langs %}
+                                {% if not is20 or l in ['Auto', '中文', '英语'] %}
                                 <option value="{{ l }}" {% if l == 'Auto' %}selected{% endif %}>{{ l }}</option>
+                                {% endif %}
                                 {% endfor %}
-                                {% if dialects %}
+                                {% if dialects and not is20 %}
                                 <optgroup label="{{ 'chinese_dialects'|t(lang) }}">
                                     {% for dialect in dialects %}
                                     <option value="{{ dialect[0] }}">{{ dialect[1] }}</option>
@@ -75,6 +78,7 @@
                     </div>
                 </div>
 
+                {% if current_engine != 'indextts20' %}
                 <!-- Card: 时长模式 -->
                 <div class="card">
                     <div class="card-hdr">
@@ -110,6 +114,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Generate Button -->
                 <button type="submit" class="btn-generate">

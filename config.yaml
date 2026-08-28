@@ -16,7 +16,7 @@ models:
   # - shared：使用 shared_models_root 指定的外部共享目录，
   #   可与 Seedvr2 / Image_MultiModel 共享模型文件，节省磁盘
   # 注意：shared 模式下路径结构须与 portable 一致：
-  #   {shared_root}/VoxCPM2/, {shared_root}/SenseVoiceSmall/, {shared_root}/IndexTTS2/ 等
+  #   {shared_root}/VoxCPM2/, {shared_root}/SenseVoiceSmall/, {shared_root}/IndexTTS-2.5/, {shared_root}/IndexTTS-2.0/ 等
   model_source_mode: portable
   shared_models_root: ""   # 例如：C:/AI_Shared_Models
   voxcpm2:
@@ -40,9 +40,21 @@ models:
       requires_gpu: true
     indextts2:
       name: "indextts2"
-      display_name: "IndexTTS 2.0"
-      model_dir: "IndexTTS2"
+      display_name: "IndexTTS 2.5"
+      model_dir: "IndexTTS-2.5"
       vram_gb: 6.0
+      ram_gb: 16.0
+      languages: ["zh", "en", "ja", "es", "ar"]
+      quality: "high"
+      license: "bilibili Model Use License（商用需向 bilibili 登记书面授权）"
+      supported_features: ["clone", "emotion_control", "duration_control"]
+      sample_rate: 48000
+      requires_gpu: true
+    indextts20:
+      name: "indextts20"
+      display_name: "IndexTTS 2.0"
+      model_dir: "IndexTTS-2.0"
+      vram_gb: 5.5
       ram_gb: 16.0
       languages: ["zh", "en"]
       quality: "high"

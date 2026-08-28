@@ -411,7 +411,7 @@
     }
 }
 
-/* === GPT-SoVITS / dots.tts clone tab: two-column → stack on mobile === */
+/* === 克隆类 tab 通用两栏布局: two-column → stack on mobile === */
     .two-col {
         grid-template-columns: 1fr !important;
         gap: 0.75rem !important;

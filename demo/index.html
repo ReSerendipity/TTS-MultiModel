@@ -208,8 +208,6 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
       <button class="nav-item" data-page="ic"><span class="ic">🔊</span>克隆合成</button>
       <button class="nav-item" data-page="ie"><span class="ic">😊</span>情感控制</button>
       <button class="nav-item" data-page="id"><span class="ic">⏱</span>时长控制</button>
-      <div class="nav-sec-label">dots.tts</div>
-      <button class="nav-item" data-page="dc"><span class="ic">⚡</span>快速克隆</button>
       <div class="nav-sec-label">系统</div>
       <button class="nav-item" data-page="settings"><span class="ic">⚙</span>系统设置</button>
       <button class="nav-item" data-page="history"><span class="ic">🕘</span>历史记录</button>
@@ -402,22 +400,6 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
       </div>
     </section>
 
-    <!-- dots.tts 快速克隆 -->
-    <section class="page" id="page-dc">
-      <div class="page-head"><h1>dots.tts · 快速克隆</h1><p>轻量引擎低延迟快速克隆（模拟流程，参考音频 2–5 秒即可）。</p></div>
-      <div class="card">
-        <label class="fld">参考音频（2–5 秒）</label>
-        <div class="upload" id="t-upload" tabindex="0">🎤 上传参考音频</div>
-        <input type="file" id="t-file" accept="audio/*" class="hidden">
-        <div id="t-filetag"></div>
-        <label class="fld" style="margin-top:12px">合成文本</label>
-        <textarea id="t-text" rows="3" style="width:100%;resize:vertical">dots.tts 是轻量级 TTS 引擎，适合快速合成场景。</textarea>
-        <button class="btn" id="t-run" style="width:100%;margin-top:12px">⚡ 快速克隆合成（模拟）</button>
-        <div class="steps hidden" id="t-steps"></div>
-        <div id="t-player" class="hidden"></div>
-      </div>
-    </section>
-
     <!-- 系统设置 -->
     <section class="page" id="page-settings">
       <div class="page-head"><h1>系统设置</h1><p>引擎状态与运行参数（模拟信息）。</p></div>
@@ -426,7 +408,6 @@ label.fld{display:block;font-size:12px;color:var(--t3);margin-bottom:5px}
         <div class="engine-cards">
           <div class="eng"><div class="name">VoxCPM2 <span class="st">● 已加载</span></div><div class="desc">声音设计 / 克隆 / 剧本配音 / LoRA</div><div class="gpu">VRAM 5.6 GB · FP16</div></div>
           <div class="eng"><div class="name">IndexTTS 2.5 <span class="st">● 已加载</span></div><div class="desc">零样本克隆 / 情感 / 时长控制</div><div class="gpu">VRAM 3.2 GB · FP16</div></div>
-          <div class="eng"><div class="name">dots.tts <span class="st" style="color:var(--amber)">● 模拟</span></div><div class="desc">轻量快速克隆</div><div class="gpu">VRAM 0.9 GB · INT8</div></div>
         </div>
       </div>
       <div class="card">
@@ -722,7 +703,6 @@ function bindUpload(uploadId,fileId,tagId,previewBtnId){
 const getCFile=bindUpload('c-upload','c-file','c-filetag','c-preview');
 const getUFile=bindUpload('u-upload','u-file','u-filetag',null);
 const getIFile=bindUpload('i-upload','i-file','i-filetag',null);
-const getTFile=bindUpload('t-upload','t-file','t-filetag',null);
 
 /* 声音克隆 */
 $('#c-run').onclick=async()=>{
@@ -773,16 +753,6 @@ $('#id-run').onclick=async()=>{
   const rate=Math.max(0.5,Math.min(1.8,(text.length/4.5)/dur));
   buildPlayer('id-player',text,rate,1,'自然','indextts2');
   $('#id-run').disabled=false;showToast('按时长合成完成（模拟）✓');
-};
-
-/* dots.tts */
-$('#t-run').onclick=async()=>{
-  const ref=getTFile();$('#t-run').disabled=true;
-  const steps=['轻量引擎 · 加载参考音频…','端到端快速克隆…'];
-  if(!ref)steps[0]='轻量引擎 · 直接端到端合成…';
-  await runSteps('t-steps',steps,550);
-  buildPlayer('t-player',$('#t-text').value.trim()||'（空文本）',1.05,1,'自然','voxcpm2');
-  $('#t-run').disabled=false;showToast('快速合成完成（模拟）✓');
 };
 
 /* ===== 续写生成 ===== */
@@ -900,7 +870,6 @@ const CMDS=[
   {t:'前往 IndexTTS 克隆',fn:()=>switchPage('ic')},
   {t:'前往 IndexTTS 情感',fn:()=>switchPage('ie')},
   {t:'前往 IndexTTS 时长',fn:()=>switchPage('id')},
-  {t:'前往 dots.tts 快速克隆',fn:()=>switchPage('dc')},
   {t:'前往 系统设置',fn:()=>switchPage('settings')},
   {t:'前往 历史记录',fn:()=>switchPage('history')},
   {t:'前往 音色库',fn:()=>switchPage('persona')},

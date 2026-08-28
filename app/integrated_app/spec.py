@@ -51,7 +51,8 @@ class EngineSpec:
 # 引擎静态规格（与 config.yaml engines 节对齐）
 ENGINES: dict[str, EngineSpec] = {
     "voxcpm2": EngineSpec(name="voxcpm2", display_name="VoxCPM2", sample_rate=48000, requires_gpu=True),
-    "indextts2": EngineSpec(name="indextts2", display_name="IndexTTS 2.0", sample_rate=48000, requires_gpu=True),
+    "indextts2": EngineSpec(name="indextts2", display_name="IndexTTS 2.5", sample_rate=48000, requires_gpu=True),
+    "indextts20": EngineSpec(name="indextts20", display_name="IndexTTS 2.0", sample_rate=48000, requires_gpu=True),
 }
 
 def supported_engine_names() -> list[str]:

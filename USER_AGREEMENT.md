@@ -7,7 +7,7 @@
 
 1.1 项目代码适用 [Apache License 2.0](LICENSE)，可自由使用、修改、再分发（保留版权声明与 LICENSE 副本）。
 
-1.2 **模型权重许可独立于代码**：各引擎权重许可不同（VoxCPM2/dots.tts 为 Apache-2.0；IndexTTS2 为 bilibili 协议，商用需书面授权；ChatTTS/F5-TTS 等为非商用许可）——使用前请核对引擎仓库 LICENSE，商用场景按各许可要求取得授权。
+1.2 **模型权重许可独立于代码**：各引擎权重许可不同（VoxCPM2 及其辅助模型 SenseVoiceSmall / ZipEnhancer 为 Apache-2.0；IndexTTS2 为 bilibili Model Use License，商用需书面授权）——使用前请核对引擎仓库 LICENSE，商用场景按各许可要求取得授权。
 
 ## 2. 合法使用承诺
 

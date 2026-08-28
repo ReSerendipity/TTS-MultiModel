@@ -238,7 +238,7 @@
       self.register({
         id: 'load-indextts2',
         label: '加载 IndexTTS 模型',
-        description: '激活 IndexTTS 2.0 引擎',
+        description: '激活 IndexTTS 2.5 引擎',
         category: '模型',
         icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
         action: function() {
@@ -298,14 +298,29 @@
 
       self.register({
         id: 'switch-engine-indextts2',
-        label: '切换引擎 → IndexTTS',
-        description: '切换到 IndexTTS 2.0 引擎',
+        label: '切换引擎 → IndexTTS 2.5',
+        description: '切换到 IndexTTS 2.5 引擎',
         category: '模型',
         icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l10-10M4 7l10 10"/></svg>',
         action: function() {
           var selector = document.querySelector('[name="engine_selector"]');
           if (selector) {
             selector.value = 'indextts2';
+            selector.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+      });
+
+      self.register({
+        id: 'switch-engine-indextts20',
+        label: '切换引擎 → IndexTTS 2.0',
+        description: '切换到 IndexTTS 2.0 引擎（版本对比用）',
+        category: '模型',
+        icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l10-10M4 7l10 10"/></svg>',
+        action: function() {
+          var selector = document.querySelector('[name="engine_selector"]');
+          if (selector) {
+            selector.value = 'indextts20';
             selector.dispatchEvent(new Event('change', { bubbles: true }));
           }
         }

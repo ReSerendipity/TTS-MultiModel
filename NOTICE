@@ -23,8 +23,7 @@ Third-Party Components
 This product includes the following third-party components:
 
 - VoxCPM2 (https://github.com/eroclang/VoxCPM2) — Apache 2.0
-- IndexTTS2 (https://github.com/IndexTeam/IndexTTS2) — Apache 2.0
-- dots.tts (https://github.com/dots-ecosystem/dots-tts) — Apache 2.0
+- IndexTTS2 (https://github.com/IndexTeam/IndexTTS2) — bilibili Model Use License
 - FastAPI (https://github.com/tiangolo/fastapi) — MIT
 - PyTorch (https://github.com/pytorch/pytorch) — BSD-style
 - WinPython (https://github.com/winpython/winpython) — MIT

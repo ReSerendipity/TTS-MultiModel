@@ -417,10 +417,10 @@ def _check_engine_ready(
 
     if engine_name is None:
         engine_name = registry.current_engine
-    if engine_name == "indextts2":
+    if engine_name in ("indextts2", "indextts20"):
         if registry.indextts2_engine is None:
             return _error_html(
-                request, "IndexTTS 2.5 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id="indextts2"
+                request, "IndexTTS 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id=engine_name
             )
     else:
         if registry.voxcpm_model is None:

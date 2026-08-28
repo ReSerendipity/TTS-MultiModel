@@ -64,6 +64,7 @@ from ..model_manager import (
     _gen_tracker,
     get_preload_status,
     load_indextts2,
+    load_indextts20,
     load_voxcpm2,
     preload_model,
     switch_engine,
@@ -220,6 +221,8 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
         loop = asyncio.get_running_loop()
         if engine == "indextts2":
             load_fn = load_indextts2
+        elif engine == "indextts20":
+            load_fn = load_indextts20
         elif engine == "voxcpm2":
             load_fn = load_voxcpm2
         else:

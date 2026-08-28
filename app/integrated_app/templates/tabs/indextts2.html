@@ -158,6 +158,7 @@
                     </div>
                 </div>
 
+                {% if current_engine != 'indextts20' %}
                 <!-- Target duration -->
                 <div class="it2-target-duration">
                     <label class="tts-form-label" for="it2-target-duration">{{ "target_duration"|t(lang) }} <svg class="tts-help-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></label>
@@ -166,6 +167,7 @@
                                 <span class="tts-text-muted">{{ "seconds"|t(lang) }}</span>
                             </div>
                         </div>
+                {% endif %}
 
                         <button type="submit" class="tts-btn tts-btn-primary generate-btn tts-full-width-btn" aria-label="{{ "indextts2_generate"|t(lang) }}"><span class="btn-text">{{ "indextts2_generate"|t(lang) }}</span></button>
             </div>

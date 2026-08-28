@@ -6,7 +6,7 @@
 """
 from .state import *
 from . import state as _state
-from .load import _do_load_voxcpm2_internal, load_indextts2
+from .load import _do_load_voxcpm2_internal, load_indextts2, load_indextts20
 from .unload import unload_model
 
 def _can_hot_standby(target_engine: str) -> bool:
@@ -26,7 +26,14 @@ def _can_hot_standby(target_engine: str) -> bool:
             时保守返回 ``False``。
     """
     from ..gpu_backend import GPUBackend, GPUBackendManager
-    from ..model_registry import ENGINE_VRAM_REQUIREMENTS
+    from ..model_registry import ENGINE_VRAM_REQUIREMENTS, INDEXTTS_VARIANTS
+
+    # IndexTTS 2.5 与 2.0 复用同一引擎槽位（互斥）：家族内互切绝不能热待机，
+    # 否则新实例会覆盖同一槽位而旧实例未卸载 → 显存泄漏。强制走卸载-再加载路径。
+    current_engine = registry.current_engine
+    if current_engine in INDEXTTS_VARIANTS and target_engine in INDEXTTS_VARIANTS:
+        logger.info("[热待机] IndexTTS 家族内互切复用同一槽位，禁用热待机以先卸载旧实例")
+        return False
 
     backend: GPUBackend = GPUBackendManager.detect_backend()
     if backend == GPUBackend.CPU:
@@ -307,21 +314,23 @@ def _rollback_engine(prev_state: dict[str, Any], error: Exception) -> None:
             logger.info("[引擎切换] 回滚: VoxCPM2 模型重新加载完成")
         except Exception as reload_err:
             logger.error(f"[引擎切换] 回滚时重新加载 VoxCPM2 失败: {reload_err}")
-    elif prev_engine == EngineName.INDEXTTS2.value:
+    elif prev_engine in (EngineName.INDEXTTS2.value, EngineName.INDEXTTS20.value):
         try:
-            logger.info("[引擎切换] 回滚: 重新加载 IndexTTS2 引擎...")
-            from .engines.indextts2_engine import IndexTTS2Engine
+            _is_v20 = prev_engine == EngineName.INDEXTTS20.value
+            logger.info(f"[引擎切换] 回滚: 重新加载 {'IndexTTS 2.0' if _is_v20 else 'IndexTTS2'} 引擎...")
+            from ..engines.indextts2_engine import IndexTTS2Engine
             from ..gpu_backend import GPUBackend, GPUBackendManager
 
             backend = GPUBackendManager.detect_backend()
             new_engine: Any = IndexTTS2Engine(
-                model_dir=get_indextts2_model_path(),
+                model_dir=get_indextts20_model_path() if _is_v20 else get_indextts2_model_path(),
                 use_bf16=(backend != GPUBackend.CPU),
+                version="2.0" if _is_v20 else "2.5",
             )
-            registry.set_indextts2_loaded(new_engine)
-            logger.info("[引擎切换] 回滚: IndexTTS2 引擎重新加载完成")
+            registry.set_indextts2_loaded(new_engine, engine_name=prev_engine)
+            logger.info("[引擎切换] 回滚: IndexTTS 引擎重新加载完成")
         except Exception as reload_err:
-            logger.error(f"[引擎切换] 回滚时重新加载 IndexTTS2 失败: {reload_err}")
+            logger.error(f"[引擎切换] 回滚时重新加载 IndexTTS 失败: {reload_err}")
     elif prev_engine:
         # 通用新式引擎回滚：重新走声明式加载流程
         try:
@@ -461,6 +470,9 @@ def switch_engine(
                     yield status_tuple
             elif engine_name == EngineName.INDEXTTS2.value:
                 for status_tuple in load_indextts2():
+                    yield status_tuple
+            elif engine_name == EngineName.INDEXTTS20.value:
+                for status_tuple in load_indextts20():
                     yield status_tuple
             else:
                 # 通用新式引擎（声明式注册）

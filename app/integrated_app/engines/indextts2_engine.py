@@ -114,6 +114,35 @@ from ..text_frontend import normalize_text
 logger = logging.getLogger("tts_multimodel")
 
 
+def _save_pcm_wav_soundfile(path: str, wav: Any, sampling_rate: int) -> None:
+    """用 soundfile 直写 16-bit PCM WAV，替代 index-tts 的 save_pcm_wav。
+
+    背景：torchaudio>=2.9 把 WAV 编码委托给 TorchCodec（本机未安装、且无 ffmpeg），
+    会导致 IndexTTS 合成保存阶段抛 ImportError。本函数复刻原 save_pcm_wav 的语义：
+    入参 ``wav`` 处于 PCM 量级 ``[-32767, 32767]``（整型张量或 float 张量均可），
+    先归一到 ``[-1, 1]`` float32，再用 soundfile 以 PCM_16 子类型写盘。
+
+    Args:
+        path: 输出 WAV 文件路径。
+        wav: PCM 量级波形张量（常见形状 ``(channels, frames)``）或 numpy 数组。
+        sampling_rate: 采样率（Hz）。
+    """
+    import soundfile as sf
+    import torch
+
+    w = wav
+    if isinstance(w, torch.Tensor):
+        w = w.detach().to(device="cpu", dtype=torch.float32)
+    arr = np.asarray(w, dtype=np.float32)
+    arr = np.clip(arr / 32767.0, -1.0, 1.0)
+    if arr.ndim == 2:
+        # (channels, frames) -> (frames, channels)；单声道压平为一维
+        arr = arr.T
+        if arr.shape[1] == 1:
+            arr = arr[:, 0]
+    sf.write(path, arr, int(sampling_rate), subtype="PCM_16")
+
+
 class IndexTTS2Engine(TTSEngine):
     """IndexTTS 2.5 引擎适配器。
 
@@ -132,7 +161,7 @@ class IndexTTS2Engine(TTSEngine):
 
     **Attributes 属性说明**：
         model_dir (str):
-            模型文件目录的绝对路径。默认指向 ``<project_root>/model/IndexTTS2``。
+            模型文件目录的绝对路径。默认指向 ``<project_root>/model/IndexTTS-2.5``。
         use_deepspeed (bool):
             是否启用 DeepSpeed 推理加速标志。需额外安装 deepspeed 包，
             启用后在长文本/大 batch 场景下吞吐量提升显著。
@@ -229,8 +258,19 @@ class IndexTTS2Engine(TTSEngine):
         use_deepspeed: bool = False,
         lang: str = "Auto",
         use_qwen_emo: bool = False,
+        version: str = "2.5",
     ) -> None:
-        """初始化 IndexTTS 2.5 引擎。
+        """初始化 IndexTTS 引擎（2.5 / 2.0 双版本共用实现）。
+
+        版本变体说明：
+            ``version="2.5"``（默认，向后兼容全部既有调用）走
+            ``indextts.infer_v2_5``，权重目录 ``model/IndexTTS-2.5``，注册名
+            ``indextts2``，支持显式时长控制（duration_factor/target_duration）
+            与 5 语种（Auto/ZH/EN/JA/ES/AR）。
+            ``version="2.0"`` 走 ``indextts.infer_v2``，权重目录
+            ``model/IndexTTS-2.0``，注册名 ``indextts20``，仅中英双语、
+            无显式时长控制（infer 时忽略 duration 参数，语速走后处理变速）。
+            两者共用同一套依赖与代码库，仅推理入口类与权重不同。
 
         设备选择优先级：
             1. 显式传入的 ``device`` 参数（优先级最高）
@@ -241,7 +281,7 @@ class IndexTTS2Engine(TTSEngine):
 
         Args:
             model_dir: 模型文件目录路径。``None`` 时回退到
-                ``<project_root>/model/IndexTTS2``。
+                ``<project_root>/model/IndexTTS-2.5``（2.5）或 ``<project_root>/model/IndexTTS-2.0``（2.0）。
             use_bf16: 是否使用 BF16 混合精度推理。仅 CUDA 后端时此参数生效；
                 MPS / CPU 后端会被强制覆盖为 ``False``。
             device: 强制指定运行设备（``"cuda"`` / ``"mps"`` / ``"cpu"``）。
@@ -251,6 +291,7 @@ class IndexTTS2Engine(TTSEngine):
             lang: 合成文本的语言代码（如 ``"zh"`` / ``"en"`` / ``"ja"``），
                 默认 ``"zh"``。
             use_qwen_emo: 是否启用 Qwen 情感标签解析（依赖 Qwen 模型）。
+            version: ``"2.5"`` 或 ``"2.0"``，决定推理入口模块与能力集。
 
         Attributes:
             self.model_dir (str): 实际使用的模型目录绝对路径。
@@ -260,19 +301,40 @@ class IndexTTS2Engine(TTSEngine):
             self.use_bf16 (bool): 最终生效的 BF16 开关（MPS/CPU 下恒为 False）。
             self.lang (str): 默认合成语言代码。
             self.use_qwen_emo (bool): Qwen 情感标签解析开关。
+            self.version_str (str): 变体版本（"2.5" / "2.0"）。
+            self.supports_duration (bool): 是否支持显式时长控制。
+            self.supported_langs (set[str]): 允许的语言代码集合。
             self.tts (Any): 底层 IndexTTS2 推理实例，未加载时为 ``None``。
         """
+        # ========== 版本变体配置 ==========
+        # 2.5 与 2.0 共用本类：唯一差异是推理入口模块、权重目录、能力集。
+        self.version_str: str = "2.0" if str(version) == "2.0" else "2.5"
+        if self.version_str == "2.0":
+            self._infer_module: str = "indextts.infer_v2"
+            self._engine_name: str = "indextts20"
+            self._model_dir_name: str = "IndexTTS-2.0"
+            self._hf_repo: str = "IndexTeam/IndexTTS-2"
+            self.supports_duration: bool = False
+            self.supported_langs: set[str] = {"Auto", "ZH", "EN"}
+        else:
+            self._infer_module = "indextts.infer_v2_5"
+            self._engine_name = "indextts2"
+            self._model_dir_name = "IndexTTS-2.5"
+            self._hf_repo = "IndexTeam/IndexTTS-2.5"
+            self.supports_duration = True
+            self.supported_langs = {"Auto", "ZH", "EN", "JA", "ES", "AR"}
+
         # ========== 延迟导入 GPU 后端模块 ==========
         # 避免在模块级别导入导致无 CUDA 环境下的导入错误
         from ..gpu_backend import GPUBackend, GPUBackendManager
 
         # ========== 模型目录路径解析 ==========
-        # 默认模型目录：<项目根目录>/model/IndexTTS2
+        # 默认模型目录：<项目根目录>/model/IndexTTS-2.5（2.5）或 IndexTTS-2.0（2.0）
         # Path(__file__).parent.parent.parent 定位到项目根：
         #   本文件位于 app/integrated_app/engines/，向上3级到达项目根
         if model_dir is None:
             project_root = Path(__file__).parent.parent.parent
-            model_dir = str(project_root / "model" / "IndexTTS2")
+            model_dir = str(project_root / "model" / self._model_dir_name)
 
         self.model_dir: str = model_dir
         self.use_deepspeed: bool = use_deepspeed
@@ -355,21 +417,33 @@ class IndexTTS2Engine(TTSEngine):
             EngineLoadError: 当任一必需文件缺失或当前进程无读取权限时抛出，
                 错误信息中包含缺失/不可读的文件名列表。
         """
-        required_files: list[str] = [
-            "gpt.pth",
-            "s2mel.pth",
-            "bpe.model",
-            "config.yaml",
-            "feat1.pt",
-            "feat2.pt",
-            "wav2vec2bert_stats.pt",
-            "configuration.json",
-        ]
+        if self.version_str == "2.0":
+            # ⚠️ 2.0 权重仓库（IndexTeam/IndexTTS-2）部分辅助文件名与 2.5 存在
+            #    差异（如 feat*.data vs feat*.pt），尚未逐字核实，先只硬校验两项
+            #    必然存在的核心文件，其余降为可选告警，避免缺省误报阻塞加载。
+            #    权重下载完成后应按实际清单精修此列表。
+            required_files: list[str] = [
+                "config.yaml",
+                "gpt.pth",
+            ]
+        else:
+            required_files = [
+                "gpt.pth",
+                "s2mel.pth",
+                "codec.pth",
+                "config.yaml",
+                "feat1.pt",
+                "feat2.pt",
+                "wav2vec2bert_stats.pt",
+                "configuration.json",
+                "multilingual_zh_ja_yue_char_del.tiktoken",
+            ]
 
-        # 可选但建议文件：IndexTTS 2.5 引入了 BigVGAN 声码器与 CAMPPlus
-        # 说话人模型。由于无法 100% 确认 2.5 精确文件名，为避免缺省时误报
-        # 阻塞加载，这里仅做 warning 提示，不参与必需校验。
+        # 可选文件：不同权重布局可能附带或不附带，缺失仅告警不阻塞。
+        # bpe.model 在 IndexTeam/IndexTTS-2.5 仓库中不存在（以 *.tiktoken 分词器替代），
+        # 保留为可选项以兼容个别历史布局；bigvgan/campplus 为 2.5 建议文件。
         optional_files: list[str] = [
+            "bpe.model",
             "bigvgan.pth",
             "campplus.pth",
         ]
@@ -399,7 +473,7 @@ class IndexTTS2Engine(TTSEngine):
                 f"IndexTTS 2.5 模型文件不可读: {problematic_files}\n"
                 f"请运行: python scripts/download_indextts2.py 下载模型，"
                 f"或检查目录权限。",
-                engine="indextts2",
+                engine=self._engine_name,
             )
 
         logger.info(f"[IndexTTS2] 模型文件验证通过: {self.model_dir}")
@@ -420,17 +494,37 @@ class IndexTTS2Engine(TTSEngine):
             EngineLoadError: 其他模型权重加载失败场景（损坏、版本不兼容等）。
         """
         try:
-            from indextts.infer_v2_5 import IndexTTS2
+            import importlib
+
+            _infer_mod = importlib.import_module(self._infer_module)
+            IndexTTS2 = _infer_mod.IndexTTS2
         except ImportError as e:
             raise ImportError(
-                "indextts 未安装或缺少 IndexTTS 2.5 推理模块，请运行: pip install indextts\n"
-                "或参考: https://github.com/index-tts/index-tts"
+                f"indextts 未安装或缺少 {self._infer_module} 推理模块。"
+                "PyPI 无 'indextts' 包，请从官方仓库安装：\n"
+                "  git clone https://github.com/index-tts/index-tts.git\n"
+                "  cd index-tts && pip install -e .\n"
+                "（2.0 与 2.5 共用同一仓库，安装一次即同时提供 infer_v2 与 infer_v2_5）"
             ) from e
 
         config_path = os.path.join(self.model_dir, "config.yaml")
 
         logger.info("[IndexTTS2] 开始加载模型...")
         start_time = time.time()
+
+        # ---- 兼容性补丁 1：用 soundfile 替换 save_pcm_wav，绕开 torchcodec ----
+        # torchaudio>=2.9 把 WAV 编码委托给 TorchCodec（本机未安装、且无 ffmpeg），
+        # 会导致 infer 保存阶段 ImportError。此处仅替换 IndexTTS 推理模块命名空间内的
+        # save_pcm_wav 绑定为 soundfile 实现，作用域限于本引擎，不修改第三方源码。
+        try:
+            _infer_mod.save_pcm_wav = _save_pcm_wav_soundfile  # type: ignore[attr-defined]
+            logger.info("[IndexTTS2] 已启用 soundfile WAV 保存补丁（绕开 torchcodec）")
+        except Exception as _patch_err:
+            logger.warning(f"[IndexTTS2] save_pcm_wav 补丁应用失败（将回退 torchaudio）: {_patch_err}")
+
+        # ---- 兼容性补丁 2：2.0 与 2.5 构造函数精度参数名不同 ----
+        # infer_v2（2.0）用 use_fp16；infer_v2_5（2.5）用 use_bf16。
+        precision_kwarg = {"use_fp16": self.use_bf16} if self.version_str == "2.0" else {"use_bf16": self.use_bf16}
 
         try:
             # WHY use_cuda_kernel=False 默认：
@@ -441,10 +535,10 @@ class IndexTTS2Engine(TTSEngine):
             self.tts = IndexTTS2(
                 cfg_path=config_path,
                 model_dir=self.model_dir,
-                use_bf16=self.use_bf16,
                 use_cuda_kernel=False,
                 use_deepspeed=self.use_deepspeed,
                 use_qwen_emo=self.use_qwen_emo,
+                **precision_kwarg,
             )
         except RuntimeError as e:
             err_msg = str(e).lower()
@@ -464,7 +558,7 @@ class IndexTTS2Engine(TTSEngine):
                 ) from e
             raise EngineLoadError(
                 f"IndexTTS2 模型加载失败 (RuntimeError): {e}",
-                engine="indextts2",
+                engine=self._engine_name,
             ) from e
         except TTSError:
             raise
@@ -472,7 +566,7 @@ class IndexTTS2Engine(TTSEngine):
             logger.exception(f"[IndexTTS2] 模型加载失败: {e}")
             raise EngineLoadError(
                 f"IndexTTS2 模型加载失败: {type(e).__name__}: {e}",
-                engine="indextts2",
+                engine=self._engine_name,
             ) from e
 
         load_time = time.time() - start_time
@@ -595,7 +689,7 @@ class IndexTTS2Engine(TTSEngine):
         if not self.is_ready():
             raise EngineNotLoadedError(
                 "IndexTTS2 引擎未加载，请先调用 load() 或切换引擎。",
-                engine="indextts2",
+                engine=self._engine_name,
             )
 
         if not text or not text.strip():
@@ -687,9 +781,15 @@ class IndexTTS2Engine(TTSEngine):
             # - alpha=1.0：完全使用情感嵌入，情感最强但可能出现失真
             infer_kwargs["emo_alpha"] = emo_alpha
 
-            # ========== 时长控制参数（互斥） ==========
+            # ========== 时长控制参数（互斥，仅 2.5 支持） ==========
             # target_duration 优先级高于 duration_factor
-            if target_duration and target_duration > 0:
+            if not self.supports_duration:
+                if (target_duration and target_duration > 0) or duration_factor != 1.0:
+                    logger.debug(
+                        f"[IndexTTS2] {self.version} 不支持显式时长控制，"
+                        f"忽略 target_duration/duration_factor（语速请用后处理 tempo）"
+                    )
+            elif target_duration and target_duration > 0:
                 # 精确时长控制模式：模型会通过时长预测器调整 mel 谱长度
                 # 使最终音频时长精确匹配目标值（误差通常 < 0.1 秒）
                 # 适用场景：对口型、视频配音、固定时长广告等
@@ -708,10 +808,18 @@ class IndexTTS2Engine(TTSEngine):
             if seed is not None:
                 infer_kwargs["seed"] = int(seed)
 
-            # ========== 语言设置 ==========
-            # 指定合成文本的语言代码，交由底层 2.5 模型处理。
-            # 显式传入的 lang 优先；否则使用构造时保存的 self.lang（默认 "Auto"）。
-            infer_kwargs["lang"] = lang if lang is not None else self.lang
+            # ========== 语言设置（仅 2.5 的 infer 接受 lang 形参） ==========
+            # infer_v2（2.0）的 infer() 无 lang 参数，若下传会落入 **generation_kwargs
+            # 被 model.generate 拒绝（ValueError: model_kwargs 'lang' not used）。
+            # 故 lang 仅在 2.5 下传；2.0 只校验语言、不注入。
+            _lang_val = lang if lang is not None else self.lang
+            if _lang_val not in self.supported_langs:
+                logger.debug(
+                    f"[IndexTTS2] {self.version} 不支持语言 {_lang_val}，回退 Auto"
+                )
+                _lang_val = "Auto"
+            if self.version_str == "2.5":
+                infer_kwargs["lang"] = _lang_val
 
             # 透传额外 kwargs，支持高级用户传入底层 IndexTTS2 的其他参数
             infer_kwargs.update(kwargs)
@@ -735,12 +843,22 @@ class IndexTTS2Engine(TTSEngine):
 
             GPUBackendManager.synchronize(device=self.device)
 
-            # 底层 infer 返回 (sample_rate, wav_tensor) 元组
-            # wav_tensor 可能是 torch.Tensor 或 numpy.ndarray，统一转换为 numpy
-            # 返回格式异常时安全降级为空数组而非崩溃
+            # 底层 infer 返回格式随版本不同：
+            #   - 2.5（infer_v2_5）返回 (sample_rate, wav_tensor) 元组
+            #   - 2.0（infer_v2）仅返回已写盘的输出路径 str（无元组）
+            # 统一规整为 (sample_rate, wav_ndarray)，保证对外契约一致。
             if isinstance(result, tuple) and len(result) >= 2:
                 sample_rate, wav = int(result[0]), np.asarray(result[1])
                 logger.debug(f"[IndexTTS2] 推理完成: sample_rate={sample_rate}, wav_shape={wav.shape}")
+            elif isinstance(result, (str, os.PathLike)) and os.path.exists(str(result)):
+                # 2.0：infer 只回写文件路径，用 soundfile 读回波形
+                import soundfile as _sf
+
+                wav, sample_rate = _sf.read(str(result))
+                wav = np.asarray(wav, dtype=np.float32)
+                logger.debug(
+                    f"[IndexTTS2] 2.0 从输出文件读回波形: sr={sample_rate}, shape={wav.shape}"
+                )
             else:
                 logger.warning(f"[IndexTTS2] 推理返回格式异常: {type(result)}")
                 sample_rate, wav = 22050, np.zeros(0, dtype=np.float32)
@@ -762,7 +880,7 @@ class IndexTTS2Engine(TTSEngine):
                     os.unlink(output_path)
             raise GenerationError(
                 f"IndexTTS 2.5 合成失败: {type(e).__name__}: {e}",
-                engine="indextts2",
+                engine=self._engine_name,
             ) from e
 
     def synthesize(
@@ -1018,9 +1136,11 @@ class IndexTTS2Engine(TTSEngine):
         """返回引擎版本标识字符串。
 
         Returns:
-            str: 固定为 ``"IndexTTS 2.5"``。
+            str: ``"IndexTTS 2.0"`` 或 ``"IndexTTS 2.5"``（依构造时的 version 变体；
+                在类上非绑定读取时按类属性 ``version_str`` 默认判定）。
         """
-        return "IndexTTS 2.5"
+        _v = getattr(self, "version_str", "2.5")
+        return "IndexTTS 2.0" if _v == "2.0" else "IndexTTS 2.5"
 
     @property
     def min_vram_gb(self) -> float:
@@ -1153,3 +1273,26 @@ class IndexTTS2Engine(TTSEngine):
             "Streaming generation is not supported by IndexTTS2 engine. "
             "Please switch to VoxCPM2 engine for streaming features."
         )
+
+
+class IndexTTS20Engine(IndexTTS2Engine):
+    """IndexTTS 2.0 引擎 —— ``IndexTTS2Engine`` 的薄子类。
+
+    仅把 ``version`` 默认锁定为 ``"2.0"``，从而复用全部加载/推理/情感控制
+    逻辑，差异（推理模块 ``indextts.infer_v2``、权重目录 ``model/IndexTTS-2.0``、
+    注册名 ``indextts20``、无显式时长、仅中英）全部由基类按 version 变体处理。
+    设置独立的类引用名，便于 :func:`engine_registry.register` 以
+    ``.engines.indextts2_engine:IndexTTS20Engine`` 懒导入注册第三个引擎。
+    """
+
+    version_str: str = "2.0"
+
+    def __init__(self, *args: Any, version: str = "2.0", **kwargs: Any) -> None:
+        """构造 IndexTTS 2.0 引擎实例。
+
+        Args:
+            *args: 透传给 :class:`IndexTTS2Engine` 的位置参数。
+            version: 固定默认 ``"2.0"``（显式传入其他值将覆盖）。
+            **kwargs: 透传给 :class:`IndexTTS2Engine` 的关键字参数。
+        """
+        super().__init__(*args, version=version, **kwargs)

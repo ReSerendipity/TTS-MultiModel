@@ -462,56 +462,42 @@ def load_voxcpm2(
 
 def load_indextts2(
     progress_callback: Callable[..., None] | None = None,
+    version: str = "2.5",
 ) -> Generator[tuple[str, None, None, None], None, None]:
-    """加载 IndexTTS 2.5 引擎（生成器进度事件流）。
-
-    Generator function to load IndexTTS 2.5 engine step by step.
-
-    生成器产出格式（每条均为 ``(status_text, None, None, None)`` 四元组，
-    兼容调用方 ``for status_text, _, _, _ in gen:`` 解包）：
-        1. ``"正在检查系统资源..."``：
-           校验 ``get_indextts2_model_path()`` 是否存在并查询显存状态。
-        2. ``"正在加载 IndexTTS 2.5 引擎..."``：
-           构造 ``IndexTTS2Engine``，内部依次加载 VQ Encoder、
-           Flow Matching 主干、HiFi-GAN Vocoder 等子模块。
-        3. ``"IndexTTS 2.5 引擎就绪"``：加载完成。
-        4. 异常时：``"IndexTTS 2.5 加载失败: <ErrType>: <msg>"``。
-
-    ``try/finally`` 保证：
-        a) 半加载异常时清理 ``registry.indextts2_engine``；
-        b) ``gc.collect()`` + ``GPUBackendManager.empty_cache()`` +
-           ``free_gpu_memory()`` 分层释放；
-        c) 释放 ``_model_lock``。
+    """加载 IndexTTS 引擎（2.5 / 2.0 双版本共用，生成器进度事件流）。
 
     Args:
-        progress_callback (Optional[Callable[..., None]]): 预留回调参数
-            （保持签名兼容；默认 ``None``）。
+        progress_callback: 预留回调参数（保持签名兼容；默认 ``None``）。
+        version: ``"2.5"``（默认）或 ``"2.0"``。决定权重目录、注册名与提示文案。
 
     Yields:
-        tuple[str, None, None, None]:
-            ``(status_text, None, None, None)`` 四元组；``status_text``
-            为当前阶段描述；其余三个位置为历史占位（保持不变）。
+        tuple[str, None, None, None]: ``(status_text, None, None, None)`` 四元组。
     """
     _model_lock.acquire()
+    is_v20 = str(version) == "2.0"
+    engine_name = EngineName.INDEXTTS20.value if is_v20 else EngineName.INDEXTTS2.value
+    label = "IndexTTS 2.0" if is_v20 else "IndexTTS 2.5"
+    model_path = get_indextts20_model_path() if is_v20 else get_indextts2_model_path()
+    download_script = "scripts/download_indextts20.py" if is_v20 else "scripts/download_indextts2.py"
     # 模型加载开始时重置显存泄漏检测基线，避免加载期间显存上升导致误报
     get_health_monitor().reset_vram_baseline()
     try:
-        from .engines.indextts2_engine import IndexTTS2Engine
+        from ..engines.indextts2_engine import IndexTTS2Engine
         from ..gpu_backend import GPUBackend, GPUBackendManager
 
         backend: GPUBackend = GPUBackendManager.detect_backend()
 
         # Check if model files exist
-        if not os.path.exists(get_indextts2_model_path()):
+        if not os.path.exists(model_path):
             raise FileNotFoundError(
-                f"IndexTTS 2.5 模型文件不存在: {get_indextts2_model_path()}\n"
-                "请运行: python scripts/download_indextts2.py 下载模型"
+                f"{label} 模型文件不存在: {model_path}\n"
+                f"请运行: python {download_script} 下载模型"
             )
 
         # Step 1: VRAM/RAM check
         from ..model_registry import ENGINE_VRAM_REQUIREMENTS
 
-        needed_vram_gb: float = ENGINE_VRAM_REQUIREMENTS.get(EngineName.INDEXTTS2.value, 6.0)
+        needed_vram_gb: float = ENGINE_VRAM_REQUIREMENTS.get(engine_name, 6.0)
         status_text: str = "正在检查系统资源..."
         if progress_callback is not None:
             with contextlib.suppress(Exception):
@@ -530,24 +516,25 @@ def load_indextts2(
                 logger.debug(f"[IndexTTS2] 显存查询失败（跳过预检）: {mem_err}")
 
         # Step 2: Load model
-        status_text = "正在加载 IndexTTS 2.5 引擎..."
+        status_text = f"正在加载 {label} 引擎..."
         if progress_callback is not None:
             with contextlib.suppress(Exception):
                 progress_callback(status_text)
         yield status_text, None, None, None
 
-        logger.info("[IndexTTS2] 开始加载 IndexTTS 2.5 引擎...")
+        logger.info(f"[IndexTTS2] 开始加载 {label} 引擎...")
         start_time: float = time.time()
 
         new_engine: Any = IndexTTS2Engine(
-            model_dir=get_indextts2_model_path(),
+            model_dir=model_path,
             use_bf16=(backend != GPUBackend.CPU),
+            version="2.0" if is_v20 else "2.5",
         )
 
         load_time: float = time.time() - start_time
-        logger.info(f"[IndexTTS2] IndexTTS 2.5 引擎加载完成，耗时: {load_time:.1f}秒")
+        logger.info(f"[IndexTTS2] {label} 引擎加载完成，耗时: {load_time:.1f}秒")
 
-        registry.set_indextts2_loaded(new_engine)
+        registry.set_indextts2_loaded(new_engine, engine_name=engine_name)
 
         # IndexTTS2 预热推理
         try:
@@ -560,7 +547,7 @@ def load_indextts2(
         except Exception as idx_warmup_err:
             logger.debug(f"IndexTTS2 预热失败（可忽略）: {idx_warmup_err}")
 
-        status_text = "IndexTTS 2.5 引擎就绪"
+        status_text = f"{label} 引擎就绪"
         logger.info(f"[IndexTTS2] {status_text}")
         if progress_callback is not None:
             with contextlib.suppress(Exception):
@@ -580,24 +567,37 @@ def load_indextts2(
         logger.error(f"[IndexTTS2] 文件系统错误: {fs_err}")
         with contextlib.suppress(Exception):
             free_gpu_memory()
-        error_msg: str = f"IndexTTS 2.5 加载失败: {type(fs_err).__name__}: {fs_err}"
+        error_msg: str = f"{label} 加载失败: {type(fs_err).__name__}: {fs_err}"
         yield error_msg, None, None, None
     except Exception as e:
         import traceback
 
         tb: str = traceback.format_exc()
-        logger.error(f"[IndexTTS2] IndexTTS 2.5 加载失败: {type(e).__name__}: {e}\n详细错误:\n{tb}")
+        logger.error(f"[IndexTTS2] {label} 加载失败: {type(e).__name__}: {e}\n详细错误:\n{tb}")
         gc.collect()
         from ..gpu_backend import GPUBackendManager
 
         with contextlib.suppress(Exception):
             GPUBackendManager.empty_cache()
             free_gpu_memory()
-        error_msg = f"IndexTTS 2.5 加载失败: {type(e).__name__}: {e}"
+        error_msg = f"{label} 加载失败: {type(e).__name__}: {e}"
         yield error_msg, None, None, None
     finally:
         with contextlib.suppress(Exception):
             _model_lock.release()
+
+
+def load_indextts20(
+    progress_callback: Callable[..., None] | None = None,
+) -> Generator[tuple[str, None, None, None], None, None]:
+    """加载 IndexTTS 2.0 引擎（复用 ``load_indextts2``，version="2.0"）。
+
+    与 2.5 共用同一推理代码包与引擎槽位（互斥），仅权重目录与入口类不同。
+
+    Yields:
+        同 :func:`load_indextts2` 的 ``(status_text, None, None, None)`` 四元组。
+    """
+    yield from load_indextts2(progress_callback=progress_callback, version="2.0")
 
 
 # ====================================================================

@@ -36,10 +36,10 @@ CAMPPlus 说话人模型、w2v-bert-2.0 特征提取器）。这些辅助模型*
     python scripts/download_indextts2.py
 
 下载目标目录:
-    model/IndexTTS2/
+    model/IndexTTS-2.5/
 
 下载完成后:
-    1. 安装 IndexTTS 2.5 依赖: pip install indextts
+    1. 安装 index-tts 代码包（PyPI 无 'indextts' 包）: git clone https://github.com/index-tts/index-tts && cd index-tts && pip install -e .
     2. 重启应用（start.bat 或 clean_launch.py）
     3. IndexTTS 2.5 引擎将自动出现在引擎切换选项中
 
@@ -64,7 +64,7 @@ def download_indextts2_model():
 
     功能说明:
         使用 modelscope 的 snapshot_download 函数下载 IndexTeam/IndexTTS-2.5 仓库
-        到本地 model/IndexTTS2 目录。下载完成后验证所有必需文件是否存在，
+        到本地 model/IndexTTS-2.5 目录。下载完成后验证所有必需文件是否存在，
         并打印每个文件的大小信息。
 
     Returns:
@@ -94,7 +94,7 @@ def download_indextts2_model():
         sys.exit(1)
 
     project_root = Path(__file__).parent.parent
-    model_dir = project_root / "model" / "IndexTTS2"
+    model_dir = project_root / "model" / "IndexTTS-2.5"
 
     logger.info(f"目标目录: {model_dir}")
     logger.info("开始下载 IndexTTS 2.5 模型...")
@@ -115,16 +115,18 @@ def download_indextts2_model():
 
         logger.info(f"下载完成: {downloaded_path}")
 
-        # 验证文件
+        # 验证文件（与 IndexTeam/IndexTTS-2.5 实际仓库布局对齐：
+        # 该仓库无 bpe.model，分词器为 *.tiktoken；额外含 codec.pth 语义编解码）
         required_files = [
             "gpt.pth",
             "s2mel.pth",
-            "bpe.model",
+            "codec.pth",
             "config.yaml",
             "feat1.pt",
             "feat2.pt",
             "wav2vec2bert_stats.pt",
             "configuration.json",
+            "multilingual_zh_ja_yue_char_del.tiktoken",
         ]
 
         missing_files = []
@@ -198,7 +200,9 @@ def main():
         print("✅ 下载完成！")
         print()
         print("下一步:")
-        print("  1. 安装 IndexTTS 2.5 依赖: pip install indextts")
+        print("  1. 安装 index-tts 代码包（PyPI 无 'indextts' 包，需从仓库安装）：")
+        print("     git clone https://github.com/index-tts/index-tts.git")
+        print("     cd index-tts && pip install -e .")
         print("  2. 重启应用，IndexTTS 2.5 引擎将自动可用")
     else:
         print("❌ 下载失败，请检查网络连接后重试")

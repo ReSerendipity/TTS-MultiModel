@@ -89,6 +89,15 @@ class EngineName(str, Enum):
 
     VOXCPM2 = "voxcpm2"
     INDEXTTS2 = "indextts2"
+    INDEXTTS20 = "indextts20"
+
+
+#: IndexTTS 家族成员集合。2.5（indextts2）与 2.0（indextts20）是同一推理
+#: 代码包的两个版本变体，运行期复用同一个引擎槽位（互斥，同一时刻仅一个激活），
+#: 因此所有"是否 IndexTTS / 取 IndexTTS 实例"的判断都按本集合处理，避免硬编码单值。
+INDEXTTS_VARIANTS: frozenset[str] = frozenset(
+    {EngineName.INDEXTTS2.value, EngineName.INDEXTTS20.value}
+)
 
 
 #: 引擎标识符到前端 UI 显示名称的映射字典。
@@ -98,6 +107,7 @@ class EngineName(str, Enum):
 ENGINE_DISPLAY_NAMES: dict[str, str] = {
     EngineName.VOXCPM2.value: "VoxCPM2",
     EngineName.INDEXTTS2.value: "IndexTTS 2.5",
+    EngineName.INDEXTTS20.value: "IndexTTS 2.0",
 }
 
 #: 各引擎的基线显存需求字典（单位 GB，浮点数）。
@@ -108,6 +118,7 @@ ENGINE_DISPLAY_NAMES: dict[str, str] = {
 ENGINE_VRAM_REQUIREMENTS: dict[str, float] = {
     EngineName.VOXCPM2.value: 6.5,
     EngineName.INDEXTTS2.value: 6.0,
+    EngineName.INDEXTTS20.value: 5.5,
 }
 
 # --- 声明式引擎规格缓存（由 load_engine_specs_from_config 填充） ---
@@ -447,25 +458,30 @@ class ModelRegistry:
             self._current_size = EngineName.VOXCPM2.value
         self._notify_sse()
 
-    def set_indextts2_loaded(self, engine: Any) -> None:
-        """原子性设置 IndexTTS 2.5 已加载状态，并触发 SSE engine_switch 事件。
+    def set_indextts2_loaded(self, engine: Any, engine_name: str | None = None) -> None:
+        """原子性设置 IndexTTS 引擎已加载状态，并触发 SSE engine_switch 事件。
+
+        IndexTTS 2.5 与 2.0 复用同一引擎槽位 ``_indextts2_engine``（互斥），
+        通过 ``engine_name`` 区分当前激活的具体变体（默认 2.5，向后兼容既有调用）。
 
         在单次 RLock 持有时间内完成：
         1. 写入引擎实例 ``_indextts2_engine``。
-        2. 将 ``current_engine / current_type / current_size`` 全部切换为 ``"indextts2"``。
+        2. 将 ``current_engine / current_type / current_size`` 全部切换为 ``engine_name``。
 
         Note:
             本方法**仅修改状态**，真正的引擎加载由 :mod:`model_manager` 完成。
             状态变更后自动调用 :meth:`_notify_sse` 推送 ``engine_switch`` 事件。
 
         Args:
-            engine: 已加载并初始化完成的 IndexTTS2Engine 实例。
+            engine: 已加载并初始化完成的 IndexTTS 引擎实例（2.5 或 2.0）。
+            engine_name: 激活变体注册名，``"indextts2"``（默认）或 ``"indextts20"``。
         """
+        name = engine_name or EngineName.INDEXTTS2.value
         with self._lock:
             self._indextts2_engine = engine
-            self._current_engine = EngineName.INDEXTTS2.value
-            self._current_type = EngineName.INDEXTTS2.value
-            self._current_size = EngineName.INDEXTTS2.value
+            self._current_engine = name
+            self._current_type = name
+            self._current_size = name
         self._notify_sse()
 
     def set_engine_loaded(self, name: str, instance: Any) -> None:
@@ -580,7 +596,10 @@ class ModelRegistry:
             满足两个条件时返回 ``True``，否则 ``False``。
         """
         with self._lock:
-            return self._indextts2_engine is not None and self._current_engine == EngineName.INDEXTTS2.value
+            return (
+                self._indextts2_engine is not None
+                and self._current_engine in INDEXTTS_VARIANTS
+            )
 
     def is_engine_ready(self) -> bool:
         """判断当前激活引擎是否就绪。
@@ -595,7 +614,7 @@ class ModelRegistry:
             engine = self._current_engine
         if engine == EngineName.VOXCPM2.value:
             return self.is_voxcpm_ready()
-        elif engine == EngineName.INDEXTTS2.value:
+        elif engine in INDEXTTS_VARIANTS:
             return self.is_indextts2_ready()
         # 通用新式引擎：委托引擎实例自身的 is_ready()
         if engine:
@@ -652,10 +671,8 @@ class ModelRegistry:
                     "control_enabled": self.voxcpm_control_enabled,
                 }
             elif (
-                engine == EngineName.INDEXTTS2.value
-                and self._indextts2_engine is not None
-                or engine
-                and self._engines.get(engine) is not None
+                (engine in INDEXTTS_VARIANTS and self._indextts2_engine is not None)
+                or (engine and self._engines.get(engine) is not None)
             ):
                 info = {
                     "engine": self._current_engine,
@@ -717,7 +734,7 @@ class ModelRegistry:
                     logger.exception("[ModelRegistry] VoxCPM2Engine 懒实例化失败")
                     return None
             return self._voxcpm2_engine_instance
-        elif self.current_engine == EngineName.INDEXTTS2.value and self.indextts2_engine is not None:
+        elif self.current_engine in INDEXTTS_VARIANTS and self.indextts2_engine is not None:
             return self.indextts2_engine
         # 通用新式引擎：直接返回通用容器中的实例
         current = self.current_engine
@@ -896,7 +913,8 @@ class MultiEngineRegistry:
         if self._registry.voxcpm_model is not None:
             names.append(EngineName.VOXCPM2.value)
         if self._registry.indextts2_engine is not None:
-            names.append(EngineName.INDEXTTS2.value)
+            cur = self._registry.current_engine
+            names.append(cur if cur in INDEXTTS_VARIANTS else EngineName.INDEXTTS2.value)
         return names
 
 
