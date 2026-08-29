@@ -10,8 +10,10 @@ repos:
       - id: ruff
         args: [--fix]
         files: ^(app/integrated_app|scripts|tests)/
+        exclude: ^app/integrated_app/vendor/
       - id: ruff-format
         files: ^(app/integrated_app|scripts|tests)/
+        exclude: ^app/integrated_app/vendor/
 
   # Standard pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -49,7 +51,7 @@ repos:
 
   # Shell scripts
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.10.1.0
+    rev: v0.11.0.1
     hooks:
       - id: shellcheck
         files: \.sh$
@@ -67,7 +69,7 @@ repos:
       # P1 安全修复：禁止提交包含 PRIVATE KEY 标记的 .env 或其他文件
       - id: forbid-private-key-in-env
         name: Forbid PRIVATE KEY in .env files
-        entry: python -c "import sys; [sys.exit(1) for f in sys.argv[1:] if any(b'PRIVATE KEY' in open(f,'rb').read()[:4096] for _ in [0])]" 
+        entry: python -c "import sys; [sys.exit(1) for f in sys.argv[1:] if any(b'PRIVATE KEY' in open(f,'rb').read()[:4096] for _ in [0])]"
         language: system
         files: \.env$
         pass_filenames: true

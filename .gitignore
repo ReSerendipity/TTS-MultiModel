@@ -389,3 +389,10 @@ docs/_devarchive/
 docs/plans/
 docs/project/
 docs/整理记录_20260823.md
+
+# 本地预检脚本（不入库）
+precheck.ps1
+
+# 模型权重与运行数据（禁止提交）
+checkpoints/
+data/
