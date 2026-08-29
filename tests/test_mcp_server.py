@@ -8,22 +8,20 @@ Covers:
 - Response serialization (to_json)
 """
 
-import asyncio
 import json
 
 import pytest
 
 from integrated_app.mcp_server import (
     MCP_PROTOCOL_VERSION,
+    MCP_SERVER_NAME,
+    MCP_SERVER_VERSION,
     MCPRequest,
     MCPResponse,
     MCPServer,
-    MCP_SERVER_NAME,
-    MCP_SERVER_VERSION,
     MCPTool,
     run_mcp_server,
 )
-
 
 # ---------------------------------------------------------------------------
 # Dataclass tests

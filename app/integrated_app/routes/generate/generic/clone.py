@@ -3,7 +3,7 @@
 **端点**：POST ``/api/generate/generic/clone``
 
 **适用引擎**：任何实现 ``TTSEngine.generate_voice_clone`` 的当前激活引擎，
-    
+
 
 **表单参数（multipart/form-data）**：
     - text (str, 必填)：待合成文本。
@@ -14,7 +14,7 @@
     - tempo_factor / voice_enhancement / target_lufs：通用后处理参数。
 
 **引擎专属高级参数（折叠区，用户可视场景选择是否调整）**：
-    
+
     由于 ``TTSEngine.generate_voice_clone`` 协议定义为 ``**kwargs``，
     路由将这些参数透传给当前激活引擎，未匹配字段会被引擎忽略，
     因此一条端点可同时服务多个引擎。
@@ -59,7 +59,7 @@ async def generic_clone_endpoint(
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
     target_lufs: float = Form(-16.0),
-        num_steps: int = Form(10),
+    num_steps: int = Form(10),
     guidance_scale: float = Form(1.2),
     seed: int = Form(42),
     random_seed: str = Form("true"),

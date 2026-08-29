@@ -16,7 +16,6 @@
 
 import os
 import sys
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -35,23 +34,27 @@ class TestLRUCache:
 
     def test_create_cache(self):
         from integrated_app.cache import LRUCache
+
         cache = LRUCache(maxsize=5)
         assert cache._maxsize == 5
         assert cache.get("nonexistent") is None  # Empty cache returns None
 
     def test_put_and_get(self):
         from integrated_app.cache import LRUCache
+
         cache = LRUCache(maxsize=5)
         cache.put("key1", "value1")
         assert cache.get("key1") == "value1"
 
     def test_get_nonexistent(self):
         from integrated_app.cache import LRUCache
+
         cache = LRUCache(maxsize=5)
         assert cache.get("nonexistent") is None
 
     def test_eviction_on_overflow(self):
         from integrated_app.cache import LRUCache
+
         cache = LRUCache(maxsize=3)
         cache.put("a", 1)
         cache.put("b", 2)
@@ -62,6 +65,7 @@ class TestLRUCache:
 
     def test_lru_order(self):
         from integrated_app.cache import LRUCache
+
         cache = LRUCache(maxsize=3)
         cache.put("a", 1)
         cache.put("b", 2)
@@ -74,6 +78,7 @@ class TestLRUCache:
 
     def test_cache_size_via_stats(self):
         from integrated_app.cache import LRUCache
+
         cache = LRUCache(maxsize=5)
         cache.put("a", 1)
         cache.put("b", 2)
@@ -83,6 +88,7 @@ class TestLRUCache:
     def test_clear_cache_not_available_on_base(self):
         """LRUCache 基类没有 clear 方法，AdaptiveLRUCache 有。"""
         from integrated_app.cache import LRUCache
+
         cache = LRUCache(maxsize=5)
         cache.put("a", 1)
         # LRUCache doesn't have clear, but get still works
@@ -90,6 +96,7 @@ class TestLRUCache:
 
     def test_contains(self):
         from integrated_app.cache import LRUCache
+
         cache = LRUCache(maxsize=5)
         cache.put("key", "value")
         assert "key" in cache
@@ -101,6 +108,7 @@ class TestAdaptiveLRUCache:
 
     def test_create_adaptive_cache(self):
         from integrated_app.cache import AdaptiveLRUCache
+
         cache = AdaptiveLRUCache(default_maxsize=10)
         assert cache.get("nonexistent") is None  # Empty cache returns None
         cache.put("k", "v")
@@ -108,12 +116,14 @@ class TestAdaptiveLRUCache:
 
     def test_adaptive_put_and_get(self):
         from integrated_app.cache import AdaptiveLRUCache
+
         cache = AdaptiveLRUCache(default_maxsize=10)
         cache.put("key", "value")
         assert cache.get("key") == "value"
 
     def test_adaptive_clear(self):
         from integrated_app.cache import AdaptiveLRUCache
+
         cache = AdaptiveLRUCache(default_maxsize=10)
         cache.put("key", "value")
         cache.clear()
@@ -130,6 +140,7 @@ class TestProgressManager:
 
     def test_create_progress_manager(self):
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         state = pm.get_state()
         assert isinstance(state, dict)
@@ -137,6 +148,7 @@ class TestProgressManager:
 
     def test_start_progress(self):
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1)
         state = pm.get_state()
@@ -146,6 +158,7 @@ class TestProgressManager:
 
     def test_complete_progress(self):
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1)
         pm.complete()
@@ -154,6 +167,7 @@ class TestProgressManager:
 
     def test_get_percentage(self):
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1)
         pct = pm.get_percentage()
@@ -170,6 +184,7 @@ class TestGenerationTracker:
 
     def test_create_tracker(self):
         from integrated_app.tracker import GenerationTracker
+
         tracker = GenerationTracker()
         info = tracker.get_info()
         assert isinstance(info, dict)
@@ -178,6 +193,7 @@ class TestGenerationTracker:
 
     def test_start_generation_returns_id(self):
         from integrated_app.tracker import GenerationTracker
+
         tracker = GenerationTracker()
         gen_id = tracker.start_generation()
         assert gen_id is not None
@@ -185,6 +201,7 @@ class TestGenerationTracker:
 
     def test_get_info(self):
         from integrated_app.tracker import GenerationTracker
+
         tracker = GenerationTracker()
         tracker.start_generation()
         info = tracker.get_info()
@@ -196,6 +213,7 @@ class TestGenerationTracker:
 
     def test_end_generation(self):
         from integrated_app.tracker import GenerationTracker
+
         tracker = GenerationTracker()
         tracker.start_generation()
         tracker.end_generation(elapsed=1.5)
@@ -214,20 +232,24 @@ class TestGPUUtils:
 
     def test_is_oom_error_with_oom_message(self):
         from integrated_app.gpu_utils import is_oom_error
+
         err = RuntimeError("CUDA out of memory. Tried to allocate 2.00 GiB")
         assert is_oom_error(err) is True
 
     def test_is_oom_error_with_non_oom_message(self):
         from integrated_app.gpu_utils import is_oom_error
+
         err = RuntimeError("Some other error")
         assert is_oom_error(err) is False
 
     def test_is_oom_error_with_none(self):
         from integrated_app.gpu_utils import is_oom_error
+
         assert is_oom_error(None) is False
 
     def test_get_gpu_device_no_cuda(self):
         from integrated_app.gpu_utils import get_gpu_device
+
         device = get_gpu_device()
         # Without CUDA, should return "cpu" or None
         # When torch is imported, may return torch.device("cpu")
@@ -235,14 +257,17 @@ class TestGPUUtils:
 
     def test_free_gpu_memory_no_crash(self):
         from integrated_app.gpu_utils import free_gpu_memory
+
         # Should not crash even without GPU
         free_gpu_memory()
 
     def test_gpu_memory_monitor_creation(self):
         from integrated_app.gpu_utils import GPUMemoryMonitor
+
         monitor = GPUMemoryMonitor()
-        assert hasattr(GPUMemoryMonitor, 'get_vram_info')
-        assert hasattr(GPUMemoryMonitor, 'can_load_model')
+        assert monitor is not None
+        assert hasattr(GPUMemoryMonitor, "get_vram_info")
+        assert hasattr(GPUMemoryMonitor, "can_load_model")
         # On CPU-only systems, should return zeros without crashing
         info = GPUMemoryMonitor.get_vram_info()
         assert isinstance(info, dict)
@@ -258,22 +283,26 @@ class TestHistoryDB:
 
     def test_history_db_importable(self):
         from integrated_app.history_db import HistoryDatabase
+
         assert hasattr(HistoryDatabase, "insert")
         assert hasattr(HistoryDatabase, "query")
         assert hasattr(HistoryDatabase, "count")
 
     def test_history_db_creation(self, tmp_path):
         from integrated_app.history_db import HistoryDatabase
+
         db_path = str(tmp_path / "test_history.db")
         db = HistoryDatabase(db_path)
         assert hasattr(db, "insert")
         assert hasattr(db, "query")
         # Verify DB file was created
         import os
+
         assert os.path.exists(db_path)
 
     def test_history_db_add_record(self, tmp_path):
         from integrated_app.history_db import HistoryDatabase
+
         db_path = str(tmp_path / "test_history.db")
         db = HistoryDatabase(db_path)
         if hasattr(db, "add_record"):
@@ -288,6 +317,7 @@ class TestHistoryDB:
 
     def test_history_db_get_records(self, tmp_path):
         from integrated_app.history_db import HistoryDatabase
+
         db_path = str(tmp_path / "test_history.db")
         db = HistoryDatabase(db_path)
         if hasattr(db, "get_records"):
@@ -328,15 +358,18 @@ class TestSSERoutes:
 
     def test_sse_event_bus_singleton(self):
         from integrated_app.routes.sse import event_bus
+
         assert event_bus is not None
 
     def test_sse_event_creation(self):
         from integrated_app.routes.sse import SSEEvent
+
         event = SSEEvent(type="test", data={"key": "value"})
         assert event.type == "test"
 
     def test_sse_notify_no_crash(self):
         from integrated_app.routes.sse import SSEEvent, event_bus
+
         event_bus.notify(SSEEvent(type="test", data={}))
         # Should not raise
 
@@ -344,6 +377,7 @@ class TestSSERoutes:
         # SSE endpoint should be registered
         # Use a timeout to avoid hanging on the streaming response
         import threading
+
         result = {}
 
         def make_request():
@@ -405,14 +439,17 @@ class TestGenerationModule:
 
     def test_module_importable(self):
         from integrated_app import generation
+
         assert generation is not None
 
     def test_has_preprocess_function(self):
         from integrated_app import generation
+
         assert hasattr(generation, "preprocess_and_save_temp")
 
     def test_has_merge_function(self):
         from integrated_app import generation
+
         has_merge = any(
             hasattr(generation, name)
             for name in ("merge_audio_segments", "merge_audio", "concat_audio", "merge_audio_files")
@@ -430,30 +467,36 @@ class TestConfigModule:
 
     def test_get_config_singleton(self):
         from integrated_app.config import get_config
+
         c1 = get_config()
         c2 = get_config()
         assert c1 is c2
 
     def test_config_has_persona_dir(self):
         from integrated_app.config import PERSONA_DIR
+
         assert isinstance(PERSONA_DIR, str)
         assert len(PERSONA_DIR) > 0
 
     def test_config_has_data_dir(self):
         from integrated_app.config import DATA_DIR
+
         assert isinstance(DATA_DIR, str)
 
     def test_config_has_root_dir(self):
         from integrated_app.config import ROOT_DIR
+
         assert isinstance(ROOT_DIR, str)
 
     def test_config_has_model_paths(self):
-        from integrated_app.config import VOXCPM2_MODEL_PATH, INDEXTTS2_MODEL_PATH
+        from integrated_app.config import INDEXTTS2_MODEL_PATH, VOXCPM2_MODEL_PATH
+
         assert isinstance(VOXCPM2_MODEL_PATH, str)
         assert isinstance(INDEXTTS2_MODEL_PATH, str)
 
     def test_persona_name_regex(self):
         from integrated_app.config import _PERSONA_NAME_RE
+
         assert _PERSONA_NAME_RE.match("valid_name") is not None
         assert _PERSONA_NAME_RE.match("中文名") is not None
         assert _PERSONA_NAME_RE.match("../bad") is None
@@ -461,12 +504,14 @@ class TestConfigModule:
 
     def test_config_has_api_auth(self):
         from integrated_app.config import get_config
+
         config = get_config()
         assert hasattr(config, "api_auth")
 
     def test_config_has_rate_limit(self):
         """Verify config has rate limiting configuration."""
         from integrated_app.config import get_config
+
         config = get_config()
         # Rate limiting is a security requirement, should exist
         has_rate_limit = any(hasattr(config, name) for name in ("rate_limit", "rate_limiting"))
@@ -484,21 +529,25 @@ class TestEngineInterface:
 
     def test_tts_engine_is_abstract(self):
         from integrated_app.engine_interface import TTSEngine
+
         # TTSEngine should be an abstract base class
         assert hasattr(TTSEngine, "__abstractmethods__") or hasattr(TTSEngine, "generate")
 
     def test_in_memory_registry_creation(self):
         from integrated_app.engine_interface import InMemoryEngineRegistry
+
         reg = InMemoryEngineRegistry()
         assert reg is not None
 
     def test_registry_get_nonexistent(self):
         from integrated_app.engine_interface import InMemoryEngineRegistry
+
         reg = InMemoryEngineRegistry()
         assert reg.get("nonexistent") is None
 
     def test_registry_list_empty(self):
         from integrated_app.engine_interface import InMemoryEngineRegistry
+
         reg = InMemoryEngineRegistry()
         engines = reg.list_engines()
         assert isinstance(engines, list)
@@ -515,6 +564,7 @@ class TestServiceLayerExtended:
 
     def test_generation_result_defaults(self):
         from integrated_app.service_layer import GenerationResult
+
         r = GenerationResult()
         assert r.audio_path == ""
         assert r.engine == ""
@@ -522,11 +572,13 @@ class TestServiceLayerExtended:
 
     def test_load_result_defaults(self):
         from integrated_app.service_layer import LoadResult
+
         r = LoadResult()
         assert r.success is False
 
     def test_load_result_with_values(self):
         from integrated_app.service_layer import LoadResult
+
         r = LoadResult(success=True, load_time=5.2, engine="voxcpm2")
         assert r.success is True
         assert r.load_time == 5.2

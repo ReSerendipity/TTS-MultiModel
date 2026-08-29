@@ -1,9 +1,9 @@
 """Integration tests for API authentication middleware."""
+
 import pytest
+from app.integrated_app.auth import APIAuthMiddleware
 from fastapi import FastAPI
 from starlette.testclient import TestClient
-
-from app.integrated_app.auth import APIAuthMiddleware
 
 
 @pytest.fixture

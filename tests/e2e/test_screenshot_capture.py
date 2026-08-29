@@ -19,6 +19,7 @@ import pytest
 
 try:
     from playwright.sync_api import sync_playwright
+
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
@@ -94,7 +95,8 @@ def _click_tab(page, tab_name):
         return False
     # 若按钮位于折叠分组（.sidebar-nav-section.section-collapsed）内，
     # 先点击分组标题 .sidebar-nav-label 展开，否则 display:none 无法点击
-    page.evaluate("""(t) => {
+    page.evaluate(
+        """(t) => {
         const btn = document.querySelector(`.sidebar-item[data-tab="${t}"]`);
         if (!btn) return;
         const sec = btn.closest('.sidebar-nav-section');
@@ -102,7 +104,9 @@ def _click_tab(page, tab_name):
             const label = sec.querySelector('.sidebar-nav-label');
             if (label) label.click();
         }
-    }""", tab_name)
+    }""",
+        tab_name,
+    )
     page.wait_for_timeout(400)
     button.first.click()
     page.wait_for_load_state("domcontentloaded", timeout=15000)

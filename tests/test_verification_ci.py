@@ -13,8 +13,6 @@ import os
 import sys
 from pathlib import Path
 
-import pytest
-
 _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
@@ -28,12 +26,14 @@ class TestPersonaPtOrigin:
     def test_persona_pt_origin_constant_exists(self):
         """PERSONA_PT_ORIGIN 常量存在。"""
         from integrated_app.persona_manager import PERSONA_PT_ORIGIN
+
         assert PERSONA_PT_ORIGIN is not None
         assert "TTS_MultiModel" in PERSONA_PT_ORIGIN
 
     def test_persona_pt_format_version_positive(self):
         """PERSONA_PT_FORMAT_VERSION 为正整数。"""
         from integrated_app.persona_manager import PERSONA_PT_FORMAT_VERSION
+
         assert isinstance(PERSONA_PT_FORMAT_VERSION, int)
         assert PERSONA_PT_FORMAT_VERSION >= 1
 
@@ -44,7 +44,9 @@ class TestPersonaPtOrigin:
         这是合法的向后兼容代码，不构成安全风险。
         """
         import integrated_app.prompt_cache as pc
-        source = open(pc.__file__, encoding="utf-8").read()
+
+        with open(pc.__file__, encoding="utf-8") as source_file:
+            source = source_file.read()
         # pickle.dump 不应出现在写入路径中
         assert "pickle.dump" not in source
         # 主序列化函数应使用 json
@@ -54,6 +56,7 @@ class TestPersonaPtOrigin:
     def test_cache_files_use_json_extension(self):
         """缓存文件使用 .json 扩展名。"""
         from integrated_app.prompt_cache import _get_cache_file_path, _get_metadata_path
+
         assert str(_get_cache_file_path("test")).endswith(".json")
         assert str(_get_metadata_path()).endswith(".json")
 
@@ -63,7 +66,8 @@ class TestModelChecksums:
 
     def test_model_dirs_exist(self):
         """模型目录结构存在。"""
-        from integrated_app.config import VOXCPM2_MODEL_PATH, INDEXTTS2_MODEL_PATH
+        from integrated_app.config import INDEXTTS2_MODEL_PATH, VOXCPM2_MODEL_PATH
+
         # Paths should be defined (may not exist in CI, but should be valid strings)
         assert isinstance(VOXCPM2_MODEL_PATH, str)
         assert isinstance(INDEXTTS2_MODEL_PATH, str)
@@ -77,11 +81,12 @@ class TestModelChecksums:
     def test_config_has_model_paths(self):
         """配置包含所有必要的模型路径。"""
         from integrated_app.config import (
-            VOXCPM2_MODEL_PATH,
+            INDEXTTS2_MODEL_PATH,
             VOXCPM2_ASR_PATH,
             VOXCPM2_DENOISER_PATH,
-            INDEXTTS2_MODEL_PATH,
+            VOXCPM2_MODEL_PATH,
         )
+
         assert VOXCPM2_MODEL_PATH is not None
         assert VOXCPM2_ASR_PATH is not None
         assert VOXCPM2_DENOISER_PATH is not None
@@ -94,22 +99,26 @@ class TestModelWeights:
     def test_model_registry_importable(self):
         """model_registry 可导入。"""
         from integrated_app.model_registry import registry
+
         assert registry is not None
 
     def test_registry_has_current_engine(self):
         """registry 有 current_engine 属性。"""
         from integrated_app.model_registry import registry
+
         assert hasattr(registry, "current_engine")
 
     def test_registry_has_is_ready_methods(self):
         """registry 有 is_*_ready 方法。"""
         from integrated_app.model_registry import registry
+
         assert hasattr(registry, "is_voxcpm_ready")
         assert hasattr(registry, "is_indextts2_ready")
 
     def test_engine_interface_defined(self):
         """TTSEngine 接口已定义。"""
         from integrated_app.engine_interface import TTSEngine
+
         assert TTSEngine is not None
         assert hasattr(TTSEngine, "generate") or hasattr(TTSEngine, "__abstractmethods__")
 
@@ -170,4 +179,5 @@ class TestUIOptimizations:
     def test_rate_limit_middleware_importable(self):
         """Rate limit 中间件可导入。"""
         from integrated_app.middleware.rate_limit import RateLimitMiddleware
+
         assert RateLimitMiddleware is not None

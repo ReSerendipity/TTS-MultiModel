@@ -8,27 +8,24 @@ Covers:
 - Audio format conversion helper
 """
 
-import asyncio
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from integrated_app.openai_api import (
+    _MODEL_ENGINE_MAP,
+    _VOICE_PERSONA_MAP,
     BatchGenerationManager,
     BatchSpeechRequest,
-    BatchStatus,
     OpenAICompatibleRouter,
     SpeechRequest,
     TaskCancelManager,
     _convert_audio_format,
     _stream_file,
-    _MODEL_ENGINE_MAP,
-    _VOICE_PERSONA_MAP,
     openai_router,
 )
-
 
 # ---------------------------------------------------------------------------
 # Module-level fixture for OpenAI router tests

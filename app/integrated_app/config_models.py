@@ -35,7 +35,14 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 
 class AdvancedParamsConfig(BaseModel):
@@ -106,6 +113,7 @@ class ServerConfig(BaseModel):
     port_fallback_max: int = Field(default=8090, ge=1, le=65535)
     open_browser: bool = Field(default=True, description="Auto-open browser on startup")
     workers: int = Field(default=1, ge=1, le=4, description="Worker count (1 for GPU)")
+
     @field_validator("host")
     @classmethod
     def host_must_be_loopback_or_docker(cls, v: str) -> str:
@@ -116,9 +124,7 @@ class ServerConfig(BaseModel):
         """
         allowed = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
         if v not in allowed:
-            raise ValueError(
-                f"host must be loopback (127.0.0.1 / localhost / ::1) or 0.0.0.0, got: {v}"
-            )
+            raise ValueError(f"host must be loopback (127.0.0.1 / localhost / ::1) or 0.0.0.0, got: {v}")
         return v
 
 

@@ -19,6 +19,7 @@ def gpu_available():
     """检查 CUDA GPU 是否可用。"""
     try:
         import torch
+
         if torch.cuda.is_available():
             return torch.cuda.current_device()
     except ImportError:
@@ -55,7 +56,7 @@ class TestEngineSwitchVRAM:
         torch.cuda.empty_cache()
         baseline = torch.cuda.memory_allocated()
 
-        for i in range(5):
+        for _i in range(5):
             dummy = torch.randn(500, 500, device="cuda")
             allocated_during = torch.cuda.memory_allocated()
             assert allocated_during > baseline

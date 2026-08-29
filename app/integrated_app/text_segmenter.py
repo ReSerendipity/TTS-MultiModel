@@ -35,7 +35,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any
 
 import numpy as np
 
@@ -103,10 +102,7 @@ class TextSegment:
         return self.char_count
 
     def __repr__(self) -> str:
-        return (
-            f"TextSegment(index={self.index}, chars={self.char_count}, "
-            f"text='{self.text[:30]}...')"
-        )
+        return f"TextSegment(index={self.index}, chars={self.char_count}, text='{self.text[:30]}...')"
 
 
 @dataclass
@@ -238,7 +234,7 @@ class TextSegmenter:
         # 更新分块的位置信息
         result_segments: list[TextSegment] = []
         current_pos = 0
-        for i, seg_text in enumerate(segments):
+        for _i, seg_text in enumerate(segments):
             seg_text = seg_text.strip()
             if not seg_text:
                 continue
@@ -396,9 +392,7 @@ class TextSegmenter:
                     current_length = 0
 
                 # 二次切分超长句子
-                sub_segments = self._split_long_sentence(
-                    sentence, pause_marks
-                )
+                sub_segments = self._split_long_sentence(sentence, pause_marks)
                 segments.extend(sub_segments)
                 continue
 
@@ -512,13 +506,9 @@ class AudioCrossfader:
             default_sample_rate: 默认采样率（Hz）。
         """
         if fade_duration_ms < 0:
-            raise ValueError(
-                f"fade_duration_ms 不能为负数，得到: {fade_duration_ms}"
-            )
+            raise ValueError(f"fade_duration_ms 不能为负数，得到: {fade_duration_ms}")
         if default_sample_rate <= 0:
-            raise ValueError(
-                f"default_sample_rate 必须为正数，得到: {default_sample_rate}"
-            )
+            raise ValueError(f"default_sample_rate 必须为正数，得到: {default_sample_rate}")
 
         self._fade_duration_ms = fade_duration_ms
         self._default_sample_rate = default_sample_rate
@@ -575,16 +565,16 @@ class AudioCrossfader:
                 fade_in = np.linspace(0.0, 1.0, actual_fade, endpoint=False)
 
                 # 交叉淡入淡出：重叠区域 = 前段尾部 * fade_out + 后段头部 * fade_in
-                overlap_region = (
-                    result[-actual_fade:] * fade_out + current[:actual_fade] * fade_in
-                )
+                overlap_region = result[-actual_fade:] * fade_out + current[:actual_fade] * fade_in
 
                 # 拼接：前段（去尾部）+ 重叠区域 + 后段（去头部）
-                result = np.concatenate([
-                    result[:-actual_fade],
-                    overlap_region,
-                    current[actual_fade:],
-                ])
+                result = np.concatenate(
+                    [
+                        result[:-actual_fade],
+                        overlap_region,
+                        current[actual_fade:],
+                    ]
+                )
 
         return result.astype(np.float32)
 

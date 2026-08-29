@@ -17,15 +17,11 @@ import sys
 import numpy as np
 import pytest
 
-_APP_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin"
-)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
 from integrated_app.text_segmenter import (
-    DEFAULT_FADE_DURATION_MS,
-    DEFAULT_MAX_CHARS,
     AudioCrossfader,
     TextSegment,
     TextSegmenter,
@@ -33,7 +29,6 @@ from integrated_app.text_segmenter import (
     get_segmenter,
     segment_text,
 )
-
 
 # ---------------------------------------------------------------------------
 # TextSegmenter 基础分块测试
@@ -302,9 +297,7 @@ class TestAudioCrossfader:
     def test_apply_fade_both(self):
         """同时淡入淡出。"""
         audio = np.ones(2000, dtype=np.float32)
-        result = self.crossfader.apply_fade(
-            audio, fade_in_ms=100, fade_out_ms=100, sample_rate=self.sr
-        )
+        result = self.crossfader.apply_fade(audio, fade_in_ms=100, fade_out_ms=100, sample_rate=self.sr)
         assert result[0] < 0.1
         assert result[-1] < 0.1
 
@@ -411,9 +404,7 @@ class TestModuleFunctions:
         """crossfade_concat_audio 便捷函数应正常工作。"""
         audio1 = np.ones(1000, dtype=np.float32)
         audio2 = np.ones(1000, dtype=np.float32)
-        result = crossfade_concat_audio(
-            [audio1, audio2], sample_rate=24000, fade_duration_ms=50
-        )
+        result = crossfade_concat_audio([audio1, audio2], sample_rate=24000, fade_duration_ms=50)
         assert isinstance(result, np.ndarray)
         assert len(result) > 0
 

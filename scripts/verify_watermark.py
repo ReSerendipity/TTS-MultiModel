@@ -3,6 +3,7 @@
 用法: python scripts/verify_watermark.py <wav 文件> [source_id]
 退出码: 0=验证通过, 1=失败/未检测到。
 """
+
 import sys
 import wave
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 
 import numpy as np
+
 from integrated_app.watermark import detect_watermark
 
 

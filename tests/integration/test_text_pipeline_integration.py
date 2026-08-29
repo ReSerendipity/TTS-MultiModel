@@ -14,11 +14,8 @@ import os
 import sys
 
 import numpy as np
-import pytest
 
-_APP_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "bin"
-)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "bin")
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
@@ -27,7 +24,6 @@ from integrated_app.prompt_expander import PromptExpander, TemplateCategory
 from integrated_app.security.content_safety import ContentSafetyDetector, SafetyCategory
 from integrated_app.text_frontend import TextFrontend
 from integrated_app.text_segmenter import AudioCrossfader, TextSegmenter
-
 
 # ---------------------------------------------------------------------------
 # 流水线集成测试
@@ -157,9 +153,7 @@ class TestTextPipelineIntegration:
         assert len(safety_results) == len(texts)
 
         # 过滤安全文本
-        safe_texts = [
-            text for text, result in zip(texts, safety_results, strict=False) if result.is_safe
-        ]
+        safe_texts = [text for text, result in zip(texts, safety_results, strict=False) if result.is_safe]
 
         # 批量前端处理
         for text in safe_texts:

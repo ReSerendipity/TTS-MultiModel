@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for the top-level application server and static asset handling."""
 
 

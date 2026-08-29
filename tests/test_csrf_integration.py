@@ -1,9 +1,9 @@
 """Integration tests for CSRF protection middleware."""
+
 import pytest
+from app.integrated_app.middleware.csrf import CSRFMiddleware
 from fastapi import FastAPI
 from starlette.testclient import TestClient
-
-from app.integrated_app.middleware.csrf import CSRFMiddleware
 
 
 @pytest.fixture

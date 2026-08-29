@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests verifying HTMX request handling for tab/fragment endpoints."""
 
 

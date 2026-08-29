@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """progress 模块单元测试 — 生成进度管理（使用公共接口）。
 
 覆盖目标模块：app/integrated_app/progress.py
@@ -9,7 +8,7 @@
 - 删除与 test_progress_ext.py 重复的 test_advance_segment/test_cancel/test_reset/update_phase
 - 保留唯一的功能测试：format_duration(私有方法测试可以接受)、schedule_reset(后台线程场景)
 """
-import time
+
 import pytest
 
 
@@ -19,6 +18,7 @@ class TestProgressManagerPublicInterface:
     def test_start_and_complete(self):
         """Start and complete workflow via public methods."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=3, phase="测试中")
 
@@ -35,6 +35,7 @@ class TestProgressManagerPublicInterface:
     def test_advance_segment(self):
         """Advance segments through workflow."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=3, phase="开始")
         pm.advance_segment(phase="第 1 段")
@@ -47,6 +48,7 @@ class TestProgressManagerPublicInterface:
     def test_cancel(self):
         """Cancel detection via public interface."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1, phase="开始")
         assert pm.is_cancelled() is False
@@ -58,6 +60,7 @@ class TestProgressManagerPublicInterface:
     def test_reset(self):
         """Reset clears all state."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=3, phase="测试中")
         pm.advance_segment(phase="第 1 段")
@@ -74,6 +77,7 @@ class TestProgressManagerPublicInterface:
     def test_update_phase(self):
         """Update phase via public method."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1, phase="初始")
         pm.update_phase("更新后")
@@ -82,6 +86,7 @@ class TestProgressManagerPublicInterface:
     def test_add_chars_processed(self):
         """Character count accumulation."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1, phase="开始")
         pm.add_chars_processed(100)
@@ -92,6 +97,7 @@ class TestProgressManagerPublicInterface:
     def test_get_speed_stats(self):
         """Speed statistics calculation."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1, phase="开始")
         pm.add_chars_processed(100)
@@ -102,6 +108,7 @@ class TestProgressManagerPublicInterface:
     def test_progress_html_complete(self):
         """HTML progress bar shows 100% when complete."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1, phase="完成")
         pm.complete()
@@ -112,6 +119,7 @@ class TestProgressManagerPublicInterface:
     def test_progress_html_too_early(self):
         """No HTML output before any progress."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1, phase="刚开始")
         html = pm.get_progress_html()
@@ -127,6 +135,7 @@ class TestProgressManagerPublicInterface:
     def test_schedule_reset(self):
         """Test that schedule_reset resets state after a delay."""
         from integrated_app.progress import ProgressManager
+
         pm = ProgressManager()
         pm.start(total_segments=1, phase="测试")
         pm.advance_segment(phase="完成")
@@ -141,6 +150,7 @@ class TestProgressManagerPublicInterface:
 
         # Poll for reset completion instead of fixed sleep
         import time as _time
+
         deadline = _time.time() + 1.0  # 1s timeout
         while _time.time() < deadline:
             status = pm.get_status()

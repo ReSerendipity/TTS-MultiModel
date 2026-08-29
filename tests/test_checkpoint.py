@@ -3,12 +3,9 @@
 覆盖目标模块: app/integrated_app/checkpoint.py
 """
 
-import json
 import os
 import sys
 import tempfile
-
-import pytest
 
 _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
 if _APP_DIR not in sys.path:
@@ -77,21 +74,27 @@ class TestTaskCheckpoint:
     def test_list_checkpoints(self):
         """列出未完成的 checkpoint。"""
         # task-a: 未完成 (1/3)
-        self.mgr.save_checkpoint("task-a", {
-            "engine": "voxcpm2",
-            "total": 3,
-            "completed_items": [{"text": "a1"}],
-            "remaining": [{"text": "a2"}, {"text": "a3"}],
-            "config": {},
-        })
+        self.mgr.save_checkpoint(
+            "task-a",
+            {
+                "engine": "voxcpm2",
+                "total": 3,
+                "completed_items": [{"text": "a1"}],
+                "remaining": [{"text": "a2"}, {"text": "a3"}],
+                "config": {},
+            },
+        )
         # task-b: 已完成 (3/3) - 不应出现在 list 中
-        self.mgr.save_checkpoint("task-b", {
-            "engine": "voxcpm2",
-            "total": 3,
-            "completed_items": [{"text": "b1"}, {"text": "b2"}, {"text": "b3"}],
-            "remaining": [],
-            "config": {},
-        })
+        self.mgr.save_checkpoint(
+            "task-b",
+            {
+                "engine": "voxcpm2",
+                "total": 3,
+                "completed_items": [{"text": "b1"}, {"text": "b2"}, {"text": "b3"}],
+                "remaining": [],
+                "config": {},
+            },
+        )
 
         pending = self.mgr.list_checkpoints()
         assert len(pending) == 1

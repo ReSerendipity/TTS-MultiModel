@@ -15,14 +15,11 @@ import sys
 
 import pytest
 
-_APP_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin"
-)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
 from integrated_app.g2p_manager import (
-    DEFAULT_CACHE_SIZE,
     G2PManager,
     G2PResult,
     G2PStats,
@@ -30,7 +27,6 @@ from integrated_app.g2p_manager import (
     convert_text,
     get_g2p_manager,
 )
-
 
 # ---------------------------------------------------------------------------
 # G2PManager 基础功能测试

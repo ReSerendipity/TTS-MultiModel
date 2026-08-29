@@ -745,7 +745,7 @@ async def streaming_audio_generation(
 <audio class="tts-audio-hidden" id="streaming-audio">
     <source src="/output/{safe_filename}" type="audio/wav">
 </audio>
-{_EMBEDDED_PLAYER_HTML.format(audio_url='/output/' + safe_filename)}
+{_EMBEDDED_PLAYER_HTML.format(audio_url="/output/" + safe_filename)}
 <script>
 (function(){{
     var audio = document.getElementById('streaming-audio');

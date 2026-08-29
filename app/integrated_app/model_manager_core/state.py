@@ -7,6 +7,7 @@ _persona_embedding_cache、_gen_tracker、_progress_mgr、_time_estimator 及全
 同步使用约定：_model_lock 为 threading.RLock；路由层须通过
 loop.run_in_executor 调度同步 generator，禁止在 async 上下文直接持锁。
 """
+
 import contextlib
 import gc
 import logging
@@ -33,12 +34,7 @@ from ..exceptions import (
     InsufficientVRAMError,
     TTSError,
 )
-from ..gpu_utils import (
-    GPUMemoryMonitor,
-    free_gpu_memory,
-    get_gpu_device,
-    is_oom_error,
-)
+from ..gpu_utils import GPUMemoryMonitor, free_gpu_memory, get_gpu_device, is_oom_error
 from ..model_registry import EngineName, registry
 from ..monitor import get_health_monitor
 from ..progress import ProgressManager
@@ -118,24 +114,51 @@ _progress_mgr: ProgressManager = ProgressManager()
 _model_lock: threading.RLock = threading.RLock()
 
 __all__ = [
-    "contextlib", "gc", "os", "threading", "time", "Callable", "Generator", "Any",
-    "AdaptiveLRUCache", "LRUCache",
-    "DATA_DIR", "ROOT_DIR",
-    "get_indextts2_model_path", "get_indextts20_model_path", "get_voxcpm2_asr_path",
-    "get_voxcpm2_denoiser_path", "get_voxcpm2_model_path",
+    "contextlib",
+    "gc",
+    "os",
+    "threading",
+    "time",
+    "Callable",
+    "Generator",
+    "Any",
+    "AdaptiveLRUCache",
+    "LRUCache",
+    "DATA_DIR",
+    "ROOT_DIR",
+    "get_indextts2_model_path",
+    "get_indextts20_model_path",
+    "get_voxcpm2_asr_path",
+    "get_voxcpm2_denoiser_path",
+    "get_voxcpm2_model_path",
     "GenerationTimeEstimator",
-    "EngineLoadError", "EngineSwitchError", "InsufficientVRAMError", "TTSError",
-    "GPUMemoryMonitor", "free_gpu_memory", "get_gpu_device", "is_oom_error",
-    "EngineName", "registry",
+    "EngineLoadError",
+    "EngineSwitchError",
+    "InsufficientVRAMError",
+    "TTSError",
+    "GPUMemoryMonitor",
+    "free_gpu_memory",
+    "get_gpu_device",
+    "is_oom_error",
+    "EngineName",
+    "registry",
     "get_health_monitor",
-    "ProgressManager", "GenerationTracker",
+    "ProgressManager",
+    "GenerationTracker",
     "logger",
-    "_VRAM_FREE_THRESHOLD_BYTES", "_VRAM_WAIT_MAX_SECONDS",
-    "_VRAM_POLL_INTERVAL_SECONDS", "_VRAM_FREE_PERCENT_FLOOR",
-    "_PRELOAD_READ_CHUNK_BYTES", "_PERSONA_CACHE_DEFAULT_SIZE",
-    "_WARMUP_TOP_PERSONAS", "_UNLOAD_SLOW_THRESHOLD_SECONDS",
+    "_VRAM_FREE_THRESHOLD_BYTES",
+    "_VRAM_WAIT_MAX_SECONDS",
+    "_VRAM_POLL_INTERVAL_SECONDS",
+    "_VRAM_FREE_PERCENT_FLOOR",
+    "_PRELOAD_READ_CHUNK_BYTES",
+    "_PERSONA_CACHE_DEFAULT_SIZE",
+    "_WARMUP_TOP_PERSONAS",
+    "_UNLOAD_SLOW_THRESHOLD_SECONDS",
     "_LOAD_RETRY_AFTER_UNLOAD_SECONDS",
     "_TORCH_COMPILE_CACHE_DIR",
-    "_time_estimator", "_persona_embedding_cache",
-    "_gen_tracker", "_progress_mgr", "_model_lock",
+    "_time_estimator",
+    "_persona_embedding_cache",
+    "_gen_tracker",
+    "_progress_mgr",
+    "_model_lock",
 ]

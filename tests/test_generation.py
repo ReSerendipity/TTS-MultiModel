@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
 """Tests for generation.py text splitting logic."""
-import pytest
+
 from integrated_app.generation import (
-    split_text_for_tts,
-    _is_decimal_point,
-    _is_abbreviation,
-    _is_inside_quotes,
     _find_best_split_point,
+    _is_abbreviation,
+    _is_decimal_point,
+    _is_inside_quotes,
+    split_text_for_tts,
 )
 
 
@@ -54,12 +53,12 @@ class TestAbbreviation:
 
 class TestInsideQuotes:
     def test_inside_chinese_quotes(self):
-        text = '\u201c你好世界\u201d然后走了'
+        text = "\u201c你好世界\u201d然后走了"
         # 位置 2 在引号内
         assert _is_inside_quotes(text, 2) is True
 
     def test_outside_quotes(self):
-        text = '\u201c你好\u201d然后走了'
+        text = "\u201c你好\u201d然后走了"
         # 位置 0 在引号外
         assert _is_inside_quotes(text, 0) is False
 

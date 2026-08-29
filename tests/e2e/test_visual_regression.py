@@ -17,6 +17,7 @@
 - numpy（已包含在项目依赖中）
 """
 
+import contextlib
 import os
 import tempfile
 
@@ -24,12 +25,14 @@ import pytest
 
 try:
     from playwright.sync_api import sync_playwright
+
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
 try:
     import numpy as np
+
     NUMPY_AVAILABLE = True
 except ImportError:
     NUMPY_AVAILABLE = False
@@ -49,9 +52,7 @@ SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), "screenshots")
 
 def _load_image_as_array(filepath):
     """使用 numpy 加载 PNG 图像为像素数组。"""
-    return np.asarray(
-        __import__("PIL").Image.open(filepath).convert("RGB")
-    ) if __import__("PIL").__version__ else None
+    return np.asarray(__import__("PIL").Image.open(filepath).convert("RGB")) if __import__("PIL").__version__ else None
 
 
 def _load_image_png(filepath):
@@ -62,6 +63,7 @@ def _load_image_png(filepath):
     """
     try:
         from PIL import Image
+
         img = Image.open(filepath).convert("RGB")
         return np.asarray(img)
     except ImportError:
@@ -90,6 +92,7 @@ def _compare_images(baseline_path, current_path):
 def server_url():
     """获取服务器 URL，如未运行则跳过。"""
     import urllib.request
+
     try:
         urllib.request.urlopen(BASE_URL, timeout=3)
         return BASE_URL
@@ -127,6 +130,7 @@ def _capture_and_compare(page, screenshots_dir, filename):
     if not os.path.exists(baseline_path) or snapshot_update:
         # 首次运行或更新 baseline
         import shutil
+
         shutil.move(tmp_path, baseline_path)
         pytest.skip(f"Baseline created/updated: {filename}")
     else:
@@ -163,10 +167,9 @@ def _capture_and_compare(page, screenshots_dir, filename):
                             )
                     # 保存当前截图便于人工对比定位
                     import shutil as _shutil
-                    try:
+
+                    with contextlib.suppress(OSError):
                         _shutil.copy(tmp_path, os.path.join(screenshots_dir, f"current_{filename}"))
-                    except OSError:
-                        pass
             finally:
                 os.unlink(tmp_path)
             assert is_match, (
@@ -191,8 +194,7 @@ def _stabilize_page(page):
     _freeze_random(page)
     # 停止所有 JS 定时器（进度条模拟动画等），消除动画帧差异
     page.evaluate(
-        "() => { const maxId = window.setInterval(() => {}, 1e9); "
-        "for (let i = 1; i <= maxId; i++) clearInterval(i); }"
+        "() => { const maxId = window.setInterval(() => {}, 1e9); for (let i = 1; i <= maxId; i++) clearInterval(i); }"
     )
     page.evaluate("() => document.fonts.ready.then(() => true)")
     # 等待 htmx 异步内容加载完成（tab-loading spinner 隐藏 / tab-content 渲染）

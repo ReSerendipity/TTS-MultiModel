@@ -12,12 +12,14 @@ CI (benchmark.yml) runs the same command on every push to ``main`` and on
 weekly schedule.
 """
 
+from unittest.mock import patch
+
 import numpy as np
 import pytest
-from unittest.mock import patch
 
 try:
     import pytest_benchmark  # noqa: F401
+
     BENCHMARK_AVAILABLE = True
 except ImportError:
     BENCHMARK_AVAILABLE = False
@@ -42,7 +44,7 @@ class TestGenerationBenchmarks:
             for _ in range(100):
                 split_text_for_tts(long_text, max_chars=200)
 
-        result = benchmark(_run)
+        benchmark(_run)
         # Sanity: the function should return a list of segments
         segments = split_text_for_tts(long_text, max_chars=200)
         assert isinstance(segments, list) and len(segments) > 0
@@ -98,6 +100,7 @@ class TestGenerationBenchmarks:
         cache = AdaptiveLRUCache(default_maxsize=15)
 
         with patch.object(AdaptiveLRUCache, "_get_gpu_memory_percent", return_value=0.0):
+
             def _run():
                 for _ in range(10):
                     cache.adapt_capacity()

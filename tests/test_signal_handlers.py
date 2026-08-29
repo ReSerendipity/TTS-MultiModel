@@ -16,10 +16,9 @@
 import signal
 import threading
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
 
 # =====================================================================
 # 基础状态测试
@@ -275,9 +274,8 @@ class TestSignalHandlerContext:
     def test_context_manager_restores_on_exception(self):
         from integrated_app.signal_handlers import SignalHandlerContext
 
-        with pytest.raises(ValueError):
-            with SignalHandlerContext():
-                raise ValueError("test")
+        with pytest.raises(ValueError), SignalHandlerContext():
+            raise ValueError("test")
 
 
 # =====================================================================

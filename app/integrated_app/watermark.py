@@ -51,6 +51,7 @@ _WATERMARK_FREQ_HIGH = 20000  # 嵌入频率上限（Hz）
 _WATERMARK_FRAME_SIZE = 2048  # FFT 帧大小
 _WATERMARK_REPEAT = 4  # 水印重复次数以增强鲁棒性
 
+
 #: v2 载波相位表（对齐零相位，crest 因子最低）与 v1 兼容表（旧 RandomState(42) 均匀相位）。
 #: 嵌入端使用 v2 对齐相位表；检测端多假设检测同时尝试两表，旧格式样本 presence 仍可检出。
 def _carrier_phases_v2(n_bins):
@@ -59,7 +60,6 @@ def _carrier_phases_v2(n_bins):
 
 def _carrier_phases_v1(n_bins):
     return np.random.RandomState(42).uniform(0, 2 * np.pi, size=n_bins)
-
 
 
 @dataclass
@@ -166,9 +166,7 @@ def _build_payload_v2(source_id: str, timestamp: float, content_hash: str) -> by
     """
     code = _SOURCE_ID_TO_CODE.get(source_id)
     if code is None:
-        logger.warning(
-            f"source_id '{source_id}' 不在 v2 枚举表，使用通用码 {_SOURCE_CODE_UNKNOWN}"
-        )
+        logger.warning(f"source_id '{source_id}' 不在 v2 枚举表，使用通用码 {_SOURCE_CODE_UNKNOWN}")
         code = _SOURCE_CODE_UNKNOWN
     ts_sec = int(timestamp) & 0xFFFFFFFF
     hash_hex = (content_hash or "")[:4]
@@ -528,10 +526,7 @@ def detect_watermark(
                 # 再与载波相关，抑制噪声/突发频谱帧间能量方差对判决的支配；
                 # 白化相关仅用于比特判决，不参与 presence 判分。
                 med = np.median(np.abs(bin_vals))
-                if med > 0:
-                    corr_white = np.real((bin_vals / med) * np.conj(carriers)) * flip_sign
-                else:
-                    corr_white = corr
+                corr_white = np.real(bin_vals / med * np.conj(carriers)) * flip_sign if med > 0 else corr
 
                 is_edge = frame_idx == 0 or frame_idx == n_frames - 1
                 weights = np.full(effective_bits, 1.5 if is_edge else 2.0)
@@ -550,7 +545,6 @@ def detect_watermark(
                 if score > best_score:
                     best_score = score
                     best_bits = detected_bits
-
 
     detection_threshold = 0.001
     if best_score < detection_threshold:

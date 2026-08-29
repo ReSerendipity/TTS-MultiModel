@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 """Tests for cache.py LRU logic and AdaptiveLRUCache."""
-import time
+
 from unittest.mock import patch
-import pytest
-from integrated_app.cache import LRUCache, AdaptiveLRUCache
+
+from integrated_app.cache import AdaptiveLRUCache, LRUCache
 
 
 class TestLRUCache:
@@ -102,20 +101,20 @@ class TestAdaptiveLRUCache:
         """Without GPU, capacity should default to 20."""
         cache = AdaptiveLRUCache(default_maxsize=5)
         # Mock _get_gpu_memory_percent to avoid importing torch-dependent gpu_backend
-        with patch.object(AdaptiveLRUCache, '_get_gpu_memory_percent', return_value=0.0):
+        with patch.object(AdaptiveLRUCache, "_get_gpu_memory_percent", return_value=0.0):
             target = cache.adapt_capacity()
             assert target == 20  # No GPU = 0% = default 20
 
     def test_memory_estimate(self):
         cache = AdaptiveLRUCache(default_maxsize=5)
-        with patch.object(AdaptiveLRUCache, '_get_gpu_memory_percent', return_value=0.0):
+        with patch.object(AdaptiveLRUCache, "_get_gpu_memory_percent", return_value=0.0):
             cache.put("a", "hello")
             stats = cache.get_stats()
             assert stats["memory_estimate_mb"] >= 0
 
     def test_clear(self):
         cache = AdaptiveLRUCache(default_maxsize=5)
-        with patch.object(AdaptiveLRUCache, '_get_gpu_memory_percent', return_value=0.0):
+        with patch.object(AdaptiveLRUCache, "_get_gpu_memory_percent", return_value=0.0):
             cache.put("a", 1)
             cache.put("b", 2)
             cache.clear()
@@ -126,7 +125,7 @@ class TestAdaptiveLRUCache:
 
     def test_eviction_count(self):
         cache = AdaptiveLRUCache(default_maxsize=3)
-        with patch.object(AdaptiveLRUCache, '_get_gpu_memory_percent', return_value=0.0):
+        with patch.object(AdaptiveLRUCache, "_get_gpu_memory_percent", return_value=0.0):
             for i in range(10):
                 cache.put(f"key_{i}", f"value_{i}")
             stats = cache.get_stats()
@@ -134,7 +133,7 @@ class TestAdaptiveLRUCache:
 
     def test_delete_updates_memory(self):
         cache = AdaptiveLRUCache(default_maxsize=5)
-        with patch.object(AdaptiveLRUCache, '_get_gpu_memory_percent', return_value=0.0):
+        with patch.object(AdaptiveLRUCache, "_get_gpu_memory_percent", return_value=0.0):
             cache.put("a", "hello world")
             stats_before = cache.get_stats()
             del cache["a"]
@@ -143,7 +142,7 @@ class TestAdaptiveLRUCache:
 
     def test_overwrite_same_key(self):
         cache = AdaptiveLRUCache(default_maxsize=5)
-        with patch.object(AdaptiveLRUCache, '_get_gpu_memory_percent', return_value=0.0):
+        with patch.object(AdaptiveLRUCache, "_get_gpu_memory_percent", return_value=0.0):
             cache.put("a", "first")
             cache.put("a", "second")
             assert cache.get("a") == "second"
@@ -153,13 +152,13 @@ class TestAdaptiveLRUCache:
     def test_capacity_map_high_gpu(self):
         """High GPU usage should shrink cache."""
         cache = AdaptiveLRUCache(default_maxsize=15)
-        with patch.object(AdaptiveLRUCache, '_get_gpu_memory_percent', return_value=95.0):
+        with patch.object(AdaptiveLRUCache, "_get_gpu_memory_percent", return_value=95.0):
             target = cache.adapt_capacity()
             assert target == 5  # GPU > 90% -> 5 items
 
     def test_capacity_map_medium_gpu(self):
         """Medium GPU usage should set moderate cache."""
         cache = AdaptiveLRUCache(default_maxsize=15)
-        with patch.object(AdaptiveLRUCache, '_get_gpu_memory_percent', return_value=80.0):
+        with patch.object(AdaptiveLRUCache, "_get_gpu_memory_percent", return_value=80.0):
             target = cache.adapt_capacity()
             assert target == 10  # GPU > 75% -> 10 items

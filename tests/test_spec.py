@@ -1,5 +1,4 @@
 """tests for app.integrated_app.spec (TTS spec contract layer)."""
-import pytest
 
 from integrated_app import spec
 
@@ -17,7 +16,7 @@ def test_samples_to_duration():
 def test_is_valid_text_length():
     assert spec.is_valid_text_length("a" * 100)
     assert spec.is_valid_text_length("a" * 200)
-    assert not spec.is_valid_text_length("a" * 49)   # below MIN
+    assert not spec.is_valid_text_length("a" * 49)  # below MIN
     assert not spec.is_valid_text_length("a" * 201)  # above MAX
 
 

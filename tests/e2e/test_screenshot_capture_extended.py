@@ -24,12 +24,14 @@ collide (e.g. ``voxcpm2_01_voice_design_savedtab_adv_open_light_viewport.png``).
 
 from __future__ import annotations
 
+import contextlib
 import os
 
 import pytest
 
 try:
     from playwright.sync_api import Page, sync_playwright
+
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional dependency
     PLAYWRIGHT_AVAILABLE = False
@@ -188,9 +190,11 @@ GLOBAL_STATES: list[tuple[str, str]] = [
 
 # --- fixtures ---------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def server_url():
     import urllib.request
+
     try:
         urllib.request.urlopen(BASE_URL, timeout=3)
         return BASE_URL
@@ -208,6 +212,7 @@ def browser():
 
 
 # --- helpers ----------------------------------------------------------------
+
 
 def _make_dirs() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -268,13 +273,9 @@ def _go_home(page: Page, theme: str) -> None:
     # Set tts_onboarded_v1 BEFORE page navigation so onboarding.js reads it
     # on the fresh context.  We preload an about:blank, seed localStorage on
     # the origin, then navigate to the real URL.
-    try:
+    with contextlib.suppress(Exception):
         page.goto(f"{BASE_URL}/favicon.ico", wait_until="domcontentloaded", timeout=15000)
-    except Exception:
-        pass
-    page.evaluate(
-        """() => { localStorage.setItem('tts_onboarded_v1', '1'); }"""
-    )
+    page.evaluate("""() => { localStorage.setItem('tts_onboarded_v1', '1'); }""")
     page.goto(f"{BASE_URL}/", wait_until="domcontentloaded", timeout=30000)
     # networkidle can stall indefinitely when SSE/event-stream keeps connections
     # open; treat it as best-effort and fall back to a fixed settle time.
@@ -293,7 +294,8 @@ def _click_tab(page: Page, tab_name: str) -> bool:
         return False
     # 若按钮位于折叠分组（.sidebar-nav-section.section-collapsed）内，
     # 先点击分组标题 .sidebar-nav-label 展开，否则 max-height:0 无法点击
-    page.evaluate("""(t) => {
+    page.evaluate(
+        """(t) => {
         const btn = document.querySelector(`.sidebar-item[data-tab="${t}"]`);
         if (!btn) return;
         const sec = btn.closest('.sidebar-nav-section');
@@ -301,7 +303,9 @@ def _click_tab(page: Page, tab_name: str) -> bool:
             const label = sec.querySelector('.sidebar-nav-label');
             if (label) label.click();
         }
-    }""", tab_name)
+    }""",
+        tab_name,
+    )
     page.wait_for_timeout(400)
     button.first.click()
     try:
@@ -428,6 +432,7 @@ def _switch_model_tab(page: Page, model: str) -> None:
 
 # --- test class -------------------------------------------------------------
 
+
 class TestExtendedScreenshotCapture:
     """Capture extended interactive-state screenshots in light & dark themes."""
 
@@ -447,7 +452,7 @@ class TestExtendedScreenshotCapture:
         elif state_label == "health_panel":
             _open_health_panel(page)
         elif state_label.startswith("model_"):
-            model_key = state_label[len("model_"):]
+            model_key = state_label[len("model_") :]
             _switch_model_tab(page, model_key)
 
         _save(page, f"global_{state_label}", theme)

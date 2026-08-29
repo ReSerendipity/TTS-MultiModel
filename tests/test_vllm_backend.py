@@ -13,20 +13,16 @@ Covers:
 import json
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from integrated_app.vllm_backend import (
-    VLLMConfig,
-    VLLMBackend,
-    VLLMStatus,
     VLLM_DISABLED,
+    VLLMBackend,
+    VLLMConfig,
+    VLLMStatus,
     check_vllm_config_compatibility,
     get_vllm_backend,
     is_vllm_available,
 )
-
 
 # ---------------------------------------------------------------------------
 # is_vllm_available

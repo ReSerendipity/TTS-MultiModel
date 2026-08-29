@@ -1,11 +1,13 @@
 """生成/验证 DCT 数字水印密钥。初始化脚本：生成密钥、自我测试。"""
+
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 
 import numpy as np
-from integrated_app.watermark import embed_watermark, detect_watermark
+
+from integrated_app.watermark import detect_watermark, embed_watermark
 
 
 def main() -> int:

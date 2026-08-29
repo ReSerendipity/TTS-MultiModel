@@ -1,13 +1,15 @@
-# -*- coding: utf-8 -*-
 """Tests for exceptions.py hierarchy and decorator."""
+
 import asyncio
+
 import pytest
+
 from integrated_app.exceptions import (
-    TTSError,
-    ModelLoadError,
-    InsufficientVRAMError,
-    GenerationError,
     EngineSwitchError,
+    GenerationError,
+    InsufficientVRAMError,
+    ModelLoadError,
+    TTSError,
     ValidationError,
     tts_error_handler,
 )

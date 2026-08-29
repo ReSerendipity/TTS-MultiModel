@@ -86,16 +86,26 @@ class TestSaveLoadRoundtrip:
 
     def test_overwrite_keeps_latest_state(self, tmp_path):
         mgr = TaskCheckpoint(checkpoint_dir=str(tmp_path))
-        mgr.save_checkpoint("t", {
-            "engine": "a", "total": 4,
-            "completed_items": [{"i": 0}],
-            "remaining": [{"i": 1}, {"i": 2}, {"i": 3}], "config": {},
-        })
-        mgr.save_checkpoint("t", {
-            "engine": "a", "total": 4,
-            "completed_items": [{"i": 0}, {"i": 1}, {"i": 2}],
-            "remaining": [{"i": 3}], "config": {},
-        })
+        mgr.save_checkpoint(
+            "t",
+            {
+                "engine": "a",
+                "total": 4,
+                "completed_items": [{"i": 0}],
+                "remaining": [{"i": 1}, {"i": 2}, {"i": 3}],
+                "config": {},
+            },
+        )
+        mgr.save_checkpoint(
+            "t",
+            {
+                "engine": "a",
+                "total": 4,
+                "completed_items": [{"i": 0}, {"i": 1}, {"i": 2}],
+                "remaining": [{"i": 3}],
+                "config": {},
+            },
+        )
         loaded = mgr.load_checkpoint("t")
         assert loaded is not None
         assert loaded["completed"] == 3
@@ -148,7 +158,10 @@ class TestResumeFromCheckpoint:
             return _fake_inference(batch)
 
         results, stats = inf.resume_from_checkpoint(
-            mgr, "batch-crash", spy_fn, checkpoint_every=3,
+            mgr,
+            "batch-crash",
+            spy_fn,
+            checkpoint_every=3,
         )
         assert results is not None
         assert len(results) == 6
@@ -233,10 +246,16 @@ class TestListResumableAndResumeState:
         _save_progress(mgr, "finished", total=5, done=5)
         _save_progress(mgr, "stale", total=5, done=2)
         # 人为制造 remaining 为空但 completed < total 的无效现场
-        mgr.save_checkpoint("stale", {
-            "engine": "voxcpm2", "total": 5,
-            "completed_items": [{"text": "x"}], "remaining": [], "config": {},
-        })
+        mgr.save_checkpoint(
+            "stale",
+            {
+                "engine": "voxcpm2",
+                "total": 5,
+                "completed_items": [{"text": "x"}],
+                "remaining": [],
+                "config": {},
+            },
+        )
 
         resumable = mgr.list_resumable()
         assert [cp["task_id"] for cp in resumable] == ["pending"]

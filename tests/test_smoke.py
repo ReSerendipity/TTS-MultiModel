@@ -2,12 +2,13 @@
 
 These tests should:
 1. Run quickly (<30s total)
-2. Not require GPU or model loading  
+2. Not require GPU or model loading
 3. Cover critical paths that would indicate a broken build
 
 Usage:
     pytest -m smoke  # Run only smoke tests
 """
+
 import os
 import sys
 

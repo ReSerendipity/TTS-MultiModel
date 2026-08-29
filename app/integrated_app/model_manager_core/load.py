@@ -5,8 +5,10 @@ _do_load_voxcpm2_internal / load_indextts2、PreloadService / preload_model /
 get_preload_status。
 【边界】不做卸载（unload.py）；不做引擎切换（switch.py）。
 """
-from .state import *
+
 from . import state as _state
+from .state import *
+
 
 def get_persona_cache_stats() -> dict[str, Any]:
     """获取当前 Persona 嵌入缓存的统计信息。
@@ -489,10 +491,7 @@ def load_indextts2(
 
         # Check if model files exist
         if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"{label} 模型文件不存在: {model_path}\n"
-                f"请运行: python {download_script} 下载模型"
-            )
+            raise FileNotFoundError(f"{label} 模型文件不存在: {model_path}\n请运行: python {download_script} 下载模型")
 
         # Step 1: VRAM/RAM check
         from ..model_registry import ENGINE_VRAM_REQUIREMENTS

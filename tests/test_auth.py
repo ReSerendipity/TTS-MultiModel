@@ -10,6 +10,7 @@ Coverage:
 - Public paths bypass: /api/health/*, static files need no token
 - Empty token fail-closed: even valid-looking requests rejected
 """
+
 import os
 import sys
 
@@ -27,6 +28,7 @@ os.environ.setdefault("TTS_SKIP_MODEL_LOAD", "1")
 # ============================================================================
 # Test fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def app_with_auth_off():
@@ -66,6 +68,7 @@ def app_with_auth_on():
 # Authentication disabled behavior
 # ============================================================================
 
+
 class TestAuthDisabled:
     """Test behavior when API authentication is disabled."""
 
@@ -88,16 +91,14 @@ class TestAuthDisabled:
 # Authentication enabled - valid token scenarios
 # ============================================================================
 
+
 class TestAuthEnabledValidToken:
     """Test behavior when API auth is enabled with valid token."""
 
     def test_valid_bearer_token_allows_access(self, app_with_auth_on):
         """Correct Bearer token should allow API access."""
         with TestClient(app_with_auth_on) as client:
-            resp = client.get(
-                "/api/protected",
-                headers={"Authorization": "Bearer test-secret-token"}
-            )
+            resp = client.get("/api/protected", headers={"Authorization": "Bearer test-secret-token"})
             assert resp.status_code == 200
             assert resp.json()["data"] == "secret"
 
@@ -110,17 +111,11 @@ class TestAuthEnabledValidToken:
         """
         with TestClient(app_with_auth_on) as client:
             # Uppercase "Bearer" works
-            resp_upper = client.get(
-                "/api/protected",
-                headers={"Authorization": "Bearer test-secret-token"}
-            )
+            resp_upper = client.get("/api/protected", headers={"Authorization": "Bearer test-secret-token"})
             assert resp_upper.status_code == 200
 
             # Lowercase "bearer" is rejected (timing-safe comparison)
-            resp_lower = client.get(
-                "/api/protected",
-                headers={"Authorization": "bearer test-secret-token"}
-            )
+            resp_lower = client.get("/api/protected", headers={"Authorization": "bearer test-secret-token"})
             assert resp_lower.status_code == 401
             # Check error message contains "invalid" in English or Chinese ("无效")
             detail_lower = resp_lower.json()["detail"].lower()
@@ -138,6 +133,7 @@ class TestAuthEnabledValidToken:
 # Authentication enabled - invalid/missing token rejection
 # ============================================================================
 
+
 class TestAuthEnabledRejectInvalid:
     """Test that invalid/missing tokens are properly rejected."""
 
@@ -150,28 +146,19 @@ class TestAuthEnabledRejectInvalid:
     def test_invalid_token_rejected(self, app_with_auth_on):
         """Wrong token should get 401."""
         with TestClient(app_with_auth_on) as client:
-            resp = client.get(
-                "/api/protected",
-                headers={"Authorization": "Bearer wrong-token"}
-            )
+            resp = client.get("/api/protected", headers={"Authorization": "Bearer wrong-token"})
             assert resp.status_code == 401
 
     def test_empty_token_rejected(self, app_with_auth_on):
         """Empty Bearer token should be rejected when auth enabled."""
         with TestClient(app_with_auth_on) as client:
-            resp = client.get(
-                "/api/protected",
-                headers={"Authorization": "Bearer "}
-            )
+            resp = client.get("/api/protected", headers={"Authorization": "Bearer "})
             assert resp.status_code == 401
 
     def test_non_bearer_scheme_rejected(self, app_with_auth_on):
         """Non-Bearer auth scheme should be rejected."""
         with TestClient(app_with_auth_on) as client:
-            resp = client.get(
-                "/api/protected",
-                headers={"Authorization": "Basic dXNlcjpwYXNz"}
-            )
+            resp = client.get("/api/protected", headers={"Authorization": "Basic dXNlcjpwYXNz"})
             assert resp.status_code == 401
 
 
@@ -179,27 +166,31 @@ class TestAuthEnabledRejectInvalid:
 # Configuration tests
 # ============================================================================
 
+
 class TestAuthConfiguration:
     """Test auth configuration structure."""
 
     def test_config_has_api_auth_section(self):
         """Config has api_auth section."""
         from integrated_app.config import get_config
+
         config = get_config()
-        assert hasattr(config, 'api_auth')
+        assert hasattr(config, "api_auth")
 
     def test_api_auth_enabled_field_exists_and_bool(self):
         """API auth config has enabled field of bool type."""
         from integrated_app.config import get_config
+
         config = get_config()
         auth = config.api_auth
-        assert hasattr(auth, 'enabled')
+        assert hasattr(auth, "enabled")
         assert isinstance(auth.enabled, bool)
 
     def test_api_auth_token_field_exists_and_str(self):
         """API auth config has token field of str type."""
         from integrated_app.config import get_config
+
         config = get_config()
         auth = config.api_auth
-        assert hasattr(auth, 'token')
+        assert hasattr(auth, "token")
         assert isinstance(auth.token, str)

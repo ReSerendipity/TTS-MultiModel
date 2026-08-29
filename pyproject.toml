@@ -114,12 +114,20 @@ include = ["integrated_app*", "integrated_app.vendor*"]
 target-version = "py310"
 line-length = 120
 src = ["app/integrated_app", "tests", "scripts"]
+# WHY 必须 true：ruff 默认只把 exclude 应用于「目录递归发现」的文件，
+# 命令行显式传入的路径（如 `ruff check app/integrated_app/`）会绕过 exclude，
+# 导致上面 vendor/ 的排除形同虚设、vendored 上游代码被 --fix 静默改写。
+force-exclude = true
 exclude = [
     "**/node_modules",
     "**/__pycache__",
     "**/.git",
     "**/pynini_src",
     "**/reference_repos",
+    # vendored 上游代码（voxcpm / indextts / tn 等）保持与上游字节一致，
+    # 不由本仓 lint/format 改写，否则未来同步上游会冲突、推理行为可能被静默改变。
+    # 与 .pre-commit-config.yaml 的 exclude: ^app/integrated_app/vendor/ 同源。
+    "**/vendor",
     "dist",
     "build",
 ]
@@ -138,12 +146,33 @@ ignore = ["E501", "B008", "B905"]
 "app/clean_launch.py" = ["E402", "I001"]
 "app/integrated_app/training/config.py" = ["F821"]
 "app/integrated_app/training/data.py" = ["F821"]
+# model_manager_core 门面层有意用 `from .state import *` 共享模块级状态
+# （state.py 统一持有 _model_lock / registry / 各类路径常量并显式 __all__ 导出），
+# 因此 load/switch/unload 中的 F403/F405 是架构设计，不是缺陷。
+# F401 必须一并忽略：model_manager.py 是纯 re-export 门面，其显式 import 的名字
+# 在本文件内「未被使用」正是其存在意义；多行 import 的 `# noqa: F401` 只能挂在
+# 报错行上，挂在收尾括号上无效，ruff --fix 会据此把整段 re-export 静默删除，
+# 曾导致 routes/model.py ImportError、/api/model/* 全量 404、引擎无法切换。
+"app/integrated_app/model_manager.py" = ["F401", "F403", "F405"]
+"app/integrated_app/model_manager_core/load.py" = ["F401", "F403", "F405"]
+"app/integrated_app/model_manager_core/switch.py" = ["F401", "F403", "F405"]
+"app/integrated_app/model_manager_core/unload.py" = ["F401", "F403", "F405"]
+# 测试与脚本必须先 sys.path.insert(...) 再 import 被测模块，无法把 import 提到文件顶部
+"tests/*.py" = ["E402"]
+"tests/integration/*.py" = ["E402"]
+"scripts/*.py" = ["E402"]
+# 入参校验类测试故意用 pytest.raises(Exception) 兜住所有异常，验证 Pydantic 拒绝路径
+"tests/test_openai_api.py" = ["B017"]
+"tests/test_voxcpm2_decorators.py" = ["B017"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["integrated_app"]
 
 [tool.mypy]
-python_version = "3.10"
+# 3.10 会让 mypy 以旧语法解析 numpy 新版 stub（其 __init__.pyi 用了 PEP 695 `type`
+# 语句），直接报 "Type statement is only supported in Python 3.12 and greater" 并中断整轮检查。
+# 与 .github/workflows/ci.yml lint job 的 python-version: "3.12" 对齐。
+python_version = "3.12"
 ignore_missing_imports = true
 strict = false
 warn_return_any = false
@@ -156,6 +185,9 @@ exclude = [
     "node_modules",
     "build",
     "dist",
+    # vendored 上游代码不做类型检查：其 __init__.py 会让 mypy 报
+    # "Source file found twice under different module names" 并直接中断整轮检查
+    "vendor/",
 ]
 
 [tool.pytest.ini_options]

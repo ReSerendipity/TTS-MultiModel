@@ -5,6 +5,7 @@ The auditor lives OUTSIDE this repo (C:\\Users\\Doro\\.spec_audit).  On a
 developer machine it is found and the check is authoritative; in a fresh CI
 checkout it is absent and the check degrades to "skip" (keeps CI green).
 """
+
 from __future__ import annotations
 
 import json
@@ -26,8 +27,9 @@ if auditor is None:
 with tempfile.TemporaryDirectory(prefix="spec_audit_") as td:
     out = Path(td) / "current.json"
     out_md = Path(td) / "current.md"
-    subprocess.run([sys.executable, str(auditor), "--project", HERE.name,
-                    "--json", str(out), "--md", str(out_md)], check=True)
+    subprocess.run(
+        [sys.executable, str(auditor), "--project", HERE.name, "--json", str(out), "--md", str(out_md)], check=True
+    )
     data = json.loads(out.read_text(encoding="utf-8"))[0]
 
 hard = [f for f in data["findings"] if f["status"] == "PHANTOM" and f["tier"] == "ASSERTIVE"]

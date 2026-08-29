@@ -15,9 +15,7 @@ import sys
 
 import pytest
 
-_APP_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin"
-)
+_APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
@@ -29,7 +27,6 @@ from integrated_app.security.content_safety import (
     get_safety_detector,
     is_safe,
 )
-
 
 # ---------------------------------------------------------------------------
 # 安全文本测试
@@ -240,7 +237,7 @@ class TestBatchDetection:
         texts = ["你好世界", "我要杀人", "天气真好", "贩毒计划"]
         unsafe = self.detector.filter_safe(texts)
         # 应只包含不安全项
-        for idx, text, result in unsafe:
+        for idx, _text, result in unsafe:
             assert not result.is_safe
             assert idx in (1, 3)
 

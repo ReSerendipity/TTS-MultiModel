@@ -3,16 +3,17 @@
 只验证机制闭环：注册引擎推理函数 → 构造 handler → 续跑 remaining → 清理 checkpoint；
 未注册引擎 → 保留 checkpoint 并返回 False。全部使用 fake 数据，不跑真实推理。
 """
+
 from pathlib import Path
 
 import pytest
 
-from integrated_app.checkpoint import TaskCheckpoint
 from integrated_app.batch_inference import (
     get_resume_inference_fn,
     make_checkpoint_resume_handler,
     register_resume_inference_fn,
 )
+from integrated_app.checkpoint import TaskCheckpoint
 
 
 @pytest.fixture
@@ -34,7 +35,9 @@ def _make_cp(task_id: str, engine: str, total: int, completed_n: int) -> dict:
 
 
 def test_register_and_lookup():
-    fn = lambda batch: [1.0] * len(batch)
+    def fn(batch):
+        return [1.0] * len(batch)
+
     register_resume_inference_fn("voxcpm2", fn)
     assert get_resume_inference_fn("voxcpm2") is fn
     assert get_resume_inference_fn("no_such_engine") is None

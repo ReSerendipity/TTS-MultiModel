@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 Test script to verify that all new modules can be imported and basic functionality works.
 This script checks syntax, imports, and basic class/function availability without requiring full dependencies.
 """
 
-import sys
 import os
+import sys
 
 import pytest
 
@@ -17,47 +16,57 @@ _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
+
 def test_module_imports():
     """Test that all new modules can be imported."""
     # Test GPU utils
-    from integrated_app.gpu_utils import is_oom_error, free_gpu_memory
+    from integrated_app.gpu_utils import free_gpu_memory, is_oom_error
+
     assert callable(is_oom_error)
     assert callable(free_gpu_memory)
 
     # Test model registry
     from integrated_app.model_registry import ModelRegistry
+
     assert ModelRegistry is not None
 
     # Test config models
     from integrated_app.config_models import AppConfig
+
     assert AppConfig is not None
 
     # Test estimator
     from integrated_app.estimator import GenerationTimeEstimator
+
     assert GenerationTimeEstimator is not None
 
     # Test engine interface
-    from integrated_app.engine_interface import TTSEngine, ControllableTTSEngine
+    from integrated_app.engine_interface import ControllableTTSEngine, TTSEngine
+
     assert TTSEngine is not None
     assert ControllableTTSEngine is not None
 
     # Test monitor
     from integrated_app.monitor import HealthMonitor, get_health_monitor
+
     assert HealthMonitor is not None
     assert callable(get_health_monitor)
 
     # Test audio processing
     from integrated_app.audio_processing import enhance_audio, normalize_loudness
+
     assert callable(enhance_audio)
     assert callable(normalize_loudness)
 
     # Test history db
     from integrated_app.history_db import HistoryDatabase, create_history_db
+
     assert HistoryDatabase is not None
     assert callable(create_history_db)
 
     # Test persona metadata
-    from integrated_app.persona_metadata import PersonaMetadata, PersonaExporter, load_persona_metadata
+    from integrated_app.persona_metadata import PersonaExporter, PersonaMetadata, load_persona_metadata
+
     assert PersonaMetadata is not None
     assert PersonaExporter is not None
     assert callable(load_persona_metadata)
@@ -66,10 +75,11 @@ def test_module_imports():
 def test_basic_functionality():
     """Test basic functionality of key components."""
     # Test GenerationTimeEstimator
-    from integrated_app.estimator import GenerationTimeEstimator
     import tempfile
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    from integrated_app.estimator import GenerationTimeEstimator
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         temp_file = f.name
 
     try:
@@ -87,7 +97,7 @@ def test_basic_functionality():
         os.unlink(temp_file)
 
     # Test HistoryDB
-    from integrated_app.history_db import HistoryDatabase, create_history_db
+    from integrated_app.history_db import create_history_db
 
     with tempfile.TemporaryDirectory() as temp_dir:
         db = create_history_db(temp_dir)

@@ -35,13 +35,16 @@ class TestConcurrentAPIAccess:
     @pytest.fixture
     def stress_client(self):
         from fastapi.testclient import TestClient
+
         from integrated_app.app_server import create_app
+
         app = create_app()
         client = TestClient(app, raise_server_exceptions=False)
         return client
 
     def test_concurrent_health_check(self, stress_client):
         """并发 50 次 health ping 请求，全部应返回 200。"""
+
         def make_request():
             resp = stress_client.get("/api/health/ping")
             return resp.status_code
@@ -50,11 +53,11 @@ class TestConcurrentAPIAccess:
             futures = [executor.submit(make_request) for _ in range(50)]
             results = [f.result() for f in as_completed(futures)]
 
-        assert all(code == 200 for code in results), \
-            f"Not all requests succeeded: {set(results)}"
+        assert all(code == 200 for code in results), f"Not all requests succeeded: {set(results)}"
 
     def test_concurrent_model_status(self, stress_client):
         """并发 30 次 model status 请求。"""
+
         def make_request():
             resp = stress_client.get("/api/model/status")
             return resp.status_code
@@ -80,10 +83,7 @@ class TestConcurrentAPIAccess:
             return resp.status_code
 
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [
-                executor.submit(make_request, endpoints[i % len(endpoints)])
-                for i in range(50)
-            ]
+            futures = [executor.submit(make_request, endpoints[i % len(endpoints)]) for i in range(50)]
             results = [f.result() for f in as_completed(futures)]
 
         # All should be 200 (these are all GET endpoints that work without models)
@@ -92,6 +92,7 @@ class TestConcurrentAPIAccess:
 
     def test_response_time_under_load(self, stress_client):
         """负载下响应时间应在合理范围（< 2s for health ping）。"""
+
         def timed_request():
             start = time.time()
             resp = stress_client.get("/api/health/ping")
@@ -109,6 +110,7 @@ class TestConcurrentAPIAccess:
     def test_no_memory_leak_under_repeated_requests(self, stress_client):
         """重复请求不应导致明显内存泄漏。"""
         import tracemalloc
+
         tracemalloc.start()
         snapshot1 = tracemalloc.take_snapshot()
 
@@ -121,5 +123,4 @@ class TestConcurrentAPIAccess:
 
         # Total memory growth should be reasonable (< 5MB)
         total_growth = sum(s.size_diff for s in stats if s.size_diff > 0)
-        assert total_growth < 5 * 1024 * 1024, \
-            f"Memory growth {total_growth / 1024 / 1024:.2f}MB exceeds 5MB threshold"
+        assert total_growth < 5 * 1024 * 1024, f"Memory growth {total_growth / 1024 / 1024:.2f}MB exceeds 5MB threshold"

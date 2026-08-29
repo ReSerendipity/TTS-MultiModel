@@ -2,9 +2,10 @@
 
 补充报告中发现的安全测试盲区（原测试体系缺少 SQL/XSS/SSRF）。
 """
+
+import contextlib
 import os
 import sys
-import pytest
 
 _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
 if _APP_DIR not in sys.path:
@@ -17,6 +18,7 @@ os.environ.setdefault("TTS_SKIP_MODEL_LOAD", "1")
 # SQL Injection / FTS5 Tests
 # ============================================================================
 
+
 class TestHistoryDBSQLInjectionPrevention:
     """Test that history DB properly prevents SQL injection via parameterized queries."""
 
@@ -26,9 +28,10 @@ class TestHistoryDBSQLInjectionPrevention:
         Regression test for CVE-style injection via search_text parameter.
         See app/integrated_app/history_db.py:_build_filter_conditions() line 477,1047
         """
-        from integrated_app.history_db import HistoryDatabase
-        import tempfile
         import os
+        import tempfile
+
+        from integrated_app.history_db import HistoryDatabase
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             db_path = f.name
@@ -51,20 +54,18 @@ class TestHistoryDBSQLInjectionPrevention:
                 conditions, params = db._build_filter_conditions(search_text=malicious)
 
                 # Verify parameterized binding is used
-                assert "?" in str(conditions) or len(params) > 0, \
+                assert "?" in str(conditions) or len(params) > 0, (
                     f"Query should use parameterized binding, got conditions={conditions}"
+                )
 
                 # Verify the malicious input ends up in params, NOT in conditions
                 condition_str = " ".join(conditions) if conditions else ""
-                assert malicious not in condition_str, \
-                    f"Malicious input leaked into SQL condition: {condition_str}"
+                assert malicious not in condition_str, f"Malicious input leaked into SQL condition: {condition_str}"
 
         finally:
             if os.path.exists(db_path):
-                try:
+                with contextlib.suppress(PermissionError):
                     os.unlink(db_path)
-                except PermissionError:
-                    pass
 
     def test_filter_key_whitelist_enforcement(self):
         """Unknown filter keys should be rejected/logged, not passed to SQL.
@@ -72,8 +73,9 @@ class TestHistoryDBSQLInjectionPrevention:
         Prevents injection via filter key names (e.g., {"engine"); DROP TABLE..." : "x"}).
         See app/integrated_app/history_db.py line 446-449
         """
-        from integrated_app.history_db import HistoryDatabase
         import tempfile
+
+        from integrated_app.history_db import HistoryDatabase
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             db_path = f.name
@@ -88,25 +90,23 @@ class TestHistoryDBSQLInjectionPrevention:
                 "time_from DELETE FROM history": "2024-01-01",
             }
 
-            for key in malicious_filters.keys():
+            for key in malicious_filters:
                 conditions, params = db._build_filter_conditions(filters={key: "value"})
 
                 # Malicious key should be logged and ignored, not added to conditions
                 condition_str = " ".join(conditions) if conditions else ""
-                assert key not in condition_str, \
-                    f"Malicious filter key leaked into SQL: {condition_str}"
+                assert key not in condition_str, f"Malicious filter key leaked into SQL: {condition_str}"
 
         finally:
             if os.path.exists(db_path):
-                try:
+                with contextlib.suppress(PermissionError):
                     os.unlink(db_path)
-                except PermissionError:
-                    pass
 
     def test_filename_search_parameterization(self):
         """filename search should also use parameterized LIKE queries."""
-        from integrated_app.history_db import HistoryDatabase
         import tempfile
+
+        from integrated_app.history_db import HistoryDatabase
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             db_path = f.name
@@ -122,26 +122,22 @@ class TestHistoryDBSQLInjectionPrevention:
             ]
 
             for malicious in malicious_patterns:
-                conditions, params = db._build_filter_conditions(
-                    search_text="test", search_filename=True
-                )
+                conditions, params = db._build_filter_conditions(search_text="test", search_filename=True)
 
                 # Verify safe parameterized construction
                 condition_str = " ".join(conditions) if conditions else ""
-                assert malicious not in condition_str, \
-                    f"Malicious filename pattern leaked: {condition_str}"
+                assert malicious not in condition_str, f"Malicious filename pattern leaked: {condition_str}"
 
         finally:
             if os.path.exists(db_path):
-                try:
+                with contextlib.suppress(PermissionError):
                     os.unlink(db_path)
-                except PermissionError:
-                    pass
 
 
 # ============================================================================
 # XSS Prevention Tests
 # ============================================================================
+
 
 class TestXSSPrevention:
     """Test XSS prevention in text processing and HTML output generation."""
@@ -172,24 +168,21 @@ class TestXSSPrevention:
                 assert result is not None
                 # If result is a string, verify script tags are not preserved verbatim
                 if isinstance(result, str):
-                    assert "<script>" not in result.lower(), \
-                        f"XSS payload survived processing: {result}"
+                    assert "<script>" not in result.lower(), f"XSS payload survived processing: {result}"
                 elif isinstance(result, list):
                     for segment in result:
                         if isinstance(segment, str):
-                            assert "<script>" not in segment.lower(), \
-                                f"XSS payload survived in segment: {segment}"
+                            assert "<script>" not in segment.lower(), f"XSS payload survived in segment: {segment}"
             except ValueError:
                 # Rejecting malicious input is also acceptable
                 pass
             except Exception as e:
                 # Unexpected exceptions should not contain the raw XSS payload
-                assert "<script>" not in str(e).lower(), \
-                    f"Error message leaked XSS payload: {e}"
+                assert "<script>" not in str(e).lower(), f"Error message leaked XSS payload: {e}"
 
     def test_html_progress_bar_escaping(self):
         """Progress bar HTML generation should escape user-provided text fields.
-        
+
         Note: ProgressManager uses hardcoded strings internally. User-controlled text
         flows through FastAPI/Jinja2 which handles escaping at the response layer.
         This test documents the defense-in-depth strategy.
@@ -198,14 +191,14 @@ class TestXSSPrevention:
 
         pm = ProgressManager()
         pm.start(total_segments=1, phase="正常阶段")
-        
+
         # Verify progress manager produces valid HTML structure
         html = pm.get_progress_html()
-        
+
         # Empty phase during early stage is expected behavior (<0.5s threshold)
         if pm._start_time > 0 and (pm._phase or "") == "":
             assert html == ""  # Early return is intentional
-            
+
         # When HTML is generated, internal strings use safe characters only
         # User text would be escaped by Jinja2 before insertion
         assert isinstance(html, str)
@@ -218,58 +211,65 @@ class TestXSSPrevention:
         """
         # Placeholder: actual error sanitization happens in middleware/error handlers
         # Verify the concept exists
-        
+
         class ErrorSanitizer:
             """Example error sanitization utility."""
-            
+
             @staticmethod
             def sanitize_user_facing_message(error_msg: str, include_debug: bool = False) -> str:
                 """Strip sensitive information from error messages."""
                 import re
-                
+
                 # Remove common sensitive patterns
                 patterns = [
                     r'Password["\']?\s*[:=]\s*["\'][^"\']*["\']',
                     r'Token["\']?\s*[:=]\s*["\'][^"\']*["\']',
                     r'SECRET[_A-Z]*["\']?\s*[:=]\s*["\'][^"\']*["\']',
                 ]
-                
+
                 sanitized = error_msg
                 for pattern in patterns:
-                    sanitized = re.sub(pattern, '[REDACTED]', sanitized, flags=re.IGNORECASE)
-                
+                    sanitized = re.sub(pattern, "[REDACTED]", sanitized, flags=re.IGNORECASE)
+
                 # Remove stack traces unless debug mode
                 if not include_debug:
-                    stack_match = re.search(r'\n\s*File ".*?".*?\n\s*(?:in.*?\n\s*)+.*?\^\^+', 
-                                          sanitized)
+                    stack_match = re.search(r'\n\s*File ".*?".*?\n\s*(?:in.*?\n\s*)+.*?\^\^+', sanitized)
                     if stack_match:
-                        sanitized = sanitized[:stack_match.start()] + "\n[Stack trace hidden]"
-                
+                        sanitized = sanitized[: stack_match.start()] + "\n[Stack trace hidden]"
+
                 return sanitized
-            
+
             @staticmethod
             def is_safe_for_display(error_msg: str) -> bool:
                 """Check if error message is safe to show to users."""
-                dangerous_patterns = ['password=', 'token=', 'secret=', 'api_key=', 
-                                     '<script', 'DROP TABLE', 'DELETE FROM']
+                dangerous_patterns = [
+                    "password=",
+                    "token=",
+                    "secret=",
+                    "api_key=",
+                    "<script",
+                    "DROP TABLE",
+                    "DELETE FROM",
+                ]
                 lower_msg = error_msg.lower()
                 return not any(p.lower() in lower_msg for p in dangerous_patterns)
-        
+
         sanitizer = ErrorSanitizer()
-        
+
         # Test sanitization
         malicious = "Failed with password='supersecret' and token='abc123'"
         safe = sanitizer.sanitize_user_facing_message(malicious)
         assert "password" not in safe.lower() or "[REDACTED]" in safe
-        
+
         # Test safety check
         assert sanitizer.is_safe_for_display("Operation completed successfully") is True
         assert sanitizer.is_safe_for_display("Error: DROP TABLE users") is False
 
 
 # ============================================================================
-# SSRF Prevention Tests  
+# SSRF Prevention Tests
 # ============================================================================
+
 
 class TestSSRFPrevention:
     """Test SSRF prevention for any URL-fetching functionality."""
@@ -279,8 +279,8 @@ class TestSSRFPrevention:
 
         If such endpoints exist, they should have URL validation/blocklist checks.
         """
+
         from integrated_app.app_server import create_app
-        import re
 
         app = create_app()
 
@@ -289,7 +289,7 @@ class TestSSRFPrevention:
         suspicious_routes = []
 
         for route in app.routes:
-            if hasattr(route, 'path') and hasattr(route, 'methods'):
+            if hasattr(route, "path") and hasattr(route, "methods"):
                 path_lower = route.path.lower()
                 methods_lower = [m.lower() for m in route.methods]
 
@@ -297,11 +297,13 @@ class TestSSRFPrevention:
                 if "get" in methods_lower or "post" in methods_lower:
                     for keyword in url_fetch_keywords:
                         if keyword in path_lower:
-                            suspicious_routes.append({
-                                "path": route.path,
-                                "methods": route.methods,
-                                "name": getattr(route, 'name', 'unnamed')
-                            })
+                            suspicious_routes.append(
+                                {
+                                    "path": route.path,
+                                    "methods": route.methods,
+                                    "name": getattr(route, "name", "unnamed"),
+                                }
+                            )
 
         # For now, just document these routes - future tests should validate their URL handling
         # If this assertion fails, add proper SSRF protection tests for those endpoints
@@ -311,7 +313,7 @@ class TestSSRFPrevention:
         """If audio files can be loaded from URLs, they should validate against internal IPs."""
         # This test documents the requirement - implementation may vary by feature
         # Future: Add actual URL validation test when URL-based audio loading is implemented
-        
+
         # Placeholder: verify the concept exists
         import ipaddress
 
@@ -319,6 +321,7 @@ class TestSSRFPrevention:
             """Example SSRF-safe URL checker (not actually used, just testing the logic)."""
             try:
                 from urllib.parse import urlparse
+
                 parsed = urlparse(url)
 
                 # Only allow http/https
@@ -331,8 +334,9 @@ class TestSSRFPrevention:
                     return False
 
                 import socket
+
                 ips = socket.getaddrinfo(hostname, None)
-                for family, _, _, _, addr in ips:
+                for _family, _, _, _, addr in ips:
                     ip_str = addr[0]
                     try:
                         ip = ipaddress.ip_address(ip_str)
@@ -358,6 +362,7 @@ class TestSSRFPrevention:
 # HTTP Behavior-Level XSS Prevention Tests
 # ============================================================================
 
+
 class TestXSSHTTPBehavior:
     """Test XSS prevention through actual HTTP responses.
 
@@ -377,8 +382,7 @@ class TestXSSHTTPBehavior:
         # Regardless of status code, the response body must not contain
         # the raw, unescaped <script> tag
         body = resp.text
-        assert "<script>alert" not in body, \
-            f"Raw XSS payload found in response body: {body[:200]}"
+        assert "<script>alert" not in body, f"Raw XSS payload found in response body: {body[:200]}"
 
     def test_404_response_escapes_html(self, client):
         """404 responses should escape HTML entities in any echoed path."""
@@ -388,8 +392,7 @@ class TestXSSHTTPBehavior:
 
         body = resp.text
         # The raw onerror attribute must not appear unescaped
-        assert "onerror=alert" not in body, \
-            f"Unescaped HTML event handler in 404 body: {body[:200]}"
+        assert "onerror=alert" not in body, f"Unescaped HTML event handler in 404 body: {body[:200]}"
 
     def test_csrf_rejection_message_is_safe(self, client):
         """CSRF rejection response should not contain executable HTML."""
@@ -424,6 +427,7 @@ class TestXSSHTTPBehavior:
 # HTTP Behavior-Level SSRF Prevention Tests
 # ============================================================================
 
+
 class TestSSRFHTTPBehavior:
     """Test SSRF prevention through actual HTTP endpoint behavior.
 
@@ -445,8 +449,9 @@ class TestSSRFHTTPBehavior:
             resp = client.get(vector)
             # These should all return 404 (endpoint doesn't exist) or 422 (parameter not accepted)
             # The key assertion: no 200 response with content from the target URL
-            assert resp.status_code in (404, 422, 400, 405), \
+            assert resp.status_code in (404, 422, 400, 405), (
                 f"SSRF vector {vector} returned {resp.status_code} - possible SSRF vulnerability"
+            )
 
     def test_audio_upload_rejects_url_scheme(self, client):
         """Audio upload endpoint should reject URL-based file references."""
@@ -457,8 +462,9 @@ class TestSSRFHTTPBehavior:
         )
         # Should reject (400/403/404/422), not fetch the URL
         # 403 = CSRF or auth rejection (still safe - request was denied)
-        assert resp.status_code in (400, 403, 404, 422, 405, 415), \
+        assert resp.status_code in (400, 403, 404, 422, 405, 415), (
             f"Audio upload accepted URL reference: {resp.status_code}"
+        )
 
     def test_model_load_rejects_url_path(self, client):
         """Model loading should not accept URL-based paths."""
@@ -467,8 +473,9 @@ class TestSSRFHTTPBehavior:
             data={"engine": "voxcpm2", "model_url": "http://169.254.169.254/"},
         )
         # Should not fetch the URL - reject or ignore the url parameter
-        assert resp.status_code in (200, 400, 422, 405, 403), \
+        assert resp.status_code in (200, 400, 422, 405, 403), (
             f"Model load endpoint may have fetched URL: {resp.status_code}"
+        )
 
     def test_generate_endpoint_rejects_remote_reference(self, client):
         """Generate endpoint should not accept remote reference audio URLs."""
@@ -480,8 +487,9 @@ class TestSSRFHTTPBehavior:
             },
         )
         # Should reject or return error (no model loaded), not fetch the URL
-        assert resp.status_code in (400, 422, 405, 503, 403), \
+        assert resp.status_code in (400, 422, 405, 503, 403), (
             f"Generate endpoint may have fetched remote URL: {resp.status_code}"
+        )
 
     def test_internal_ip_not_reachable_via_api(self, client):
         """Verify no API endpoint proxies requests to internal IPs."""
@@ -498,5 +506,6 @@ class TestSSRFHTTPBehavior:
             for param_name in ("url", "target", "dest", "redirect", "next", "fetch"):
                 resp = client.get(f"/api/nonexistent?{param_name}={target}")
                 # Nonexistent endpoint should return 404
-                assert resp.status_code == 404, \
+                assert resp.status_code == 404, (
                     f"Unexpected {resp.status_code} for nonexistent endpoint with {param_name}={target}"
+                )

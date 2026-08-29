@@ -8,7 +8,6 @@ import sys
 import tempfile
 
 import numpy as np
-import pytest
 import soundfile as sf
 
 _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")

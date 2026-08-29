@@ -43,7 +43,6 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
 
 logger = logging.getLogger("tts_multimodel")
 
@@ -180,7 +179,6 @@ _BUILTIN_TEMPLATES: list[PromptTemplate] = [
         variables=["speed"],
         tags=["长者", "温暖", "慈祥", "elder", "warm"],
     ),
-
     # --- 情感风格模板 ---
     PromptTemplate(
         id="emotion_cheerful",
@@ -237,7 +235,6 @@ _BUILTIN_TEMPLATES: list[PromptTemplate] = [
         variables=["intensity"],
         tags=["兴奋", "激动", "excited", "thrilled"],
     ),
-
     # --- 场景模板 ---
     PromptTemplate(
         id="scene_news",
@@ -305,7 +302,6 @@ _BUILTIN_TEMPLATES: list[PromptTemplate] = [
         variables=["character_type", "speed"],
         tags=["游戏", "配音", "game", "voice_acting"],
     ),
-
     # --- 角色模板 ---
     PromptTemplate(
         id="char_narrator",
@@ -369,7 +365,6 @@ _KEYWORD_MAP: dict[str, list[str]] = {
     "gentle": ["gentle_female"],
     "magnetic": ["magnetic_male"],
     "lively": ["lively_girl"],
-
     # 情感关键词
     "欢快": ["emotion_cheerful"],
     "悲伤": ["emotion_sad"],
@@ -379,7 +374,6 @@ _KEYWORD_MAP: dict[str, list[str]] = {
     "cheerful": ["emotion_cheerful"],
     "sad": ["emotion_sad"],
     "serious": ["emotion_serious"],
-
     # 场景关键词
     "新闻": ["scene_news"],
     "有声书": ["scene_audiobook"],
@@ -390,7 +384,6 @@ _KEYWORD_MAP: dict[str, list[str]] = {
     "news": ["scene_news"],
     "audiobook": ["scene_audiobook"],
     "advertisement": ["scene_advertisement"],
-
     # 角色关键词
     "旁白": ["char_narrator"],
     "主角": ["char_hero"],

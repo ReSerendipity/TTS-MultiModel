@@ -192,6 +192,7 @@ async def generate_voxcpm_script(
                 else:
                     # 嵌入缓存对象（张量等），wav 文件必然存在
                     from ....persona_manager import PERSONA_DIR as _PD
+
                     candidate = os.path.join(_PD, f"{safe_name}.wav")
                     wav_path = candidate if os.path.isfile(candidate) else None
 

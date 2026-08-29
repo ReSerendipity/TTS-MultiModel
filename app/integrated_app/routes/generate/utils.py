@@ -531,12 +531,12 @@ _EMBEDDED_PLAYER_HTML = (
     '<div class="ep-player" data-embedded-player data-src="{audio_url}">'
     '<button type="button" class="ep-play" title="播放/暂停" aria-label="播放/暂停">'
     '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>'
-    '</button>'
+    "</button>"
     '<div class="ep-body">'
     '<canvas class="ep-wave" height="44" aria-hidden="true"></canvas>'
     '<div class="ep-bar"><div class="ep-bar-fill"></div></div>'
     '<div class="ep-time"><span class="ep-time-cur">00:00</span><span class="ep-time-dur">00:00</span></div>'
-    '</div></div>'
+    "</div></div>"
 )
 
 

@@ -2,6 +2,7 @@
 
 对应维护契约：engines 注册名与实现必须同步；任何新增/移除引擎都会在此失败。
 """
+
 from integrated_app.engine_interface import engine_registry
 
 EXPECTED_ENGINES = {"voxcpm2", "indextts2"}
@@ -20,6 +21,4 @@ def test_registry_matches_engine_name_enum():
 
     enum_values = {e.value for e in EngineName}
     registered = set(engine_registry.list_engines())
-    assert enum_values == registered, (
-        f"枚举与注册表不一致: {sorted(enum_values)} vs {sorted(registered)}"
-    )
+    assert enum_values == registered, f"枚举与注册表不一致: {sorted(enum_values)} vs {sorted(registered)}"

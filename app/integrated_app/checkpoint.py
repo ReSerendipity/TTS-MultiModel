@@ -174,7 +174,9 @@ class TaskCheckpoint:
             self.remove_checkpoint(task_id)
             logger.info(
                 "[Checkpoint] %s 已完成或无剩余项，已清理 (%d/%d)",
-                task_id, completed, total,
+                task_id,
+                completed,
+                total,
             )
             return None
         return data
@@ -202,7 +204,9 @@ class TaskCheckpoint:
                     p.unlink()
                 logger.debug(
                     "[Checkpoint] 清理已完成/无效 checkpoint: %s (%d/%d)",
-                    p.name, completed, total,
+                    p.name,
+                    completed,
+                    total,
                 )
                 continue
             resumable.append(data)

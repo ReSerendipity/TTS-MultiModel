@@ -3,6 +3,7 @@
 Usage: python scripts/render_pages.py
 Output: tests/frontend/_rendered/*.html
 """
+
 import sys
 from pathlib import Path
 
@@ -15,9 +16,11 @@ TEMPLATE_DIR = PROJECT_ROOT / "app" / "integrated_app" / "templates"
 OUTPUT_DIR = PROJECT_ROOT / "tests" / "frontend" / "_rendered"
 PAGES = ["base", "download_guide"]
 
+
 def _t(key: str, lang: str = "zh-CN", **kw) -> str:
     """Minimal i18n filter: return key as-is (smoke test only checks structure)."""
     return str(key)
+
 
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

@@ -16,11 +16,9 @@
 """
 
 import asyncio
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
+import contextlib
 
 import pytest
-
 
 # =====================================================================
 # GenerationJob 数据类测试
@@ -163,6 +161,7 @@ class TestInitShutdownQueue:
         loop.run_until_complete(force_reinit())
         # New worker should exist and be a different task
         from integrated_app.task_queue import _generation_worker_task as new_task
+
         assert new_task is not None
         assert new_task is not old_task or old_task.done()
 
@@ -187,7 +186,9 @@ class TestInitShutdownQueue:
         loop.run_until_complete(shutdown_and_check())
 
         # After shutdown, both should be None
-        from integrated_app.task_queue import _generation_queue as queue_after, _generation_worker_task as worker_after
+        from integrated_app.task_queue import _generation_queue as queue_after
+        from integrated_app.task_queue import _generation_worker_task as worker_after
+
         assert queue_after is None
         assert worker_after is None
         # Status should return zeros when uninitialized
@@ -321,16 +322,12 @@ class TestCancelGeneration:
         result = cancel_generation("gen-running")
         assert result == "running"
         # Wait for cancellation to complete
-        try:
+        with contextlib.suppress(asyncio.CancelledError, Exception):
             loop.run_until_complete(asyncio.wait_for(task, timeout=1.0))
-        except (asyncio.CancelledError, Exception):
-            pass
         # Verify the task was cancelled or completed
         assert task.cancelled() or task.done()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             loop.run_until_complete(task)
-        except asyncio.CancelledError:
-            pass
 
 
 # =====================================================================
@@ -372,6 +369,7 @@ class TestEnqueueGeneration:
 
         async def test_with_none():
             import integrated_app.task_queue as tq
+
             tq._generation_queue = None
             with pytest.raises(RuntimeError, match="尚未初始化"):
                 await enqueue_generation("test-gen", dummy())
@@ -381,6 +379,7 @@ class TestEnqueueGeneration:
 
         # Restore
         import integrated_app.task_queue as tq
+
         tq._generation_queue = original
 
     def test_enqueue_and_process(self):
@@ -405,7 +404,6 @@ class TestEnqueueGeneration:
     def test_enqueue_marks_queued(self):
         """Test that enqueued generation is marked as queued."""
         from integrated_app.task_queue import (
-            _queued_generation_ids,
             enqueue_generation,
             is_generation_active,
         )

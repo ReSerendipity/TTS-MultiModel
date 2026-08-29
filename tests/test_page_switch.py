@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Playwright test script for TTS MultiModel page switching verification.
 
 Identified bugs in tts_multimodel_replica.html:

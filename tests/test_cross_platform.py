@@ -79,7 +79,6 @@ class TestAtomicWrite:
 class TestFileLock:
     def test_lock_acquire_release(self, tmp_path):
         """Verify file lock mechanism works correctly."""
-        import os
         lock_path = tmp_path / "test.lock"
         with file_lock(str(lock_path)):
             # Lock file should exist while holding lock (or be created in parent dir on some platforms)

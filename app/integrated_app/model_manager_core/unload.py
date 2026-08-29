@@ -3,8 +3,10 @@
 包含 _check_voxcpm2_lock 与 unload_model。
 【边界】不做加载（load.py）；切换路径经 switch.py 调用本模块。
 """
-from .state import *
+
 from . import state as _state
+from .state import *
+
 
 def _check_voxcpm2_lock() -> bool:
     """非阻塞检查模型锁是否可用。

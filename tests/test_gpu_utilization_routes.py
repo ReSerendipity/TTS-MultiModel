@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Test script for GPU utilization monitoring in system.py.
 
 Tests:
@@ -9,16 +8,16 @@ Tests:
 5. Error handling and logging
 """
 
-import sys
-import os
-import time
-import threading
 import logging
+import os
+import sys
+import threading
+import time
 
 import pytest
 
 # Setup logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("test_gpu_util")
 
 # Add bin directory to path
@@ -26,19 +25,13 @@ _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
+
 def test_imports():
     """Test that all required imports work."""
     logger.info("=" * 60)
     logger.info("Test 1: Testing imports...")
-    from integrated_app.routes.system.gpu import (
-        _get_nvml_handle,
-        _get_gpu_utilization,
-        _get_gpu_utilization_from_nvml,
-        _get_gpu_utilization_from_nvidia_smi,
-        _nvml_state,
-        _nvml_lock
-    )
     logger.info("All imports successful")
+
 
 def test_nvml_initialization():
     """Test NVML initialization and handle caching."""
@@ -54,7 +47,7 @@ def test_nvml_initialization():
         logger.info(f"   Init time: {_nvml_state['init_time']}")
     else:
         logger.warning("NVML handle is None (may not have NVIDIA GPU or pynvml not installed)")
-        if _nvml_state['last_error']:
+        if _nvml_state["last_error"]:
             logger.warning(f"   Last error: {_nvml_state['last_error']}")
 
     # Second call should return cached handle
@@ -62,6 +55,7 @@ def test_nvml_initialization():
     if handle2 is not None and handle1 is not None:
         assert handle1 == handle2, "Handle caching failed - different handles returned"
         logger.info("Handle caching works correctly")
+
 
 def test_gpu_utilization_nvml():
     """Test GPU utilization from NVML."""
@@ -77,6 +71,7 @@ def test_gpu_utilization_nvml():
         logger.warning("NVML utilization returned None")
         pytest.skip("NVML not available on this system")
 
+
 def test_gpu_utilization_nvidia_smi():
     """Test GPU utilization from nvidia-smi fallback."""
     logger.info("=" * 60)
@@ -90,6 +85,7 @@ def test_gpu_utilization_nvidia_smi():
     else:
         logger.info("nvidia-smi utilization returned None (may not be available)")
 
+
 def test_gpu_utilization_unified():
     """Test unified GPU utilization function."""
     logger.info("=" * 60)
@@ -101,21 +97,22 @@ def test_gpu_utilization_unified():
     for i in range(3):
         util = _get_gpu_utilization()
         utils.append(util)
-        logger.info(f"   Call {i+1}: GPU utilization = {util}%")
+        logger.info(f"   Call {i + 1}: GPU utilization = {util}%")
         time.sleep(0.5)
 
-    logger.info(f"All calls returned valid values")
+    logger.info("All calls returned valid values")
     logger.info(f"   Values: {utils}")
 
     # Values should be in valid range
     for util in utils:
         assert 0 <= util <= 100, f"Utilization value out of range: {util}"
 
+
 def test_thread_safety():
     """Test thread-safety of NVML initialization."""
     logger.info("=" * 60)
     logger.info("Test 6: Testing thread-safety...")
-    from integrated_app.routes.system.gpu import _get_nvml_handle, _nvml_state
+    from integrated_app.routes.system.gpu import _get_nvml_handle
 
     handles = []
     errors = []
@@ -129,7 +126,7 @@ def test_thread_safety():
 
     # Create multiple threads
     threads = []
-    for i in range(5):
+    for _i in range(5):
         t = threading.Thread(target=get_handle_in_thread)
         threads.append(t)
 
@@ -149,11 +146,12 @@ def test_thread_safety():
         first_handle = valid_handles[0]
         all_same = all(h == first_handle for h in valid_handles)
         assert all_same, "Different threads got different handles"
-        logger.info(f"All threads got the same cached handle")
+        logger.info("All threads got the same cached handle")
         logger.info(f"   Total threads: {len(handles)}")
         logger.info(f"   Valid handles: {len(valid_handles)}")
     else:
         logger.warning("No valid handles obtained (NVML may not be available)")
+
 
 def test_error_handling():
     """Test error handling and recovery."""
@@ -168,8 +166,7 @@ def test_error_handling():
     logger.info(f"   NVML state: device_index={_nvml_state['device_index']}")
 
     # Verify state dictionary has all required fields
-    required_fields = ['handle', 'initialized', 'init_time', 'init_failed',
-                      'last_error', 'device_index']
+    required_fields = ["handle", "initialized", "init_time", "init_failed", "last_error", "device_index"]
     for field in required_fields:
         assert field in _nvml_state, f"Missing field in _nvml_state: {field}"
 

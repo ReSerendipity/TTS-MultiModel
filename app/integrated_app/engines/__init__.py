@@ -73,7 +73,7 @@ __all__ = [
 ]
 
 from ..engine_interface import engine_registry
-from .indextts2_engine import IndexTTS20Engine, IndexTTS2Engine
+from .indextts2_engine import IndexTTS2Engine, IndexTTS20Engine
 
 engine_registry.register(
     "indextts2",

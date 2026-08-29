@@ -54,8 +54,9 @@ class TestVRAMSwitch:
 
     def test_load_unload_vram_release(self, server_url):
         """测试加载后卸载是否释放显存。"""
-        import requests
         import time
+
+        import requests
 
         self._unload_all(server_url)
         time.sleep(2)
@@ -88,8 +89,9 @@ class TestVRAMSwitch:
 
     def test_engine_switch_no_leak(self, server_url):
         """测试引擎切换无显存泄漏。"""
-        import requests
         import time
+
+        import requests
 
         self._unload_all(server_url)
         time.sleep(3)
@@ -140,8 +142,9 @@ class TestVRAMSwitch:
 
     def test_repeated_switch_stability(self, server_url):
         """测试反复切换的显存稳定性（5 轮）。"""
-        import requests
         import time
+
+        import requests
 
         self._unload_all(server_url)
         time.sleep(3)

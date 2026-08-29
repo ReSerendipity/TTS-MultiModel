@@ -814,9 +814,7 @@ class IndexTTS2Engine(TTSEngine):
             # 故 lang 仅在 2.5 下传；2.0 只校验语言、不注入。
             _lang_val = lang if lang is not None else self.lang
             if _lang_val not in self.supported_langs:
-                logger.debug(
-                    f"[IndexTTS2] {self.version} 不支持语言 {_lang_val}，回退 Auto"
-                )
+                logger.debug(f"[IndexTTS2] {self.version} 不支持语言 {_lang_val}，回退 Auto")
                 _lang_val = "Auto"
             if self.version_str == "2.5":
                 infer_kwargs["lang"] = _lang_val
@@ -856,9 +854,7 @@ class IndexTTS2Engine(TTSEngine):
 
                 wav, sample_rate = _sf.read(str(result))
                 wav = np.asarray(wav, dtype=np.float32)
-                logger.debug(
-                    f"[IndexTTS2] 2.0 从输出文件读回波形: sr={sample_rate}, shape={wav.shape}"
-                )
+                logger.debug(f"[IndexTTS2] 2.0 从输出文件读回波形: sr={sample_rate}, shape={wav.shape}")
             else:
                 logger.warning(f"[IndexTTS2] 推理返回格式异常: {type(result)}")
                 sample_rate, wav = 22050, np.zeros(0, dtype=np.float32)

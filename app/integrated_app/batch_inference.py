@@ -410,13 +410,14 @@ def get_resume_inference_fn(engine_name: str) -> Callable | None:
     return _RESUME_INFERENCE_FNS.get(engine_name)
 
 
-def make_checkpoint_resume_handler(checkpoint_mgr: "TaskCheckpoint") -> Callable[[dict[str, Any]], bool]:
+def make_checkpoint_resume_handler(checkpoint_mgr: TaskCheckpoint) -> Callable[[dict[str, Any]], bool]:
     """构造默认 checkpoint 续跑处理器。
 
     处理器契约（app_server.py lifespan）：callable(cp_dict) -> bool，
     True 表示成功续跑（checkpoint 已清理），False 表示保留 checkpoint。
     未注册引擎时返回 False 并保留 checkpoint（结构化 warning）。
     """
+
     def handler(cp: dict[str, Any]) -> bool:
         task_id = cp.get("task_id", "")
         engine = cp.get("engine") or (cp.get("config") or {}).get("engine", "")
@@ -425,7 +426,8 @@ def make_checkpoint_resume_handler(checkpoint_mgr: "TaskCheckpoint") -> Callable
             logger.warning(
                 "[CheckpointResume] checkpoint %s 的引擎 '%s' 未注册续跑推理函数，"
                 "保留 checkpoint 待处理（可调用 register_resume_inference_fn 注册）",
-                task_id, engine or "(未知)",
+                task_id,
+                engine or "(未知)",
             )
             return False
         result = get_batch_inferencer().resume_from_checkpoint(
@@ -436,7 +438,8 @@ def make_checkpoint_resume_handler(checkpoint_mgr: "TaskCheckpoint") -> Callable
         if result is not None:
             logger.info(
                 "[CheckpointResume] 已从 checkpoint 续跑完成并清理: %s (%d 项)",
-                task_id, result[1].successful if len(result) > 1 else 0,
+                task_id,
+                result[1].successful if len(result) > 1 else 0,
             )
             return True
         logger.warning("[CheckpointResume] checkpoint %s 无可续跑内容", task_id)

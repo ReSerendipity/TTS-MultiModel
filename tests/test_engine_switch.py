@@ -1,13 +1,16 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from integrated_app.exceptions import EngineSwitchError, InsufficientVRAMError
-from integrated_app.model_registry import registry, EngineName
+from integrated_app.model_registry import EngineName
 
 
 class TestEngineSwitch:
     def test_rejects_unknown_engine(self):
         with pytest.raises(EngineSwitchError):
             from integrated_app.model_manager import switch_engine
+
             gen = switch_engine("unknown_engine")
             list(gen)
 
@@ -16,11 +19,14 @@ class TestEngineSwitch:
             mock_gpu.detect_backend.return_value = MagicMock(value="cuda")
             mock_gpu.get_device_properties.return_value = {"total_memory": 8 * 1024**3}
             mock_gpu.memory_allocated.return_value = 7 * 1024**3
-            with patch("integrated_app.model_manager_core.state.get_gpu_device", return_value=0):
-                with pytest.raises(InsufficientVRAMError):
-                    from integrated_app.model_manager import switch_engine
-                    gen = switch_engine("voxcpm2")
-                    list(gen)
+            with (
+                patch("integrated_app.model_manager_core.state.get_gpu_device", return_value=0),
+                pytest.raises(InsufficientVRAMError),
+            ):
+                from integrated_app.model_manager import switch_engine
+
+                gen = switch_engine("voxcpm2")
+                list(gen)
 
     def test_engine_name_enum_values(self):
         assert EngineName.VOXCPM2.value == "voxcpm2"
@@ -28,6 +34,7 @@ class TestEngineSwitch:
 
     def test_registry_initial_state(self):
         from integrated_app.model_registry import ModelRegistry
+
         ModelRegistry._reset()
         r = ModelRegistry()
         assert r.voxcpm_model is None

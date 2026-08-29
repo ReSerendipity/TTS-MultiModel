@@ -1,4 +1,5 @@
 """Tests for SQLite-based history database."""
+
 import os
 import sys
 
@@ -18,6 +19,7 @@ class TestHistoryDatabase:
     def db(self, tmp_path):
         """Create a temporary HistoryDatabase for testing."""
         from integrated_app.history_db import HistoryDatabase
+
         db_path = str(tmp_path / "test_history.db")
         database = HistoryDatabase(db_path=db_path)
         return database
@@ -75,23 +77,38 @@ class TestHistoryDatabase:
 
     def test_search(self, db):
         """Search filters records by keyword."""
-        db.add_record(filename="hello.wav", filepath="/outputs/hello.wav",
-                      created_at="2026-01-01T00:00:00",
-                      file_size=1024, duration_seconds=1.0,
-                      engine="voxcpm2", text_preview="你好世界")
-        db.add_record(filename="test.wav", filepath="/outputs/test.wav",
-                      created_at="2026-01-01T00:00:00",
-                      file_size=1024, duration_seconds=1.0,
-                      engine="voxcpm2", text_preview="测试文本")
+        db.add_record(
+            filename="hello.wav",
+            filepath="/outputs/hello.wav",
+            created_at="2026-01-01T00:00:00",
+            file_size=1024,
+            duration_seconds=1.0,
+            engine="voxcpm2",
+            text_preview="你好世界",
+        )
+        db.add_record(
+            filename="test.wav",
+            filepath="/outputs/test.wav",
+            created_at="2026-01-01T00:00:00",
+            file_size=1024,
+            duration_seconds=1.0,
+            engine="voxcpm2",
+            text_preview="测试文本",
+        )
         results = db.get_paginated_records(limit=10, offset=0, search_keyword="你好")
         assert results["total"] == 1
 
     def test_delete_records(self, db):
         """Can delete records."""
-        db.add_record(filename="delete_me.wav", filepath="/outputs/delete_me.wav",
-                      created_at="2026-01-01T00:00:00",
-                      file_size=1024, duration_seconds=1.0,
-                      engine="voxcpm2", text_preview="删除我")
+        db.add_record(
+            filename="delete_me.wav",
+            filepath="/outputs/delete_me.wav",
+            created_at="2026-01-01T00:00:00",
+            file_size=1024,
+            duration_seconds=1.0,
+            engine="voxcpm2",
+            text_preview="删除我",
+        )
         records = db.get_paginated_records(limit=10, offset=0)
         assert records["total"] == 1
         db.delete_multiple_records(["delete_me.wav"], delete_files=False)
@@ -100,10 +117,15 @@ class TestHistoryDatabase:
 
     def test_hide_and_show_records(self, db):
         """Can hide and show records."""
-        db.add_record(filename="hide_me.wav", filepath="/outputs/hide_me.wav",
-                      created_at="2026-01-01T00:00:00",
-                      file_size=1024, duration_seconds=1.0,
-                      engine="voxcpm2", text_preview="隐藏我")
+        db.add_record(
+            filename="hide_me.wav",
+            filepath="/outputs/hide_me.wav",
+            created_at="2026-01-01T00:00:00",
+            file_size=1024,
+            duration_seconds=1.0,
+            engine="voxcpm2",
+            text_preview="隐藏我",
+        )
         db.hide_multiple_records(["hide_me.wav"])
         visible = db.get_paginated_records(limit=10, offset=0)
         assert visible["total"] == 0
@@ -114,10 +136,15 @@ class TestHistoryDatabase:
     def test_get_total_count(self, db):
         """Get total count of records."""
         for i in range(3):
-            db.add_record(filename=f"count_{i}.wav", filepath=f"/outputs/count_{i}.wav",
-                          created_at="2026-01-01T00:00:00",
-                          file_size=1024, duration_seconds=1.0,
-                          engine="voxcpm2", text_preview=f"计数{i}")
+            db.add_record(
+                filename=f"count_{i}.wav",
+                filepath=f"/outputs/count_{i}.wav",
+                created_at="2026-01-01T00:00:00",
+                file_size=1024,
+                duration_seconds=1.0,
+                engine="voxcpm2",
+                text_preview=f"计数{i}",
+            )
         assert db.get_total_count() == 3
 
     def test_batch_delete_100_records(self, db):
@@ -162,16 +189,18 @@ class TestHistoryDatabase:
 
     def test_insert_and_query(self, db):
         """insert() stores a full record and query() retrieves it."""
-        record_id = db.insert({
-            "filename": "inserted.wav",
-            "filepath": "/outputs/inserted.wav",
-            "created_at": "2026-01-01T00:00:00",
-            "file_size_bytes": 4096,
-            "duration_seconds": 3.5,
-            "text_preview": "插入测试",
-            "engine": "indextts2",
-            "persona_name": "test_persona",
-        })
+        record_id = db.insert(
+            {
+                "filename": "inserted.wav",
+                "filepath": "/outputs/inserted.wav",
+                "created_at": "2026-01-01T00:00:00",
+                "file_size_bytes": 4096,
+                "duration_seconds": 3.5,
+                "text_preview": "插入测试",
+                "engine": "indextts2",
+                "persona_name": "test_persona",
+            }
+        )
         assert record_id > 0
         rows = db.query(engine="indextts2", search_text="插入")
         assert len(rows) == 1
@@ -207,6 +236,7 @@ class TestHistoryDatabaseMigration:
     def test_migration_from_json(self, tmp_path):
         """Can migrate records from JSON file via insert_batch."""
         import json
+
         json_path = str(tmp_path / "history_records.json")
         # Create a fake JSON history file
         data = [
@@ -224,6 +254,7 @@ class TestHistoryDatabaseMigration:
             json.dump(data, f)
 
         from integrated_app.history_db import HistoryDatabase
+
         db_path = str(tmp_path / "test_migrate.db")
         database = HistoryDatabase(db_path=db_path)
         # Simulate JSON migration by loading and inserting records
@@ -241,6 +272,7 @@ class TestHistoryDatabaseFTS:
     @pytest.fixture
     def db(self, tmp_path):
         from integrated_app.history_db import HistoryDatabase
+
         return HistoryDatabase(db_path=str(tmp_path / "fts.db"))
 
     def _seed(self, db, n=60):
@@ -252,7 +284,7 @@ class TestHistoryDatabaseFTS:
                 file_size=1024,
                 duration_seconds=1.0,
                 engine="voxcpm2",
-                text_preview=("你好世界编号%d" % i) if i % 3 == 0 else ("hello world number %d" % i),
+                text_preview=f"你好世界编号{i}" if i % 3 == 0 else f"hello world number {i}",
             )
 
     def test_fts_enabled_on_modern_sqlite(self, db):
@@ -276,30 +308,54 @@ class TestHistoryDatabaseFTS:
 
     def test_short_keyword_fallback(self, db):
         """1-2 char keywords fall back to LIKE and still match substrings."""
-        db.add_record(filename="a.wav", filepath="/outputs/a.wav",
-                      created_at="2026-01-01T00:00:00", file_size=1, duration_seconds=1.0,
-                      engine="voxcpm2", text_preview="甲乙")
+        db.add_record(
+            filename="a.wav",
+            filepath="/outputs/a.wav",
+            created_at="2026-01-01T00:00:00",
+            file_size=1,
+            duration_seconds=1.0,
+            engine="voxcpm2",
+            text_preview="甲乙",
+        )
         res = db.get_paginated_records(limit=10, offset=0, search_keyword="甲")
         assert res["total"] == 1
 
     def test_fts_replace_resync(self, db):
         """INSERT OR REPLACE keeps FTS index consistent (old text unfindable)."""
-        db.add_record(filename="r.wav", filepath="/outputs/r.wav",
-                      created_at="2026-01-01T00:00:00", file_size=1, duration_seconds=1.0,
-                      engine="voxcpm2", text_preview="原始文本内容甲")
+        db.add_record(
+            filename="r.wav",
+            filepath="/outputs/r.wav",
+            created_at="2026-01-01T00:00:00",
+            file_size=1,
+            duration_seconds=1.0,
+            engine="voxcpm2",
+            text_preview="原始文本内容甲",
+        )
         assert db.get_paginated_records(limit=10, search_keyword="原始文本")["total"] == 1
         # Overwrite same filepath with new content
-        db.add_record(filename="r.wav", filepath="/outputs/r.wav",
-                      created_at="2026-01-01T00:00:00", file_size=1, duration_seconds=1.0,
-                      engine="voxcpm2", text_preview="替换后的新文本内容")
+        db.add_record(
+            filename="r.wav",
+            filepath="/outputs/r.wav",
+            created_at="2026-01-01T00:00:00",
+            file_size=1,
+            duration_seconds=1.0,
+            engine="voxcpm2",
+            text_preview="替换后的新文本内容",
+        )
         assert db.get_paginated_records(limit=10, search_keyword="原始文本")["total"] == 0
         assert db.get_paginated_records(limit=10, search_keyword="替换后的新")["total"] == 1
 
     def test_fts_delete_resync(self, db):
         """Deleting a record removes it from full-text search."""
-        db.add_record(filename="d.wav", filepath="/outputs/d.wav",
-                      created_at="2026-01-01T00:00:00", file_size=1, duration_seconds=1.0,
-                      engine="voxcpm2", text_preview="待删除的独特文本")
+        db.add_record(
+            filename="d.wav",
+            filepath="/outputs/d.wav",
+            created_at="2026-01-01T00:00:00",
+            file_size=1,
+            duration_seconds=1.0,
+            engine="voxcpm2",
+            text_preview="待删除的独特文本",
+        )
         rec = db.get_paginated_records(limit=10, search_keyword="待删除的独特")
         assert rec["total"] == 1
         rid = rec["items"][0]["id"]
@@ -319,6 +375,7 @@ class TestHistoryDatabaseKeyset:
     @pytest.fixture
     def db(self, tmp_path):
         from integrated_app.history_db import HistoryDatabase
+
         return HistoryDatabase(db_path=str(tmp_path / "keyset.db"))
 
     def _seed(self, db, n=120):
@@ -396,6 +453,7 @@ class TestHistoryDatabaseMigrationHelper:
     @pytest.fixture
     def db(self, tmp_path):
         from integrated_app.history_db import HistoryDatabase
+
         return HistoryDatabase(db_path=str(tmp_path / "mig.db"))
 
     def test_add_new_column_and_idempotent(self, db):

@@ -17,8 +17,6 @@ These tests use mock objects to avoid loading real VoxCPM models.
 import json
 import os
 import sys
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -40,7 +38,6 @@ class TestValidateFileExists:
     def test_existing_file(self, tmp_path):
         f = tmp_path / "test.txt"
         f.write_text("hello")
-        result = Path(__name__)  # placeholder
         from integrated_app.cli import validate_file_exists
 
         path = validate_file_exists(str(f), "test file")
@@ -518,9 +515,7 @@ class TestBuildParser:
         from integrated_app.cli import _build_parser
 
         parser = _build_parser()
-        args = parser.parse_args([
-            "clone", "--text", "hello", "--reference-audio", "ref.wav", "--output", "out.wav"
-        ])
+        args = parser.parse_args(["clone", "--text", "hello", "--reference-audio", "ref.wav", "--output", "out.wav"])
         assert args.command == "clone"
         assert args.reference_audio == "ref.wav"
 
@@ -573,50 +568,54 @@ class TestMainEntry:
         """main() should dispatch to cmd_design for design subcommand."""
         from integrated_app import cli
 
-        with patch.object(cli, "cmd_design") as mock_design:
-            with patch.object(cli, "validate_ranges"):
-                with patch.object(cli, "_build_parser") as mock_parser:
-                    mock_parser.return_value.parse_args.return_value = MagicMock(
-                        command="design", text="hello", output="out.wav"
-                    )
-                    cli.main()
-                    mock_design.assert_called_once()
+        with (
+            patch.object(cli, "cmd_design") as mock_design,
+            patch.object(cli, "validate_ranges"),
+            patch.object(cli, "_build_parser") as mock_parser,
+        ):
+            mock_parser.return_value.parse_args.return_value = MagicMock(
+                command="design", text="hello", output="out.wav"
+            )
+            cli.main()
+            mock_design.assert_called_once()
 
     def test_clone_dispatch(self):
         from integrated_app import cli
 
-        with patch.object(cli, "cmd_clone") as mock_clone:
-            with patch.object(cli, "validate_ranges"):
-                with patch.object(cli, "_build_parser") as mock_parser:
-                    mock_parser.return_value.parse_args.return_value = MagicMock(
-                        command="clone", text="hello", output="out.wav"
-                    )
-                    cli.main()
-                    mock_clone.assert_called_once()
+        with (
+            patch.object(cli, "cmd_clone") as mock_clone,
+            patch.object(cli, "validate_ranges"),
+            patch.object(cli, "_build_parser") as mock_parser,
+        ):
+            mock_parser.return_value.parse_args.return_value = MagicMock(
+                command="clone", text="hello", output="out.wav"
+            )
+            cli.main()
+            mock_clone.assert_called_once()
 
     def test_batch_dispatch(self):
         from integrated_app import cli
 
-        with patch.object(cli, "cmd_batch") as mock_batch:
-            with patch.object(cli, "validate_ranges"):
-                with patch.object(cli, "_build_parser") as mock_parser:
-                    mock_parser.return_value.parse_args.return_value = MagicMock(
-                        command="batch"
-                    )
-                    cli.main()
-                    mock_batch.assert_called_once()
+        with (
+            patch.object(cli, "cmd_batch") as mock_batch,
+            patch.object(cli, "validate_ranges"),
+            patch.object(cli, "_build_parser") as mock_parser,
+        ):
+            mock_parser.return_value.parse_args.return_value = MagicMock(command="batch")
+            cli.main()
+            mock_batch.assert_called_once()
 
     def test_legacy_dispatch(self):
         from integrated_app import cli
 
-        with patch.object(cli, "_dispatch_legacy") as mock_legacy:
-            with patch.object(cli, "validate_ranges"):
-                with patch.object(cli, "_build_parser") as mock_parser:
-                    mock_parser.return_value.parse_args.return_value = MagicMock(
-                        command=None
-                    )
-                    cli.main()
-                    mock_legacy.assert_called_once()
+        with (
+            patch.object(cli, "_dispatch_legacy") as mock_legacy,
+            patch.object(cli, "validate_ranges"),
+            patch.object(cli, "_build_parser") as mock_parser,
+        ):
+            mock_parser.return_value.parse_args.return_value = MagicMock(command=None)
+            cli.main()
+            mock_legacy.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

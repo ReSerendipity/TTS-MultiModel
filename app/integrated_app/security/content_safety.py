@@ -294,24 +294,12 @@ class ContentSafetyDetector:
 
         # 编译关键词模式正则
         self._compiled_patterns: dict[SafetyCategory, list[re.Pattern[str]]] = {
-            SafetyCategory.VIOLENCE: [
-                re.compile(p, re.IGNORECASE) for p in _VIOLENCE_PATTERNS
-            ],
-            SafetyCategory.HATE_SPEECH: [
-                re.compile(p, re.IGNORECASE) for p in _HATE_SPEECH_PATTERNS
-            ],
-            SafetyCategory.SELF_HARM: [
-                re.compile(p, re.IGNORECASE) for p in _SELF_HARM_PATTERNS
-            ],
-            SafetyCategory.SEXUAL: [
-                re.compile(p, re.IGNORECASE) for p in _SEXUAL_PATTERNS
-            ],
-            SafetyCategory.ILLEGAL: [
-                re.compile(p, re.IGNORECASE) for p in _ILLEGAL_PATTERNS
-            ],
-            SafetyCategory.HARASSMENT: [
-                re.compile(p, re.IGNORECASE) for p in _HARASSMENT_PATTERNS
-            ],
+            SafetyCategory.VIOLENCE: [re.compile(p, re.IGNORECASE) for p in _VIOLENCE_PATTERNS],
+            SafetyCategory.HATE_SPEECH: [re.compile(p, re.IGNORECASE) for p in _HATE_SPEECH_PATTERNS],
+            SafetyCategory.SELF_HARM: [re.compile(p, re.IGNORECASE) for p in _SELF_HARM_PATTERNS],
+            SafetyCategory.SEXUAL: [re.compile(p, re.IGNORECASE) for p in _SEXUAL_PATTERNS],
+            SafetyCategory.ILLEGAL: [re.compile(p, re.IGNORECASE) for p in _ILLEGAL_PATTERNS],
+            SafetyCategory.HARASSMENT: [re.compile(p, re.IGNORECASE) for p in _HARASSMENT_PATTERNS],
         }
 
         # CLIP 模型懒初始化
@@ -352,9 +340,7 @@ class ContentSafetyDetector:
             )
 
         if len(text) > MAX_DETECTION_TEXT_LENGTH:
-            raise ValueError(
-                f"文本长度 {len(text)} 超过最大限制 {MAX_DETECTION_TEXT_LENGTH}"
-            )
+            raise ValueError(f"文本长度 {len(text)} 超过最大限制 {MAX_DETECTION_TEXT_LENGTH}")
 
         # 第一步：关键词模式匹配
         keyword_result = self._detect_by_keywords(text)
@@ -365,10 +351,7 @@ class ContentSafetyDetector:
             clip_result = self._detect_by_clip(text)
 
         # 综合评分
-        if clip_result is not None:
-            result = self._combine_results(keyword_result, clip_result)
-        else:
-            result = keyword_result
+        result = self._combine_results(keyword_result, clip_result) if clip_result is not None else keyword_result
 
         # 更新统计
         with self._lock:
@@ -378,9 +361,7 @@ class ContentSafetyDetector:
             else:
                 self.stats.blocked += 1
                 cat = result.category.value
-                self.stats.category_counts[cat] = (
-                    self.stats.category_counts.get(cat, 0) + 1
-                )
+                self.stats.category_counts[cat] = self.stats.category_counts.get(cat, 0) + 1
 
         return result
 
@@ -491,9 +472,7 @@ class ContentSafetyDetector:
             confidence=confidence,
             matched_patterns=list(set(matched_patterns))[:10],  # 去重，最多10个
             message=(
-                f"检测到{CATEGORY_DESCRIPTIONS[best_category]}相关内容"
-                if not is_safe
-                else "内容安全（匹配数低于阈值）"
+                f"检测到{CATEGORY_DESCRIPTIONS[best_category]}相关内容" if not is_safe else "内容安全（匹配数低于阈值）"
             ),
             detection_method="keyword",
         )
@@ -542,7 +521,11 @@ class ContentSafetyDetector:
             with torch.no_grad():
                 outputs = self._clip_model(**inputs)
                 # 使用 CLS token 或池化输出
-                embeddings = outputs.logits_per_classification if hasattr(outputs, "logits_per_classification") else outputs.last_hidden_state[:, 0, :]
+                embeddings = (
+                    outputs.logits_per_classification
+                    if hasattr(outputs, "logits_per_classification")
+                    else outputs.last_hidden_state[:, 0, :]
+                )
                 # 归一化
                 embeddings = embeddings / embeddings.norm(dim=-1, keepdim=True)
                 text_emb = embeddings[0:1]
@@ -564,9 +547,7 @@ class ContentSafetyDetector:
                 category=best_category if not is_safe else SafetyCategory.SAFE,
                 confidence=best_confidence,
                 message=(
-                    f"CLIP 检测: {CATEGORY_DESCRIPTIONS[best_category]}"
-                    if not is_safe
-                    else "CLIP 检测: 内容安全"
+                    f"CLIP 检测: {CATEGORY_DESCRIPTIONS[best_category]}" if not is_safe else "CLIP 检测: 内容安全"
                 ),
                 detection_method="clip",
             )
@@ -592,12 +573,8 @@ class ContentSafetyDetector:
             model_name = "openai/clip-vit-base-patch32"
             # 固定 HF revision（2024-02-29 官方提交），防止上游仓库被篡改导致供应链风险（bandit B615）
             model_revision = "3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268"
-            self._clip_tokenizer = AutoTokenizer.from_pretrained(
-                model_name, revision=model_revision
-            )
-            self._clip_model = AutoModel.from_pretrained(
-                model_name, revision=model_revision
-            )
+            self._clip_tokenizer = AutoTokenizer.from_pretrained(model_name, revision=model_revision)
+            self._clip_model = AutoModel.from_pretrained(model_name, revision=model_revision)
             self._clip_model.eval()
             logger.info("CLIP 安全检测模型加载成功: %s", model_name)
             return True
@@ -637,12 +614,8 @@ class ContentSafetyDetector:
             )
 
         # 取不安全结果
-        unsafe_result = (
-            keyword_result if not keyword_result.is_safe else clip_result
-        )
-        safe_confidence = (
-            keyword_result.confidence if keyword_result.is_safe else clip_result.confidence
-        )
+        unsafe_result = keyword_result if not keyword_result.is_safe else clip_result
+        safe_confidence = keyword_result.confidence if keyword_result.is_safe else clip_result.confidence
         unsafe_confidence = unsafe_result.confidence
 
         return SafetyDetectionResult(

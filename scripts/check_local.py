@@ -20,18 +20,34 @@
       再跑指定 Playwright spec。改 UI/测试后提交前务必本地跑一遍受影响 spec
       （E2E 全量 231 个约 6 分钟，可一次传多个 spec 用逗号分隔）。
 """
+
 from __future__ import annotations
 
 import argparse
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 TEXT_EXTS = {
-    ".py", ".json", ".yaml", ".yml", ".toml", ".md", ".txt",
-    ".html", ".css", ".js", ".mjs", ".ts", ".cfg", ".ini",
-    ".sh", ".ps1", ".bat", ".svg", ".xml",
+    ".py",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".md",
+    ".txt",
+    ".html",
+    ".css",
+    ".js",
+    ".mjs",
+    ".ts",
+    ".cfg",
+    ".ini",
+    ".sh",
+    ".ps1",
+    ".bat",
+    ".svg",
+    ".xml",
 }
 
 
@@ -50,9 +66,7 @@ def check_dir(path: str) -> bool:
 def utf8_scan() -> None:
     """严格 UTF-8 扫描所有被 git 跟踪的文本文件。"""
     print("== UTF-8 编码扫描（git ls-files 文本文件）==", flush=True)
-    listed = subprocess.run(
-        ["git", "ls-files"], capture_output=True, text=True
-    )
+    listed = subprocess.run(["git", "ls-files"], capture_output=True, text=True)
     if listed.returncode != 0:
         print("  (不是 git 仓库，跳过)", flush=True)
         return
@@ -125,10 +139,7 @@ def run_e2e(specs: str) -> None:
         print("FAIL: --e2e-specs 不能为空", flush=True)
         sys.exit(1)
     # Windows 用 playwright.cmd；类 Unix 直接 npx。
-    if os.name == "nt":
-        cmd = [r"node_modules\.bin\playwright.cmd"]
-    else:
-        cmd = ["npx", "playwright"]
+    cmd = [r"node_modules\.bin\playwright.cmd"] if os.name == "nt" else ["npx", "playwright"]
     cmd += ["test", *spec_list, "--project=chromium-desktop", "--reporter=line"]
     run(cmd, f"Playwright E2E {len(spec_list)} 个 spec")
 
@@ -164,8 +175,15 @@ def main() -> None:
     if args.full:
         # 全量 pytest（--timeout 防挂死；--full 时才跑，耗时较长）
         run(
-            [sys.executable, "-m", "pytest", "-q", "--timeout=180",
-             "-m", "not integration and not gpu and not cuda and not vram"],
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--timeout=180",
+                "-m",
+                "not integration and not gpu and not cuda and not vram",
+            ],
             "pytest 全量（含超时保护）",
         )
 

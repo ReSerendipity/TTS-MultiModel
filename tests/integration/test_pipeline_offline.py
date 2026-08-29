@@ -13,9 +13,7 @@ This module runs in CI (no GPU, no models) as part of the standard test suite.
 
 import os
 import sys
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 # Ensure app/ is on sys.path
 _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "app")
@@ -130,8 +128,9 @@ class TestModelManagerFlow:
         """model_manager should be importable with core functions."""
         from integrated_app import model_manager
 
-        assert hasattr(model_manager, "load_voxcpm2") or hasattr(model_manager, "unload_model"), \
+        assert hasattr(model_manager, "load_voxcpm2") or hasattr(model_manager, "unload_model"), (
             "model_manager should have load_voxcpm2 or unload_model function"
+        )
 
 
 # ---------------------------------------------------------------------------

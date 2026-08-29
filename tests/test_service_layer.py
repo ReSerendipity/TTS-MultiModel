@@ -17,10 +17,9 @@
 """
 
 import time
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # =====================================================================
 # 数据类测试
@@ -103,9 +102,7 @@ class TestSwitchResult:
     def test_success(self):
         from integrated_app.service_layer import SwitchResult
 
-        r = SwitchResult(
-            success=True, from_engine="voxcpm2", to_engine="indextts2", switch_time=5.0
-        )
+        r = SwitchResult(success=True, from_engine="voxcpm2", to_engine="indextts2", switch_time=5.0)
         assert r.success is True
         assert r.from_engine == "voxcpm2"
         assert r.to_engine == "indextts2"
@@ -362,6 +359,7 @@ class TestTTSGenerationServiceGeneration:
             result = svc.generate_voice_design(text="你好", instruction="温柔")
             # generate_voice_design returns a GenerationResult
             from integrated_app.service_layer import GenerationResult
+
             assert isinstance(result, GenerationResult)
             engine.generate_voice_design.assert_called_once()
 
@@ -531,9 +529,9 @@ class TestTTSGenerationServiceStreaming:
                 loop.close()
 
     def test_generate_streaming_tobytes(self):
-        from integrated_app.service_layer import TTSGenerationService
-
         import numpy as np
+
+        from integrated_app.service_layer import TTSGenerationService
 
         engine = MagicMock()
 
@@ -570,9 +568,9 @@ class TestTTSGenerationServiceStreaming:
                 loop.close()
 
     def test_generate_streaming_tuple_format(self):
-        from integrated_app.service_layer import TTSGenerationService
-
         import numpy as np
+
+        from integrated_app.service_layer import TTSGenerationService
 
         engine = MagicMock()
 
@@ -698,9 +696,11 @@ class TestModelService:
         from integrated_app.service_layer import ModelService
 
         svc = ModelService()
-        with patch("integrated_app.model_manager.unload_model", side_effect=Exception("fail")):
-            with pytest.raises(Exception, match="fail"):
-                svc.unload_model()
+        with (
+            patch("integrated_app.model_manager.unload_model", side_effect=Exception("fail")),
+            pytest.raises(Exception, match="fail"),
+        ):
+            svc.unload_model()
 
     def test_switch_engine_success(self):
         from integrated_app.service_layer import ModelService

@@ -20,6 +20,7 @@ import pytest
 # Try importing training modules; skip if dependencies unavailable
 try:
     import torch
+
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
@@ -31,6 +32,7 @@ try:
         DynamicBucketPacker,
         LengthSortedBatchPacker,
     )
+
     HAS_PACKERS = True
 except Exception:
     HAS_PACKERS = False
@@ -140,9 +142,9 @@ class TestLengthSortedBatchPacker:
         # First entry takes 50 tokens -> batch 0 has 450 remaining
         # Second entry takes 400 tokens -> best fit is batch 0 (450 remaining >= 400)
         entries = [
-            DatasetEntry(Path("/tmp/a.wav"), "a", None, 1.0),   # 50 tokens
-            DatasetEntry(Path("/tmp/b.wav"), "b", None, 8.0),   # 400 tokens
-            DatasetEntry(Path("/tmp/c.wav"), "c", None, 1.0),   # 50 tokens
+            DatasetEntry(Path("/tmp/a.wav"), "a", None, 1.0),  # 50 tokens
+            DatasetEntry(Path("/tmp/b.wav"), "b", None, 8.0),  # 400 tokens
+            DatasetEntry(Path("/tmp/c.wav"), "c", None, 1.0),  # 50 tokens
         ]
         batches = packer.pack(entries)
         # a and c should be in same batch (both 50 tokens, fits in 500)
@@ -198,7 +200,7 @@ class TestDynamicBucketPacker:
         )
         entries = [
             DatasetEntry(Path("/tmp/short.wav"), "s", None, 1.0),  # bucket 0
-            DatasetEntry(Path("/tmp/med.wav"), "m", None, 5.0),    # bucket 1
+            DatasetEntry(Path("/tmp/med.wav"), "m", None, 5.0),  # bucket 1
             DatasetEntry(Path("/tmp/long.wav"), "l", None, 15.0),  # bucket 2
         ]
         batches = packer.pack(entries)
@@ -290,9 +292,7 @@ class TestAudioFeatureProcessingPacker:
     def test_call_basic(self):
         """Test __call__ with a simple batch."""
         mock_vae = self._make_mock_audio_vae()
-        packer = AudioFeatureProcessingPacker(
-            dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae
-        )
+        packer = AudioFeatureProcessingPacker(dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae)
         audio_tokens = torch.tensor([[0.1, 0.2, 0.3]], dtype=torch.float32)
         text_tokens = torch.tensor([[1, 2, 3]], dtype=torch.int32)
         task_ids = torch.tensor([1], dtype=torch.int32)
@@ -313,20 +313,12 @@ class TestAudioFeatureProcessingPacker:
     def test_process_tts_data(self):
         """Test process_tts_data method."""
         mock_vae = self._make_mock_audio_vae()
-        packer = AudioFeatureProcessingPacker(
-            dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae
-        )
+        packer = AudioFeatureProcessingPacker(dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae)
         audio_token = torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.float32)
         text_token = torch.tensor([1, 2, 3], dtype=torch.int32)
 
         result = packer.process_tts_data(audio_token, text_token, is_prompt=False)
         assert len(result) == 8  # 8-tuple return
-        packed_text = result[0]
-        audio_feat = result[1]
-        text_mask = result[2]
-        audio_mask = result[3]
-        loss_mask = result[4]
-        labels = result[5]
         audio_duration = result[6]
         text_token_count = result[7]
 
@@ -336,9 +328,7 @@ class TestAudioFeatureProcessingPacker:
     def test_process_tts_data_with_prompt(self):
         """Test process_tts_data with is_prompt=True."""
         mock_vae = self._make_mock_audio_vae()
-        packer = AudioFeatureProcessingPacker(
-            dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae
-        )
+        packer = AudioFeatureProcessingPacker(dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae)
         audio_token = torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.float32)
         text_token = torch.tensor([1, 2, 3], dtype=torch.int32)
 
@@ -346,16 +336,12 @@ class TestAudioFeatureProcessingPacker:
         loss_mask = result[4]
         # When is_prompt=True, audio loss_mask should be all zeros
         # (loss_mask layout: [text_zeros, audio_zeros_if_prompt, end_zero])
-        # Total length = text_length + audio_length + 1
-        total_len = loss_mask.shape[0]
         assert torch.all(loss_mask == 0)
 
     def test_encode_audio(self):
         """Test encode_audio method."""
         mock_vae = self._make_mock_audio_vae()
-        packer = AudioFeatureProcessingPacker(
-            dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae
-        )
+        packer = AudioFeatureProcessingPacker(dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae)
         wav = torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.float32)
         feat = packer.encode_audio(wav)
         # encode_audio returns [1, T', D]
@@ -365,9 +351,7 @@ class TestAudioFeatureProcessingPacker:
     def test_extract_audio_feats(self):
         """Test extract_audio_feats method."""
         mock_vae = self._make_mock_audio_vae()
-        packer = AudioFeatureProcessingPacker(
-            dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae
-        )
+        packer = AudioFeatureProcessingPacker(dataset_cnt=1, max_len=512, patch_size=1, feat_dim=8, audio_vae=mock_vae)
         audio_data = torch.randn(1000, dtype=torch.float32)
         feats, duration = packer.extract_audio_feats(audio_data)
         assert feats.dim() == 4  # [1, T_patch, P, D]

@@ -111,7 +111,9 @@ def download_indextts2_model():
 
     try:
         cache_dir = model_dir.parent / ".cache" / "indextts2"
-        downloaded_path = snapshot_download("IndexTeam/IndexTTS-2.5", cache_dir=str(cache_dir), local_dir=str(model_dir))
+        downloaded_path = snapshot_download(
+            "IndexTeam/IndexTTS-2.5", cache_dir=str(cache_dir), local_dir=str(model_dir)
+        )
 
         logger.info(f"下载完成: {downloaded_path}")
 

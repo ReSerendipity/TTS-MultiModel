@@ -95,9 +95,7 @@ class EngineName(str, Enum):
 #: IndexTTS 家族成员集合。2.5（indextts2）与 2.0（indextts20）是同一推理
 #: 代码包的两个版本变体，运行期复用同一个引擎槽位（互斥，同一时刻仅一个激活），
 #: 因此所有"是否 IndexTTS / 取 IndexTTS 实例"的判断都按本集合处理，避免硬编码单值。
-INDEXTTS_VARIANTS: frozenset[str] = frozenset(
-    {EngineName.INDEXTTS2.value, EngineName.INDEXTTS20.value}
-)
+INDEXTTS_VARIANTS: frozenset[str] = frozenset({EngineName.INDEXTTS2.value, EngineName.INDEXTTS20.value})
 
 
 #: 引擎标识符到前端 UI 显示名称的映射字典。
@@ -596,10 +594,7 @@ class ModelRegistry:
             满足两个条件时返回 ``True``，否则 ``False``。
         """
         with self._lock:
-            return (
-                self._indextts2_engine is not None
-                and self._current_engine in INDEXTTS_VARIANTS
-            )
+            return self._indextts2_engine is not None and self._current_engine in INDEXTTS_VARIANTS
 
     def is_engine_ready(self) -> bool:
         """判断当前激活引擎是否就绪。
@@ -670,9 +665,8 @@ class ModelRegistry:
                     "voiceclone_enabled": self.voxcpm_voiceclone_enabled,
                     "control_enabled": self.voxcpm_control_enabled,
                 }
-            elif (
-                (engine in INDEXTTS_VARIANTS and self._indextts2_engine is not None)
-                or (engine and self._engines.get(engine) is not None)
+            elif (engine in INDEXTTS_VARIANTS and self._indextts2_engine is not None) or (
+                engine and self._engines.get(engine) is not None
             ):
                 info = {
                     "engine": self._current_engine,

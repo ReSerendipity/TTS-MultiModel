@@ -1,9 +1,8 @@
 """Shared pytest fixtures for the TTS MultiModel test suite."""
 
+import contextlib
 import os
 import sys
-import tempfile
-import shutil
 from pathlib import Path
 
 import pytest
@@ -65,10 +64,8 @@ def isolated_history_db(tmp_path: Path):
     yield db_path
     # Cleanup is handled by tmp_path fixture
     if db_path.exists():
-        try:
-            db_path.unlink()
-        except PermissionError:
-            pass  # Windows may hold locks on DB files
+        with contextlib.suppress(PermissionError):
+            db_path.unlink()  # Windows may hold locks on DB files
 
 
 @pytest.fixture(scope="session")

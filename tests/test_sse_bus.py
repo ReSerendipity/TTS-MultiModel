@@ -39,6 +39,7 @@ class TestSSEEventBus:
 
     def test_notify_none_only_wakes_event(self, bus):
         """Notify with None should wake up the internal event."""
+
         async def run():
             await bus.subscribe()
             bus.notify(None)  # Old pattern: only wakes Event

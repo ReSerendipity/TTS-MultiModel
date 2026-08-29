@@ -15,7 +15,7 @@
 
 import os
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -35,15 +35,16 @@ class TestEngineSwitchModelManagerIntegration:
     def test_model_manager_has_switch_function(self):
         """model_manager 应暴露 switch 相关函数。"""
         from integrated_app import model_manager
+
         has_switch = any(
-            hasattr(model_manager, name)
-            for name in ("switch_engine", "unload_model", "load_voxcpm2", "load_model")
+            hasattr(model_manager, name) for name in ("switch_engine", "unload_model", "load_voxcpm2", "load_model")
         )
         assert has_switch, "model_manager should expose engine switch/load/unload functions"
 
     def test_model_registry_current_engine_initially_none(self):
         """model_registry 初始状态 current_engine 可能为 None 或空。"""
         from integrated_app.model_registry import registry
+
         current = registry.current_engine
         assert current is None or isinstance(current, str)
 
@@ -89,23 +90,27 @@ class TestSSETrackerIntegration:
         """全局 event_bus 是单例。"""
         from integrated_app.routes.sse import event_bus
         from integrated_app.routes.sse import event_bus as bus2
+
         assert event_bus is bus2
 
     def test_tracker_has_start_generation(self):
         """GenerationTracker 有 start_generation 方法。"""
         from integrated_app.tracker import GenerationTracker
+
         tracker = GenerationTracker()
         assert hasattr(tracker, "start_generation") or hasattr(tracker, "get_info")
 
     def test_sse_notify_does_not_crash_without_subscribers(self):
         """无订阅者时 notify 不崩溃。"""
         from integrated_app.routes.sse import SSEEvent, event_bus
+
         event_bus.notify(SSEEvent(type="test", data={"key": "value"}))
         # Should not raise
 
     def test_tracker_start_returns_id(self):
         """start_generation 返回非 None ID。"""
         from integrated_app.tracker import GenerationTracker
+
         tracker = GenerationTracker()
         if hasattr(tracker, "start_generation"):
             gen_id = tracker.start_generation()
@@ -123,21 +128,29 @@ class TestServiceLayerRegistryIntegration:
     def test_service_layer_importable(self):
         """service_layer 可导入。"""
         from integrated_app import service_layer
+
         assert service_layer is not None
 
     def test_service_layer_has_generation_service(self):
         """service_layer 暴露 TTSGenerationService 或类似类。"""
         from integrated_app import service_layer
+
         has_service = any(
             hasattr(service_layer, name)
-            for name in ("TTSGenerationService", "ModelService", "PersonaService",
-                         "get_generation_service", "get_model_service")
+            for name in (
+                "TTSGenerationService",
+                "ModelService",
+                "PersonaService",
+                "get_generation_service",
+                "get_model_service",
+            )
         )
         assert has_service
 
     def test_generation_result_dataclass(self):
         """GenerationResult 数据类可创建且字段正确。"""
         from integrated_app.service_layer import GenerationResult
+
         r = GenerationResult()
         assert r.audio_path == ""
         assert r.duration == 0.0
@@ -146,6 +159,7 @@ class TestServiceLayerRegistryIntegration:
     def test_load_result_dataclass(self):
         """LoadResult 数据类可创建。"""
         from integrated_app.service_layer import LoadResult
+
         r = LoadResult()
         assert r.success is False
         assert r.load_time == 0.0
@@ -162,6 +176,7 @@ class TestConfigRouteIntegration:
     def test_config_singleton(self):
         """get_config 返回单例。"""
         from integrated_app.config import get_config
+
         c1 = get_config()
         c2 = get_config()
         assert c1 is c2
@@ -169,16 +184,20 @@ class TestConfigRouteIntegration:
     def test_config_has_api_auth(self):
         """配置包含 api_auth 节。"""
         from integrated_app.config import get_config
+
         config = get_config()
         assert hasattr(config, "api_auth")
 
     def test_config_has_rate_limit(self):
         """配置包含 rate_limit 节或类似配置。"""
         from integrated_app.config import get_config
+
         config = get_config()
         # rate_limit config may be under different attribute names
         has_rate_limit = any(hasattr(config, name) for name in ("rate_limit", "rate_limiting"))
-        assert has_rate_limit or True  # Some configs may not have it
+        if not has_rate_limit:
+            pytest.skip("当前 config 未定义 rate_limit 配置项，属非必需项")
+        assert has_rate_limit
 
     def test_app_has_settings_route(self, client):
         """应用注册了系统设置路由。"""
@@ -197,6 +216,7 @@ class TestPromptCacheIntegration:
     def test_prompt_cache_importable(self):
         """prompt_cache 模块可导入。"""
         from integrated_app import prompt_cache
+
         assert prompt_cache is not None
 
     def test_prompt_cache_no_pickle(self):
@@ -206,7 +226,9 @@ class TestPromptCacheIntegration:
         这是合法的向后兼容代码，不构成安全风险。主序列化使用 JSON + 二进制格式。
         """
         import integrated_app.prompt_cache as pc
-        source = open(pc.__file__, encoding="utf-8").read()
+
+        with open(pc.__file__, encoding="utf-8") as source_file:
+            source = source_file.read()
         # pickle.dump 不应出现在写入路径中（仅迁移读取允许 pickle.load）
         assert "pickle.dump" not in source
         # 主序列化函数应使用 json
@@ -216,12 +238,14 @@ class TestPromptCacheIntegration:
     def test_cache_file_extension_is_json(self):
         """缓存文件使用 .json 扩展名。"""
         from integrated_app.prompt_cache import _get_cache_file_path
+
         path = _get_cache_file_path("test_key")
         assert str(path).endswith(".json")
 
     def test_metadata_extension_is_json(self):
         """元数据文件使用 .json 扩展名。"""
         from integrated_app.prompt_cache import _get_metadata_path
+
         path = _get_metadata_path()
         assert str(path).endswith(".json")
 
@@ -237,17 +261,20 @@ class TestRateLimitGenerateIntegration:
     def test_rate_limit_prefixes_include_generate(self):
         """_RATE_LIMITED_PREFIXES 包含 /api/generate/。"""
         from integrated_app.middleware.rate_limit import _RATE_LIMITED_PREFIXES
+
         assert any("/api/generate" in p for p in _RATE_LIMITED_PREFIXES)
 
     def test_rate_limit_middleware_importable(self):
         """RateLimitMiddleware 可导入。"""
         from integrated_app.middleware.rate_limit import RateLimitMiddleware
+
         assert RateLimitMiddleware is not None
 
     def test_rate_limit_can_be_disabled(self):
         """RateLimitMiddleware 可以禁用。"""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from integrated_app.middleware.rate_limit import RateLimitMiddleware
 
         app = FastAPI()
@@ -308,7 +335,9 @@ class TestOpenAIAPIRegistryDeepIntegration:
         """创建仅包含 OpenAI router 的测试客户端（无 CSRF）。"""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from integrated_app.openai_api import openai_router
+
         app = FastAPI()
         app.include_router(openai_router.router)
         return TestClient(app)
@@ -367,4 +396,5 @@ class TestHistoryDBAppIntegration:
     def test_history_database_importable(self):
         """HistoryDatabase 可导入。"""
         from integrated_app.history_db import HistoryDatabase
+
         assert HistoryDatabase is not None

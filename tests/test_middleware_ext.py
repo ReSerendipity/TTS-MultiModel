@@ -9,29 +9,23 @@
 import asyncio
 import logging
 import sqlite3
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
-from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from integrated_app.middleware.csrf import CSRFMiddleware
 from integrated_app.middleware.error_handler import (
     _build_error_response,
     _build_sqlite_error_response,
     _build_timeout_error_response,
     _get_request_id,
     _parse_validation_errors,
-    generic_error_handler,
     register_error_handlers,
-    sqlite_error_handler,
-    timeout_error_handler,
 )
 from integrated_app.middleware.rate_limit import (
-    RateLimitMiddleware,
     _RATE_LIMITED_PREFIXES,
+    RateLimitMiddleware,
 )
 from integrated_app.middleware.request_id import (
     RequestIDLogFilter,
@@ -40,7 +34,6 @@ from integrated_app.middleware.request_id import (
     get_request_id,
     set_request_id,
 )
-
 
 # =====================================================================
 # RateLimitMiddleware 测试
@@ -163,6 +156,7 @@ class TestBuildErrorResponse:
         )
         assert resp.status_code == 400
         import json
+
         body = json.loads(resp.body)
         assert body["status"] == "error"
         assert body["code"] == "TEST_ERROR"
@@ -177,6 +171,7 @@ class TestBuildErrorResponse:
             detail=[{"field": "name", "message": "required"}],
         )
         import json
+
         body = json.loads(resp.body)
         assert body["detail"] == [{"field": "name", "message": "required"}]
 
@@ -188,6 +183,7 @@ class TestBuildErrorResponse:
             request_id="req-12345",
         )
         import json
+
         body = json.loads(resp.body)
         assert body["request_id"] == "req-12345"
 
@@ -199,6 +195,7 @@ class TestBuildErrorResponse:
             extra={"retry_after": 5},
         )
         import json
+
         body = json.loads(resp.body)
         assert body["retry_after"] == 5
 
@@ -220,6 +217,7 @@ class TestSqliteErrorResponse:
         resp = _build_sqlite_error_response(exc)
         assert resp.status_code == 503
         import json
+
         body = json.loads(resp.body)
         assert body["code"] == "database_locked"
 
@@ -228,6 +226,7 @@ class TestSqliteErrorResponse:
         resp = _build_sqlite_error_response(exc)
         assert resp.status_code == 503
         import json
+
         body = json.loads(resp.body)
         assert body["code"] == "database_locked"
 
@@ -236,6 +235,7 @@ class TestSqliteErrorResponse:
         resp = _build_sqlite_error_response(exc)
         assert resp.status_code == 503
         import json
+
         body = json.loads(resp.body)
         assert body["code"] == "disk_error"
 
@@ -244,6 +244,7 @@ class TestSqliteErrorResponse:
         resp = _build_sqlite_error_response(exc)
         assert resp.status_code == 503
         import json
+
         body = json.loads(resp.body)
         assert body["code"] == "database_unavailable"
 
@@ -261,6 +262,7 @@ class TestTimeoutErrorResponse:
         resp = _build_timeout_error_response(exc)
         assert resp.status_code == 504
         import json
+
         body = json.loads(resp.body)
         assert body["code"] == "gateway_timeout"
 
@@ -318,6 +320,7 @@ class TestRegisterErrorHandlers:
 
     def test_tts_error_handler_registered(self):
         from integrated_app.exceptions import TTSError
+
         app = FastAPI()
         register_error_handlers(app)
         assert TTSError in app.exception_handlers
@@ -435,8 +438,13 @@ class TestRequestIdLogFilter:
         set_request_id("test-rid-999")
         log_filter = RequestIDLogFilter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="test message", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="test message",
+            args=(),
+            exc_info=None,
         )
         log_filter.filter(record)
         assert record.request_id == "test-rid-999"
@@ -446,8 +454,13 @@ class TestRequestIdLogFilter:
         set_request_id("")
         log_filter = RequestIDLogFilter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="test message", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="test message",
+            args=(),
+            exc_info=None,
         )
         log_filter.filter(record)
         # Should have some request_id attribute (either empty or "-")
@@ -457,7 +470,12 @@ class TestRequestIdLogFilter:
         """filter 始终返回 True。"""
         log_filter = RequestIDLogFilter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="test", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="test",
+            args=(),
+            exc_info=None,
         )
         assert log_filter.filter(record) is True

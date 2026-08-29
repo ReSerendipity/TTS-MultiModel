@@ -7,11 +7,10 @@
 """
 
 import asyncio
-import os
+import contextlib
 import signal
-import threading
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -277,10 +276,8 @@ class TestTaskQueue:
     @pytest.fixture(autouse=True)
     def setup_queue(self):
         """每个测试前初始化队列，测试后关闭。"""
-        try:
+        with contextlib.suppress(RuntimeError):
             asyncio.get_running_loop()
-        except RuntimeError:
-            pass
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -290,7 +287,7 @@ class TestTaskQueue:
         loop.close()
 
     async def _init_and_cleanup(self):
-        from integrated_app.task_queue import init_queue, shutdown_queue
+        from integrated_app.task_queue import init_queue
 
         await init_queue(force=True)
 

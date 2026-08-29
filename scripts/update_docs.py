@@ -12,6 +12,7 @@ Defaults: repo-root = one level above this script; tag = "HEAD" (range tag~5..ta
 Exit codes: 0 always (best-effort). On no git range / missing FILEMAP it prints a
 short note and exits 0, mirroring the degradation semantics of check_spec_refs.py.
 """
+
 import datetime
 import subprocess
 import sys
@@ -19,8 +20,7 @@ from pathlib import Path
 
 
 def sh(args, cwd):
-    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
+    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.returncode, (r.stdout or "")
 
 
@@ -31,9 +31,8 @@ def main(argv):
     if not spec.exists():
         print(f"FILEMAP not found: {spec}; skipping")
         return 0
-    rc, out = sh(["git", "-C", str(repo), "diff", "--name-status",
-                  f"{tag}~5..{tag}", "--", "."], repo)
-    changed = [l for l in out.splitlines() if l and not l.startswith("fatal")]
+    rc, out = sh(["git", "-C", str(repo), "diff", "--name-status", f"{tag}~5..{tag}", "--", "."], repo)
+    changed = [line for line in out.splitlines() if line and not line.startswith("fatal")]
     if not changed:
         print("no git range; skipping")
         return 0

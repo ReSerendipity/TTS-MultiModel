@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 def openai_client():
     """创建仅包含 OpenAI router 的测试客户端（无 CSRF）。"""
     from integrated_app.openai_api import openai_router
+
     app = FastAPI()
     app.include_router(openai_router.router)
     return TestClient(app)

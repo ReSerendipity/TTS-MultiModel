@@ -15,7 +15,6 @@ CI 离线环境可能不完整。测试使用 try/except 在导入失败时跳�
 """
 
 import json
-import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -24,12 +23,14 @@ import pytest
 # Try importing training modules; skip if dependencies unavailable
 try:
     import torch
+
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
 
 try:
-    from integrated_app.training.data import DatasetEntry, HFVoxCPMDataset, BatchProcessor
+    from integrated_app.training.data import BatchProcessor, DatasetEntry, HFVoxCPMDataset
+
     HAS_TRAINING = True
 except Exception:
     HAS_TRAINING = False
@@ -133,9 +134,7 @@ class TestHFVoxCPMDatasetScan:
         (tmp_path / "sample1.txt").write_text("hello", encoding="utf-8")
 
         # Bad line: missing text
-        (tmp_path / "metadata.jsonl").write_text(
-            json.dumps({"audio_file": "sample1.wav"}), encoding="utf-8"
-        )
+        (tmp_path / "metadata.jsonl").write_text(json.dumps({"audio_file": "sample1.wav"}), encoding="utf-8")
 
         with pytest.raises(ValueError):
             HFVoxCPMDataset(data_dir=tmp_path)
@@ -152,9 +151,11 @@ class TestHFVoxCPMDatasetScan:
                 return 0.5  # Below min_duration
             return 25.0  # Above max_duration
 
-        with patch.object(HFVoxCPMDataset, "_safe_read_duration", side_effect=mock_duration):
-            with pytest.raises(ValueError, match="没有可用的"):
-                HFVoxCPMDataset(data_dir=tmp_path, min_duration=1.0, max_duration=20.0)
+        with (
+            patch.object(HFVoxCPMDataset, "_safe_read_duration", side_effect=mock_duration),
+            pytest.raises(ValueError, match="没有可用的"),
+        ):
+            HFVoxCPMDataset(data_dir=tmp_path, min_duration=1.0, max_duration=20.0)
 
     def test_split_ratio(self, tmp_path):
         """Test train/eval split."""

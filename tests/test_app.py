@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 def test_app_creation(app):
     assert app.title == "TTS MultiModel Voice Studio"
 

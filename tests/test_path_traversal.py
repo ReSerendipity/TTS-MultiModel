@@ -1,5 +1,5 @@
 """Tests for path traversal protection in audio routes."""
-import pytest
+
 from pathlib import Path
 
 

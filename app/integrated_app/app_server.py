@@ -39,7 +39,11 @@ from fastapi.templating import Jinja2Templates
 from .auth import APIAuthMiddleware
 from .exceptions import TTSError, ValidationError
 from .middleware.csrf import CSRFMiddleware
-from .middleware.error_handler import generic_error_handler, tts_error_handler, validation_error_handler
+from .middleware.error_handler import (
+    generic_error_handler,
+    tts_error_handler,
+    validation_error_handler,
+)
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.request_id import RequestIDLogFilter, RequestIDMiddleware
 from .model_registry import EngineName
@@ -355,9 +359,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     #   - 仅当 config.yaml runtime.task.auto_recover=true 时才真正续跑，
     #     否则只扫描记录（保持既有单任务行为不变）
     try:
+        from .batch_inference import make_checkpoint_resume_handler
         from .checkpoint import TaskCheckpoint
         from .config import ROOT_DIR, get_config
-        from .batch_inference import make_checkpoint_resume_handler
 
         runtime_task = get_config().pydantic_config.runtime.task
         checkpoint_dir = os.path.join(ROOT_DIR, runtime_task.checkpoint_dir)
@@ -398,7 +402,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     except Exception as resume_err:
                         logger.warning(
                             "[lifespan] 恢复 checkpoint %s 失败: %s",
-                            cp.get("task_id"), resume_err,
+                            cp.get("task_id"),
+                            resume_err,
                         )
                 if resumed:
                     logger.info(f"[lifespan] 已从 checkpoint 恢复 {resumed} 个未完成任务")

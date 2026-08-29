@@ -22,14 +22,12 @@ import io
 import threading
 import time
 from collections.abc import Callable, Generator
-from typing import (
-    Any,
-    Literal,
-    NamedTuple,
-)
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 
+from ...exceptions import ContentSafetyError
+from ...security.content_safety import check_safety
 from ._base import (
     GenerationError,
     _advanced_kwargs,
@@ -39,8 +37,6 @@ from ._base import (
     split_text_for_tts,
 )
 from .decorators import with_generation_context
-from ...exceptions import ContentSafetyError
-from ...security.content_safety import check_safety
 
 StreamingMode = Literal["sse", "binary"]
 

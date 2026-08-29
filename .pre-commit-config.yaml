@@ -4,8 +4,11 @@
 
 repos:
   # Ruff linter + formatter
+  # rev 必须与开发者 venv 及 CI（ci.yml 用 `pip install ruff` 取最新版）实际使用的版本一致：
+  # 旧 pin v0.12.0 仍带 UP038（isinstance 元组 -> X|Y），而 ruff 0.16.x 已废弃该规则，
+  # 结果是本地 `ruff check` 全绿、pre-commit 却凭空报错，且两边会互相改写代码。
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.0
+    rev: v0.16.5
     hooks:
       - id: ruff
         args: [--fix]
@@ -40,14 +43,10 @@ repos:
         files: \.py$
         exclude: ^tests/training/
 
-  # Python import sort (isort compatible with ruff)
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: [--profile, black, --filter-files]
-        files: ^(app/integrated_app|scripts)/.*\.py$
-        exclude: ^app/integrated_app/vendor/
+  # 不单独挂 isort：import 排序的唯一权威是 ruff 的 I 规则
+  # （pyproject [tool.ruff.lint] select 含 "I" + [tool.ruff.lint.isort] known-first-party），
+  # 再挂一个 isort --profile black 会用 line_length=88 与 ruff 的 120 互相重排，
+  # 形成「isort 改完 ruff 再改回来」的死循环，每次提交都被两个钩子来回挡。
 
   # Shell scripts
   - repo: https://github.com/shellcheck-py/shellcheck-py

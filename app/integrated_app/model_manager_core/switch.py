@@ -4,10 +4,12 @@
 引擎加载器 _load_voxcpm2_engine / _load_generic_engine。
 【边界】加载委托 load.py；卸载委托 unload.py。
 """
-from .state import *
+
 from . import state as _state
 from .load import _do_load_voxcpm2_internal, load_indextts2, load_indextts20
+from .state import *
 from .unload import unload_model
+
 
 def _can_hot_standby(target_engine: str) -> bool:
     """判断是否可热待机（同时保留新旧双引擎在显存中）。
@@ -182,9 +184,7 @@ def _check_vram_prereq(engine_name: str, backend: Any, gpu_device: Any) -> float
     # 走不到"先卸载再加载"的路径。因此把当前引擎的基线占用视为卸载后可回收的
     # 显存，只有"卸载后仍装不下"才判定为硬失败。
     current_engine: str | None = registry.current_engine
-    current_vram_gb: float = (
-        ENGINE_VRAM_REQUIREMENTS.get(current_engine, 0.0) if current_engine else 0.0
-    )
+    current_vram_gb: float = ENGINE_VRAM_REQUIREMENTS.get(current_engine, 0.0) if current_engine else 0.0
     effective_free_gb: float = free_gb + current_vram_gb
 
     logger.info(

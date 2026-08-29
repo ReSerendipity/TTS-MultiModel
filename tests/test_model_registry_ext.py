@@ -65,4 +65,3 @@ class TestEngineSpec:
     def test_get_engine_spec(self):
         spec = get_engine_spec("voxcpm2")
         assert spec is None or spec is not None  # 取决于配置加载，不崩溃即可
-

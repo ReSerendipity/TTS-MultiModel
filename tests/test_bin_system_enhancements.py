@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test script to verify system enhancement improvements:
 1. Log rotation configuration
@@ -10,7 +9,6 @@ Test script to verify system enhancement improvements:
 import os
 import sys
 import tempfile
-import sqlite3
 import time
 
 import pytest
@@ -22,10 +20,12 @@ _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
+
 def test_log_rotation():
     """Test that log rotation is properly configured."""
-    from integrated_app.app_server import setup_logging, RotatingFileHandler
     import logging
+
+    from integrated_app.app_server import RotatingFileHandler, setup_logging
 
     # Call setup_logging
     setup_logging()
@@ -39,9 +39,10 @@ def test_log_rotation():
     assert handler.backupCount == 3, f"Expected 3 backups, got {handler.backupCount}"
     assert handler.encoding is not None, "Encoding should be set"
 
+
 def test_cached_static_files():
     """Test that CachedStaticFiles class exists and works."""
-    from integrated_app.app_server import CachedStaticFiles, _NO_CACHE_EXTENSIONS
+    from integrated_app.app_server import _NO_CACHE_EXTENSIONS, CachedStaticFiles
 
     # Verify cache configurations
     assert CachedStaticFiles is not None, "CachedStaticFiles class should be defined"
@@ -54,7 +55,9 @@ def test_cached_static_files():
 
     # Test that the class inherits from StaticFiles
     from fastapi.staticfiles import StaticFiles
+
     assert issubclass(CachedStaticFiles, StaticFiles), "CachedStaticFiles should inherit from StaticFiles"
+
 
 def test_database_optimizations():
     """Test database optimizations."""
@@ -88,13 +91,13 @@ def test_database_optimizations():
         """)
         indexes = [row[0] for row in cursor.fetchall()]
         expected_indexes = [
-            'idx_history_created_at',
-            'idx_history_engine',
-            'idx_history_persona',
-            'idx_history_engine_created',
-            'idx_history_persona_created',
-            'idx_history_is_success',
-            'idx_history_filepath',
+            "idx_history_created_at",
+            "idx_history_engine",
+            "idx_history_persona",
+            "idx_history_engine_created",
+            "idx_history_persona_created",
+            "idx_history_is_success",
+            "idx_history_filepath",
         ]
         for idx in expected_indexes:
             assert idx in indexes, f"Index {idx} missing"
@@ -143,17 +146,19 @@ def test_database_optimizations():
         except Exception:
             pass
 
+
 def test_audio_cache_headers():
     """Test that audio routes have cache headers configured."""
     # Read the audio.py file and check for Cache-Control headers
     audio_py_path = os.path.join(_APP_DIR, "integrated_app", "routes", "audio.py")
-    with open(audio_py_path, 'r', encoding='utf-8') as f:
+    with open(audio_py_path, encoding="utf-8") as f:
         content = f.read()
 
     assert "Cache-Control" in content, "Should have Cache-Control header"
     assert "max-age=3600" in content, "serve_audio should have max-age=3600"
     assert "max-age=86400" in content, "speaker_sample should have max-age=86400"
     assert "Accept-Ranges" in content, "Should have Accept-Ranges header"
+
 
 def main():
     print("System Enhancement Verification Tests")
@@ -193,6 +198,7 @@ def main():
     else:
         print("\n[WARNING] Some tests failed")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
 import threading
 import time
 from collections import OrderedDict
@@ -168,11 +167,7 @@ class G2PStats:
     @property
     def avg_processing_time_ms(self) -> float:
         """平均处理时间（毫秒）。"""
-        return (
-            self.total_processing_time_ms / self.total_requests
-            if self.total_requests > 0
-            else 0.0
-        )
+        return self.total_processing_time_ms / self.total_requests if self.total_requests > 0 else 0.0
 
     def to_dict(self) -> dict[str, Any]:
         """转换为可序列化字典。"""
@@ -298,8 +293,7 @@ class G2PManager:
         }
 
         logger.info(
-            "G2PManager 初始化完成 | "
-            "后端可用性: zh=%s(pypinyin), en=%s(g2p_en), ja=%s(pyopenjtalk), ko=%s(g2pk2)",
+            "G2PManager 初始化完成 | 后端可用性: zh=%s(pypinyin), en=%s(g2p_en), ja=%s(pyopenjtalk), ko=%s(g2pk2)",
             _HAS_PYPINYIN,
             _HAS_G2P_EN,
             _HAS_OPENJTALK,
@@ -340,9 +334,7 @@ class G2PManager:
             )
 
         if len(text) > MAX_TEXT_LENGTH:
-            raise ValueError(
-                f"文本长度 {len(text)} 超过最大限制 {MAX_TEXT_LENGTH}"
-            )
+            raise ValueError(f"文本长度 {len(text)} 超过最大限制 {MAX_TEXT_LENGTH}")
 
         if lang not in SUPPORTED_LANGUAGES:
             logger.warning("不支持的语言 '%s'，回退为 '%s'", lang, DEFAULT_LANGUAGE)
@@ -359,9 +351,7 @@ class G2PManager:
                 self.stats.cache_hits += 1
                 self.stats.total_requests += 1
                 self.stats.total_processing_time_ms += elapsed
-                self.stats.language_usage[lang] = (
-                    self.stats.language_usage.get(lang, 0) + 1
-                )
+                self.stats.language_usage[lang] = self.stats.language_usage.get(lang, 0) + 1
             return G2PResult(
                 text=cached_result,
                 language=lang,
@@ -383,9 +373,7 @@ class G2PManager:
         with self._lock:
             self.stats.total_requests += 1
             self.stats.total_processing_time_ms += elapsed
-            self.stats.language_usage[lang] = (
-                self.stats.language_usage.get(lang, 0) + 1
-            )
+            self.stats.language_usage[lang] = self.stats.language_usage.get(lang, 0) + 1
 
         return G2PResult(
             text=converted,
@@ -408,9 +396,7 @@ class G2PManager:
         result = self.convert(text, lang)
         return result.text
 
-    def convert_batch(
-        self, texts: list[str], lang: str = DEFAULT_LANGUAGE
-    ) -> list[G2PResult]:
+    def convert_batch(self, texts: list[str], lang: str = DEFAULT_LANGUAGE) -> list[G2PResult]:
         """批量 G2P 转换。
 
         Args:
@@ -534,11 +520,8 @@ class G2PManager:
             return text, "passthrough"
 
         # 使用 jieba 分词辅助多音字消歧
-        if _HAS_JIEBA:
-            words = list(jieba.cut(text))
-        else:
-            # 无 jieba 时按字符处理
-            words = list(text)
+        # 无 jieba 时按字符处理
+        words = list(jieba.cut(text)) if _HAS_JIEBA else list(text)
 
         # 使用 pypinyin 转换为带声调的拼音
         pinyin_list: list[str] = []

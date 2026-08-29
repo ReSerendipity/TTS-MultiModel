@@ -1,9 +1,9 @@
 """Tests for prompt cache with safe serialization."""
+
 import os
 import sys
+
 import pytest
-import tempfile
-import time
 
 _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
 if _APP_DIR not in sys.path:
@@ -18,25 +18,29 @@ class TestPromptCacheSerialization:
     def test_cache_file_extension(self):
         """Cache files use .json extension."""
         from integrated_app.prompt_cache import _get_cache_file_path
+
         path = _get_cache_file_path("test_key")
         assert str(path).endswith(".json")
 
     def test_metadata_extension(self):
         """Metadata file uses .json extension."""
         from integrated_app.prompt_cache import _get_metadata_path
+
         path = _get_metadata_path()
         assert str(path).endswith(".json")
 
     def test_no_pickle_in_module(self):
         """Module does not expose pickle as a public attribute."""
         import integrated_app.prompt_cache as pc
+
         # pickle should not be in the module's public namespace
-        public_attrs = [a for a in dir(pc) if not a.startswith('_')]
-        assert 'pickle' not in public_attrs
+        public_attrs = [a for a in dir(pc) if not a.startswith("_")]
+        assert "pickle" not in public_attrs
 
     def test_serialize_dict(self):
         """Can serialize a simple dict."""
-        from integrated_app.prompt_cache import _serialize_prompt_cache, _deserialize_prompt_cache
+        from integrated_app.prompt_cache import _deserialize_prompt_cache, _serialize_prompt_cache
+
         data = {"key": "value", "number": 42}
         serialized = _serialize_prompt_cache(data)
         deserialized = _deserialize_prompt_cache(serialized)
@@ -45,7 +49,8 @@ class TestPromptCacheSerialization:
 
     def test_serialize_nested_dict(self):
         """Can serialize nested dicts."""
-        from integrated_app.prompt_cache import _serialize_prompt_cache, _deserialize_prompt_cache
+        from integrated_app.prompt_cache import _deserialize_prompt_cache, _serialize_prompt_cache
+
         data = {"outer": {"inner": [1, 2, 3]}}
         serialized = _serialize_prompt_cache(data)
         deserialized = _deserialize_prompt_cache(serialized)
@@ -53,7 +58,8 @@ class TestPromptCacheSerialization:
 
     def test_serialize_list(self):
         """Can serialize a list."""
-        from integrated_app.prompt_cache import _serialize_prompt_cache, _deserialize_prompt_cache
+        from integrated_app.prompt_cache import _deserialize_prompt_cache, _serialize_prompt_cache
+
         data = [1, "two", 3.0, None]
         serialized = _serialize_prompt_cache(data)
         deserialized = _deserialize_prompt_cache(serialized)
@@ -71,20 +77,24 @@ class TestPromptCacheOperations:
     def _set_cache_dir(self, cache_dir):
         """Monkeypatch the global cache directory for isolated tests."""
         from pathlib import Path
+
         import integrated_app.prompt_cache as pc
+
         os.makedirs(cache_dir, exist_ok=True)
         pc._PROMPT_CACHE_DIR = Path(cache_dir)
 
     def test_cache_directory_creation(self, cache_dir):
         """Cache directory is created on first use."""
         from integrated_app.prompt_cache import _ensure_cache_dir
+
         self._set_cache_dir(cache_dir)
         _ensure_cache_dir()
         assert os.path.isdir(cache_dir)
 
     def test_save_and_load(self, cache_dir):
         """Can save and load a cache entry."""
-        from integrated_app.prompt_cache import save_prompt_cache, load_cached_prompt
+        from integrated_app.prompt_cache import load_cached_prompt, save_prompt_cache
+
         self._set_cache_dir(cache_dir)
         audio_path = os.path.join(cache_dir, "test_audio.wav")
         # Create a dummy file so cache key can be computed from content
@@ -97,7 +107,8 @@ class TestPromptCacheOperations:
 
     def test_cache_stats(self, cache_dir):
         """Can get cache statistics."""
-        from integrated_app.prompt_cache import save_prompt_cache, get_cache_stats, _ensure_cache_dir
+        from integrated_app.prompt_cache import _ensure_cache_dir, get_cache_stats, save_prompt_cache
+
         self._set_cache_dir(cache_dir)
         _ensure_cache_dir()
         audio_path = os.path.join(cache_dir, "stats_audio.wav")
@@ -111,7 +122,14 @@ class TestPromptCacheOperations:
 
     def test_clear_cache(self, cache_dir):
         """Can clear the cache."""
-        from integrated_app.prompt_cache import save_prompt_cache, load_cached_prompt, clear_prompt_cache, get_cache_stats, _ensure_cache_dir
+        from integrated_app.prompt_cache import (
+            _ensure_cache_dir,
+            clear_prompt_cache,
+            get_cache_stats,
+            load_cached_prompt,
+            save_prompt_cache,
+        )
+
         self._set_cache_dir(cache_dir)
         _ensure_cache_dir()
         audio_path = os.path.join(cache_dir, "clear_audio.wav")

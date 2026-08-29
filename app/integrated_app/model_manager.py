@@ -17,35 +17,50 @@ State management:
 
 同步使用约定: _model_lock 为 threading.RLock，见 model_manager_core/state.py。
 """
-import os
-import threading
+
 from typing import Any
 
 from .cache import AdaptiveLRUCache, LRUCache
-from .config import DATA_DIR, ROOT_DIR
-from .estimator import GenerationTimeEstimator
-from .gpu_utils import GPUMemoryMonitor, free_gpu_memory, get_gpu_device, is_oom_error
+from .gpu_utils import GPUMemoryMonitor, free_gpu_memory, is_oom_error
+from .model_manager_core.load import (  # noqa: F401
+    PersonaWarmupService,
+    PreloadService,
+    _do_load_voxcpm2_internal,
+    _warmup_persona_cache_compat,
+    get_persona_cache_stats,
+    get_preload_status,
+    load_indextts2,
+    load_indextts20,
+    load_voxcpm2,
+    preload_model,
+    warmup_persona_cache,
+)
+from .model_manager_core.state import *  # noqa: F401,F403
+from .model_manager_core.switch import (  # noqa: F401
+    _can_hot_standby,
+    _check_vram_prereq,
+    _load_generic_engine,
+    _load_voxcpm2_engine,
+    _rollback_engine,
+    _snapshot_engine_state,
+    _validate_engine_name,
+    _wait_vram_freed,
+    switch_engine,
+)
+from .model_manager_core.unload import _check_voxcpm2_lock, unload_model  # noqa: F401
 from .progress import ProgressManager
 from .tracker import GenerationTracker
 
-from .model_manager_core.state import *  # noqa: F401,F403
-from .model_manager_core.load import (
-    PersonaWarmupService, PreloadService, get_persona_cache_stats,
-    get_preload_status, load_indextts2, load_indextts20, load_voxcpm2, preload_model,
-    warmup_persona_cache, _do_load_voxcpm2_internal, _warmup_persona_cache_compat,
-)  # noqa: F401
-from .model_manager_core.unload import _check_voxcpm2_lock, unload_model  # noqa: F401
-from .model_manager_core.switch import (
-    _can_hot_standby, _check_vram_prereq, _load_generic_engine,
-    _load_voxcpm2_engine, _rollback_engine, _snapshot_engine_state,
-    _validate_engine_name, _wait_vram_freed, switch_engine,
-)  # noqa: F401
-
 __all__ = [
-    "LRUCache", "AdaptiveLRUCache",
-    "ProgressManager", "GenerationTracker",
-    "GPUMemoryMonitor", "is_oom_error", "free_gpu_memory",
+    "LRUCache",
+    "AdaptiveLRUCache",
+    "ProgressManager",
+    "GenerationTracker",
+    "GPUMemoryMonitor",
+    "is_oom_error",
+    "free_gpu_memory",
 ]
+
 
 def get_generation_tracker() -> GenerationTracker:
     """获取全局 ``GenerationTracker`` 单例。

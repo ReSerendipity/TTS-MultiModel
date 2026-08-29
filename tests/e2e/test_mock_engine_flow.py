@@ -14,12 +14,12 @@
 
 import os
 import struct
-import wave
 
 import pytest
 
 try:
     from playwright.sync_api import sync_playwright
+
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
@@ -36,6 +36,7 @@ BASE_URL = os.environ.get("TTS_SERVER_URL", "http://127.0.0.1:7869")
 def server_url():
     """获取服务器 URL，如未运行则跳过。"""
     import urllib.request
+
     try:
         urllib.request.urlopen(BASE_URL, timeout=3)
         return BASE_URL
@@ -75,21 +76,24 @@ class TestMockEngineBusinessFlow:
     def test_api_health_check(self, server_url):
         """测试 API 健康检查端点可达。"""
         import urllib.request
+
         resp = urllib.request.urlopen(f"{BASE_URL}/api/health/ping", timeout=5)
         assert resp.status == 200
 
     def test_model_status_reflects_no_model(self, server_url):
         """测试无模型时 model status 返回正确状态。"""
-        import urllib.request
         import json
+        import urllib.request
+
         resp = urllib.request.urlopen(f"{BASE_URL}/api/model/status", timeout=5)
         data = json.loads(resp.read())
         assert isinstance(data, dict)
 
     def test_generate_without_model_returns_error(self, server_url):
         """测试无模型时生成请求返回错误（503 或类似）。"""
-        import urllib.request
         import json
+        import urllib.request
+
         # Try to generate without model loaded
         req = urllib.request.Request(
             f"{BASE_URL}/v1/audio/speech",
@@ -150,6 +154,7 @@ class TestMockEngineBusinessFlow:
     def test_sse_endpoint_connectable(self, server_url):
         """测试 SSE 端点可连接。"""
         import urllib.request
+
         try:
             req = urllib.request.Request(
                 f"{BASE_URL}/api/sse/events",
