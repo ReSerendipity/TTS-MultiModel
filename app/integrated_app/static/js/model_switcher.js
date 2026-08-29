@@ -117,11 +117,9 @@ window.switchModel = function(modelName) {
             tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
 
-        // IndexTTS 2.0/2.5 共用同一套生成 tab 与后端端点（复用同一引擎槽位），
-        // 因此选中 indextts20 时，侧栏按 indextts2 的 tab 集渲染；
-        // 但 2.0 不支持显式时长控制，需隐藏 *_duration 项。
-        var tabModel = (modelName === 'indextts20') ? 'indextts2' : modelName;
-        var hideDuration = (modelName === 'indextts20');
+        // IndexTTS 2.0 拥有独立的侧栏分组与独立模板（data-model="indextts20"），
+        // 不再把 indextts20 重映射到 indextts2 的 tab 集并按引擎版本裁剪。
+        var tabModel = modelName;
 
         var sections = document.querySelectorAll('.sidebar-nav-section[data-section-model]');
         sections.forEach(function(sec) {
@@ -145,11 +143,7 @@ window.switchModel = function(modelName) {
 
         var items = document.querySelectorAll('.sidebar-item[data-model]');
         items.forEach(function(item) {
-            var itemModel = item.dataset.model;
-            var shouldShow = (itemModel === tabModel || itemModel === 'all');
-            if (shouldShow && hideDuration && item.dataset.tab && item.dataset.tab.slice(-9) === '_duration') {
-                shouldShow = false; // 2.0 无显式时长控制
-            }
+            var shouldShow = (item.dataset.model === tabModel || item.dataset.model === 'all');
             item.classList.toggle('sidebar-item-hidden', !shouldShow);
         });
 

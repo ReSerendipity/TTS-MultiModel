@@ -14,6 +14,8 @@ function getPageTitles() {
             indextts2_clone: window.I18N["tab_indextts2_clone"],
             indextts2_emotion: window.I18N["tab_indextts2_emotion"],
             indextts2_duration: window.I18N["tab_indextts2_duration"],
+            indextts20_clone: window.I18N["tab_indextts20_clone"],
+            indextts20_emotion: window.I18N["tab_indextts20_emotion"],
             lora: window.I18N["tab_lora"],
             lora_training: window.I18N["tab_lora_training"],
             history: window.I18N["tab_history"],

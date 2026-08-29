@@ -214,6 +214,9 @@ async def generate_indextts2(
     # 再次显式取 engine 引用：pre_validate 已检查过非空，这里再取一次用于 infer()
     engine = registry.get_current_engine()
 
+    # 2.0 与 2.5 复用本端点与同一引擎槽位，完成文案按当前激活引擎显示
+    model_label: str = "IndexTTS 2.0" if registry.current_engine == "indextts20" else "IndexTTS 2.5"
+
     # ------------------------------------------------------------------
     # 2. 处理参考音频（ref_audio）与情感参考音频（emo_audio）
     # ------------------------------------------------------------------
@@ -309,6 +312,9 @@ async def generate_indextts2(
         """IndexTTS2分段情感合成闭包（含临时文件清理、segment逐段推理逻辑）"""
         segments = split_text_for_tts(text)
         all_audio: list[np.ndarray] = []
+        # IndexTTS 2.5 / 2.0 原生输出 22050Hz；以引擎实际返回的 sample_rate 为准，
+        # 不再硬编码 44100（那会让浏览器按 2 倍速播放，音调与时长全错）。
+        out_sample_rate: int = 22050
         for seg in segments:
             seg = seg.strip()
             if not seg:
@@ -336,17 +342,28 @@ async def generate_indextts2(
             if seed > 0:
                 infer_kwargs["seed"] = seed
 
-            result_path: str | None = engine.infer(**infer_kwargs)
-            if result_path and os.path.exists(result_path):
-                import scipy.io.wavfile as wavfile
-
-                sr, data = wavfile.read(result_path)
-                if data.dtype != np.int16:
-                    data = (data.astype(np.float32) * 32768.0).clip(-32768, 32767).astype(np.int16)
-                all_audio.append(data)
-                # 临时 WAV 文件用完即删：避免 SAVE_DIR/tmp 堆积
+            # engine.infer() 的对外契约是 (sample_rate, wav, output_path) 三元组
+            # （见 engines/indextts2_engine.py 的 Returns 说明与内部调用点）。
+            # 历史上本行把返回值当 str 用并对 tuple 调 os.path.exists()，
+            # 导致 IndexTTS 每次都「推理已完成、wav 已落盘」却在收尾抛
+            # `_path_exists: path should be ... not tuple` → 整条请求 400、前端拿不到音频。
+            seg_result = engine.infer(**infer_kwargs)
+            if not seg_result:
+                continue
+            seg_sr, seg_wav, seg_path = seg_result
+            data = np.asarray(seg_wav)
+            if data.size == 0:
+                continue
+            if data.dtype != np.int16:
+                data = (data.astype(np.float32) * 32768.0).clip(-32768, 32767).astype(np.int16)
+            all_audio.append(data)
+            if seg_sr:
+                out_sample_rate = int(seg_sr)
+            # 引擎已写盘的临时 WAV 用完即删：避免 SAVE_DIR/tmp 堆积
+            if seg_path:
                 with contextlib.suppress(OSError):
-                    os.remove(result_path)
+                    if os.path.isfile(seg_path):
+                        os.remove(seg_path)
 
         if not all_audio:
             return None, "生成失败：未产生任何音频数据"
@@ -355,8 +372,12 @@ async def generate_indextts2(
         timestamp: int = int(time.time())
         filename: str = f"indextts2_{timestamp}.wav"
         output_path: str = os.path.join(SAVE_DIR, filename)
-        _save_wav_compatible(combined, output_path, sample_rate=44100)
-        return (44100, "wav", filename), "IndexTTS 2.5 生成完成"
+        _save_wav_compatible(combined, output_path, sample_rate=out_sample_rate)
+        return (
+            out_sample_rate,
+            "wav",
+            filename,
+        ), f"{model_label} 生成完成"
 
     # ------------------------------------------------------------------
     # 6. 统一生成执行器：
@@ -373,7 +394,7 @@ async def generate_indextts2(
         run_fn=_run,
         endpoint_name="IndexTTS2",
         voice_or_persona="",
-        model_type="IndexTTS 2.5",
+        model_type=model_label,
         engine="indextts2",
         tempo_factor=tempo_factor,
         voice_enhancement=voice_enhancement,

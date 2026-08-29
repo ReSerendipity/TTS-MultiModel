@@ -295,7 +295,25 @@ def _do_load_voxcpm2_internal(
         else:
             kwargs["load_denoiser"] = False
 
-        new_model: Any = voxcpm.VoxCPM.from_pretrained(get_voxcpm2_model_path(), **kwargs)
+        try:
+            new_model: Any = voxcpm.VoxCPM.from_pretrained(get_voxcpm2_model_path(), **kwargs)
+        except ImportError as denoiser_exc:
+            # 降噪/语音增强子模块（speech_zipenhancer）经 modelscope pipeline 拉入
+            # addict / datasets 等**可选传递依赖**。它们缺失时只应降级音质，
+            # 不应让整条引擎切换失败——否则 VoxCPM2 一旦被切走就再也切不回来
+            # （公开的 load_voxcpm2 用 include_denoiser=False 所以初次加载正常，
+            #   而 switch_engine 的 _load_voxcpm2_engine 强制 True，故障只在此暴露）。
+            if not include_denoiser:
+                raise
+            logger.warning(
+                "[VoxCPM2] 降噪子模块可选依赖缺失（%s），已降级为不含降噪的加载路径。"
+                "如需完整音质，请补装 modelscope pipeline 的可选依赖。",
+                denoiser_exc,
+            )
+            kwargs.pop("zipenhancer_model_id", None)
+            kwargs["load_denoiser"] = False
+            yield "降噪子模块不可用，正在以降级模式加载...", None, None, None
+            new_model = voxcpm.VoxCPM.from_pretrained(get_voxcpm2_model_path(), **kwargs)
 
         # Move sub-components to GPU with granular progress
         if backend != GPUBackend.CPU and gpu_device is not None:
@@ -524,11 +542,37 @@ def load_indextts2(
         logger.info(f"[IndexTTS2] 开始加载 {label} 引擎...")
         start_time: float = time.time()
 
-        new_engine: Any = IndexTTS2Engine(
-            model_dir=model_path,
-            use_bf16=(backend != GPUBackend.CPU),
-            version="2.0" if is_v20 else "2.5",
+        # 情感「文本描述」模式依赖 QwenEmotion 子模型。权重目录存在时才尝试启用，
+        # 否则 infer() 会在该模式下抛「需要以 use_qwen_emo=True 构造引擎」。
+        qwen_emo_present: bool = any(
+            name.startswith("qwen") and "emo" in name and os.path.isdir(os.path.join(model_path, name))
+            for name in os.listdir(model_path)
         )
+        if not qwen_emo_present:
+            logger.info(f"[IndexTTS2] 未发现 QwenEmotion 权重，情感文本描述模式不可用（{model_path}）")
+
+        def _build_engine(with_qwen_emo: bool) -> Any:
+            return IndexTTS2Engine(
+                model_dir=model_path,
+                use_bf16=(backend != GPUBackend.CPU),
+                version="2.0" if is_v20 else "2.5",
+                use_qwen_emo=with_qwen_emo,
+            )
+
+        try:
+            new_engine: Any = _build_engine(qwen_emo_present)
+        except EngineLoadError as qwen_exc:
+            # QwenEmotion 用 device_map 加载，需要可选依赖 `accelerate`；
+            # 缺失时只应关闭「情感文本描述」这一种模式，
+            # 绝不能让整个 IndexTTS 引擎加载失败（克隆与向量情感模式仍然可用）。
+            if not qwen_emo_present:
+                raise
+            logger.warning(
+                "[IndexTTS2] 启用 QwenEmotion 失败（%s），已降级为不支持情感文本描述模式；"
+                "如需该模式请安装可选依赖 accelerate。",
+                qwen_exc,
+            )
+            new_engine = _build_engine(False)
 
         load_time: float = time.time() - start_time
         logger.info(f"[IndexTTS2] {label} 引擎加载完成，耗时: {load_time:.1f}秒")

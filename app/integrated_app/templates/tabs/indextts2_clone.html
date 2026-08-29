@@ -5,7 +5,7 @@
     <div class="two-col">
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
-            <form id="it2c-form" hx-post="/api/generate/indextts2/clone" hx-target="#it2c-result" hx-swap="innerHTML" hx-indicator="#it2c-spinner" hx-encoding="multipart/form-data" x-data="{ durationMode: 'free' }">
+            <form id="it2c-form" hx-post="/api/generate/indextts2" hx-target="#it2c-result" hx-swap="innerHTML" hx-indicator="#it2c-spinner" hx-encoding="multipart/form-data" x-data="{ durationMode: 'free' }">
                         {% include 'partials/output_format.html' %}
                 <input type="hidden" name="mode" value="clone">
 
@@ -60,13 +60,10 @@
                         <div class="fg">
                             <label class="fl" for="it2c-lang-select">{{ "language"|t(lang) }}</label>
                             <select name="lang" id="it2c-lang-select" class="fs">
-                                {% set is20 = (current_engine == 'indextts20') %}
                                 {% for l in langs %}
-                                {% if not is20 or l in ['Auto', '中文', '英语'] %}
                                 <option value="{{ l }}" {% if l == 'Auto' %}selected{% endif %}>{{ l }}</option>
-                                {% endif %}
                                 {% endfor %}
-                                {% if dialects and not is20 %}
+                                {% if dialects %}
                                 <optgroup label="{{ 'chinese_dialects'|t(lang) }}">
                                     {% for dialect in dialects %}
                                     <option value="{{ dialect[0] }}">{{ dialect[1] }}</option>
@@ -78,7 +75,6 @@
                     </div>
                 </div>
 
-                {% if current_engine != 'indextts20' %}
                 <!-- Card: 时长模式 -->
                 <div class="card">
                     <div class="card-hdr">
@@ -114,7 +110,6 @@
                         </div>
                     </div>
                 </div>
-                {% endif %}
 
                 <!-- Generate Button -->
                 <button type="submit" class="btn-generate">

@@ -1,0 +1,153 @@
+{# IndexTTS 2.0 Voice Clone tab — 独立模板（不再复用 indextts2_clone.html + Jinja 裁剪）
+   与 2.5 的差异：仅支持中/英、无显式时长控制，因此本文件不含时长卡片，
+   语种下拉也只渲染 Auto/中文/英语。
+   后端仍走共享端点 /api/generate/indextts2（2.0 与 2.5 复用同一引擎槽位，
+   由 registry.current_engine 决定实际推理权重）。
+   Two-column layout: form (left 65%) + result (right 35%). #}
+<div class="pv-theme">
+    <div class="two-col">
+        <!-- ============ Form Column (65%) ============ -->
+        <div class="col-form">
+            <form id="it20c-form" hx-post="/api/generate/indextts2" hx-target="#it20c-result" hx-swap="innerHTML" hx-indicator="#it20c-spinner" hx-encoding="multipart/form-data">
+                        {% include 'partials/output_format.html' %}
+                <input type="hidden" name="mode" value="clone">
+
+                <!-- Card: 参考音频 -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+                        {{ "tab_indextts20_clone"|t(lang) }}
+                    </div>
+                    <div class="card-body">
+                        <div class="hint-text" style="margin-bottom:10px">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            {{ "indextts20_clone_desc"|t(lang) }}
+                        </div>
+
+                        <div class="fg">
+                            <label class="fl">{{ "ref_audio"|t(lang) }}</label>
+                            <div class="upload-zone" onclick="this.querySelector('input').click()">
+                                <input type="file" id="it20c-ref-audio-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt20cFileName(this)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                <p><span id="it20c-ref-audio-name">{{ "upload_clone_ref"|t(lang) }}</span></p>
+                                <p style="font-size:10px;margin-top:2px">{{ "supported_formats"|t(lang) }} (5-30s)</p>
+                            </div>
+                        </div>
+
+                        <div class="fg" id="it20c-audio-preview" style="display:none">
+                            <label class="fl">{{ "audio_preview"|t(lang) }}</label>
+                            <audio id="it20c-preview-audio" controls style="width:100%"></audio>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: 合成文本 -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+                        {{ "synthesis_text"|t(lang) }}
+                    </div>
+                    <div class="card-body">
+                        <div class="fg">
+                            <label class="fl" for="it20c-text">{{ "synthesis_text"|t(lang) }}</label>
+                            <textarea name="text" id="it20c-text"
+                                      class="ft tts-textarea tts-auto-resize"
+                                      rows="3"
+                                      placeholder="{{ 'enter_text_placeholder'|t(lang) }}"
+                                      data-char-counter="it20c-char-counter"
+                                      data-max-chars="{{ engine_max_total_chars }}"
+                                      data-segment-max-chars="{{ gen_split_max_chars }}"
+                                      data-auto-resize="true"></textarea>
+                            <div class="cc" id="it20c-char-counter">0/{{ engine_max_total_chars }} | {{ "per_segment"|t(lang) }} {{ gen_split_max_chars }}{{ "chars"|t(lang) }}</div>
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="it20c-lang-select">{{ "language"|t(lang) }}</label>
+                            <select name="lang" id="it20c-lang-select" class="fs">
+                                {# IndexTTS 2.0 仅支持中英双语：不渲染方言组，也不渲染其余语种 #}
+                                <option value="Auto" selected>Auto</option>
+                                {% for l in langs %}
+                                {% if l in ['中文', '英语'] %}
+                                <option value="{{ l }}">{{ l }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                            <div class="fh">{{ "indextts20_lang_hint"|t(lang) }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button type="submit" class="btn-generate">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                    {{ "indextts20_generate"|t(lang) }}
+                </button>
+                <div class="gen-hint">Ctrl+Enter</div>
+            </form>
+        </div>
+
+        <!-- ============ Result Column (35%) ============ -->
+        <div class="col-result">
+            <!-- Card: 生成结果 -->
+            <div class="card">
+                <div class="card-hdr">
+                    <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+                    {{ "result_audio"|t(lang) }}
+                </div>
+                <div class="card-body">
+                    <div id="it20c-result" aria-live="polite">
+                        <div id="it20c-spinner" class="htmx-indicator" style="display:none">
+                            <div class="hint-text">{{ "generating"|t(lang) }}</div>
+                            <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+                        </div>
+                        <div class="status-message" id="it20c-status" aria-live="polite"></div>
+                        <div class="empty-state" id="it20c-empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:0.35;margin-bottom:12px"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg>
+                            <p class="empty-state-title">{{ "no_result_yet"|t(lang) }}</p>
+                            <p class="empty-state-desc">{{ "upload_ref_then_generate"|t(lang) }}</p>
+                        </div>
+                    </div>
+                    <audio class="tts-audio-hidden" id="it20c-audio"></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    // Initialize shared TTS form utilities
+    TTSForm.init({
+        formId: 'it20c-form',
+        resultId: 'it20c-result',
+        statusId: 'it20c-status',
+        textareaId: 'it20c-text',
+        counterId: 'it20c-char-counter',
+        maxChars: {{ engine_max_total_chars }},
+        segmentMaxChars: {{ gen_split_max_chars }},
+        counterClass: 'tts-char-counter'
+    });
+
+    window.updateIt20cFileName = function(input) {
+        var nameEl = document.getElementById('it20c-ref-audio-name');
+        var previewEl = document.getElementById('it20c-audio-preview');
+        var previewAudio = document.getElementById('it20c-preview-audio');
+        if (input.files && input.files.length > 0) {
+            nameEl.textContent = input.files[0].name;
+            var url = URL.createObjectURL(input.files[0]);
+            previewAudio.src = url;
+            previewEl.style.display = '';
+        } else {
+            nameEl.textContent = '{{ "upload_clone_ref"|t(lang) }}';
+            previewEl.style.display = 'none';
+        }
+    };
+
+    // Ctrl+Enter to submit
+    document.getElementById('it20c-text').addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('it20c-form').requestSubmit();
+        }
+    });
+})();
+</script>

@@ -269,18 +269,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Auto-switch tab for engine
 window.autoSwitchTabForEngine = function(engine) {
-    var isVox = engine.toLowerCase().indexOf('voxcpm2') !== -1;
+    var key = (engine || '').toLowerCase();
     var activeItem = document.querySelector('.sidebar-item.active');
     if (!activeItem) return;
-    var activeEngine = activeItem.getAttribute('data-engine') || '';
-    var isActiveVisible = false;
-    if (activeEngine === 'all') {
-        isActiveVisible = true;
-    } else if (isVox && activeEngine === 'voxcpm2') {
-        isActiveVisible = true;
-    }
-    if (!isActiveVisible) {
-        var defaultTab = isVox ? 'voice_design' : 'indextts2_clone';
+    // 侧栏项上的引擎标记是 data-model（历史上误读 data-engine，该属性不存在），
+    // 导致 isActiveVisible 恒为 false、任何引擎切换都强制跳回默认 tab。
+    var activeModel = activeItem.getAttribute('data-model') || '';
+    var isVisible = activeModel === 'all' || activeModel === key;
+    if (!isVisible) {
+        // 必须先判 indextts20：'indextts20'.indexOf('indextts2') 同样命中
+        var defaultTab = key.indexOf('voxcpm2') !== -1
+            ? 'voice_design'
+            : (key.indexOf('indextts20') !== -1 ? 'indextts20_clone' : 'indextts2_clone');
         var targetItem = document.querySelector('.sidebar-item[data-tab="' + defaultTab + '"]');
         if (targetItem) {
             targetItem.click();
@@ -295,14 +295,14 @@ document.addEventListener('DOMContentLoaded', function() {
         var progressContainer = document.querySelector('.progress-container.active');
         var formatSelector = document.querySelector('.format-selector');
         var offset = 20; // Base padding
-        
+
         if (topBar) offset += topBar.offsetHeight;
         if (formatSelector) offset += formatSelector.offsetHeight;
         if (progressContainer) offset += progressContainer.offsetHeight;
-        
+
         return offset;
     }
-    
+
     function scrollToAnchor(anchor) {
         if (!anchor) return;
         var element = document.getElementById(anchor);
@@ -314,40 +314,40 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         if (!element) return;
-        
+
         var tabContent = document.getElementById('tab-content');
         var scrollContainer = tabContent || document.documentElement;
-        
+
         var elementRect = element.getBoundingClientRect();
         var containerRect = scrollContainer.getBoundingClientRect ? scrollContainer.getBoundingClientRect() : { top: 0 };
-        
+
         var currentScrollTop = scrollContainer === document.documentElement ? window.pageYOffset : scrollContainer.scrollTop;
         var targetY = currentScrollTop + elementRect.top - containerRect.top - getScrollOffset();
-        
+
         scrollContainer.scrollTo({
             top: Math.max(0, targetY),
             behavior: 'smooth'
         });
     }
-    
+
     // Handle anchor clicks
     document.body.addEventListener('click', function(e) {
         var link = e.target.closest('a[href^="#"]');
         if (!link) return;
-        
+
         var href = link.getAttribute('href');
         if (!href || href === '#') return;
-        
+
         var anchor = href.substring(1);
         if (anchor === 'main-content') return; // Skip skip link
-        
+
         e.preventDefault();
         scrollToAnchor(anchor);
-        
+
         // Update URL hash without jumping
         history.pushState(null, '', '#' + anchor);
     });
-    
+
     // Handle initial hash on page load
     if (window.location.hash) {
         var initialAnchor = window.location.hash.substring(1);
@@ -355,7 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
             scrollToAnchor(initialAnchor);
         }, 500); // Wait for content to load
     }
-    
+
     // Handle hash after HTMX content loads
     document.body.addEventListener('htmx:afterSettle', function() {
         if (window.location.hash) {

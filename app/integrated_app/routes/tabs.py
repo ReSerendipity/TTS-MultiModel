@@ -9,8 +9,12 @@
 支持的 Tab（允许列表）：
     voice_design / voice_clone / ultimate_clone / prompt_continue /
     script / voxcpm2 / settings / indextts2 / indextts2_clone /
-    indextts2_emotion / indextts2_duration / lora / lora_training /
-    history / persona / help
+    indextts2_emotion / indextts2_duration / indextts20_clone /
+    indextts20_emotion / lora / lora_training / history / persona / help
+
+    IndexTTS 2.0（indextts20）拥有独立 Tab 与独立模板，不再复用 2.5 的
+    模板并在模板内用 Jinja 条件裁剪：2.0 无显式时长控制，因此没有
+    indextts20_duration。
 
 路径前缀：
     无（router 直接注册，路由为 ``/tab/{tab_name}``；为保持 100% 向后
@@ -56,6 +60,8 @@ _TAB_TEMPLATES: dict[str, str] = {
     "indextts2_clone": "tabs/indextts2_clone.html",
     "indextts2_emotion": "tabs/indextts2_emotion.html",
     "indextts2_duration": "tabs/indextts2_duration.html",
+    "indextts20_clone": "tabs/indextts20_clone.html",
+    "indextts20_emotion": "tabs/indextts20_emotion.html",
     "lora": "tabs/lora_manager.html",
     "lora_training": "tabs/lora_training.html",
     "history": "tabs/history.html",
@@ -77,6 +83,9 @@ _VOXCPM2_TABS: frozenset[str] = frozenset(
 
 # IndexTTS2 专属 Tab（字符上限 3072）
 _INDEXTTS2_TABS: frozenset[str] = frozenset({"indextts2", "indextts2_clone", "indextts2_emotion", "indextts2_duration"})
+
+# IndexTTS 2.0 专属 Tab（与 2.5 同为 3072；2.0 无时长控制，故无 *_duration）
+_INDEXTTS20_TABS: frozenset[str] = frozenset({"indextts20_clone", "indextts20_emotion"})
 
 # 通用新式引擎专属 Tab（字符上限 4096；当前无成员，留空供未来通用引擎 Tab 复用）
 _GENERIC_ENGINE_TABS: frozenset[str] = frozenset()
@@ -102,7 +111,7 @@ def _common_context(request: Request, tab_name: str = "") -> dict[str, Any]:
 
     if tab_name in _VOXCPM2_TABS:
         engine_max_chars = 8192
-    elif tab_name in _INDEXTTS2_TABS:
+    elif tab_name in _INDEXTTS2_TABS or tab_name in _INDEXTTS20_TABS:
         engine_max_chars = 3072
     elif tab_name in _GENERIC_ENGINE_TABS:
         engine_max_chars = 4096

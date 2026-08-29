@@ -1,0 +1,287 @@
+{# IndexTTS 2.0 Emotion Control tab — 独立模板（不再复用 indextts2_emotion.html + Jinja 裁剪）
+   字段名与后端 /api/generate/indextts2 的 Form 参数严格对齐：
+   ref_audio / emo_audio / emo_text / emo_alpha / emo_happy..emo_calm。
+   （2.5 模板历史上用 emotion_audio / emotion_text / emotion_weight 命名，
+    端点收不到这些值，情感控制实际不生效——本模板不再沿用该错误命名。）
+   预设情感通过 JS 展开为 8 维向量，因为端点只接受向量而不接受 preset 名。 #}
+<div class="pv-theme">
+    <div class="two-col">
+        <!-- ============ Form Column (65%) ============ -->
+        <div class="col-form">
+            <form id="it20e-form" hx-post="/api/generate/indextts2" hx-target="#it20e-result" hx-swap="innerHTML" hx-indicator="#it20e-spinner" hx-encoding="multipart/form-data" x-data="{ it20eMode: 'same' }">
+                        {% include 'partials/output_format.html' %}
+                <input type="hidden" name="mode" value="emotion">
+
+                <!-- Card: 模式选择 -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg></span>
+                        {{ "tab_indextts20_emotion"|t(lang) }}
+                    </div>
+                    <div class="card-body">
+                        <div class="hint-text" style="margin-bottom:10px">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            {{ "indextts20_emotion_desc"|t(lang) }}
+                        </div>
+
+                        <div class="fg">
+                            <label class="fl">{{ "emotion_mode"|t(lang) }}</label>
+                            <div class="mode-pills">
+                                <button type="button" class="mode-pill active" :class="{ 'active': it20eMode === 'same' }" @click="it20eMode='same'">{{ "emotion_same_prompt"|t(lang) }}</button>
+                                <button type="button" class="mode-pill" :class="{ 'active': it20eMode === 'diff' }" @click="it20eMode='diff'">{{ "emotion_diff_prompt"|t(lang) }}</button>
+                                <button type="button" class="mode-pill" :class="{ 'active': it20eMode === 'text' }" @click="it20eMode='text'">{{ "emotion_text_desc"|t(lang) }}</button>
+                            </div>
+                        </div>
+
+                        <!-- Same Prompt Mode：一段音频同时提供音色与情感 -->
+                        <div id="it20e-same-panel" x-show="it20eMode === 'same'" x-transition>
+                            <div class="fg">
+                                <label class="fl">{{ "ref_audio"|t(lang) }}</label>
+                                <div class="upload-zone" onclick="this.querySelector('input').click()">
+                                    <input type="file" id="it20e-same-audio-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt20eFileName(this, 'it20e-same-name')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    <p><span id="it20e-same-name">{{ "upload_ref_audio_desc"|t(lang) }}</span></p>
+                                    <p style="font-size:10px;margin-top:2px">{{ "supported_formats"|t(lang) }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Different Prompts Mode：音色与情感分别提供 -->
+                        <div id="it20e-diff-panel" x-show="it20eMode === 'diff'" x-transition style="display:none">
+                            <div class="fg">
+                                <label class="fl">{{ "timbre_ref_audio"|t(lang) }}</label>
+                                <div class="upload-zone" style="padding:14px" onclick="this.querySelector('input').click()">
+                                    <input type="file" id="it20e-diff-timbre-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt20eFileName(this, 'it20e-diff-timbre-name')">
+                                    <p style="font-size:12px"><span id="it20e-diff-timbre-name">{{ "upload_timbre_ref"|t(lang) }}</span></p>
+                                </div>
+                            </div>
+                            <div class="fg">
+                                <label class="fl">{{ "emotion_ref_audio"|t(lang) }}</label>
+                                <div class="upload-zone" style="padding:14px" onclick="this.querySelector('input').click()">
+                                    <input type="file" id="it20e-diff-emotion-input" name="emo_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt20eFileName(this, 'it20e-diff-emotion-name')">
+                                    <p style="font-size:12px"><span id="it20e-diff-emotion-name">{{ "upload_emotion_ref_desc"|t(lang) }}</span></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Text Description Mode：端点优先级 emo_text > emo_audio > 向量 -->
+                        <div id="it20e-text-panel" x-show="it20eMode === 'text'" x-transition style="display:none">
+                            <div class="fg">
+                                <label class="fl">{{ "timbre_ref_audio"|t(lang) }}</label>
+                                <div class="upload-zone" style="padding:14px" onclick="this.querySelector('input').click()">
+                                    <input type="file" id="it20e-text-timbre-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt20eFileName(this, 'it20e-text-timbre-name')">
+                                    <p style="font-size:12px"><span id="it20e-text-timbre-name">{{ "upload_timbre_ref"|t(lang) }}</span></p>
+                                </div>
+                            </div>
+                            <div class="fg">
+                                <label class="fl" for="it20e-emotion-text">{{ "emotion_text_input"|t(lang) }}</label>
+                                <input type="text" id="it20e-emotion-text" name="emo_text" class="fi" placeholder="{{ 'emotion_text_input_placeholder'|t(lang) }}">
+                                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                                    <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it20e-emotion-text').value='{{ "quick_desc_value_1"|t(lang) }}'">{{ "quick_desc_1"|t(lang) }}</button>
+                                    <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it20e-emotion-text').value='{{ "quick_desc_value_2"|t(lang) }}'">{{ "quick_desc_2"|t(lang) }}</button>
+                                    <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it20e-emotion-text').value='{{ "quick_desc_value_3"|t(lang) }}'">{{ "quick_desc_3"|t(lang) }}</button>
+                                    <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it20e-emotion-text').value='{{ "quick_desc_value_4"|t(lang) }}'">{{ "quick_desc_4"|t(lang) }}</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: 情感控制（8 维向量 + 强度） -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3z"/></svg></span>
+                        {{ "emotion_control"|t(lang) }}
+                    </div>
+                    <div class="card-body">
+                        <div class="fg">
+                            <label class="fl">{{ "preset_emotions"|t(lang) }}</label>
+                            <div class="emotion-presets">
+                                <span class="emotion-pill" onclick="selectIt20ePresetEmotion('angry', this)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 15s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="11" y1="8" y2="10"/><line x1="15" x2="13" y1="8" y2="10"/></svg>
+                                    {{ "emotion_angry"|t(lang) }}
+                                </span>
+                                <span class="emotion-pill" onclick="selectIt20ePresetEmotion('cry', this)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 16s1.5-2 4-2 4 2 4 2"/><line x1="9" x2="9.01" y1="10" y2="10"/><line x1="15" x2="15.01" y1="10" y2="10"/><path d="M17 10v4"/></svg>
+                                    {{ "emotion_cry"|t(lang) }}
+                                </span>
+                                <span class="emotion-pill" onclick="selectIt20ePresetEmotion('fear', this)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="16" r="2"/><line x1="8" x2="10" y1="8" y2="10"/><line x1="16" x2="14" y1="8" y2="10"/></svg>
+                                    {{ "emotion_fear"|t(lang) }}
+                                </span>
+                                <span class="emotion-pill" onclick="selectIt20ePresetEmotion('depressed', this)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 16s1.5-2 4-2 4 2 4 2"/><path d="M9 9l-1 1"/><path d="M15 9l1 1"/></svg>
+                                    {{ "emotion_depressed"|t(lang) }}
+                                </span>
+                                <span class="emotion-pill" onclick="selectIt20ePresetEmotion('happy', this)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+                                    {{ "emotion_happy"|t(lang) }}
+                                </span>
+                                <span class="emotion-pill" onclick="selectIt20ePresetEmotion('surprise', this)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="16" r="2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+                                    {{ "emotion_surprise"|t(lang) }}
+                                </span>
+                                <span class="emotion-pill" onclick="selectIt20ePresetEmotion('calm', this)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" x2="16" y1="15" y2="15"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+                                    {{ "emotion_calm"|t(lang) }}
+                                </span>
+                            </div>
+                            {# 端点不接收 preset 名，只接收 8 维向量；预设由 JS 展开写入这些 hidden input #}
+                            <input type="hidden" name="emo_happy" id="it20e-emo-happy" value="0">
+                            <input type="hidden" name="emo_angry" id="it20e-emo-angry" value="0">
+                            <input type="hidden" name="emo_sad" id="it20e-emo-sad" value="0">
+                            <input type="hidden" name="emo_afraid" id="it20e-emo-afraid" value="0">
+                            <input type="hidden" name="emo_disgusted" id="it20e-emo-disgusted" value="0">
+                            <input type="hidden" name="emo_melancholic" id="it20e-emo-melancholic" value="0">
+                            <input type="hidden" name="emo_surprised" id="it20e-emo-surprised" value="0">
+                            <input type="hidden" name="emo_calm" id="it20e-emo-calm" value="0">
+                        </div>
+
+                        <div class="fg">
+                            <label class="fl">{{ "emotion_weight"|t(lang) }}</label>
+                            <div class="emotion-slider-row">
+                                <label>{{ "weight"|t(lang) }}</label>
+                                <input type="range" name="emo_alpha" id="it20e-emo-alpha" min="0" max="1.4" step="0.1" value="1.0" oninput="document.getElementById('it20e-weight-display').textContent = parseFloat(this.value).toFixed(1); updateIt20eEmotionViz()">
+                                <span class="val" id="it20e-weight-display">1.0</span>
+                            </div>
+                            <div class="fh">0={{ "emotion_weight_0"|t(lang) }} &middot; 0.6={{ "emotion_weight_06"|t(lang) }} &middot; 1.0={{ "emotion_weight_10"|t(lang) }} &middot; 1.4={{ "emotion_weight_14"|t(lang) }}</div>
+                        </div>
+
+                        <!-- Emotion visualization -->
+                        <div id="it20e-emotion-viz" style="display:flex;gap:4px;height:8px;border-radius:4px;overflow:hidden;background:var(--bg3);padding:2px;margin-top:8px">
+                            <div class="emotion-bar" data-emotion="happy" style="flex:1;background:var(--green);border-radius:4px;transition:flex 0.3s;min-width:4px" title="Happy"></div>
+                            <div class="emotion-bar" data-emotion="angry" style="flex:1;background:var(--red);border-radius:4px;transition:flex 0.3s;min-width:4px" title="Angry"></div>
+                            <div class="emotion-bar" data-emotion="sad" style="flex:1;background:var(--blue);border-radius:4px;transition:flex 0.3s;min-width:4px" title="Sad"></div>
+                            <div class="emotion-bar" data-emotion="fear" style="flex:1;background:var(--p500);border-radius:4px;transition:flex 0.3s;min-width:4px" title="Fear"></div>
+                            <div class="emotion-bar" data-emotion="surprise" style="flex:1;background:var(--orange);border-radius:4px;transition:flex 0.3s;min-width:4px" title="Surprise"></div>
+                            <div class="emotion-bar" data-emotion="disgust" style="flex:1;background:var(--green);border-radius:4px;transition:flex 0.3s;min-width:4px;opacity:0.6" title="Disgust"></div>
+                            <div class="emotion-bar" data-emotion="neutral" style="flex:1;background:var(--t3);border-radius:4px;transition:flex 0.3s;min-width:4px" title="Neutral"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: 合成文本 -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+                        {{ "synthesis_text"|t(lang) }}
+                    </div>
+                    <div class="card-body">
+                        <div class="fg">
+                            <label class="fl" for="it20e-text">{{ "synthesis_text"|t(lang) }}</label>
+                            <textarea name="text" id="it20e-text"
+                                      class="ft tts-textarea tts-auto-resize"
+                                      rows="3"
+                                      placeholder="{{ 'enter_text_placeholder'|t(lang) }}"
+                                      data-char-counter="it20e-char-counter"
+                                      data-max-chars="{{ engine_max_total_chars }}"
+                                      data-segment-max-chars="{{ gen_split_max_chars }}"
+                                      data-auto-resize="true"></textarea>
+                            <div class="cc" id="it20e-char-counter">0/{{ engine_max_total_chars }} | {{ "per_segment"|t(lang) }} {{ gen_split_max_chars }}{{ "chars"|t(lang) }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button type="submit" class="btn-generate">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6-4.8-6.4 4.8L8 14l-6-4.8h7.6z"/></svg>
+                    {{ "indextts20_generate"|t(lang) }}
+                </button>
+                <div class="gen-hint">Ctrl+Enter</div>
+            </form>
+        </div>
+
+        <!-- ============ Result Column (35%) ============ -->
+        <div class="col-result">
+            <!-- Card: 生成结果 -->
+            <div class="card">
+                <div class="card-hdr">
+                    <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></span>
+                    {{ "result_audio"|t(lang) }}
+                </div>
+                <div class="card-body">
+                    <div id="it20e-result" aria-live="polite">
+                        <div id="it20e-spinner" class="htmx-indicator" style="display:none">
+                            <div class="hint-text">{{ "generating"|t(lang) }}</div>
+                            <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+                        </div>
+                        <div class="status-message" id="it20e-status" aria-live="polite"></div>
+                        <div class="empty-state" id="it20e-empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:0.35;margin-bottom:12px"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg>
+                            <p class="empty-state-title">{{ "no_result_yet"|t(lang) }}</p>
+                            <p class="empty-state-desc">{{ "upload_ref_then_generate"|t(lang) }}</p>
+                        </div>
+                    </div>
+                    <audio class="tts-audio-hidden" id="it20e-audio"></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    TTSForm.init({
+        formId: 'it20e-form',
+        resultId: 'it20e-result',
+        statusId: 'it20e-status',
+        textareaId: 'it20e-text',
+        counterId: 'it20e-char-counter',
+        maxChars: {{ engine_max_total_chars }},
+        segmentMaxChars: {{ gen_split_max_chars }},
+        counterClass: 'tts-char-counter'
+    });
+
+    window.updateIt20eFileName = function(input, nameElId) {
+        var nameEl = document.getElementById(nameElId);
+        if (nameEl) {
+            nameEl.textContent = (input.files && input.files.length > 0) ? input.files[0].name : '{{ "supported_formats"|t(lang) }}';
+        }
+    };
+
+    // 预设名 -> 8 维情感向量（端点只认向量）。键名与 hidden input 一一对应。
+    var PRESET_VECTORS = {
+        angry:     { emo_angry: 1.0 },
+        cry:       { emo_sad: 0.8, emo_melancholic: 0.4 },
+        fear:      { emo_afraid: 1.0 },
+        depressed: { emo_melancholic: 0.8, emo_sad: 0.4 },
+        happy:     { emo_happy: 1.0 },
+        surprise:  { emo_surprised: 1.0 },
+        calm:      { emo_calm: 1.0 }
+    };
+    var VECTOR_KEYS = ['emo_happy', 'emo_angry', 'emo_sad', 'emo_afraid',
+                       'emo_disgusted', 'emo_melancholic', 'emo_surprised', 'emo_calm'];
+
+    window.selectIt20ePresetEmotion = function(emotion, btn) {
+        document.querySelectorAll('.emotion-presets .emotion-pill').forEach(function(p){ p.classList.remove('active'); });
+        btn.classList.add('active');
+        var vector = PRESET_VECTORS[emotion] || {};
+        VECTOR_KEYS.forEach(function(key) {
+            var el = document.getElementById('it20e-' + key.replace('emo_', ''));
+            if (el) el.value = String(vector[key] !== undefined ? vector[key] : 0);
+        });
+        updateIt20eEmotionViz();
+    };
+
+    window.updateIt20eEmotionViz = function() {
+        var emotionViz = document.getElementById('it20e-emotion-viz');
+        var slider = document.getElementById('it20e-emo-alpha');
+        if (!emotionViz || !slider) return;
+        var val = parseFloat(slider.value) || 0;
+        emotionViz.querySelectorAll('.emotion-bar').forEach(function(bar, i, all) {
+            var center = Math.floor(all.length / 2);
+            var factor = Math.max(0.15, 1 - Math.abs(i - center) * 0.2);
+            bar.style.flex = (val * factor + 0.1).toFixed(2);
+        });
+    };
+
+    updateIt20eEmotionViz();
+
+    document.getElementById('it20e-text').addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('it20e-form').requestSubmit();
+        }
+    });
+})();
+</script>

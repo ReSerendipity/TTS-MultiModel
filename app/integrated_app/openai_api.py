@@ -583,10 +583,12 @@ class BatchGenerationManager:
                 if speed != 1.0:
                     infer_kwargs["target_duration"] = None
 
-                result_path = await loop.run_in_executor(
+                seg_result = await loop.run_in_executor(
                     None,
                     lambda: engine.infer(**infer_kwargs),
                 )
+                # engine.infer 对外契约是 (sample_rate, wav, output_path)，批量任务只需路径
+                result_path = seg_result[2] if isinstance(seg_result, tuple) and len(seg_result) >= 3 else seg_result
             else:
                 # VoxCPM2 引擎
                 voice = params.get("voice", "")
@@ -979,7 +981,13 @@ class OpenAICompatibleRouter:
             infer_kwargs["use_emo_text"] = True
 
         try:
-            return engine.infer(**infer_kwargs)
+            result = engine.infer(**infer_kwargs)
+            # 本函数签名承诺返回 str | None，而 engine.infer 契约是
+            # (sample_rate, wav, output_path)，必须取第三项再返回
+            if isinstance(result, tuple) and len(result) >= 3:
+                path = result[2]
+                return path if isinstance(path, str) and path else None
+            return result if isinstance(result, str) else None
         except Exception as e:
             logger.error(f"[OpenAI API] IndexTTS2 生成失败: {e}")
             return None

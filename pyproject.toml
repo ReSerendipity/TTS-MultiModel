@@ -61,6 +61,10 @@ dependencies = [
     # === AI 生态 ===
     "funasr>=1.0.0",
     "modelscope>=1.9.0",
+    # modelscope 的 pipeline/config 解析在运行期需要 addict；引擎切换路径
+    # （_load_voxcpm2_engine 强制 include_denoiser=True）会经 speech_zipenhancer
+    # 走到它。缺失时降噪会降级关闭、音质下降，故列为生产依赖而非可选。
+    "addict>=2.4.0",
     # === Web 框架 ===
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
@@ -87,6 +91,10 @@ dependencies = [
 dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "pytest-cov>=4.0", "ruff>=0.4", "mypy>=1.0"]
 vllm = ["vllm>=0.6.0"]
 watermark = []  # No extra deps needed, uses numpy/scipy only
+# IndexTTS 情感「文本描述」模式（emo_text）需要 QwenEmotion 子模型，
+# 其用 device_map 加载、依赖 accelerate。未安装时引擎仍可正常加载与合成
+# （克隆 / 8 维向量情感模式均可用），仅该模式会被明确拒绝。
+emotion = ["accelerate>=0.30.0"]
 
 [project.scripts]
 tts-multimodel = "integrated_app.cli:main"

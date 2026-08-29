@@ -7,7 +7,7 @@
     <div class="two-col">
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
-            <form id="it2e-form" hx-post="/api/generate/indextts2/emotion" hx-target="#it2e-result" hx-swap="innerHTML" hx-indicator="#it2e-spinner" hx-encoding="multipart/form-data" x-data="{ it2eMode: 'same' }">
+            <form id="it2e-form" hx-post="/api/generate/indextts2" hx-target="#it2e-result" hx-swap="innerHTML" hx-indicator="#it2e-spinner" hx-encoding="multipart/form-data" x-data="{ it2eMode: 'same' }">
                         {% include 'partials/output_format.html' %}
                 <input type="hidden" name="mode" value="emotion">
                 <input type="hidden" name="emotion_mode" id="it2e-emotion-mode" value="same">
@@ -51,21 +51,21 @@
                             <div class="fg">
                                 <label class="fl">{{ "timbre_ref_audio"|t(lang) }}</label>
                                 <div class="upload-zone" style="padding:14px" onclick="this.querySelector('input').click()">
-                                    <input type="file" id="it2e-diff-timbre-input" name="timbre_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-diff-timbre-name')">
+                                    <input type="file" id="it2e-diff-timbre-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-diff-timbre-name')">
                                     <p style="font-size:12px"><span id="it2e-diff-timbre-name">{{ "upload_timbre_ref"|t(lang) }}</span></p>
                                 </div>
                             </div>
                             <div class="fg">
                                 <label class="fl">{{ "emotion_ref_audio"|t(lang) }}</label>
                                 <div class="upload-zone" style="padding:14px" onclick="this.querySelector('input').click()">
-                                    <input type="file" id="it2e-diff-emotion-input" name="emotion_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-diff-emotion-name')">
+                                    <input type="file" id="it2e-diff-emotion-input" name="emo_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-diff-emotion-name')">
                                     <p style="font-size:12px"><span id="it2e-diff-emotion-name">{{ "upload_emotion_ref_desc"|t(lang) }}</span></p>
                                 </div>
                             </div>
                             <div class="fg">
                                 <label class="fl">{{ "emotion_weight"|t(lang) }}</label>
                                 <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-                                    <input type="range" name="emotion_weight" min="0" max="1.4" step="0.1" value="0.6" style="flex:1;accent-color:var(--p500)" oninput="document.getElementById('it2e-diff-weight-display').textContent = parseFloat(this.value).toFixed(1)">
+                                    <input type="range" name="emo_alpha_audio" min="0" max="1.4" step="0.1" value="0.6" style="flex:1;accent-color:var(--p500)" oninput="document.getElementById('it2e-diff-weight-display').textContent = parseFloat(this.value).toFixed(1)">
                                     <span style="font-size:12px;color:var(--p700);font-weight:600;min-width:28px;text-align:right" id="it2e-diff-weight-display">0.6</span>
                                 </div>
                                 <div class="fh">0={{ "emotion_weight_0"|t(lang) }} &middot; 0.6={{ "emotion_weight_06"|t(lang) }} &middot; 1.0={{ "emotion_weight_10"|t(lang) }} &middot; 1.4={{ "emotion_weight_14"|t(lang) }}</div>
@@ -77,13 +77,13 @@
                             <div class="fg">
                                 <label class="fl">{{ "timbre_ref_audio"|t(lang) }}</label>
                                 <div class="upload-zone" style="padding:14px" onclick="this.querySelector('input').click()">
-                                    <input type="file" id="it2e-text-timbre-input" name="timbre_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-text-timbre-name')">
+                                    <input type="file" id="it2e-text-timbre-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-text-timbre-name')">
                                     <p style="font-size:12px"><span id="it2e-text-timbre-name">{{ "upload_timbre_ref"|t(lang) }}</span></p>
                                 </div>
                             </div>
                             <div class="fg">
                                 <label class="fl" for="it2e-emotion-text">{{ "emotion_text_input"|t(lang) }}</label>
-                                <input type="text" id="it2e-emotion-text" name="emotion_text" class="fi" placeholder="{{ 'emotion_text_input_placeholder'|t(lang) }}">
+                                <input type="text" id="it2e-emotion-text" name="emo_text" class="fi" placeholder="{{ 'emotion_text_input_placeholder'|t(lang) }}">
                                 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
                                     <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it2e-emotion-text').value='{{ "quick_desc_value_1"|t(lang) }}'">{{ "quick_desc_1"|t(lang) }}</button>
                                     <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it2e-emotion-text').value='{{ "quick_desc_value_2"|t(lang) }}'">{{ "quick_desc_2"|t(lang) }}</button>
@@ -141,7 +141,7 @@
                             <label class="fl">{{ "emotion_weight"|t(lang) }}</label>
                             <div class="emotion-slider-row">
                                 <label>{{ "weight"|t(lang) }}</label>
-                                <input type="range" name="emotion_weight" id="it2e-emotion-weight" min="0" max="1.4" step="0.1" value="1.0" oninput="document.getElementById('it2e-weight-display').textContent = parseFloat(this.value).toFixed(1); updateEmotionViz()">
+                                <input type="range" name="emo_alpha" id="it2e-emotion-weight" min="0" max="1.4" step="0.1" value="1.0" oninput="document.getElementById('it2e-weight-display').textContent = parseFloat(this.value).toFixed(1); updateEmotionViz()">
                                 <span class="val" id="it2e-weight-display">1.0</span>
                             </div>
                             <div class="fh">0={{ "emotion_weight_0"|t(lang) }} &middot; 0.6={{ "emotion_weight_06"|t(lang) }} &middot; 1.0={{ "emotion_weight_10"|t(lang) }} &middot; 1.4={{ "emotion_weight_14"|t(lang) }}</div>
