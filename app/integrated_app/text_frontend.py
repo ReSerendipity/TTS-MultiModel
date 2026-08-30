@@ -470,7 +470,11 @@ class TextNormalizer:
         self._re_zh_percentage = re.compile(r"(-?)(\d+(\.\d+)?)%")
         self._re_zh_number = re.compile(r"(-?)((\d+)(\.\d+)?)|(\.(\d+))")
         self._re_zh_positive_quantifier = re.compile(
-            r"(\d+)([多余几])?"
+            # 整数部分必须连带可选小数（\.\d+）一起吞掉。
+            # 此前只写 (\d+)，遇到「3.5元」时量词分支只匹配到「5元」，
+            # 展开成「五元」后把「3.」留在原地 -> 输出「3.五元」，
+            # 小数点被读成静音、数值语义被破坏。
+            r"(\d+(?:\.\d+)?)([多余几])?"
             r"(处|台|架|枚|趟|幅|平|方|堵|间|床|株|批|项|例|列|篇|栋|注|亩|封|艘|把|目|套|段|人|所|朵|匹|张|座|回|场|尾|条|个|首|阙|阵|网|炮|顶|丘|棵|只|支|袭|辆|挑|担|颗|壳|曲|墙|群|腔|砣|客|贯|扎|捆|刀|令|打|手|罗|坡|山|岭|江|溪|钟|队|单|双|对|出|口|头|脚|板|跳|枝|件|贴|针|线|管|名|位|身|堂|课|本|页|家|户|层|丝|毫|厘|分|钱|两|斤|担|铢|石|钧|锱|忽|克|米|升|斗|年|月|日|季|刻|时|周|天|秒|分|小时|旬|纪|岁|世|更|夜|春|夏|秋|冬|代|伏|辈|丸|泡|粒|颗|幢|堆|条|根|支|道|面|片|张|颗|块|元|吨|角|毛|度|倍|次|步|枪|弹|篇|章|节|册|卷|期|届|轮|组|班|排|连|营|团|军|师|旅|舰|机|部|省|市|县|区|镇|村|路|街|楼|号|线|站|区|期|段|级|类|种|款|项|名|位|套|间|栋|层|户)"
         )
         self._re_zh_frac = re.compile(r"(-?)(\d+)/(\d+)")
@@ -867,11 +871,11 @@ class TextNormalizer:
         return result
 
     def _replace_zh_quantifier(self, match: re.Match) -> str:
-        """数字+量词展开：3个人 -> 三个人"""
+        """数字+量词展开：3个人 -> 三个人，3.5元 -> 三点五元"""
         number = match.group(1)
         modifier = match.group(2) or ""
         quantifier = match.group(3)
-        num_str = self._verbalize_cardinal(number)
+        num_str = self._verbalize_maybe_decimal(number)
         # "二" 在量词前通常读 "两"
         if num_str == "二":
             num_str = "两"
@@ -914,6 +918,28 @@ class TextNormalizer:
             中文逐位读法（"2024" -> "二零二四"）
         """
         return "".join(_ZH_DIGITS.get(ch, ch) for ch in num_str)
+
+    @staticmethod
+    def _verbalize_maybe_decimal(num_str: str) -> str:
+        """按需展开小数：``"3"`` -> ``"三"``，``"3.5"`` -> ``"三点五"``。
+
+        WHY 不直接复用 ``_verbalize_cardinal``：它对无法 ``int()`` 的输入退化成
+        ``_verbalize_digit``，而后者对 ``"."`` 没有映射（``_ZH_DIGITS.get(ch, ch)``
+        原样返回点号），于是 ``"3.5"`` 会得到 ``"三.五"`` 而不是 ``"三点五"``。
+
+        Args:
+            num_str: 十进制数字字符串，可含一个小数点。
+
+        Returns:
+            str: 中文读法。
+        """
+        if "." not in num_str:
+            return TextNormalizer._verbalize_cardinal(num_str)
+        int_part: str
+        frac_part: str
+        int_part, _, frac_part = num_str.partition(".")
+        head: str = TextNormalizer._verbalize_cardinal(int_part) if int_part else ""
+        return f"{head}点{TextNormalizer._verbalize_digit(frac_part)}"
 
     @staticmethod
     def _verbalize_cardinal(num_str: str) -> str:

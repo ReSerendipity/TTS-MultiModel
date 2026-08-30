@@ -3,6 +3,8 @@
 覆盖目标模块: app/integrated_app/text_frontend.py
 """
 
+import pytest
+
 from integrated_app.text_frontend import (
     LanguageDetector,
     TextFrontend,
@@ -56,6 +58,41 @@ class TestTextNormalizer:
     def test_normalize_zh_numbers(self):
         out = self.normalizer.normalize("数量是100个，比例50%", "zh")
         assert "一百" in out or "100" in out
+
+    def test_normalize_zh_decimal_with_quantifier(self):
+        """回归：「3.5元」曾被量词分支切成「3.」+「五元」。
+
+        旧实现下 ``_re_zh_positive_quantifier`` 的整数组是 ``(\\d+)``，对
+        「3.5元」只匹配到「5元」，展开成「五元」后把「3.」留在原地，
+        输出「3.五元」——小数点既没读成「点」也没被展开，数值语义被破坏。
+        这类缺陷不会抛异常，只会让 TTS 念错数字，只能靠断言「结果里
+        不留任何阿拉伯数字和小数点」才能稳定捕获。
+        """
+        out: str = self.normalizer._normalize_zh("这件商品3.5元")
+        assert out == "这件商品三点五元"
+        assert "." not in out
+        assert not any(ch.isdigit() for ch in out)
+
+    @pytest.mark.parametrize(
+        ("src", "expected"),
+        [
+            ("剩下3.5个", "剩下三点五个"),
+            ("长度为10.5米", "长度为十点五米"),
+            ("一共3个人", "一共三个人"),
+            ("圆周率3.14159", "圆周率三点一四一五九"),
+            ("进度80%", "进度百分之八十"),
+            ("2024年3月15日", "二零二四年三月十五日"),
+        ],
+    )
+    def test_normalize_zh_number_matrix(self, src: str, expected: str) -> None:
+        """小数+量词、纯量词、多位小数、百分比、日期必须各自走对分支且互不回归。"""
+        assert self.normalizer._normalize_zh(src) == expected
+
+    def test_version_number_still_digit_by_digit(self):
+        """版本号不得被新的小数量词规则吞成「一点二」再漏出后续段。"""
+        out: str = self.normalizer._normalize_zh("版本1.2.3.4发布了")
+        assert "." not in out
+        assert out == "版本一点二点三点四发布了"
 
     def test_normalize_en(self):
         out = self.normalizer.normalize("Hello world, it's a test.", "en")

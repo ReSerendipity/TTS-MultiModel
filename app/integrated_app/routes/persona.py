@@ -155,7 +155,7 @@ async def persona_save(
         # 但底层 preprocess_and_save_temp 实际只接受 文件路径 / UploadFile /
         # np.ndarray，传 bytes 会得到「不支持的音频输入类型: <class 'bytes'>」——
         # 文档与实现不符，以实现为准。
-        staged_path, err = await save_uploaded_audio(request, ref_audio)
+        staged_path, err = await save_uploaded_audio(request, ref_audio, title_key="op_failed")
         if err is not None:
             # 校验失败时 _error_html 返回 HTTP 400。但 HTMX 默认只把 2xx 响应换进
             # 目标容器，而 app_init.js 的 htmx:responseError 监听器只做 console.warn

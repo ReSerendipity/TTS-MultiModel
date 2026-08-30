@@ -710,6 +710,7 @@ def _error_html(
     error_message: str,
     error_type: str = "general",
     engine_id: str = "",
+    title_key: str = "gen_failed",
 ) -> HTMLResponse:
     """渲染 HTML 错误片段；优先使用 Jinja2 模板，模板不可用时降级返回安全字符串。
 
@@ -718,22 +719,27 @@ def _error_html(
         error_message: 错误提示文本。
         error_type: 错误分类（general / oom / validation / engine_not_ready）。
         engine_id: 引擎 ID（engine_not_ready 时渲染加载按钮）。
+        title_key: 标题的 i18n 键。默认 ``gen_failed``（「生成失败」一类文案）；
+            非生成类端点（如音色保存）必须传更贴切的键，否则校验错误会被冠以
+            「生成时遇到了一点小状况」这种与操作无关的标题。
 
     Returns:
         HTMLResponse（400），携带 HX-Trigger toast 头。
     """
+    from ...i18n import get_lang, t
+
+    lang: str = get_lang(request)
     try:
         templates = request.app.state.templates
-        from ...i18n import get_lang
-
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
             context={
-                "lang": get_lang(request),
+                "lang": lang,
                 "error_message": error_message,
                 "error_type": error_type,
                 "engine_id": engine_id,
+                "title_key": title_key,
             },
             status_code=400,
             headers={
@@ -751,16 +757,25 @@ def _error_html(
         # 降级不再静默：模板路径失败会让 toast 消失，必须留下可查证据
         logger.exception("[_error_html] 错误模板渲染失败，降级为内联片段（toast 提示将丢失）")
         # 极端降级：仍保证 HTML 转义，防 XSS
+        # 标题与按钮文案走 i18n，不再写死中文「生成失败」/「加载模型」——
+        # 写死会让非生成类端点（音色保存等）的校验错误被冠以「生成失败」，
+        # 且英文/日文界面上冒出中文。t() 自身有兜底，正常不会抛。
+        try:
+            title: str = html.escape(t(title_key, lang))
+            load_label: str = html.escape(t("load_now", lang))
+        except Exception:  # noqa: BLE001 - 降级路径的最后防线
+            title = html.escape(title_key)
+            load_label = "Load"
         load_btn: str = ""
         if error_type == "engine_not_ready" and engine_id:
             load_btn = (
                 f'<button type="button" onclick="window.switchModel(\'{html.escape(engine_id)}\')" '
                 f'style="margin-top:8px;padding:4px 12px;border-radius:4px;background:var(--p500);'
-                f'color:#fff;border:none;cursor:pointer;font-size:12px">加载模型</button>'
+                f'color:#fff;border:none;cursor:pointer;font-size:12px">{load_label}</button>'
             )
         return HTMLResponse(
             f'<div class="tts-error-block" data-error-type="{html.escape(error_type)}">'
-            f'<div class="error-title">生成失败</div>'
+            f'<div class="error-title">{title}</div>'
             f'<div class="error-message">{html.escape(error_message)}</div>'
             f"{load_btn}"
             f"</div>",
@@ -778,6 +793,7 @@ async def save_uploaded_audio(
     upload_file: UploadFile | None,
     upload_dir: str | None = None,
     max_size_mb: int = 25,
+    title_key: str = "gen_failed",
 ) -> tuple[str | None, HTMLResponse | None]:
     """保存上传的音频文件，返回 (path, None) 或 (None, error_html)。
 
@@ -786,6 +802,8 @@ async def save_uploaded_audio(
         upload_file: FastAPI UploadFile（可为 None）。
         upload_dir: 保存目录；默认 {SAVE_DIR}/uploads。
         max_size_mb: 最大文件大小 MB（仅用于错误消息显示；硬限制仍以 MAX_UPLOAD_SIZE_BYTES 为准）。
+        title_key: 校验失败片段的标题 i18n 键。非生成类调用方（如音色保存）
+            应传 ``op_failed``，否则上传校验错误会显示成「生成失败」。
 
     Returns:
         成功: (绝对保存路径, None)
@@ -801,12 +819,16 @@ async def save_uploaded_audio(
     safe_name: str = os.path.basename(upload_file.filename)
     _, ext = os.path.splitext(safe_name)
     if ext.lower() not in ALLOWED_AUDIO_EXTENSIONS:
-        return None, _error_html(request, f"不支持的音频格式: {ext}")
+        return None, _error_html(request, f"不支持的音频格式: {ext}", title_key=title_key)
 
     upload_path: str = os.path.join(upload_dir, f"{int(time.time())}_{safe_name}")
     content: bytes = await upload_file.read()
     if len(content) > MAX_UPLOAD_SIZE_BYTES:
-        return None, _error_html(request, f"上传文件大小超过 {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB 限制")
+        return None, _error_html(
+            request,
+            f"上传文件大小超过 {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB 限制",
+            title_key=title_key,
+        )
 
     # P0 安全修复：写盘前执行魔术字节校验（fail-closed 白名单模式）
     from ..audio import _validate_audio_content
@@ -816,6 +838,7 @@ async def save_uploaded_audio(
         return None, _error_html(
             request,
             f"音频文件内容与声明格式不匹配（{ext_lower}），可能为伪装文件",
+            title_key=title_key,
         )
 
     async with aiofiles.open(upload_path, "wb") as f:
@@ -925,8 +948,15 @@ def _run_with_oom_retry(
     endpoint_name: str,
     degraded_fn: Any | None = None,
     max_retries: int = 2,
-) -> tuple[Any, str]:
+) -> tuple[Any, str, str | None]:
     """执行生成函数；OOM 时自动清理显存并使用降级参数重试。
+
+    WHY 返回类型必须写成三元组：本函数**所有** return 点都是
+    ``return result, msg, degraded_note``，但签名长期写成 ``tuple[Any, str]``，
+    靠两处 ``# type: ignore[return-value]`` 压制。结果是 mypy 反过来把
+    **正确的**三元解包调用点报成 ``Need more than 2 values to unpack``
+    （clone.py 与 utils._execute_generation 各一处），把一个类型标注的谎
+    变成了 34 条 misc 噪音里最像真 bug 的信号。标注必须与实现一致。
 
     Args:
         run_fn: 原始生成可调用，返回 (result, msg)。
@@ -947,7 +977,7 @@ def _run_with_oom_retry(
 
     try:
         result, msg = run_fn()
-        return result, msg, degraded_note  # type: ignore[return-value]
+        return result, msg, degraded_note
     except Exception as e:  # noqa: BLE001
         if not is_oom_error(e):
             logger.error(f"{endpoint_name} failed (non-OOM): {e}")
@@ -965,7 +995,7 @@ def _run_with_oom_retry(
                     result, msg = degraded_fn()
                 else:
                     result, msg = run_fn()
-                return result, msg, degraded_note  # type: ignore[return-value]
+                return result, msg, degraded_note
             except Exception as retry_e:  # noqa: BLE001
                 if not is_oom_error(retry_e):
                     raise

@@ -1,5 +1,5 @@
 <div class="tts-error-block" data-error-type="{{ error_type|default('general') }}">
-  <div class="error-title">{{ "gen_failed"|t(lang|default('zh-CN')) }}</div>
+  <div class="error-title">{{ (title_key or 'gen_failed')|t(lang|default('zh-CN')) }}</div>
   <div class="error-message">{{ error_message }}</div>
   <div class="tts-error-actions">
     {% if error_type == 'engine_not_ready' and engine_id %}
