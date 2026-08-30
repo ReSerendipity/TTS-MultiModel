@@ -33,7 +33,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from ..config import _DIALECTS, _LANGS, get_config
+from ..config import _DIALECTS, build_lang_options, get_config
 from ..history_db import get_history_db
 from ..i18n import get_lang, register_i18n_filters, t
 from ..model_registry import registry
@@ -121,7 +121,7 @@ def _common_context(request: Request, tab_name: str = "") -> dict[str, Any]:
     return {
         "request": request,
         "current_engine": registry.current_engine,
-        "langs": _LANGS,
+        "langs": build_lang_options(lang),
         "dialects": _DIALECTS,
         "lang": lang,
         "gen_split_max_chars": split_chars,

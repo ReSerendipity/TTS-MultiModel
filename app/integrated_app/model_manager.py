@@ -47,7 +47,11 @@ from .model_manager_core.switch import (  # noqa: F401
     _wait_vram_freed,
     switch_engine,
 )
-from .model_manager_core.unload import _check_voxcpm2_lock, unload_model  # noqa: F401
+from .model_manager_core.unload import (  # noqa: F401
+    _check_voxcpm2_lock,
+    unload_all_models,
+    unload_model,
+)
 from .progress import ProgressManager
 from .tracker import GenerationTracker
 

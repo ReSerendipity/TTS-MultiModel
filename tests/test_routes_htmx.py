@@ -151,6 +151,13 @@ def test_persona_save_rejects_unsupported_extension(client):
     )
     assert resp.status_code == 200
     assert "不支持的音频格式" in resp.text
+    # 回归：_error_html 的 HX-Trigger 曾因 json.dumps(ensure_ascii=False) 生成含中文的
+    # 头值、而 HTTP 头只允许 latin-1，抛 UnicodeEncodeError 被静默降级吞掉，
+    # 导致全站 toast 从未生效。这里断言头确实存在且已是 ASCII 安全。
+    trigger = resp.headers.get("HX-Trigger")
+    assert trigger is not None
+    trigger.encode("latin-1")
+    assert "tts-toast" in trigger
 
 
 def test_persona_save_rejects_disguised_file(client):

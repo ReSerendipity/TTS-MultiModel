@@ -325,13 +325,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.debug(f"[lifespan] 引擎规格加载失败（使用默认值）: {e}")
 
     try:
-        from .persona_manager import get_persona_manager
+        # 此前这里写的是 `from .persona_manager import get_persona_manager`
+        # + `pm.warmup_cache()`，但 persona_manager 是纯函数模块、根本没有这两个
+        # 名字（旧设计遗留）。真实实现在 model_manager.warmup_persona_cache。
+        # 后果：启动预热从未执行过，而失败只记 debug 日志、完全不可见。
+        from .model_manager import warmup_persona_cache
 
-        pm = get_persona_manager()
-        await run_in_threadpool(pm.warmup_cache)
-        logger.info("[lifespan] Persona 缓存预热完成")
+        status = await run_in_threadpool(warmup_persona_cache)
+        logger.info(f"[lifespan] Persona 缓存预热完成: {status}")
     except Exception as e:
-        logger.debug(f"[lifespan] Persona 缓存预热跳过: {e}")
+        # 用 warning 而非 debug：预热失败意味着启动路径有问题（例如又出现幻影引用），
+        # 埋在 debug 级别会让它在生产环境永久不可见。
+        logger.warning(f"[lifespan] Persona 缓存预热跳过: {e}")
 
     try:
         from .monitor import get_health_monitor

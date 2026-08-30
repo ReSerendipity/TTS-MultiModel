@@ -737,13 +737,19 @@ def _error_html(
             },
             status_code=400,
             headers={
-                "HX-Trigger": json.dumps(
-                    {"tts-toast": {"type": "error", "message": html.escape(error_message)}},
-                    ensure_ascii=False,
-                )
+                # ensure_ascii 必须保持 True（json.dumps 的默认值，故不显式传参）。
+                # HTTP 头只允许 latin-1 字节，而 error_message 绝大多数是中文，
+                # 此前这里显式写了 ensure_ascii=False，Starlette 编码响应头时抛
+                # UnicodeEncodeError: 'latin-1' codec can't encode characters，
+                # 被下面的 except 静默吞掉并走降级分支 —— 导致全站 HTMX toast
+                # 提示从未真正生效（只有纯 ASCII 消息才碰巧可用）。
+                # 改成 \uXXXX 转义后 JS 侧 JSON.parse 会自动还原，显示文本不受影响。
+                "HX-Trigger": json.dumps({"tts-toast": {"type": "error", "message": html.escape(error_message)}}),
             },
         )
     except Exception:  # noqa: BLE001
+        # 降级不再静默：模板路径失败会让 toast 消失，必须留下可查证据
+        logger.exception("[_error_html] 错误模板渲染失败，降级为内联片段（toast 提示将丢失）")
         # 极端降级：仍保证 HTML 转义，防 XSS
         load_btn: str = ""
         if error_type == "engine_not_ready" and engine_id:

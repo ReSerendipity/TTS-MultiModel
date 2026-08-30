@@ -73,6 +73,12 @@ dependencies = [
     # === 音频处理 ===
     "soundfile>=0.12.1",
     "pydub>=0.25.1",
+    # librosa 被 audio_processing / resampling 与 VoxCPM2 的 prompt / script 模式
+    # 在函数内懒导入（此前只作为 funasr 的传递依赖存在）。显式声明，避免上游
+    # 依赖树变动后这些运行路径静默 ImportError。
+    "librosa>=0.10.0",
+    # safetensors 用于 engines/voxcpm2/lora.py 加载 LoRA 权重。
+    "safetensors>=0.4.0",
     # === 数值计算 ===
     "numpy>=1.24.0",
     "scipy>=1.11.0",
@@ -95,6 +101,10 @@ watermark = []  # No extra deps needed, uses numpy/scipy only
 # 其用 device_map 加载、依赖 accelerate。未安装时引擎仍可正常加载与合成
 # （克隆 / 8 维向量情感模式均可用），仅该模式会被明确拒绝。
 emotion = ["accelerate>=0.30.0"]
+# LoRA 训练管线（app/integrated_app/training/）。API 服务启动路径绝不 import 它
+# （AGENTS.md 硬约束 #3），因此不进主依赖；但缺 datasets 时 training.data 一
+# 导入就 ModuleNotFoundError，故在此显式登记。
+training = ["datasets>=2.14.0", "einops>=0.7.0", "argbind>=0.3.7"]
 
 [project.scripts]
 tts-multimodel = "integrated_app.cli:main"

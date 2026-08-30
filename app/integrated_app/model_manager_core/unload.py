@@ -128,5 +128,35 @@ def unload_model() -> None:
 
 
 # ====================================================================
-# VoxCPM2 加载
+# 全量卸载（进程退出清理）
 # ====================================================================
+
+
+def unload_all_models() -> None:
+    """卸载所有仍处于加载态的引擎，供 lifespan shutdown 调用。
+
+    WHY 需要它：``app_server.lifespan`` 的 shutdown 分支一直写着
+    ``from .model_manager import unload_all_models``，但该函数在 model_manager
+    拆分为 model_manager_core 时**丢失了**，全仓只剩调用点没有定义。后果是每次
+    优雅关闭都抛 ``ImportError`` 并被外层 ``except`` 吞成一条 error 日志 ——
+    模型从未真正卸载、显存不释放，Ctrl+C 重启时新进程会看到残留占用。
+
+    与 :func:`unload_model` 的关系：``unload_model()`` 单次调用即会同时清空
+    ``registry.voxcpm_model`` / ``voxcpm_asr`` 与 ``indextts2_engine`` 两个槽位，
+    因此正常情况下循环一轮即退出。这里仍用有界轮次兜底，是为了防止某个引擎的
+    unload 抛异常导致槽位残留而让关闭流程静默带着显存退出。
+
+    关闭路径不得抛异常中断 uvicorn 退出，因此所有失败都只记日志。
+    """
+    max_passes: int = 3
+    for attempt in range(max_passes):
+        if registry.voxcpm_model is None and registry.indextts2_engine is None:
+            if attempt:
+                logger.info("[全量卸载] 所有引擎槽位已清空")
+            return
+        try:
+            unload_model()
+        except Exception as unload_err:  # noqa: BLE001 - 关闭路径不得中断进程退出
+            logger.warning("[全量卸载] 第 %s 轮卸载失败: %s", attempt + 1, unload_err)
+            return
+    logger.warning("[全量卸载] 已达最大卸载轮次 %s，仍有引擎槽位未释放", max_passes)

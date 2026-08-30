@@ -91,10 +91,14 @@ class PersonaWarmupService:
             self._state["in_progress"] = True
 
         def _do_warmup() -> None:
-            from .middleware.request_id import set_request_id
-
-            set_request_id(f"bg-{threading.current_thread().name}")
             try:
+                # 必须是 ..middleware —— 本文件位于 model_manager_core/ 子包内，
+                # 写成 .middleware 会解析成不存在的 model_manager_core.middleware。
+                # 且必须放在 try 内：此前它在 try 之外，ModuleNotFoundError 直接冲出
+                # 线程 bootstrap，既不写 _state["error"] 也不置 done，预热静默永久失败。
+                from ..middleware.request_id import set_request_id
+
+                set_request_id(f"bg-{threading.current_thread().name}")
                 from ..config import PERSONA_DIR
                 from ..persona_manager import load_persona_embedding
 
@@ -727,10 +731,12 @@ class PreloadService:
             self._state["error"] = None
 
         def _do_preload() -> None:
-            from .middleware.request_id import set_request_id
-
-            set_request_id(f"bg-{threading.current_thread().name}")
             try:
+                # 同 _do_warmup：相对导入深度必须是 ..，且在 try 内，避免
+                # ImportError 冲出线程 bootstrap 让预加载静默失败且不留错误状态。
+                from ..middleware.request_id import set_request_id
+
+                set_request_id(f"bg-{threading.current_thread().name}")
                 if engine == EngineName.VOXCPM2.value:
                     logger.info("[预加载] 开始预读 VoxCPM2 模型文件到系统内存...")
                     if os.path.exists(get_voxcpm2_model_path()):

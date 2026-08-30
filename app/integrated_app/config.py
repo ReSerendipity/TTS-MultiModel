@@ -637,6 +637,41 @@ _LANGS = [
     "自动检测",
 ]
 
+#: ``_LANGS`` 显示名 → i18n 英文原串（§8.3 约定：key 用英文原串）。
+#: WHY 需要这张表：``_LANGS`` 的元素是**中文显示名**且同时充当表单提交的
+#: value（wire format），不能改；但界面标签必须能随 UI 语言切换，
+#: 否则英/日/韩用户看到的是"中文/英语/日语"。因此由 tabs.py 在渲染时
+#: 查此表翻译成 label，value 保持原样以兼容既有提交与 to_lang_code 归一。
+_LANG_I18N_KEYS: dict[str, str] = {
+    "中文": "Chinese",
+    "英语": "English",
+    "日语": "Japanese",
+    "韩语": "Korean",
+    "德语": "German",
+    "法语": "French",
+    "俄语": "Russian",
+    "葡萄牙语": "Portuguese",
+    "西班牙语": "Spanish",
+    "意大利语": "Italian",
+    "自动检测": "Auto detect",
+}
+
+
+def build_lang_options(ui_lang: str) -> list[tuple[str, str]]:
+    """构造语言下拉的 ``(提交值, 显示标签)`` 列表。
+
+    Args:
+        ui_lang: 当前界面语言（决定标签语种，与音频语言选择无关）。
+
+    Returns:
+        与 ``_LANGS`` 等长的二元组列表，形态与 ``_DIALECTS`` 一致，
+        模板用 ``l[0]`` 作 value、``l[1]`` 作 label。
+    """
+    from .i18n import t
+
+    return [(value, t(_LANG_I18N_KEYS[value], ui_lang)) for value in _LANGS]
+
+
 # --- Dialect list (Chinese dialects supported by VoxCPM2) ---
 _DIALECTS = [
     ("四川话", "四川话"),

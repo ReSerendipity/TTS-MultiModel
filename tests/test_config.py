@@ -150,3 +150,34 @@ class TestToLangCode:
 
         unmapped = [name for name in _LANGS if to_lang_code(name) == "auto" and name != "自动检测"]
         assert unmapped == [], f"_LANGS 中这些显示名没有语言码映射：{unmapped}"
+
+
+class TestBuildLangOptions:
+    """语言下拉的 (提交值, 显示标签) 构造 —— 标签须随 UI 语言切换、值须保持稳定。"""
+
+    def test_values_are_unchanged_wire_format(self):
+        """值必须仍是 _LANGS 原样，否则既有表单提交与 to_lang_code 归一会被打断。"""
+        from integrated_app.config import _LANGS, build_lang_options
+
+        options = build_lang_options("en")
+        assert [v for v, _ in options] == _LANGS
+
+    def test_labels_follow_ui_language(self):
+        from integrated_app.config import build_lang_options
+
+        en = dict(build_lang_options("en"))
+        ja = dict(build_lang_options("ja"))
+        zh = dict(build_lang_options("zh"))
+        assert en["中文"] == "Chinese"
+        assert ja["中文"] == "中国語"
+        assert zh["中文"] == "中文"
+
+    def test_no_label_falls_back_to_chinese_display_name(self):
+        """非中文界面下不得残留未翻译的中文显示名（漏加 locale key 的最直接信号）。"""
+        from integrated_app.config import build_lang_options
+
+        for ui_lang in ("en", "ja", "ko", "zh-tw"):
+            for value, label in build_lang_options(ui_lang):
+                assert label != value or value in {"中文"}, (
+                    f"界面语言 {ui_lang} 下 {value!r} 的标签未被翻译（得到 {label!r}）"
+                )

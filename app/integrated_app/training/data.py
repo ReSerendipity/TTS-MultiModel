@@ -41,8 +41,13 @@ try:
 except ImportError:  # pragma: no cover - torchaudio/librosa 兜底
     sf = None  # type: ignore[assignment]
 
-from ..model.voxcpm import VoxCPMConfig
-from ..modules.audiovae import AudioVAE
+# WHY 带 vendor.voxcpm 前缀：这两行原本写成 `..model.voxcpm` / `..modules.audiovae`，
+# 是按「本文件位于 vendor/voxcpm/ 包内」的假设写的；实际本文件在
+# integrated_app/training/ 下，`..` 解析成 integrated_app，那里没有 model/ 与
+# modules/ —— 于是 LoRA 训练数据管线一 import 就 ModuleNotFoundError。
+# 同目录的 accelerator.py 用的是 `..gpu_backend`（正确深度），可作对照。
+from ..vendor.voxcpm.model.voxcpm import VoxCPMConfig
+from ..vendor.voxcpm.modules.audiovae import AudioVAE
 from .packers import AudioFeatureProcessingPacker
 
 DEFAULT_TEXT_COLUMN = "text"

@@ -64,10 +64,10 @@
                             <label class="fl" for="it20c-lang-select">{{ "language"|t(lang) }}</label>
                             <select name="lang" id="it20c-lang-select" class="fs">
                                 {# IndexTTS 2.0 仅支持中英双语：不渲染方言组，也不渲染其余语种 #}
-                                <option value="Auto" selected>Auto</option>
+                                <option value="Auto" selected>{{ "Auto"|t(lang) }}</option>
                                 {% for l in langs %}
-                                {% if l in ['中文', '英语'] %}
-                                <option value="{{ l }}">{{ l }}</option>
+                                {% if l[0] in ['中文', '英语'] %}
+                                <option value="{{ l[0] }}">{{ l[1] }}</option>
                                 {% endif %}
                                 {% endfor %}
                             </select>

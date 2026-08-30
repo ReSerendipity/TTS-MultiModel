@@ -61,7 +61,7 @@
                             <label class="fl" for="it2c-lang-select">{{ "language"|t(lang) }}</label>
                             <select name="lang" id="it2c-lang-select" class="fs">
                                 {% for l in langs %}
-                                <option value="{{ l }}" {% if l == 'Auto' %}selected{% endif %}>{{ l }}</option>
+                                <option value="{{ l[0] }}" {% if l[0] == '中文' %}selected{% endif %}>{{ l[1] }}</option>
                                 {% endfor %}
                                 {% if dialects %}
                                 <optgroup label="{{ 'chinese_dialects'|t(lang) }}">

@@ -159,11 +159,16 @@ async def persona_save(
         if err is not None:
             # 校验失败时 _error_html 返回 HTTP 400。但 HTMX 默认只把 2xx 响应换进
             # 目标容器，而 app_init.js 的 htmx:responseError 监听器只做 console.warn
-            # + 复位生成按钮状态、不渲染响应体；_error_html 本应通过 HX-Trigger 头
-            # 触发 toast，但模板分支抛错时会连同该头一起降级丢失。三者叠加的结果是
-            # 用户点了「保存音色」却看不到任何提示。因此这里保留原提示片段、
-            # 以 200 返回给同一个 status 容器渲染，与本端点其它校验分支形态一致。
-            return HTMLResponse(content=err.body, status_code=200)
+            # + 复位生成按钮状态、不渲染响应体。结果是用户点了「保存音色」却看不到
+            # 任何内联提示。因此这里保留原提示片段、以 200 返回给同一个 status 容器
+            # 渲染，与本端点其它校验分支形态一致；同时转发 HX-Trigger，让全仓统一的
+            # toast 通道也照常收到（_error_html 的该头此前因 ensure_ascii=False 抛
+            # UnicodeEncodeError 而一直静默丢失，见 routes/generate/utils.py）。
+            headers: dict[str, str] = {}
+            trigger = err.headers.get("HX-Trigger")
+            if trigger:
+                headers["HX-Trigger"] = trigger
+            return HTMLResponse(content=err.body, status_code=200, headers=headers)
         audio_input = staged_path
     else:
         audio_input = _resolve_generated_audio(result_audio.strip())
