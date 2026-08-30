@@ -1602,7 +1602,7 @@ class G2PProcessor:
                 self._manager = get_g2p_manager()
             except ImportError as e:
                 logger.warning("G2PManager 导入失败，回退为透传模式: %s", e)
-                self._manager = False  # type: ignore[assignment]
+                self._manager = False
         return self._manager if self._manager is not False else None
 
     def process(self, text: str, lang: str) -> str:

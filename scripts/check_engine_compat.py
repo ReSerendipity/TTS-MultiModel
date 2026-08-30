@@ -31,6 +31,25 @@ import sys
 from pathlib import Path
 from typing import Any
 
+
+def _reexec_with_venv_python() -> None:
+    """torch 导入失败且存在 .venv 时，用 .venv 解释器重跑自身。
+
+    pre-commit 的 language:system 钩子可能解析到未装引擎依赖的系统
+    python；此时切到项目 venv 重跑，保证检测结果反映真实运行环境。
+    """
+    try:
+        import torch  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        return
+    venv_python = Path(__file__).resolve().parents[1] / ".venv" / "Scripts" / "python.exe"
+    if venv_python.exists() and Path(sys.executable).resolve() != venv_python.resolve():
+        os.execv(str(venv_python), [str(venv_python), __file__, *sys.argv[1:]])
+
+
+_reexec_with_venv_python()
 # ---------------------------------------------------------------------------
 # 路径设置：确保 bin/ 在 sys.path 中，以便 import integrated_app
 # ---------------------------------------------------------------------------

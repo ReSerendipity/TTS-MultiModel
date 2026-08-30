@@ -23,7 +23,9 @@
     GET    /lora/state
     GET    /lora/list
     GET    /download_hints
-    POST   /api/generate/cancel   （注：路径保留历史遗留双重 /api，兼容老前端）
+    （取消生成：POST /api/generate/cancel 由 generate/voxcpm2/streaming.py
+      在共享 /api/generate 前缀下提供；本模块曾以双重 /api 前缀重复注册，
+      实际路径 /api/model/api/generate/cancel 永远无法命中，已于 2026-08 移除）
 
 权限 / CSRF：
     所有 POST/PUT/DELETE 路由均为 state-changing 请求，由
@@ -227,7 +229,7 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
             load_fn = load_voxcpm2
         else:
             # 通用新式引擎（generic_tts_engine 等）：通过 switch_engine 走声明式加载。
-            def load_fn() -> Any:  # type: ignore[no-redef]
+            def load_fn() -> Any:
                 return switch_engine(engine)
 
         from .sse import event_bus
@@ -653,23 +655,3 @@ async def model_download_hints() -> Response:
     except Exception as exc:  # noqa: BLE001
         logger.error("获取下载提示失败: %s", exc, exc_info=True)
         return JSONResponse({"status": "error", "message": "获取下载提示失败"}, status_code=500)
-
-
-# NOTE: 路径保留历史遗留 ``/api/generate/cancel``（双重 /api 前缀），
-# 不做改动以兼容已发布前端脚本的 JS 调用。
-@router.post("/api/generate/cancel", summary="取消生成任务", description="取消当前正在进行的生成任务")
-async def cancel_generation() -> Response:
-    """取消当前进行中的生成任务。
-
-    CSRF：
-        由 ``CSRFMiddleware`` 校验 ``X-CSRF-Token``。
-
-    Returns:
-        JSON：``{"status": "cancelling" | "no_active_generation", "message": ...}``。
-    """
-    from ..model_manager import _progress_mgr
-
-    if _progress_mgr:
-        _progress_mgr.cancel()
-        return JSONResponse({"status": "cancelling", "message": "生成任务已取消"})
-    return JSONResponse({"status": "no_active_generation", "message": "没有正在进行的生成任务"})

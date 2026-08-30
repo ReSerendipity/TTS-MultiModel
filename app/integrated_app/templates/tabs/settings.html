@@ -7,6 +7,7 @@
             <a href="#settings-advanced">{{ "advanced_gen_params"|t(lang) }}</a>
             <a href="#settings-defaults">{{ "generation_defaults"|t(lang) }}</a>
             <a href="#settings-general">{{ "general_settings"|t(lang) }}</a>
+            <a href="#settings-maint">{{ "sys_maint_title"|t(lang, default="系统维护") }}</a>
         </div>
 
         <div class="settings-grid">
@@ -82,6 +83,48 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 系统维护：stats / queue / GPU / 日志 / 预加载 / 重置 / 关机
+                     （后端已有 /api/system/* 与 /api/model/preload*，此前 UI 无入口） -->
+                <div class="card" id="settings-maint">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+                        {{ "sys_maint_title"|t(lang, default="系统维护") }}
+                    </div>
+                    <div class="card-body" id="section-maint-body">
+                        <div style="font-size:12px;color:var(--t2);margin-bottom:10px">{{ "sys_maint_desc"|t(lang, default="查看运行统计、队列与 GPU 状态，管理操作日志，执行模型预加载与维护操作。") }}</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+                            <button class="btn btn-o btn-sm" onclick="sysMaintStats()">{{ "sys_stats_btn"|t(lang, default="系统统计") }}</button>
+                            <button class="btn btn-o btn-sm" onclick="sysMaintQueue()">{{ "sys_queue_btn"|t(lang, default="队列状态") }}</button>
+                            <button class="btn btn-o btn-sm" onclick="sysMaintGpuStatus()">{{ "gpu_status_btn"|t(lang, default="GPU 状态") }}</button>
+                            <button class="btn btn-o btn-sm" onclick="sysMaintGpuHistory()">{{ "gpu_history_btn"|t(lang, default="显存历史") }}</button>
+                            <button class="btn btn-o btn-sm" onclick="sysMaintGpuCleanup()">{{ "gpu_cleanup_btn"|t(lang, default="清理显存") }}</button>
+                            <button class="btn btn-o btn-sm" onclick="sysMaintGpuLeak()">{{ "gpu_leak_btn"|t(lang, default="泄漏检测") }}</button>
+                            <button class="btn btn-o btn-sm" onclick="sysMaintLogs()">{{ "sys_logs_btn"|t(lang, default="查看日志") }}</button>
+                            <button class="btn btn-o btn-sm" onclick="sysMaintLogsClean()">{{ "sys_logs_clean_btn"|t(lang, default="清理旧日志") }}</button>
+                        </div>
+                        <div class="srow">
+                            <div class="sinfo">
+                                <div class="sname">{{ "model_preload_title"|t(lang, default="模型预加载") }}</div>
+                                <div class="sdesc">{{ "model_preload_desc"|t(lang, default="后台预热模型权重到 GPU，减少首次生成等待。") }}</div>
+                            </div>
+                            <div class="sctrl" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                                <select id="maint-preload-engine" class="sinput" style="width:auto">
+                                    <option value="voxcpm2">VoxCPM2</option>
+                                    <option value="indextts2">IndexTTS 2.5</option>
+                                    <option value="indextts20">IndexTTS 2.0</option>
+                                </select>
+                                <button class="btn btn-o btn-sm" onclick="sysMaintPreload()">{{ "preload_start_btn"|t(lang, default="开始预加载") }}</button>
+                                <button class="btn btn-o btn-sm" onclick="sysMaintPreloadStatus()">{{ "preload_status_btn"|t(lang, default="预加载状态") }}</button>
+                            </div>
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                            <button class="btn btn-o btn-sm" style="color:var(--orange)" onclick="sysMaintReset()">{{ "settings_reset_btn"|t(lang, default="恢复默认设置") }}</button>
+                            <button class="btn btn-o btn-sm" style="color:var(--red)" onclick="sysMaintShutdown()">{{ "shutdown_btn"|t(lang, default="关闭服务") }}</button>
+                        </div>
+                        <div id="maint-output" style="display:none;margin-top:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;max-height:260px;overflow:auto;font-family:var(--mono);font-size:11px;color:var(--t2);white-space:pre-wrap;word-break:break-all" aria-live="polite"></div>
                     </div>
                 </div>
 
@@ -891,5 +934,121 @@
     window.addEventListener('beforeunload', function() {
         if (refreshInterval) clearInterval(refreshInterval);
     });
+})();
+</script>
+<script>
+// 系统维护面板逻辑：对接 /api/system/stats|queue|gpu/*|logs*|settings/reset|shutdown 与 /api/model/preload*
+(function(){
+    function t(key, fb) { return (window.I18N && window.I18N[key]) || fb || key; }
+    function outEl() { return document.getElementById('maint-output'); }
+    function show(text) {
+        var o = outEl();
+        if (o) { o.style.display = 'block'; o.textContent = text; }
+    }
+    function kv(obj) {
+        var rows = [];
+        for (var k in obj) {
+            if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+            var v = obj[k];
+            if (v === null || v === undefined) v = '-';
+            if (typeof v === 'object') v = JSON.stringify(v);
+            rows.push(k + ': ' + v);
+        }
+        return rows.join('\n');
+    }
+    function fail(err) {
+        if (window.Toast) Toast.show(t('operation_failed', '操作失败') + ': ' + (err && err.message ? err.message : err), 'error');
+    }
+    function get(url, cb) {
+        fetch(url)
+            .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(cb)
+            .catch(fail);
+    }
+    function post(url, body, cb) {
+        var headers = { 'X-CSRF-Token': (window.getCsrfToken ? window.getCsrfToken() : '') };
+        var opts = { method: 'POST', headers: headers };
+        if (body !== undefined) {
+            headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(body);
+        }
+        fetch(url, opts)
+            .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(cb)
+            .catch(fail);
+    }
+
+    window.sysMaintStats = function() { get('/api/system/stats', function(d) { show(kv(d)); }); };
+    window.sysMaintQueue = function() { get('/api/system/queue', function(d) { show(kv(d)); }); };
+    window.sysMaintGpuStatus = function() { get('/api/system/gpu/status', function(d) { show(kv(d)); }); };
+    window.sysMaintGpuHistory = function() {
+        get('/api/system/gpu/history', function(d) {
+            var s = (d.samples || []).slice(-20).map(function(p) { return Math.round(p.used_mb) + 'MB'; }).join(' -> ');
+            show(((d.sample_count || 0) + ' samples (last 20):\n') + (s || '-'));
+        });
+    };
+    window.sysMaintGpuCleanup = function() {
+        post('/api/system/gpu/cleanup', {}, function(d) {
+            show(kv(d));
+            if (window.Toast) Toast.show((d.released_mb || 0) + 'MB · ' + (d.message || 'ok'), 'success');
+        });
+    };
+    window.sysMaintGpuLeak = function() {
+        get('/api/system/health/gpu-leak', function(d) {
+            show(kv(d));
+            if (d.warning) {
+                if (window.Toast) Toast.show(d.warning, 'warning');
+            } else if (d.status === 'ok') {
+                if (window.Toast) Toast.show(t('gpu_leak_none', '未检测到显存泄漏'), 'success');
+            }
+        });
+    };
+    window.sysMaintLogs = function() {
+        get('/api/system/logs?page_size=30', function(d) {
+            var items = d.items || [];
+            var lines = items.map(function(it) {
+                var ts = it.ts ? new Date(it.ts).toLocaleString() : '';
+                return '[' + (it.level || 'INFO') + '] ' + ts + ' ' + (it.action || '') + ' - ' + (it.message || '');
+            });
+            show((d.total_count != null ? ('total: ' + d.total_count + '\n') : '') + (lines.join('\n') || '-'));
+        });
+    };
+    window.sysMaintLogsClean = function() {
+        if (!confirm(t('logs_clean_confirm', '确定清理 30 天前的旧日志吗？'))) return;
+        var headers = { 'X-CSRF-Token': (window.getCsrfToken ? window.getCsrfToken() : '') };
+        fetch('/api/system/logs/clean', { method: 'DELETE', headers: headers })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                show(kv(d));
+                if (window.Toast) Toast.show(t('logs_clean_done', '日志清理完成'), 'success');
+            })
+            .catch(fail);
+    };
+    window.sysMaintPreload = function() {
+        var sel = document.getElementById('maint-preload-engine');
+        var engine = (sel && sel.value) || 'voxcpm2';
+        post('/api/model/preload', { engine: engine, size: engine }, function(d) {
+            show(kv(d));
+            if (window.Toast) Toast.show(d.message || (d.status === 'ok' ? 'ok' : t('operation_failed', '操作失败')), d.status === 'ok' ? 'success' : 'error');
+        });
+    };
+    window.sysMaintPreloadStatus = function() {
+        get('/api/model/preload/status', function(d) { show(kv(d.preload || d)); });
+    };
+    window.sysMaintReset = function() {
+        if (!confirm(t('settings_reset_confirm', '确定要恢复默认设置吗？config.yaml 将重置为出厂默认。'))) return;
+        post('/api/system/settings/reset', undefined, function(d) {
+            show(kv(d));
+            if (window.Toast) Toast.show(t('settings_reset_done', '已恢复默认设置') + (d.source ? (' (' + d.source + ')') : ''), 'success');
+        });
+    };
+    window.sysMaintShutdown = function() {
+        if (!confirm(t('shutdown_confirm', '确定要关闭服务吗？进行中的生成将中断。'))) return;
+        if (!confirm(t('shutdown_confirm2', '再次确认：真的要关闭服务吗？'))) return;
+        post('/api/system/shutdown', undefined, function(d) {
+            show(kv(d));
+            if (window.Toast) Toast.show(d.message || t('shutdown_started', '服务器正在关闭…'), 'warning');
+        });
+    };
 })();
 </script>

@@ -162,6 +162,9 @@ async def download_guide(request: Request, path: str = "") -> Any:
                     "request": request,
                     "lang": lang,
                     "intercepted_path": path,
+                    # i18n 文案 download_guide_welcome 含 {{ version }} 占位符，
+                    # 此前从未传入，页面一直显示字面 "v{{ version }}"
+                    "version": get_config().version,
                 },
                 headers=headers,
             )

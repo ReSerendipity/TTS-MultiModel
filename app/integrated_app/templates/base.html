@@ -46,6 +46,8 @@
     <link rel="stylesheet" href="/static/css/prototype_v4.css?v={{ app_version }}">
     <!-- UI Enhancements - modern tags, empty states, theme transitions, skeleton, responsive -->
     <link rel="stylesheet" href="/static/css/ui_enhancements.css?v={{ app_version }}">
+    <!-- Refine layer - 全局设计系统精修（克制强调色 + 暗色纵深质感），必须最后加载以覆盖以上全部 -->
+    <link rel="stylesheet" href="/static/css/refine.css?v={{ app_version }}">
     <!-- Alpine.js for Phase 2 client-side state management -->
     <script defer src="/static/js/alpine.min.js?v={{ app_version }}"></script>
     <script defer src="/static/js/alpine_init.js?v={{ app_version }}"></script>
@@ -543,6 +545,45 @@
         // Global i18n translations for JavaScript (Jinja2 template - must remain inline)
         window.I18N = {{ i18n_json|tojson }};
         window.CURRENT_LANG = '{{ lang }}';
+    </script>
+
+    <!-- 取消生成：此前 base.html 的取消按钮调用 cancelGeneration() 但全项目无定义，
+         点击抛 ReferenceError，后端 /api/generate/cancel 从未被调用。此块补上实现。 -->
+    <script>
+        window.cancelGeneration = function() {
+            var btn = document.getElementById('progress-cancel-btn');
+            if (btn && btn.disabled) return;
+            var origHtml = btn ? btn.innerHTML : '';
+            function t(key, fallback) {
+                return (window.I18N && window.I18N[key]) || fallback;
+            }
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.innerHTML = '<span>' + t('cancelling', '取消中…') + '</span>';
+            }
+            var headers = { 'X-CSRF-Token': (window.getCsrfToken ? window.getCsrfToken() : '') };
+            fetch('/api/generate/cancel', { method: 'POST', headers: headers })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && (data.status === 'cancelling' || data.status === 'ok')) {
+                        if (window.Toast) Toast.show(data.message || t('cancel_requested', '已请求取消当前生成'), 'success');
+                        if (typeof window._setGeneratingState === 'function') window._setGeneratingState(false);
+                    } else {
+                        if (window.Toast) Toast.show((data && data.message) || t('no_active_generation', '没有正在进行的生成任务'), 'info');
+                    }
+                })
+                .catch(function() {
+                    if (window.Toast) Toast.show(t('cancel_failed', '取消请求失败，请重试'), 'error');
+                })
+                .then(function() {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.opacity = '';
+                        btn.innerHTML = origHtml;
+                    }
+                });
+        };
     </script>
 
     <!-- Font popup (must be before scripts that reference #fontPop) -->

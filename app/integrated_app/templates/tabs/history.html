@@ -109,16 +109,17 @@
                             {% for row in history_records %}
                             <tr class="history-record-row" role="row">
                                 <td style="text-align:center"><input type="checkbox" class="history-row-checkbox" data-history-id="{{ row[0] }}" aria-label="{{ 'select_record'|t(lang, default='选择记录') }} {{ row[0] }}"></td>
-                                <td data-label="{{ 'filename'|t(lang) }}" style="color:var(--t1);font-family:var(--mono);font-size:11px">{{ row[0] }}</td>
+                                <td data-label="{{ 'filename'|t(lang) }}" style="color:var(--t1);font-family:var(--mono);font-size:11px">{{ row[1] }}</td>
                                 <td data-label="{{ 'engine'|t(lang, default='引擎') }}"><span class="engine-badge" data-engine="voxcpm2">VoxCPM2</span></td>
                                 <td data-label="{{ 'gen_time'|t(lang) }}" style="color:var(--t2)">{{ row[1] }}</td>
                                 <td data-label="{{ 'duration'|t(lang) }}"><span class="history-duration">{{ row[2] }}</span></td>
                                 <td data-label="{{ 'size'|t(lang) }}" style="color:var(--t2);font-family:var(--mono)">{{ row[3] }}</td>
                                 <td data-label="{{ 'actions'|t(lang, default='操作') }}" style="text-align:right">
                                     <div style="display:inline-flex;gap:4px">
-                                        <button class="btn-icon" title="{{ 'play'|t(lang) }}" onclick="playHistoryAudio('{{ row[0] }}', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
-                                        <button class="btn-icon" title="{{ 'download'|t(lang, default='下载') }}" onclick="downloadHistoryAudio('{{ row[0] }}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
-                                        <button class="btn-icon" title="{{ 'delete'|t(lang) }}" style="color:var(--red)" onclick="deleteHistoryAudio('{{ row[0] }}', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                                        <button class="btn-icon" title="{{ 'play'|t(lang) }}" onclick="playHistoryAudio('{{ row[1] }}', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+                                        <button class="btn-icon" title="{{ 'download'|t(lang, default='下载') }}" onclick="downloadHistoryAudio('{{ row[1] }}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                                        <button class="btn-icon" title="{{ 'hide'|t(lang, default='隐藏') }}" onclick="hideHistoryRecord({{ row[0] }})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
+                                        <button class="btn-icon" title="{{ 'delete'|t(lang) }}" style="color:var(--red)" onclick="deleteHistoryAudio({{ row[0] }}, '{{ row[1] }}', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                                     </div>
                                 </td>
                             </tr>
@@ -164,6 +165,8 @@
         <div class="history-batch-bar" id="history-batch-actions" style="display:none;gap:8px;align-items:center;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:12px">
             <span class="batch-hint" style="font-size:12px;color:var(--t3);white-space:nowrap">{{ "select_rows_hint"|t(lang) }}</span>
             <span class="batch-spacer" style="flex:1"></span>
+            <button class="btn btn-o btn-sm" onclick="syncHistoryRecords()">{{ "history_sync"|t(lang, default="同步记录") }}</button>
+            <button class="btn btn-o btn-sm" style="color:var(--red)" onclick="clearAllHistoryRecords()">{{ "history_clear_all"|t(lang, default="清空全部") }}</button>
             <button class="btn btn-o btn-sm" onclick="batchExportHistory()">{{ "batch_export"|t(lang) }}</button>
             <button class="btn btn-sm" style="background:var(--red);color:#fff;border:none" onclick="batchDeleteHistory()">{{ "batch_delete"|t(lang) }}</button>
             <button class="btn btn-o btn-sm" onclick="batchShowHistory()" id="show-selected-btn" style="display:none">{{ "show_selected"|t(lang) }}</button>
@@ -415,9 +418,9 @@
             tdName.style.fontFamily = 'var(--mono)';
             tdName.style.fontSize = '11px';
             if (currentSearchKeyword) {
-                tdName.innerHTML = highlightText(escapeHtml(r[0]), currentSearchKeyword);
+                tdName.innerHTML = highlightText(escapeHtml(r[1]), currentSearchKeyword);
             } else {
-                tdName.textContent = r[0];
+                tdName.textContent = r[1];
             }
 
             var tdEngine = document.createElement('td');
@@ -432,28 +435,30 @@
             var tdTime = document.createElement('td');
             tdTime.setAttribute('data-label', '{{ "gen_time"|t(lang) }}');
             tdTime.style.color = 'var(--t2)';
-            tdTime.textContent = r[1];
+            tdTime.textContent = r[2];
 
             var tdDuration = document.createElement('td');
             tdDuration.setAttribute('data-label', '{{ "duration"|t(lang) }}');
             var durationSpan = document.createElement('span');
             durationSpan.className = 'history-duration';
-            durationSpan.textContent = r[2];
+            durationSpan.textContent = r[3];
             tdDuration.appendChild(durationSpan);
 
             var tdSize = document.createElement('td');
             tdSize.setAttribute('data-label', '{{ "size"|t(lang) }}');
             tdSize.style.color = 'var(--t2)';
             tdSize.style.fontFamily = 'var(--mono)';
-            tdSize.textContent = r[3];
+            tdSize.textContent = r[4];
 
             var tdActions = document.createElement('td');
             tdActions.setAttribute('data-label', '{{ "actions"|t(lang, default="操作") }}');
             tdActions.style.textAlign = 'right';
+            var escName = String(r[1]).replace(/'/g, "\\'");
             tdActions.innerHTML = '<div style="display:inline-flex;gap:4px">' +
-                '<button class="btn-icon" title="{{ "play"|t(lang) }}" onclick="playHistoryAudio(\'' + r[0].replace(/'/g, "\\'") + '\', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>' +
-                '<button class="btn-icon" title="{{ "download"|t(lang, default="下载") }}" onclick="downloadHistoryAudio(\'' + r[0].replace(/'/g, "\\'") + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>' +
-                '<button class="btn-icon" title="{{ "delete"|t(lang) }}" style="color:var(--red)" onclick="deleteHistoryAudio(\'' + r[0].replace(/'/g, "\\'") + '\', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>' +
+                '<button class="btn-icon" title="{{ "play"|t(lang) }}" onclick="playHistoryAudio(\'' + escName + '\', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>' +
+                '<button class="btn-icon" title="{{ "download"|t(lang, default="下载") }}" onclick="downloadHistoryAudio(\'' + escName + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>' +
+                '<button class="btn-icon" title="{{ "hide"|t(lang, default="隐藏") }}" onclick="hideHistoryRecord(' + r[0] + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>' +
+                '<button class="btn-icon" title="{{ "delete"|t(lang) }}" style="color:var(--red)" onclick="deleteHistoryAudio(' + r[0] + ', \'' + escName + '\', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>' +
             '</div>';
 
             tr.appendChild(tdCheck);
@@ -796,7 +801,7 @@
             return;
         }
         var ids = [];
-        selected.forEach(function(cb) { ids.push(cb.getAttribute('data-history-id')); });
+        selected.forEach(function(cb) { ids.push(parseInt(cb.getAttribute('data-history-id'), 10)); });
 
         fetch('/api/history/show', {
             method: 'POST',
@@ -855,12 +860,36 @@
             return;
         }
         var ids = [];
-        selected.forEach(function(cb) { ids.push(cb.getAttribute('data-history-id')); });
-        // 触发下载（简化实现）
-        ids.forEach(function(id) { downloadHistoryAudio(id); });
+        selected.forEach(function(cb) { ids.push(parseInt(cb.getAttribute('data-history-id'), 10)); });
+
+        var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+        // 批量导出：POST /api/batch_export_history 返回 ZIP 附件流
+        fetch('/api/batch_export_history', { method: 'POST', headers: headers, body: JSON.stringify({ ids: ids }) })
+            .then(function(r) {
+                if (!r.ok) {
+                    return r.json().then(function(d) { throw new Error(d.message || ('HTTP ' + r.status)); });
+                }
+                return r.blob();
+            })
+            .then(function(blob) {
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'history_export.zip';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+            })
+            .catch(function(err) {
+                if (window.Toast) Toast.show(err.message || '{{ "export_failed"|t(lang, default="导出失败") }}', 'error');
+            });
     };
 
-    // 批量删除：调用 /api/audio/batch_delete_history 真正删除记录及文件
+    // 批量删除：调用 /api/batch_delete_history 真正删除记录及文件
     window.batchDeleteHistory = function() {
         var selected = document.querySelectorAll('.history-row-checkbox:checked');
         if (selected.length === 0) {
@@ -869,13 +898,13 @@
         }
         if (!confirm('{{ "confirm_batch_delete"|t(lang, default="确定要删除选中的记录吗？此操作不可撤销。") }}')) return;
         var ids = [];
-        selected.forEach(function(cb) { ids.push(cb.getAttribute('data-history-id')); });
+        selected.forEach(function(cb) { ids.push(parseInt(cb.getAttribute('data-history-id'), 10)); });
 
         var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
         var headers = { 'Content-Type': 'application/json' };
         if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
 
-        fetch('/api/audio/batch_delete_history', {
+        fetch('/api/batch_delete_history', {
             method: 'POST',
             headers: headers,
             body: JSON.stringify({ ids: ids, delete_files: true })
@@ -899,7 +928,7 @@
     // 播放历史音频
     window.playHistoryAudio = function(filename, btn) {
         if (!filename) return;
-        var audioSrc = '/api/audio/history/' + encodeURIComponent(filename);
+        var audioSrc = '/api/audio/' + encodeURIComponent(filename);
         if (window.globalAudioPlayer) {
             window.globalAudioPlayer.play(audioSrc, filename);
         } else {
@@ -914,26 +943,26 @@
     window.downloadHistoryAudio = function(filename) {
         if (!filename) return;
         var a = document.createElement('a');
-        a.href = '/api/audio/history/' + encodeURIComponent(filename) + '?download=1';
+        a.href = '/api/audio/' + encodeURIComponent(filename);
         a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
     };
 
-    // 删除历史音频：调用 /api/audio/batch_delete_history 真正删除记录及文件
-    window.deleteHistoryAudio = function(filename, btn) {
-        if (!filename) return;
-        if (!confirm('{{ "confirm_delete"|t(lang) }}: ' + filename + '?')) return;
+    // 删除历史音频（按记录 id）：调用 /api/batch_delete_history 真正删除记录及文件
+    window.deleteHistoryAudio = function(recordId, filename, btn) {
+        if (recordId === undefined || recordId === null) return;
+        if (!confirm('{{ "confirm_delete"|t(lang) }}: ' + (filename || ('#' + recordId)) + '?')) return;
 
         var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
         var headers = { 'Content-Type': 'application/json' };
         if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
 
-        fetch('/api/audio/batch_delete_history', {
+        fetch('/api/batch_delete_history', {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ ids: [filename], delete_files: true })
+            body: JSON.stringify({ ids: [parseInt(recordId, 10)], delete_files: true })
         })
             .then(function(r){ return r.json(); })
             .then(function(data){
@@ -947,6 +976,77 @@
             .catch(function(){
                 if (window.Toast) Toast.show('{{ "delete_failed"|t(lang, default="删除失败") }}', 'error');
             });
+    };
+
+    // 隐藏单条记录：POST /api/history/hide（可在“显示隐藏记录”中恢复）
+    window.hideHistoryRecord = function(recordId) {
+        var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+        fetch('/api/history/hide', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ ids: [parseInt(recordId, 10)] })
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+            if (data.status === 'ok') {
+                if (window.Toast) Toast.show(data.count + ' {{ "records_hidden"|t(lang, default="条记录已隐藏") }}', 'success');
+                if (includeHidden) refreshHistoryWithHidden(true);
+                else refreshHistory();
+            } else {
+                if (window.Toast) Toast.show(data.message || '{{ "operation_failed"|t(lang, default="操作失败") }}', 'error');
+            }
+        })
+        .catch(function(){
+            if (window.Toast) Toast.show('{{ "network_error"|t(lang, default="网络错误，请重试") }}', 'error');
+        });
+    };
+
+    // 同步文件系统与数据库：POST /api/history/sync（后台增量同步）
+    window.syncHistoryRecords = function() {
+        var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+        fetch('/api/history/sync', { method: 'POST', headers: headers })
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+            if (data.status === 'ok') {
+                if (window.Toast) Toast.show('{{ "history_sync_triggered"|t(lang, default="增量同步已触发") }}', 'success');
+                setTimeout(function(){ if (includeHidden) refreshHistoryWithHidden(true); else refreshHistory(); }, 1200);
+            } else {
+                if (window.Toast) Toast.show(data.message || '{{ "operation_failed"|t(lang, default="操作失败") }}', 'error');
+            }
+        })
+        .catch(function(){
+            if (window.Toast) Toast.show('{{ "network_error"|t(lang, default="网络错误，请重试") }}', 'error');
+        });
+    };
+
+    // 清空全部记录：POST /api/history/clear_all（默认仅隐藏，可恢复显示）
+    window.clearAllHistoryRecords = function() {
+        if (!confirm('{{ "history_clear_all_confirm"|t(lang, default="确定要清空全部历史记录吗？仅隐藏，可在“显示隐藏记录”中恢复。") }}')) return;
+        var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+        fetch('/api/history/clear_all', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ hide_only: true })
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+            if (data.status === 'ok') {
+                if (window.Toast) Toast.show(data.count + ' {{ "history_cleared"|t(lang, default="条记录已清空") }}', 'success');
+                if (includeHidden) refreshHistoryWithHidden(true);
+                else refreshHistory();
+            } else {
+                if (window.Toast) Toast.show(data.message || '{{ "operation_failed"|t(lang, default="操作失败") }}', 'error');
+            }
+        })
+        .catch(function(){
+            if (window.Toast) Toast.show('{{ "network_error"|t(lang, default="网络错误，请重试") }}', 'error');
+        });
     };
 })();
 </script>

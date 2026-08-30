@@ -113,9 +113,9 @@ def _load_audio_fallback(path: str) -> tuple[np.ndarray, int]:
         errors.append(f"soundfile: {type(exc).__name__}({exc})")
 
     try:
-        import torchaudio  # type: ignore
+        import torchaudio
 
-        waveform, sr = torchaudio.load(path)  # type: ignore[attr-defined]
+        waveform, sr = torchaudio.load(path)
         wav = waveform.squeeze(0).numpy().astype(np.float32)
         return wav, int(sr)
     except ImportError as exc:
@@ -251,7 +251,7 @@ def generate_with_prompt_continuation(
     ok, reason = validate_prompt_pair(prompt_pair)
     if not ok:
         logger.warning(f"[prompt] validate_prompt_pair 未通过: {reason}")
-        raise ValidationError.from_exception_data(  # type: ignore[attr-defined]
+        raise ValidationError.from_exception_data(
             title="Prompt 参考对校验失败",
             line_errors=[{"loc": ("prompt_pair",), "msg": reason, "type": "value_error"}],
         )

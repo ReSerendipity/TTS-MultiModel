@@ -1,0 +1,389 @@
+/* ============================================================
+   refine.css — 全局设计系统精修层（UI UX 优化 v1）
+   ------------------------------------------------------------
+   加载位置：base.html 中所有其它样式表之后（最后加载 = 最高优先级）。
+   目标（与用户确认的方向一致）：
+     1) 克制强调色：把「整条实心紫 + 大发光」的主 CTA / 小紫按钮，
+        改为低饱和、有材质纵深（顶部发丝高光 + 收紧的投影）的处理，
+        保留其作为主操作层的视觉权重，但去掉「塑料紫块」感。
+     2) 加质感：暗色采用冷灰蓝分层底 + 黑色系纵深阴影 + 发丝描边，
+        面板真正「浮」起来；亮色补一层柔和投影。
+     3) 降噪：右栏空态从巨大虚线框收敛为安静的引导区。
+     4) 全局令牌：仅重调 surfaces / borders / shadows / 主按钮渐变，
+        不新增视觉噪音，不动 accent 的点缀语义。
+
+   设计令牌主体仍来自 variables.css（三层色彩架构）。本文件是
+   「精修覆盖层」，删除本文件 + base.html 里对应 <link> 即可完全还原。
+   ============================================================ */
+
+/* ============================================================
+   1. 令牌精修 — Surfaces / Borders / Shadows（全局，非仅 pv-theme）
+   ============================================================ */
+
+/* ---------- 亮色（:root）：更冷一点的纸面 + 柔和分层 ---------- */
+:root {
+    /* 页面底：从纯白偏中性冷灰，制造与卡片的面层差 */
+    --bg-primary: #F4F6F9;
+    --bg-secondary: #FFFFFF;      /* 卡片 */
+    --bg-tertiary: #EEF1F5;       /* 次级面 / hover */
+    --bg-elevated: #E6EAF0;
+    --bg-input: #FFFFFF;
+    --bg-input-focus: #FBFCFE;
+    --bg-card: #FFFFFF;
+    --bg-sidebar: #FBFCFE;        /* 侧栏与内容区分层 */
+
+    /* 发丝级冷描边 */
+    --border-subtle: #E7EAF0;
+    --border-medium: #D6DBE4;
+
+    /* 柔和但有层次的投影（低饱和、扩散受控） */
+    --shadow-sm: 0 1px 2px rgba(16,24,40,.05);
+    --shadow-md: 0 2px 6px rgba(16,24,40,.06), 0 1px 2px rgba(16,24,40,.05);
+    --shadow-card: 0 1px 2px rgba(16,24,40,.05), 0 8px 24px -14px rgba(16,24,40,.18);
+    --shadow-elevated: 0 6px 20px -8px rgba(16,24,40,.16), 0 2px 6px rgba(16,24,40,.06);
+    --shadow-modal: 0 16px 48px -12px rgba(16,24,40,.28), 0 4px 12px rgba(16,24,40,.10);
+
+    /* 主按钮精修渐变（低饱和薰衣草，带材质纵深） */
+    --grad-btn-primary: linear-gradient(180deg, #6A5A9C 0%, #4F4179 100%);
+    --grad-btn-primary-hover: linear-gradient(180deg, #74639F 0%, #574A82 100%);
+    --btn-primary-shadow:
+        inset 0 1px 0 rgba(255,255,255,.22),
+        inset 0 -1px 0 rgba(0,0,0,.10),
+        0 6px 16px -8px rgba(63,48,102,.55),
+        0 1px 2px rgba(63,48,102,.28);
+    --btn-primary-shadow-hover:
+        inset 0 1px 0 rgba(255,255,255,.26),
+        inset 0 -1px 0 rgba(0,0,0,.10),
+        0 10px 22px -10px rgba(63,48,102,.6),
+        0 2px 4px rgba(63,48,102,.3);
+}
+
+/* ---------- 暗色（html.dark）：冷灰蓝分层 + 黑色系纵深 ---------- */
+html.dark {
+    /* 页面底更深、更冷（对齐 MM·H3 暗色令牌方向） */
+    --bg-primary: #0E1013;
+    --bg-secondary: #14171D;      /* 卡片：与页面底拉开一档，形成浮起 */
+    --bg-tertiary: #1A1E25;       /* 次级面 / hover */
+    --bg-elevated: #22262E;       /* 抬升层 / 输入聚焦 */
+    --bg-input: #171B21;
+    --bg-input-focus: #1E232B;
+    --bg-card: #14171D;
+    --bg-sidebar: #101318;         /* 侧栏独立一层 */
+    --bg-placeholder: #1A1E25;
+
+    /* 发丝描边（冷、克制） */
+    --border-subtle: #232A33;
+    --border-medium: #2E3844;
+    --border-default: #2A323D;
+
+    /* 黑色系纵深阴影：大范围低透明 + 近距实影 + 顶部发丝高光 */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.5);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.03) inset;
+    --shadow-card:
+        inset 0 1px 0 rgba(255,255,255,.035),
+        0 1px 2px rgba(0,0,0,.5),
+        0 16px 40px -22px rgba(0,0,0,.9);
+    --shadow-elevated:
+        inset 0 1px 0 rgba(255,255,255,.05),
+        0 8px 24px -10px rgba(0,0,0,.7),
+        0 2px 6px rgba(0,0,0,.5);
+    --shadow-modal: 0 24px 64px -16px rgba(0,0,0,.85), 0 8px 20px rgba(0,0,0,.6);
+
+    /* 主按钮精修渐变（暗色下略提亮以维持层级，但去掉霓虹感） */
+    --grad-btn-primary: linear-gradient(180deg, #5E5188 0%, #453A6B 100%);
+    --grad-btn-primary-hover: linear-gradient(180deg, #6A5C97 0%, #4E4177 100%);
+    --btn-primary-shadow:
+        inset 0 1px 0 rgba(255,255,255,.14),
+        inset 0 -1px 0 rgba(0,0,0,.25),
+        0 8px 20px -10px rgba(0,0,0,.75),
+        0 0 0 1px rgba(0,0,0,.25);
+    --btn-primary-shadow-hover:
+        inset 0 1px 0 rgba(255,255,255,.18),
+        inset 0 -1px 0 rgba(0,0,0,.25),
+        0 12px 26px -12px rgba(0,0,0,.8),
+        0 0 0 1px rgba(0,0,0,.25);
+}
+
+/* 内容区加一层极淡的顶光纵深（仅暗色，制造空间感，不抢内容） */
+html.dark .main-content {
+    background:
+        radial-gradient(1200px 480px at 50% -10%, rgba(120,110,160,.05), transparent 60%),
+        var(--bg-primary);
+}
+
+/* ============================================================
+   2. 卡片质感（.pv-theme 作用域）
+   ------------------------------------------------------------
+   原 .pv-theme .card 把投影写死成亮色值，暗色下几乎无纵深。
+   这里改用精修后的 --shadow-card 令牌，暗色自动获得浮起层次。
+   ============================================================ */
+.pv-theme .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-card);
+    transition: box-shadow .2s var(--ease-standard), border-color .2s var(--ease-standard);
+}
+.pv-theme .card:hover {
+    box-shadow: var(--shadow-elevated);
+    border-color: var(--border-medium);
+}
+html.dark .pv-theme .card:hover {
+    box-shadow: var(--shadow-elevated) !important;
+}
+
+/* 卡片头：极淡的分层底色 + 发丝分隔，强化「面板标题」层级 */
+.pv-theme .card-hdr {
+    background: linear-gradient(180deg, var(--bg-tertiary), transparent);
+    border-bottom: 1px solid var(--border-subtle);
+    letter-spacing: .01em;
+}
+.pv-theme .card-hdr .ico {
+    color: var(--accent-primary);
+    opacity: .9;
+}
+
+/* ============================================================
+   3. 主 CTA 去塑料感（.btn-generate）
+   ------------------------------------------------------------
+   原样式：整条高饱和紫渐变 + 大发光 + hover 白色扫光 → 塑料紫块。
+   精修：低饱和纵向渐变（顶部受光）+ 收紧的深色纵深投影 + 发丝高光，
+        保留主操作权重，去掉霓虹与扫光。
+   ============================================================ */
+.pv-theme .btn-generate {
+    background: var(--grad-btn-primary) !important;
+    box-shadow: var(--btn-primary-shadow) !important;
+    border: 1px solid rgba(0,0,0,.14) !important;
+    text-shadow: 0 1px 1px rgba(0,0,0,.18);
+    letter-spacing: .02em;
+    transition: transform .18s var(--ease-standard),
+                box-shadow .18s var(--ease-standard),
+                filter .18s var(--ease-standard) !important;
+}
+/* 关闭白色扫光伪元素（塑料感主要来源） */
+.pv-theme .btn-generate::before {
+    display: none !important;
+}
+.pv-theme .btn-generate:hover {
+    background: var(--grad-btn-primary-hover) !important;
+    box-shadow: var(--btn-primary-shadow-hover) !important;
+    transform: translateY(-1px);
+    filter: none;
+}
+.pv-theme .btn-generate:active {
+    transform: translateY(0);
+    box-shadow: var(--btn-primary-shadow) !important;
+    filter: brightness(.97);
+}
+.pv-theme .btn-generate:disabled {
+    box-shadow: none !important;
+    filter: saturate(.6) brightness(.9);
+}
+
+/* 小紫按钮 .btn-p 同步降饱和 + 材质化 */
+.pv-theme .btn-p {
+    background: var(--grad-btn-primary);
+    box-shadow: var(--btn-primary-shadow);
+    border-color: rgba(0,0,0,.12);
+}
+.pv-theme .btn-p:hover {
+    background: var(--grad-btn-primary-hover);
+    box-shadow: var(--btn-primary-shadow-hover);
+    transform: translateY(-1px);
+}
+
+/* 选中标签：用精修渐变，去掉大发光 */
+.pv-theme .tag.active {
+    background: var(--grad-btn-primary) !important;
+    box-shadow: var(--shadow-sm);
+}
+
+/* ============================================================
+   4. 空态降噪（右栏巨大虚线框 → 安静引导区）
+   ============================================================ */
+.pv-theme .empty-state {
+    min-height: 200px !important;
+    padding: 32px 20px !important;
+    background: transparent !important;
+    border: 1px dashed var(--border-medium) !important;
+    border-radius: var(--radius-lg) !important;
+    margin: 4px 0 !important;
+    opacity: .92;
+}
+.pv-theme .empty-state svg {
+    opacity: .22 !important;
+}
+.pv-theme .empty-state .empty-state-title {
+    font-size: 14px !important;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.pv-theme .empty-state .empty-state-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+}
+.pv-theme .empty-state .btn-empty-sample {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-medium);
+    box-shadow: none;
+}
+.pv-theme .empty-state .btn-empty-sample:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ============================================================
+   5. 输入 / 焦点：发丝描边 + 令牌化焦点环
+   ============================================================ */
+.pv-theme .fi,
+.pv-theme .fs,
+.pv-theme .ft {
+    background: var(--bg-input);
+    border: 1px solid var(--border-medium);
+    box-shadow: inset 0 1px 1px rgba(0,0,0,.03);
+}
+html.dark .pv-theme .fi,
+html.dark .pv-theme .fs,
+html.dark .pv-theme .ft {
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+}
+.pv-theme .fi:focus,
+.pv-theme .fs:focus,
+.pv-theme .ft:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 16%, transparent) !important;
+}
+
+/* ============================================================
+   6. 侧栏 / 顶栏微收（发丝分隔 + 弱化 active 光晕）
+   ============================================================ */
+.sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-subtle);
+}
+.top-bar {
+    border-bottom: 1px solid var(--border-subtle);
+}
+/* active 左侧强调条：保留但把大发光收成一个极淡的柔光 */
+.sidebar-item.active::before {
+    box-shadow: 0 0 6px color-mix(in srgb, var(--accent-primary) 30%, transparent) !important;
+}
+/* 引擎切换胶囊：active 用极淡强调底 + 发丝描边，避免重色块 */
+.model-tab.active {
+    background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--border-medium));
+}
+
+/* ============================================================
+   7. 次级面板 / 分隔线统一为发丝冷描边
+   ============================================================ */
+.pv-theme .stabs {
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-subtle) !important;
+}
+.pv-theme .stab.active {
+    background: var(--bg-card) !important;
+    box-shadow: var(--shadow-sm) !important;
+    border: 1px solid var(--border-subtle) !important;
+}
+.pv-theme .collapse-body.open {
+    background: var(--bg-tertiary);
+    border-color: var(--border-subtle);
+}
+.pv-theme .result-toolbar {
+    border-top-color: var(--border-subtle) !important;
+}
+.pv-theme .hint-text {
+    border-left-color: var(--accent-primary);
+}
+
+/* 侧栏分组标题：取消强制大写，使品牌名 "IndexTTS 2.5 / 2.0" 与顶栏胶囊大小写一致 */
+.sidebar-nav-label,
+.sidebar-nav-label-text { text-transform: none; }
+
+/* ============================================================
+   8. 信息密度 / 左右栏平衡（CSS 层）
+   ------------------------------------------------------------
+   原右栏 .col-result 被 position:sticky + max-height:calc(100vh-140px)
+   钉成满屏高，配合高 min-height 的空态，使内容少的页面右栏虚高、
+   与左栏失衡。这里解除强制高度（保留 sticky 便于长表单跟随），
+   并把空态收紧，使两栏按内容自然等高。
+   ============================================================ */
+.pv-theme .two-col { align-items: flex-start; }
+.pv-theme .two-col .col-result {
+    max-height: none;
+    top: 12px;
+}
+.pv-theme .empty-state {
+    min-height: 128px !important;
+    padding: 24px 18px !important;
+    gap: 2px;
+}
+.pv-theme .empty-state svg { margin-bottom: 10px !important; }
+.pv-theme .empty-state .empty-state-desc { margin-bottom: 12px; }
+
+/* 生成前的「后处理」空壳卡：body 仅含隐藏 details 时塌缩，避免空框 */
+.pv-theme .col-result .card:has(> .card-body > details[style*="display:none"]:only-child) {
+    display: none;
+}
+
+/* ============================================================
+   9. 无障碍：尊重「减少动态」偏好
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    .pv-theme .card,
+    .pv-theme .btn-generate,
+    .pv-theme .btn-p,
+    .pv-theme .tag {
+        transition: none !important;
+    }
+    .pv-theme .card { animation: none !important; }
+}
+
+/* ============================================================
+   8b. 折叠面板收起态归零（修左栏空白）
+   ------------------------------------------------------------
+   「高级参数」折叠区收起时仍占约 230px 空高，导致左栏大片留白。
+   强制收起态 collapse-body 不占位，并清掉外层容器可能的预留高度。
+   ============================================================ */
+.pv-theme .collapse-body:not(.open) {
+    display: none !important;
+}
+#advanced-params-collapse {
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+}
+
+/* ============================================================
+   8c. 右栏统一为「单一结果面板 + 内部分段」
+   ------------------------------------------------------------
+   各生成页右栏卡数不一（voice_design 1 张含工具条；voice_clone /
+   ultimate_clone 等 2~3 张独立卡）。这里把整个 .col-result 变成
+   一个带边框/投影/圆角的面板，内部各卡透明、以发丝分隔线分段，
+   使所有页面右栏视觉结构一致，且不改任何模板 DOM。
+   ============================================================ */
+.pv-theme .two-col .col-result {
+    gap: 0 !important;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+}
+.pv-theme .col-result > .card {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+.pv-theme .col-result > .card + .card {
+    border-top: 1px solid var(--border-subtle) !important;
+}
+.pv-theme .col-result .card-hdr {
+    background: transparent;
+}

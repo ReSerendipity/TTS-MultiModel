@@ -396,7 +396,7 @@ def _apply_patch_to_runtime(patch: dict[str, Any]) -> None:
                     elif hasattr(cfg, section_name):
                         # fallback：直接改 dict-like
                         with contextlib.suppress(TypeError, KeyError):
-                            target[fk] = fv  # type: ignore[index]
+                            target[fk] = fv
                 except (AttributeError, TypeError, ValueError):
                     pass
     except (ImportError, AttributeError, TypeError) as exc:

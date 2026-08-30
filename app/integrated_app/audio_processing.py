@@ -177,7 +177,7 @@ def _normalize_loudness_lufs(
     if audio.size == 0:
         return audio
 
-    meter = _pyloudnorm.Meter(sample_rate)  # type: ignore[union-attr]
+    meter = _pyloudnorm.Meter(sample_rate)
     try:
         current_loudness = meter.integrated_loudness(audio)
     except (ValueError, np.linalg.LinAlgError) as exc:
@@ -196,7 +196,7 @@ def _normalize_loudness_lufs(
         return audio
 
     try:
-        normalized = _pyloudnorm.normalize.loudness(audio, current_loudness, target_lufs)  # type: ignore[union-attr]
+        normalized = _pyloudnorm.normalize.loudness(audio, current_loudness, target_lufs)
     except (ValueError, np.linalg.LinAlgError) as exc:
         logger.warning(
             "pyloudnorm normalization failed: %s "
@@ -851,7 +851,7 @@ def _get_webrtcvad(sample_rate: int, aggressive_mode: int = 3) -> Any | None:
     key = (sample_rate, aggressive_mode)
     if key not in _vad_cache:
         try:
-            vad = _webrtcvad.Vad(aggressive_mode)  # type: ignore[union-attr]
+            vad = _webrtcvad.Vad(aggressive_mode)
             _vad_cache[key] = vad
         except Exception as exc:
             logger.debug("webrtcvad 创建失败: %s", exc)
@@ -1180,7 +1180,7 @@ def reduce_noise(
                 kwargs["y_noise"] = noise_sample_use
 
             try:
-                result = _noisereduce.reduce_noise(**kwargs)  # type: ignore[union-attr]
+                result = _noisereduce.reduce_noise(**kwargs)
             except OverflowError as exc:
                 # noisereduce 内部整数运算在极短片段 / 极端振幅下可能溢出
                 logger.warning(
@@ -1259,7 +1259,7 @@ def denoise_audio(
         logger.debug("denoise_audio: 使用 noisereduce 库")
         try:
             try:
-                result = _noisereduce.reduce_noise(  # type: ignore[union-attr]
+                result = _noisereduce.reduce_noise(
                     y=audio,
                     sr=sample_rate,
                     prop_decrease=prop_decrease,

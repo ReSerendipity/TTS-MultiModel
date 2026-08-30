@@ -110,7 +110,7 @@ class LoRAManager:
             ValidationError: magic header 不匹配。
         """
         if not os.path.isfile(safetensors_path):
-            raise ValidationError.from_exception_data(  # type: ignore[attr-defined]
+            raise ValidationError.from_exception_data(
                 title="LoRA 文件不存在",
                 line_errors=[
                     {
@@ -130,7 +130,7 @@ class LoRAManager:
                 raise ValueError(f"safetensors header_len={header_len} 超出合理范围")
         except (OSError, ValueError) as exc:
             logger.warning(f"[LoRAManager] safetensors magic header 校验失败 {safetensors_path}: {exc}")
-            raise ValidationError.from_exception_data(  # type: ignore[attr-defined]
+            raise ValidationError.from_exception_data(
                 title="LoRA 文件损坏或格式不支持",
                 line_errors=[
                     {
@@ -170,7 +170,7 @@ class LoRAManager:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning(f"[LoRAManager] meta JSON 读取失败 {meta_path}: {exc}")
-            raise ValidationError.from_exception_data(  # type: ignore[attr-defined]
+            raise ValidationError.from_exception_data(
                 title="LoRA 元数据 JSON 损坏",
                 line_errors=[
                     {
@@ -244,7 +244,7 @@ class LoRAManager:
                 )
 
             if len(self._loaded) >= self._max_loaded:
-                raise ValidationError.from_exception_data(  # type: ignore[attr-defined]
+                raise ValidationError.from_exception_data(
                     title="LoRA 同时加载数量超限",
                     line_errors=[
                         {
@@ -282,7 +282,7 @@ class LoRAManager:
                 if model_modules:
                     matched = [m for m in target_modules if any(m in n for n in model_modules)]
                     if not matched:
-                        raise ValidationError.from_exception_data(  # type: ignore[attr-defined]
+                        raise ValidationError.from_exception_data(
                             title="LoRA target_modules 与当前模型不兼容",
                             line_errors=[
                                 {
@@ -299,7 +299,7 @@ class LoRAManager:
                         )
 
             try:
-                from safetensors.torch import load_file as safe_load_file  # type: ignore
+                from safetensors.torch import load_file as safe_load_file
             except ImportError as exc:
                 raise RuntimeError("safetensors 包未安装，无法加载 LoRA。请运行: pip install safetensors") from exc
 
@@ -307,7 +307,7 @@ class LoRAManager:
                 weights = safe_load_file(safetensors_path)
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"[LoRAManager] safetensors 加载失败 {safetensors_path}: {type(exc).__name__}")
-                raise ValidationError.from_exception_data(  # type: ignore[attr-defined]
+                raise ValidationError.from_exception_data(
                     title="LoRA safetensors 加载失败",
                     line_errors=[
                         {
@@ -330,7 +330,7 @@ class LoRAManager:
                     state_backup = None
 
                 try:
-                    from peft import LoraConfig, get_peft_model  # type: ignore
+                    from peft import LoraConfig, get_peft_model
                 except ImportError:
                     logger.debug("[LoRAManager] peft 不可用，使用占位注册（仅保留元数据）")
                 else:

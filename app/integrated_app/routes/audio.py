@@ -417,13 +417,22 @@ async def get_speaker_sample(key: str) -> Response:
 
     samples_dir = os.path.join(PROJECT_ROOT, "samples", "parity")
     if not os.path.isdir(samples_dir):
-        return JSONResponse({"status": "error", "message": "Samples directory not found"}, status_code=404)
+        return JSONResponse(
+            {
+                "status": "error",
+                "message": "样本目录不存在：请将说话人样本 WAV 放入 samples/parity/ 目录后重试 (samples/parity/ not found)",
+            },
+            status_code=404,
+        )
 
     pattern = os.path.join(samples_dir, f"*{key.lower()}*.wav")
     matches = glob.glob(pattern)
     if not matches:
         return JSONResponse(
-            {"status": "error", "message": f"No sample found for speaker: {key}"},
+            {
+                "status": "error",
+                "message": f"No sample found for speaker: {key}（samples/parity/ 中无匹配 *{key}*.wav）",
+            },
             status_code=404,
         )
     match_path = Path(matches[0])
@@ -574,7 +583,7 @@ async def history_table(request: Request) -> Response:
         except (ValueError, TypeError):
             duration = 0
         duration_str = f"{duration:.1f}s" if duration > 0 else "<1s"
-        records.append([rec.get("filename", ""), rec.get("created_at", ""), duration_str, size_str])
+        records.append([rec.get("id", 0), rec.get("filename", ""), rec.get("created_at", ""), duration_str, size_str])
 
     return JSONResponse(
         {

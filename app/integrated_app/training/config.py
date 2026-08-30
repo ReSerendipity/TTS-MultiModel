@@ -29,7 +29,7 @@ import yaml
 try:
     from typing import Literal
 except ImportError:  # pragma: no cover
-    Literal = Any  # type: ignore[misc,assignment]
+    Literal = Any  # type: ignore[assignment]
 
 try:
     from pydantic import BaseModel, Field, ValidationError
@@ -51,7 +51,7 @@ TrainingPrecision = Literal["fp32", "fp16", "bf16"]
 # ---------------------------------------------------------------------- #
 # Pydantic / dataclass 配置模型
 # ---------------------------------------------------------------------- #
-class DatasetConfig(BaseModel if BaseModel is not None else object):  # type: ignore[misc,valid-type]
+class DatasetConfig(BaseModel if BaseModel is not None else object):  # type: ignore[misc]
     """数据集配置：数据根目录 / 采样率 / 时长过滤 / 切分比例。"""
 
     if BaseModel is not None:
@@ -100,7 +100,7 @@ class DatasetConfig(BaseModel if BaseModel is not None else object):  # type: ig
             }
 
 
-class LoRAConfig(BaseModel if BaseModel is not None else object):  # type: ignore[misc,valid-type]
+class LoRAConfig(BaseModel if BaseModel is not None else object):  # type: ignore[misc]
     """LoRA 适配层配置：目标模块 / rank / alpha / dropout / bias。"""
 
     if BaseModel is not None:
@@ -154,7 +154,7 @@ class LoRAConfig(BaseModel if BaseModel is not None else object):  # type: ignor
             }
 
 
-class OptimizerConfig(BaseModel if BaseModel is not None else object):  # type: ignore[misc,valid-type]
+class OptimizerConfig(BaseModel if BaseModel is not None else object):  # type: ignore[misc]
     """优化器配置：类型 / 学习率 / 权重衰减 / Adam betas。"""
 
     if BaseModel is not None:
@@ -198,7 +198,7 @@ class OptimizerConfig(BaseModel if BaseModel is not None else object):  # type: 
             }
 
 
-class TrainingConfig(BaseModel if BaseModel is not None else object):  # type: ignore[misc,valid-type]
+class TrainingConfig(BaseModel if BaseModel is not None else object):  # type: ignore[misc]
     """单次 LoRA 训练的完整参数集合。
 
     Args:
@@ -265,7 +265,7 @@ class TrainingConfig(BaseModel if BaseModel is not None else object):  # type: i
             self.batch_size = int(batch_size)
             self.grad_accum_steps = int(grad_accum_steps)
             self.warmup_steps = int(warmup_steps)
-            self.precision = precision  # type: ignore[assignment]
+            self.precision = precision
             self.save_every_n_epochs = int(save_every_n_epochs)
             self.output_dir = Path(output_dir) if output_dir is not None else Path("./training_output")
             self.seed = int(seed)
@@ -378,7 +378,7 @@ def load_training_config(path: Path) -> TrainingConfig:
                 TrainingConfig.model_validate(data)
                 if hasattr(TrainingConfig, "model_validate")
                 else TrainingConfig(**data)
-            )  # type: ignore[call-arg]
+            )
         except ValidationError as e:
             errs = e.errors() if hasattr(e, "errors") else [str(e)]
             msg_lines = [f"训练配置校验失败，共 {len(errs)} 个错误字段："]
@@ -497,8 +497,8 @@ def get_default_config(data_dir: Path) -> TrainingConfig:
     )
     if BaseModel is not None:
         if hasattr(TrainingConfig, "model_validate"):
-            return TrainingConfig.model_validate(cfg_kwargs)  # type: ignore[attr-defined]
-        return TrainingConfig(**cfg_kwargs)  # type: ignore[call-arg]
+            return TrainingConfig.model_validate(cfg_kwargs)
+        return TrainingConfig(**cfg_kwargs)
     return TrainingConfig(**cfg_kwargs)
 
 

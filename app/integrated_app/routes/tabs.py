@@ -244,6 +244,7 @@ async def load_tab(request: Request, tab_name: str, lang: str = "zh-CN") -> Resp
                 duration_str = f"{duration:.1f}s" if duration > 0 else "<1s"
                 items.append(
                     [
+                        rec.get("id", 0),
                         rec.get("filename", ""),
                         rec.get("created_at", ""),
                         duration_str,
@@ -251,7 +252,7 @@ async def load_tab(request: Request, tab_name: str, lang: str = "zh-CN") -> Resp
                     ]
                 )
             no_records_text = t("history_no_records", ctx["lang"])
-            ctx["history_records"] = items if items else [[no_records_text, "-", "-", "-"]]
+            ctx["history_records"] = items if items else [[0, no_records_text, "-", "-", "-"]]
             ctx["history_count"] = paginated["total"]
             ctx["history_loaded"] = paginated["loaded"]
             ctx["history_has_more"] = paginated["hasMore"]
@@ -259,7 +260,7 @@ async def load_tab(request: Request, tab_name: str, lang: str = "zh-CN") -> Resp
             ctx["time_filter"] = time_filter
         except Exception as exc:  # noqa: BLE001
             logger.exception("加载 History Tab 数据失败: %s", exc)
-            ctx["history_records"] = [[t("history_no_records", ctx["lang"]), "-", "-", "-"]]
+            ctx["history_records"] = [[0, t("history_no_records", ctx["lang"]), "-", "-", "-"]]
             ctx["history_count"] = 0
             ctx["history_loaded"] = 0
             ctx["history_has_more"] = False

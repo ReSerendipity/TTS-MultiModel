@@ -1,1 +1,1 @@
-{"name":"tts-multimodel-frontend-tests","private":true,"description":"TTS 前端冒烟测试（render_pages.py → jsdom smoke.js）","scripts":{"test:frontend":"python scripts/render_pages.py && node tests/frontend/smoke.js"},"devDependencies":{"jsdom":"^24.1.3"}}
+{"name":"tts-multimodel-frontend-tests","private":true,"description":"TTS 前端冒烟测试（render_pages.py → jsdom smoke.js）","scripts":{"test:frontend":"python scripts/render_pages.py && node tests/frontend/smoke.js"},"devDependencies":{"jsdom":"^24.1.3"},"dependencies":{"@playwright/test":"^1.62.1"}}

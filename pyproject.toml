@@ -208,6 +208,11 @@ exclude = [
     "vendor/",
 ]
 
+
+[[tool.mypy.overrides]]
+module = ["integrated_app.vendor.*"]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

@@ -346,7 +346,7 @@ class StateManager:
         """
         # 1) safetensors
         try:
-            from safetensors.torch import save_file  # type: ignore
+            from safetensors.torch import save_file
 
             safe_path = ckpt_dir / self.WEIGHTS_SAFE
             fd, tmp_s = tempfile.mkstemp(prefix=self.WEIGHTS_SAFE + ".", suffix=".tmp", dir=str(ckpt_dir))
@@ -458,7 +458,7 @@ class StateManager:
         safe_path = ckpt_dir / self.WEIGHTS_SAFE
         if safe_path.exists():
             try:
-                from safetensors.torch import load_file  # type: ignore
+                from safetensors.torch import load_file
 
                 return load_file(str(safe_path))
             except Exception as exc:  # noqa: BLE001

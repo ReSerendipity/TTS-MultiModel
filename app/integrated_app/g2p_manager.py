@@ -74,10 +74,10 @@ try:
 
     _HAS_PYPINYIN: bool = True
 except ImportError:
-    pinyin = None  # type: ignore[assignment]
-    lazy_pinyin = None  # type: ignore[assignment]
-    to_normal = None  # type: ignore[assignment]
-    Style = None  # type: ignore[assignment]
+    pinyin = None
+    lazy_pinyin = None
+    to_normal = None
+    Style = None
     _HAS_PYPINYIN = False
 
 try:
@@ -85,7 +85,7 @@ try:
 
     _HAS_JIEBA: bool = True
 except ImportError:
-    jieba = None  # type: ignore[assignment]
+    jieba = None
     _HAS_JIEBA = False
 
 # --- 英文 G2P: g2p_en ---
@@ -94,7 +94,7 @@ try:
 
     _HAS_G2P_EN: bool = True
 except ImportError:
-    _EnG2p = None  # type: ignore[assignment]
+    _EnG2p = None
     _HAS_G2P_EN = False
 
 # --- 日文 G2P: pyopenjtalk ---
@@ -103,7 +103,7 @@ try:
 
     _HAS_OPENJTALK: bool = True
 except ImportError:
-    pyopenjtalk = None  # type: ignore[assignment]
+    pyopenjtalk = None
     _HAS_OPENJTALK = False
 
 # --- 韩文 G2P: g2pk2 ---
@@ -112,7 +112,7 @@ try:
 
     _HAS_G2PK2: bool = True
 except ImportError:
-    _KoG2p = None  # type: ignore[assignment]
+    _KoG2p = None
     _HAS_G2PK2 = False
 
 

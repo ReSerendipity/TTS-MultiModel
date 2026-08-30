@@ -28,7 +28,7 @@ from einops import rearrange
 try:
     from typing import Literal
 except ImportError:  # pragma: no cover
-    Literal = Any  # type: ignore[misc,assignment]
+    Literal = Any  # type: ignore[assignment]
 
 from .data import DatasetEntry  # noqa: F401  # 供外部 import 时使用
 

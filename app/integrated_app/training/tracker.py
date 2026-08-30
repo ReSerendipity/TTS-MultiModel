@@ -126,7 +126,7 @@ class TrainingTracker:
             SummaryWriter 实例，失败或未安装时返回 None
         """
         try:
-            from torch.utils.tensorboard import SummaryWriter  # type: ignore
+            from torch.utils.tensorboard import SummaryWriter
 
             log_dir.mkdir(parents=True, exist_ok=True)
             return SummaryWriter(log_dir=str(log_dir))

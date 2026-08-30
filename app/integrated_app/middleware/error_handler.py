@@ -45,9 +45,9 @@ except ImportError:  # pragma: no cover - 仅新版 FastAPI 走此分支
     # FastAPI >=0.110: 表单级 ValidationError 实际已统一由 Pydantic 抛出，
     # 此处用 pydantic.ValidationError 兜底保持老代码兼容
     try:
-        from pydantic import ValidationError as _FastAPIValidationError  # type: ignore[no-redef,assignment]
+        from pydantic import ValidationError as _FastAPIValidationError
     except ImportError:  # pragma: no cover - Pydantic 是 FastAPI 硬依赖
-        _FastAPIValidationError = Exception  # type: ignore[assignment,misc]
+        _FastAPIValidationError = Exception
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 

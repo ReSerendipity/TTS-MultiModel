@@ -34,7 +34,7 @@
 </head>
 <body>
     <div class="guide-container">
-        <h2>{{ "download_guide_welcome"|t(lang) }}</h2>
+        <h2>{{ "download_guide_welcome"|t(lang)|replace("{{ version }}", version) }}</h2>
         <p style="color:var(--dg-muted);margin-bottom:24px;font-size:15px;">{{ "download_guide_notice"|t(lang) }}</p>
         <div class="missing-list">
             <h3>{{ "download_guide_missing"|t(lang) }}</h3>
@@ -54,6 +54,36 @@
             </ol>
         </div>
         <p class="note">{{ "download_guide_note"|t(lang) }}</p>
+        <!-- 动态检测：GET /api/model/download_hints（后端已有能力，此前此页为纯静态） -->
+        <div id="dg-hints-status" style="display:none;margin-top:20px;padding:14px;border-radius:10px;font-size:13px;line-height:1.7;text-align:left"></div>
     </div>
+    <script>
+    (function(){
+        var box = document.getElementById('dg-hints-status');
+        if (!box || !window.fetch) return;
+        fetch('/api/model/download_hints')
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if (!d || d.status !== 'ok') return;
+                box.style.display = 'block';
+                if (d.all_models_available) {
+                    box.style.background = 'rgba(34,197,94,.12)';
+                    box.style.border = '1px solid rgba(34,197,94,.4)';
+                    box.style.color = '#22c55e';
+                    box.textContent = '\u2713 ' + ((window.I18N && window.I18N['dg_all_models_ok']) || '所有模型已就绪，无需额外下载。');
+                } else {
+                    box.style.background = 'rgba(245,158,11,.10)';
+                    box.style.border = '1px solid rgba(245,158,11,.4)';
+                    var html = '<strong>' + ((window.I18N && window.I18N['dg_missing_title']) || '检测到缺失模型，请按以下命令下载：') + '</strong>';
+                    Object.keys(d.hints || {}).forEach(function(k){
+                        var txt = String(d.hints[k]).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+                        html += '<div style="margin-top:10px;color:var(--dg-text)"><b>' + k + '</b><br><code style="display:inline-block;color:#a5b4fc;background:var(--dg-code-bg,#1a1a3e);padding:6px 10px;border-radius:6px;white-space:pre-wrap">' + txt + '</code></div>';
+                    });
+                    box.innerHTML = html;
+                }
+            })
+            .catch(function(){ /* 静态指引已是兜底，失败不打扰 */ });
+    })();
+    </script>
 </body>
 </html>

@@ -234,7 +234,7 @@ class TrainingAccelerator:
     def _init_backend(self) -> None:
         """初始化后端，ImportError/DDP 失败时按约定降级。"""
         try:
-            from accelerate import Accelerator as _HFAccelerator  # type: ignore
+            from accelerate import Accelerator as _HFAccelerator
 
             # Precision 兼容性处理：bf16 要求硬件 Ampere+ / Apple M 系列
             resolved_precision = self._resolve_precision(self._precision)
@@ -245,7 +245,7 @@ class TrainingAccelerator:
             if self._device_str != "auto":
                 hf_kwargs["device_placement"] = True
             self._backend_impl = _HFAccelerator(**hf_kwargs)
-            self._precision = resolved_precision  # type: ignore[assignment]
+            self._precision = resolved_precision
             if self._distributed and self.world_size > 1:
                 try:
                     self.wait_for_everyone()
@@ -272,7 +272,7 @@ class TrainingAccelerator:
                 gradient_accumulation_steps=self._grad_accum,
                 distributed=False,
             )
-            self._precision = "fp32"  # type: ignore[assignment]
+            self._precision = "fp32"
         # CUDA device 上下文绑定
         if self.device.type == "cuda" and torch.cuda.is_available():
             idx = self.device.index if self.device.index is not None else 0
@@ -290,7 +290,7 @@ class TrainingAccelerator:
             # Ampere (sm_80+) 才支持 bf16 Tensor Core；Pascal/Turing 回退 fp16
             if cap[0] < 8:
                 logger.info("当前 GPU 不支持 bf16，自动使用 fp16")
-                return "fp16"  # type: ignore[return-value]
+                return "fp16"
             return requested
         # MPS/CPU 都允许 bf16（MPS bf16 较快；CPU bf16 也能跑仅用于调试）
         return requested
@@ -302,12 +302,12 @@ class TrainingAccelerator:
                 cap = torch.cuda.get_device_capability()
                 if cap[0] < 8:
                     logger.info("当前 GPU 不支持 bf16，自动使用 fp16")
-                    return "fp16"  # type: ignore[return-value]
+                    return "fp16"
                 return requested
             # 非 CUDA 环境下 bf16 统一降级 fp16 或 fp32
             if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                 return requested
-            return "fp32"  # type: ignore[return-value]
+            return "fp32"
         return requested
 
     # ------------------------------------------------------------------ #

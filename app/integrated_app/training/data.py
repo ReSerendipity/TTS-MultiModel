@@ -34,12 +34,12 @@ from torch.utils.data import Dataset as TorchDataset
 try:
     from typing import Literal
 except ImportError:  # pragma: no cover
-    Literal = Any  # type: ignore[misc,assignment]
+    Literal = Any  # type: ignore[assignment]
 
 try:
-    import soundfile as sf  # type: ignore[import]
+    import soundfile as sf
 except ImportError:  # pragma: no cover - torchaudio/librosa 兜底
-    sf = None  # type: ignore[assignment]
+    sf = None
 
 # WHY 带 vendor.voxcpm 前缀：这两行原本写成 `..model.voxcpm` / `..modules.audiovae`，
 # 是按「本文件位于 vendor/voxcpm/ 包内」的假设写的；实际本文件在
@@ -131,7 +131,7 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
         if isinstance(data_dir, HFDataset) or (
             hasattr(data_dir, "column_names") and hasattr(data_dir, "__getitem__") and hasattr(data_dir, "__len__")
         ):
-            self._legacy_dataset = data_dir  # type: ignore[assignment]
+            self._legacy_dataset = data_dir
             self._entries = []
             self._skipped_paths = []
             return
@@ -268,7 +268,7 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
                 return float(info.duration)
             # sf 缺失 -> 用 torchaudio
             try:
-                import torchaudio  # type: ignore[import]
+                import torchaudio
 
                 info = torchaudio.info(str(path))
                 return float(info.num_frames) / float(info.sample_rate)
@@ -276,7 +276,7 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
                 pass
             # 兜底：直接用 librosa
             try:
-                import librosa  # type: ignore[import]
+                import librosa
 
                 duration = librosa.get_duration(filename=str(path))
                 return float(duration)
@@ -513,13 +513,13 @@ class BatchProcessor:
             audio = torch.from_numpy(arr[:, 0]).float()
             return audio, int(sr)
         try:
-            import torchaudio  # type: ignore[import]
+            import torchaudio
 
             waveform, sr = torchaudio.load(str(path))
             return waveform[0].float(), int(sr)
         except Exception:  # pragma: no cover - 再试 librosa
             try:
-                import librosa  # type: ignore[import]
+                import librosa
 
                 arr, sr = librosa.load(str(path), sr=None, mono=True)
                 return torch.from_numpy(arr).float(), int(sr)
@@ -690,7 +690,7 @@ if TYPE_CHECKING:
 
 
 def create_dataloaders(
-    cfg: TrainingConfig,  # type: ignore[valid-type]  # 延后 import 防循环
+    cfg: TrainingConfig,  # 延后 import 防循环
     tokenizer: Any | None = None,
     feature_extractor: Any | None = None,
     accelerator: Any | None = None,

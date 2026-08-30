@@ -383,6 +383,7 @@ tests/frontend/_rendered/
 
 # AI 规范与内部工作文档（仅本地保留，不上传远程，2026-08-27）
 AGENTS.md
+FIX_LOG.md
 docs/FILEMAP.md
 docs/README.md
 docs/_devarchive/
