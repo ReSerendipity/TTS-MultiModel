@@ -102,6 +102,7 @@ from typing import Any
 
 import numpy as np
 
+from ..config import to_lang_code
 from ..engine_interface import TTSEngine
 from ..exceptions import (
     EngineLoadError,
@@ -812,9 +813,14 @@ class IndexTTS2Engine(TTSEngine):
             # infer_v2（2.0）的 infer() 无 lang 参数，若下传会落入 **generation_kwargs
             # 被 model.generate 拒绝（ValueError: model_kwargs 'lang' not used）。
             # 故 lang 仅在 2.5 下传；2.0 只校验语言、不注入。
-            _lang_val = lang if lang is not None else self.lang
+            # supported_langs 用的是 "Auto" + 大写 ISO 码（底层 IndexTTS 的约定），
+            # 而 UI 与文本前端分别给中文显示名和小写码，必须先归一再转形态，
+            # 否则 UI 选「中文」会被判为不支持而静默回退 Auto。
+            _raw_lang = lang if lang is not None else self.lang
+            _code = to_lang_code(_raw_lang)
+            _lang_val = "Auto" if _code == "auto" else _code.upper()
             if _lang_val not in self.supported_langs:
-                logger.debug(f"[IndexTTS2] {self.version} 不支持语言 {_lang_val}，回退 Auto")
+                logger.debug(f"[IndexTTS2] {self.version} 不支持语言 {_raw_lang}（归一为 {_lang_val}），回退 Auto")
                 _lang_val = "Auto"
             if self.version_str == "2.5":
                 infer_kwargs["lang"] = _lang_val

@@ -114,3 +114,39 @@ class TestConfigValidation:
 
         with pytest.raises(ValidationError):
             AppConfig(server=ServerConfig(workers=2))
+
+
+class TestToLangCode:
+    """语言标识归一（修复 UI 中文显示名与 ISO 代码词表不通的缺陷）。"""
+
+    def test_ui_display_names_map_to_iso_codes(self):
+        from integrated_app.config import to_lang_code
+
+        assert to_lang_code("中文") == "zh"
+        assert to_lang_code("英语") == "en"
+        assert to_lang_code("日语") == "ja"
+        assert to_lang_code("韩语") == "ko"
+        assert to_lang_code("自动检测") == "auto"
+
+    def test_case_and_region_variants(self):
+        from integrated_app.config import to_lang_code
+
+        assert to_lang_code("ZH") == "zh"
+        assert to_lang_code("zh-CN") == "zh"
+        assert to_lang_code("zh-Hans") == "zh"
+        assert to_lang_code("pt-BR") == "pt"
+        assert to_lang_code(" en ") == "en"
+
+    def test_empty_and_unknown_fall_back_to_auto(self):
+        from integrated_app.config import to_lang_code
+
+        assert to_lang_code("") == "auto"
+        assert to_lang_code(None) == "auto"
+        assert to_lang_code("火星语") == "auto"
+
+    def test_every_ui_lang_option_is_mappable(self):
+        """_LANGS 新增语种时必须同步 _LANG_ALIASES，否则该语种在前端被静默降级为 auto。"""
+        from integrated_app.config import _LANGS, to_lang_code
+
+        unmapped = [name for name in _LANGS if to_lang_code(name) == "auto" and name != "自动检测"]
+        assert unmapped == [], f"_LANGS 中这些显示名没有语言码映射：{unmapped}"

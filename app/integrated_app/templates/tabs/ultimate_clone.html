@@ -195,6 +195,9 @@
                         <label class="fl" for="uc-save-name">{{ "save_voice_name"|t(lang) }}</label>
                         <input type="text" id="uc-save-name" name="save_name" class="fi" placeholder="{{ 'save_voice_name'|t(lang) }}">
                     </div>
+                    {# 重名时后端回 X-Persona-Confirm 头，app_init.js 把它翻成 true，再点一次即覆盖 #}
+                    <input type="hidden" name="overwrite" value="false">
+                    <input type="hidden" name="ref_text" value="">
                     <button type="button" class="btn btn-o" style="height:34px;white-space:nowrap" hx-post="/api/persona/save" hx-target="#uc-status" hx-swap="innerHTML">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-6-8-6 8"/><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
                         {{ "save_persona"|t(lang) }}

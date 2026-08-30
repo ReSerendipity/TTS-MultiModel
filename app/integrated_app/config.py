@@ -559,6 +559,70 @@ def get_download_hints() -> dict[str, str]:
 
 
 # --- Language list ---
+# --- 语言代码归一 ---
+# WHY 需要这一层：仓库里存在三套互不相交的语言词表——
+#   1. 本模块 _LANGS（UI 下拉的中文显示名，也是表单实际提交的 value）
+#   2. text_frontend.TextNormalizer.normalize() 按 zh/en/ja/ko 分支
+#   3. IndexTTS 引擎的 supported_langs 是 {Auto, ZH, EN, JA, ES, AR}（大写）
+# 三者不互通的后果：UI 提交 "中文" 时，normalize() 走 else 分支打
+# 「不支持的语言 '中文'，跳过规范化」并原样返回，引擎又因不在
+# supported_langs 内静默回退 Auto —— 语种下拉框端到端零效果。
+# 这里提供唯一映射入口，两个消费方各自再适配自己的大小写形态。
+_LANG_ALIASES: dict[str, str] = {
+    # 中文显示名（_LANGS 的取值）
+    "中文": "zh",
+    "英语": "en",
+    "日语": "ja",
+    "韩语": "ko",
+    "德语": "de",
+    "法语": "fr",
+    "俄语": "ru",
+    "葡萄牙语": "pt",
+    "西班牙语": "es",
+    "意大利语": "it",
+    "自动检测": "auto",
+    # ISO 代码自身与常见大小写 / 区域变体
+    "zh": "zh",
+    "zh-cn": "zh",
+    "zh-hans": "zh",
+    "zh-tw": "zh",
+    "zh-hant": "zh",
+    "en": "en",
+    "ja": "ja",
+    "ko": "ko",
+    "de": "de",
+    "fr": "fr",
+    "ru": "ru",
+    "pt": "pt",
+    "es": "es",
+    "it": "it",
+    "auto": "auto",
+}
+
+
+def to_lang_code(value: str | None) -> str:
+    """把任意来源的语言标识归一为小写 ISO 代码或 ``auto``。
+
+    Args:
+        value: UI 显示名（``"中文"``）、小写代码（``"zh"``）、
+            大写代码（``"ZH"``）、区域标签（``"zh-CN"``）或空值。
+
+    Returns:
+        str: 归一后的代码；无法识别时返回 ``"auto"``（让下游做自动检测，
+        而不是抛错或静默跳过规范化）。
+    """
+    if not value:
+        return "auto"
+    key: str = str(value).strip().lower()
+    if not key:
+        return "auto"
+    if key in _LANG_ALIASES:
+        return _LANG_ALIASES[key]
+    # 区域标签兜底：取主语言子标签（pt-BR -> pt），仍未知则 auto
+    base: str = key.split("-", 1)[0]
+    return _LANG_ALIASES.get(base, "auto")
+
+
 _LANGS = [
     "中文",
     "英语",

@@ -17,6 +17,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from .config import to_lang_code
 from .exceptions import ContentSafetyError
 from .security.content_safety import check_safety
 
@@ -706,6 +707,10 @@ class TextNormalizer:
         if not text:
             return text
 
+        # UI 语言下拉提交的是中文显示名（见 config._LANGS），必须先归一成 ISO 代码，
+        # 否则下面的分支永远匹配不上，整段语言特定规范化被静默跳过。
+        lang = to_lang_code(lang)
+
         # 步骤 1：清理 Markdown 和 Emoji
         text = self.clean_markdown_emoji(text)
 
@@ -727,8 +732,15 @@ class TextNormalizer:
             return self._normalize_ja(text)
         elif lang == "ko":
             return self._normalize_ko(text)
+        elif lang == "auto":
+            # 「自动检测」= 不强制按某一语言做数字/日期等改写，交给模型自身判定。
+            # 用 debug 而非 warning：这是合法选项，不是异常输入。
+            logger.debug("语言为 auto，跳过语言特定规范化")
+            return text
         else:
-            logger.warning("不支持的语言 '%s'，跳过规范化", lang)
+            # de / fr / ru / pt / es / it 等暂无专用规范化实现，属已知能力缺口，
+            # 不是调用方传错，因此不得按 warning 级别刷屏。
+            logger.debug("语言 '%s' 暂无专用规范化实现，按原样返回", lang)
             return text
 
     # -- 中文规范化 --

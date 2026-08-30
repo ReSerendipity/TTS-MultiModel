@@ -107,3 +107,27 @@ class TestTextFrontend:
         result = frontend.process("你好")
         assert isinstance(result, tuple)
         assert len(result) == 2
+
+
+class TestLangAliasEndToEnd:
+    """UI 语言下拉提交中文显示名，规范化必须与 ISO 代码等价。
+
+    WHY：修复前 normalize() 按 zh/en/ja/ko 分支，收到 "中文" 走 else 分支
+    打 warning 并原样返回 —— 语种选择端到端零效果，且没有任何测试能发现。
+    """
+
+    SAMPLE = "价格涨了50%，比昨天多3.5元"
+
+    def test_display_name_actually_normalizes(self):
+        """证明规范化真的发生了，而不是两边都原样返回导致断言空转。"""
+        assert normalize_text(self.SAMPLE, "中文") != self.SAMPLE
+
+    def test_display_name_matches_iso_code_result(self):
+        assert normalize_text(self.SAMPLE, "中文") == normalize_text(self.SAMPLE, "zh")
+
+    def test_auto_alias_matches_auto_code(self):
+        assert normalize_text(self.SAMPLE, "自动检测") == normalize_text(self.SAMPLE, "auto")
+
+    def test_language_without_normalizer_returns_text_unchanged(self):
+        """无专用实现的语言（德语等）应原样返回而非抛错。"""
+        assert normalize_text("Hello world", "德语") == "Hello world"

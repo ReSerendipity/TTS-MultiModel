@@ -4,6 +4,8 @@
     本模块提供 Persona 音色管理的 REST API 路由（前缀 /api/persona），
     对应 Persona Tab 的增删改查功能。主要职责包括：
     - 音色列表查询与关键词过滤（GET /table）
+    - 音色固化保存（POST /save，voice_design / voice_clone / ultimate_clone
+      三页的「保存音色」按钮；重名时通过 X-Persona-Confirm 响应头驱动前端二次点击覆盖）
     - 音色删除（DELETE /{name}，同步清理关联的 wav/txt/pt/json 文件）
     - 音色参考音频下发由 routes/audio.py 的 /api/persona/audio/{name} 处理
 
@@ -16,19 +18,25 @@ Persona 数据结构（由 persona_manager 维护）：
     - created_at / updated_at: 创建/更新时间戳
 """
 
+import contextlib
+import html
 import logging
+import os
 import re
 
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
 
+from ..config import SAVE_DIR
 from ..exceptions import PersonaNotFoundError
 from ..exceptions import ValidationError as TTSValidationError
 from ..persona_manager import (
     delete_persona,
+    fn_save_persona,
     get_persona_detail_table,
     get_total_persona_count,
 )
+from .generate.utils import ALLOWED_AUDIO_EXTENSIONS, save_uploaded_audio
 
 router = APIRouter(prefix="/api/persona", tags=["persona"])
 logger = logging.getLogger("tts_multimodel")
@@ -53,6 +61,141 @@ def _validate_persona_id(name: str) -> None:
         raise TTSValidationError("非法 Persona ID：名称不能为空")
     if _INVALID_ID_PATTERN.search(name):
         raise TTSValidationError("非法 Persona ID")
+
+
+#: 触发前端把表单里的 overwrite 翻成 true 的响应头（见 static/js/app_init.js）
+_PERSONA_CONFIRM_HEADER: str = "X-Persona-Confirm"
+
+
+def _persona_status_html(message: str, tone: str) -> HTMLResponse:
+    """渲染保存结果的 HTMX 片段（直接 innerHTML 进各页的 status 容器）。
+
+    Args:
+        message: 面向用户的提示文本（会被 HTML 转义）。
+        tone: ``success`` / ``warning`` / ``error``，决定配色语义。
+
+    Returns:
+        HTMLResponse: 带 ``status-message`` 类的片段。
+    """
+    color = {"success": "#16a34a", "warning": "#f59e0b", "error": "#dc2626"}[tone]
+    return HTMLResponse(
+        f'<div class="status-message {tone}" style="font-size:12px;color:{color}">{html.escape(message)}</div>'
+    )
+
+
+def _resolve_generated_audio(value: str) -> str | None:
+    """把前端回传的「最近一次生成结果」文件名解析为 SAVE_DIR 内的绝对路径。
+
+    WHY 只接受裸文件名：该字段来自客户端，若允许路径分隔符就直接构成任意文件
+    读取——音色固化会把音频复制进 personas/，因此必须钉死在 outputs/ 目录内。
+
+    Args:
+        value: 前端 ``result_audio`` 字段（来自结果片段的 data-audio-filename）。
+
+    Returns:
+        命中且合法时返回绝对路径，否则 None。
+    """
+    if not value or os.path.basename(value) != value or value in {".", ".."}:
+        return None
+    if os.path.splitext(value)[1].lower() not in ALLOWED_AUDIO_EXTENSIONS:
+        return None
+    save_root = os.path.realpath(SAVE_DIR)
+    candidate = os.path.realpath(os.path.join(SAVE_DIR, value))
+    if candidate != save_root and not candidate.startswith(save_root + os.sep):
+        return None
+    return candidate if os.path.isfile(candidate) else None
+
+
+@router.post(
+    "/save",
+    summary="保存音色",
+    description="把上传的参考音频或最近一次生成结果固化到音色库；重名时返回覆盖确认",
+)
+async def persona_save(
+    request: Request,
+    save_name: str = Form(""),
+    ref_audio: UploadFile | None = File(None),
+    result_audio: str = Form(""),
+    ref_text: str = Form(""),
+    instruction: str = Form(""),
+    overwrite: bool = Form(False),
+) -> HTMLResponse:
+    """保存音色（voice_design / voice_clone / ultimate_clone 三页共用）。
+
+    音频来源二选一，优先级：上传的 ``ref_audio`` > 生成结果 ``result_audio``。
+    克隆/极致克隆页表单自带参考音频，走前者；语音设计页无参考音频，
+    固化的是「最近一次生成的结果音频」，由前端把结果片段上的
+    ``data-audio-filename`` 回填进隐藏字段。
+
+    Args:
+        request: FastAPI Request（CSRF 由中间件统一校验，此处无需二次处理）。
+        save_name: 目标音色名，交由 ``fn_save_persona`` 做白名单与越界校验。
+        ref_audio: 用户上传的参考音频。
+        result_audio: outputs/ 目录内的生成结果文件名。
+        ref_text: 音色参考文本（克隆页）。
+        instruction: 音色风格描述（设计页，作为 ref_text 的替代来源）。
+        overwrite: 是否覆盖同名音色。
+
+    Returns:
+        HTMLResponse: 状态片段；重名且 overwrite=False 时额外带
+        ``X-Persona-Confirm`` 头，前端据此把表单的 overwrite 置为 true，
+        用户再点一次即覆盖。
+    """
+    name: str = save_name.strip()
+    if not name:
+        return _persona_status_html("请先填写音色名称", "error")
+
+    staged_path: str | None = None
+    audio_input: str | None = None
+
+    if ref_audio is not None and ref_audio.filename:
+        # 复用 routes/generate/utils.save_uploaded_audio：它已实现扩展名白名单、
+        # 体积上限与安全文件名处理，落盘后返回绝对路径。
+        # WHY 不把 bytes 直接喂给 fn_save_persona：其 docstring 声称支持 bytes，
+        # 但底层 preprocess_and_save_temp 实际只接受 文件路径 / UploadFile /
+        # np.ndarray，传 bytes 会得到「不支持的音频输入类型: <class 'bytes'>」——
+        # 文档与实现不符，以实现为准。
+        staged_path, err = await save_uploaded_audio(request, ref_audio)
+        if err is not None:
+            # 校验失败时 _error_html 返回 HTTP 400。但 HTMX 默认只把 2xx 响应换进
+            # 目标容器，而 app_init.js 的 htmx:responseError 监听器只做 console.warn
+            # + 复位生成按钮状态、不渲染响应体；_error_html 本应通过 HX-Trigger 头
+            # 触发 toast，但模板分支抛错时会连同该头一起降级丢失。三者叠加的结果是
+            # 用户点了「保存音色」却看不到任何提示。因此这里保留原提示片段、
+            # 以 200 返回给同一个 status 容器渲染，与本端点其它校验分支形态一致。
+            return HTMLResponse(content=err.body, status_code=200)
+        audio_input = staged_path
+    else:
+        audio_input = _resolve_generated_audio(result_audio.strip())
+        if audio_input is None and result_audio.strip():
+            return _persona_status_html("生成结果音频无效或已被清理，请重新生成后再保存", "error")
+
+    if audio_input is None:
+        return _persona_status_html("缺少音频：请上传参考音频，或先生成一段语音再保存", "error")
+
+    try:
+        message, needs_confirm = fn_save_persona(
+            name,
+            audio_input,
+            (ref_text or instruction).strip(),
+            bool(overwrite),
+        )
+    except Exception as exc:  # noqa: BLE001 - 固化失败不得泄漏内部异常细节
+        logger.exception("保存音色失败 (name=%s): %s", name, exc)
+        return _persona_status_html("保存失败，请稍后重试", "error")
+    finally:
+        # 临时上传文件用完即删，避免 outputs/uploads 堆积
+        if staged_path:
+            with contextlib.suppress(OSError):
+                if os.path.isfile(staged_path):
+                    os.remove(staged_path)
+
+    if needs_confirm:
+        response = _persona_status_html(message, "warning")
+        response.headers[_PERSONA_CONFIRM_HEADER] = "1"
+        return response
+
+    return _persona_status_html(message, "success" if message.startswith("✅") else "error")
 
 
 @router.get("/table", summary="音色表格", description="获取音色库表格数据，支持关键词过滤")

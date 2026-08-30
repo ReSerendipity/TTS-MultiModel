@@ -267,6 +267,32 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// ===== Persona 保存：重名覆盖确认 =====
+// 状态容器（#vd-status / #vc-status / #uc-status）位于 <form> 之外，
+// 服务端在其内渲染的「确认覆盖」按钮拿不到表单里的参考音频文件，
+// 因此改为：后端在需要确认时回 X-Persona-Confirm 头，前端把同一个 form 内的
+// 隐藏字段 overwrite 翻成 true，用户再点一次原保存按钮即覆盖。
+document.body.addEventListener('htmx:afterRequest', function(evt) {
+    var detail = evt.detail;
+    var path = detail && detail.pathInfo ? detail.pathInfo.requestPath : '';
+    if (!path || path.indexOf('/api/persona/save') === -1) return;
+    if (!detail.xhr || detail.xhr.getResponseHeader('X-Persona-Confirm') !== '1') return;
+    var form = detail.elt && detail.elt.closest ? detail.elt.closest('form') : null;
+    var field = form ? form.querySelector('input[name="overwrite"]') : null;
+    if (field) field.value = 'true';
+});
+
+// ===== 语音设计页：把最近一次生成结果的文件名回填进保存表单 =====
+// 设计页没有参考音频可上传，可固化的只有生成结果；后端结果片段已带
+// data-audio-filename，这里取出写入隐藏字段，避免新增一个暴露服务端路径的接口。
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    var target = evt.detail && evt.detail.target;
+    if (!target || target.id !== 'vd-result') return;
+    var holder = target.querySelector('[data-audio-filename]');
+    var field = document.getElementById('vd-result-audio');
+    if (holder && field) field.value = holder.getAttribute('data-audio-filename') || '';
+});
+
 // Auto-switch tab for engine
 window.autoSwitchTabForEngine = function(engine) {
     var key = (engine || '').toLowerCase();

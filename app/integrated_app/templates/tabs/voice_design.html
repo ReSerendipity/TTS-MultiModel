@@ -172,6 +172,10 @@
                                 <label class="fl" for="vd-save-name">{{ "save_voice_name"|t(lang) }}</label>
                                 <input type="text" id="vd-save-name" name="save_name" class="fi" placeholder="{{ 'save_voice_name'|t(lang) }}">
                             </div>
+                            {# 设计页无参考音频：固化的是「最近一次生成结果」，由下方 JS 回填文件名 #}
+                            <input type="hidden" name="result_audio" id="vd-result-audio" value="">
+                            {# 重名时后端回 X-Persona-Confirm 头，app_init.js 把它翻成 true，再点一次即覆盖 #}
+                            <input type="hidden" name="overwrite" value="false">
                             <button type="button" class="btn btn-o" style="height:34px;white-space:nowrap" hx-post="/api/persona/save" hx-target="#vd-status" hx-swap="innerHTML" onclick="return checkVdSaveNameDuplicate(this);">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
                                 {{ "save_persona"|t(lang) }}
@@ -279,7 +283,7 @@
                 </div>
             </div>
 
-            
+
         </div>
     </div>
 </div>
@@ -301,10 +305,15 @@
 
     // Check for duplicate persona name before saving
     window.checkVdSaveNameDuplicate = function(btn) {
-        var nameInput = btn.closest('.voice-name-row').querySelector('input[name=save_name]');
+        var row = btn.closest('.voice-name-row');
+        var nameInput = row ? row.querySelector('input[name=save_name]') : null;
         if (!nameInput) return true;
         var name = nameInput.value.trim();
         if (!name) return true; // Let server handle empty name
+        // 已经点过「覆盖」（app_init.js 收到 X-Persona-Confirm 后翻起该字段）时放行，
+        // 否则第二次点击仍会被这里拦下，永远走不到服务端的覆盖分支。
+        var overwriteField = row ? row.querySelector('input[name="overwrite"]') : null;
+        if (overwriteField && overwriteField.value === 'true') return true;
         var existingNames = Array.from(document.querySelectorAll('#vd-persona-name option')).map(function(opt) { return opt.textContent.trim(); });
         if (existingNames.includes(name)) {
             Toast.show((window.I18N && window.I18N['name_exists']) || '该名称已存在，请使用其他名称', 'error');
