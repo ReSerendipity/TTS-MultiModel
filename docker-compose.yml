@@ -6,13 +6,21 @@ services:
     ports:
       - "7869:7869"
     volumes:
+      # M5 整改：配置运行时挂载，不 baked 进镜像（见 .dockerignore）
+      - ./config.yaml:/app/config.yaml:ro
       - ./model:/app/model
       - ./outputs:/app/outputs
       - ./personas:/app/personas
+      - ./lora:/app/lora
       - ./cache:/app/cache
     environment:
+      # M5 整改：API token 通过环境变量/secret 注入，禁止硬编码（配合 .env 或 CI secrets）
+      - TTS_API_AUTH_TOKEN=${TTS_API_AUTH_TOKEN:-changeme}
       - TTS_AUTO_LOAD_MODEL=1
       - TTS_AUTO_LOAD_ENGINE=voxcpm2
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_OFFLINE=1
+      - MODELSCOPE_OFFLINE=1
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7869/api/health/ping')"]
       interval: 30s

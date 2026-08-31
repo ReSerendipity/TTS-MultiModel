@@ -1,14 +1,24 @@
+# M5 整改：构建镜像时排除敏感/可写数据，强制运行时挂载（见 docker-compose.yml）
+.git
+.gitignore
+.github
 .venv
 __pycache__
 *.pyc
-.git
-.github
-logs
-outputs
-personas
-cache
-*.egg-info
-docs
-tests
-*.md
-!README.md
+
+# 配置与密钥：运行时通过挂载/secret 注入，禁止 baked 进镜像
+config.yaml
+.env
+app/cert.pem
+app/key.pem
+
+# 运行时可写数据与模型权重（体积大、含用户数据）
+data/
+model/
+personas/
+lora/
+outputs/
+cache/
+logs/
+state/
+*.db
