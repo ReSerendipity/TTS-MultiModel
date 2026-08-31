@@ -14,6 +14,9 @@ import os
 import sys
 
 import numpy as np
+import pytest
+
+pytestmark = pytest.mark.integration
 
 _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "bin")
 if _APP_DIR not in sys.path:

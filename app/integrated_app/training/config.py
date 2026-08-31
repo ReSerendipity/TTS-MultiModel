@@ -60,6 +60,18 @@ class DatasetConfig(BaseModel if BaseModel is not None else object):  # type: ig
         min_duration_sec: float = Field(1.0, ge=0.0, le=10.0, description="最短有效时长，小于则丢弃")
         max_duration_sec: float = Field(20.0, ge=1.0, le=600.0, description="最长有效时长，超过则丢弃或截断")
         split_ratio: float = Field(0.9, ge=0.7, le=0.99, description="train/eval 切分比例（0.7~0.99）")
+        text_normalizer: Literal["none", "text_frontend"] = Field(  # noqa: UP037
+            "text_frontend",
+            description="文本归一化器：none=不归一化；text_frontend=复用推理侧 text_frontend 归一化以消除 training-serving skew（P2-1）",
+        )
+        text_norm_lang: str = Field(
+            "auto",
+            description="归一化语言：auto=仅通用预处理（与推理 auto 对齐）；zh/en/ja/ko=与推理同语言完全对齐（P2-1）",
+        )
+        stratify_by_speaker: bool = Field(
+            True,
+            description="train/eval 切分是否按 speaker 分层，防止同一说话人样本跨组导致 eval loss 虚低（隐性数据泄漏，P2-3）",
+        )
     else:
 
         def __init__(
@@ -69,6 +81,9 @@ class DatasetConfig(BaseModel if BaseModel is not None else object):  # type: ig
             min_duration_sec: float = 1.0,
             max_duration_sec: float = 20.0,
             split_ratio: float = 0.9,
+            text_normalizer: str = "text_frontend",
+            text_norm_lang: str = "auto",
+            stratify_by_speaker: bool = True,
         ) -> None:
             """初始化数据集配置（pydantic 缺失时的 fallback 实现）。
 
@@ -78,12 +93,18 @@ class DatasetConfig(BaseModel if BaseModel is not None else object):  # type: ig
                 min_duration_sec: 最短有效时长（秒），小于则丢弃
                 max_duration_sec: 最长有效时长（秒），超过则丢弃
                 split_ratio: train/eval 切分比例（0.7~0.99）
+                text_normalizer: 文本归一化器（P2-1）
+                text_norm_lang: 归一化语言（P2-1）
+                stratify_by_speaker: 是否按 speaker 分层切分（P2-3）
             """
             self.data_dir = Path(data_dir)
             self.sample_rate = int(sample_rate)
             self.min_duration_sec = float(min_duration_sec)
             self.max_duration_sec = float(max_duration_sec)
             self.split_ratio = float(split_ratio)
+            self.text_normalizer = text_normalizer
+            self.text_norm_lang = text_norm_lang
+            self.stratify_by_speaker = bool(stratify_by_speaker)
 
         def dict(self) -> builtins.dict[str, Any]:
             """将配置转换为可 JSON 序列化的字典。
@@ -97,6 +118,9 @@ class DatasetConfig(BaseModel if BaseModel is not None else object):  # type: ig
                 "min_duration_sec": self.min_duration_sec,
                 "max_duration_sec": self.max_duration_sec,
                 "split_ratio": self.split_ratio,
+                "text_normalizer": self.text_normalizer,
+                "text_norm_lang": self.text_norm_lang,
+                "stratify_by_speaker": self.stratify_by_speaker,
             }
 
 
@@ -220,6 +244,8 @@ class TrainingConfig(BaseModel if BaseModel is not None else object):  # type: i
         lora: LoRAConfig
         optimizer: OptimizerConfig
         epochs: int = Field(10, ge=1, le=200, description="总训练 epoch 数")
+        early_stopping_patience: int = Field(0, ge=0, le=50, description="早停耐心值：连续 N 个 epoch eval loss 无改善则停止；0=禁用（P2-4）")
+        early_stopping_min_delta: float = Field(0.0, ge=0.0, description="早停最小改善量：eval loss 改进小于该值视为无改善（P2-4）")
         batch_size: int = Field(2, ge=1, le=32, description="单卡每步 batch 大小")
         grad_accum_steps: int = Field(4, ge=1, le=32, description="梯度累积步数")
         warmup_steps: int = Field(100, ge=0, description="学习率 warmup 的 step 数")
@@ -235,6 +261,8 @@ class TrainingConfig(BaseModel if BaseModel is not None else object):  # type: i
             lora: LoRAConfig,
             optimizer: OptimizerConfig,
             epochs: int = 10,
+            early_stopping_patience: int = 0,
+            early_stopping_min_delta: float = 0.0,
             batch_size: int = 2,
             grad_accum_steps: int = 4,
             warmup_steps: int = 100,
@@ -262,6 +290,8 @@ class TrainingConfig(BaseModel if BaseModel is not None else object):  # type: i
             self.lora = lora
             self.optimizer = optimizer
             self.epochs = int(epochs)
+            self.early_stopping_patience = int(early_stopping_patience)
+            self.early_stopping_min_delta = float(early_stopping_min_delta)
             self.batch_size = int(batch_size)
             self.grad_accum_steps = int(grad_accum_steps)
             self.warmup_steps = int(warmup_steps)
@@ -281,6 +311,8 @@ class TrainingConfig(BaseModel if BaseModel is not None else object):  # type: i
                 "lora": self.lora.dict(),
                 "optimizer": self.optimizer.dict(),
                 "epochs": self.epochs,
+                "early_stopping_patience": self.early_stopping_patience,
+                "early_stopping_min_delta": self.early_stopping_min_delta,
                 "batch_size": self.batch_size,
                 "grad_accum_steps": self.grad_accum_steps,
                 "warmup_steps": self.warmup_steps,

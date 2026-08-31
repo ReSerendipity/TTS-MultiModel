@@ -12,6 +12,10 @@
 
 * 顶部补齐 CI 徽章，移除底部重复徽章 ([1205d8a](https://github.com/ReSerendipity/TTS_MultiModel/commit/1205d8a76c9f68d0653a0ddee9a847ffeb8893a2))
 
+### Chore
+
+* **working-tree batch (uncommitted):** ruff 终检 11→0（批次内 23 文件全绿）：修复 `lora.py` F821（`LoRAMeta` 新增字段误读 `meta_dict`→`raw_meta`）、`training.py` SIM105×2、`clean_launch.py` UP009/UP015；清理 `metrics.py` 未用导入（F401）；安全/后端/容器化评估整改批次收尾，AGENTS.md 自进化同步至 v1.19（见 `docs/project/KNOWN_GOTCHAS.md` #41）
+
 ## [2.2.0](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.1.0...v2.2.0) (2026-08-21)
 
 

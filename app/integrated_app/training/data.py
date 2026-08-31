@@ -108,6 +108,7 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
         min_duration: float = 1.0,
         max_duration: float = 20.0,
         seed: int = 42,
+        stratify_by_speaker: bool = True,
     ) -> None:
         """初始化 VoxCPM 训练数据集。
 
@@ -154,13 +155,36 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
                 f"时长越界被跳过，0 个可用。"
             )
         # 固定种子切分，保证 train/eval 一致
+        self.stratify_by_speaker = stratify_by_speaker
         rng = random.Random(seed)  # nosec B311 - 固定种子可复现数据集切分，非安全用途
-        rng.shuffle(entries_raw)
-        cutoff = max(1, int(len(entries_raw) * split_ratio))
-        if split == "train":
-            self._entries = entries_raw[:cutoff]
+        if stratify_by_speaker:
+            # P2-3 按 speaker 分层切分：同一说话人的样本不跨 train/eval，
+            # 防止说话人泄漏导致 eval loss 系统性虚低（隐性 data leakage）。
+            groups: dict[object, list[DatasetEntry]] = {}
+            for e in entries_raw:
+                groups.setdefault(e.speaker_id, []).append(e)
+            train_acc: list[DatasetEntry] = []
+            eval_acc: list[DatasetEntry] = []
+            for items in groups.values():
+                rng.shuffle(items)
+                n_eval = max(0, int(round(len(items) * (1 - split_ratio))))
+                if split == "train":
+                    train_acc.extend(items[: len(items) - n_eval])
+                elif split == "eval":
+                    eval_acc.extend(items[len(items) - n_eval :])
+            if split == "train":
+                self._entries = train_acc
+            elif split == "eval":
+                self._entries = eval_acc
+            else:  # "all"
+                self._entries = entries_raw
         else:
-            self._entries = entries_raw[cutoff:] if len(entries_raw) > cutoff else entries_raw[-1:]
+            rng.shuffle(entries_raw)
+            cutoff = max(1, int(len(entries_raw) * split_ratio))
+            if split == "train":
+                self._entries = entries_raw[:cutoff]
+            else:
+                self._entries = entries_raw[cutoff:] if len(entries_raw) > cutoff else entries_raw[-1:]
         # Why min_duration=1.0 / max_duration=20.0：
         # < 1s 的样本几乎不含有效语音信息（除了静音只有 0.2s 人声），训练贡献极小；
         # > 20s 的样本会让 batch padding 浪费 80%（其他样本 2s 要补 18s 静音），
@@ -336,6 +360,30 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
             )
         return self._entries[idx]
 
+    @property
+    def dataset_fingerprint(self) -> str:
+        """数据集内容指纹（P2-2）：基于已扫描样本的稳定 sha256 摘要（前 16 位）。
+
+        用于把训练产物回溯到具体数据集快照，支撑复现与血缘审计。
+        指纹由 (音频绝对路径, 时长四舍五入 3 位, 文本前 12 位 md5) 的规范排序 JSON 计算，
+        数据目录内容（增删样本 / 改文本 / 改时长）任一变化都会导致指纹改变。
+        """
+        import hashlib
+        import json
+
+        payloads = []
+        for e in sorted(self._entries, key=lambda x: str(x.audio_path)):
+            text = (e.text or "").strip()
+            payloads.append(
+                (
+                    str(e.audio_path),
+                    round(float(e.duration), 3),
+                    hashlib.md5(text.encode("utf-8")).hexdigest()[:12],
+                )
+            )
+        blob = json.dumps(payloads, ensure_ascii=False, sort_keys=True)
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
     def stats(self) -> dict[str, Any]:
         """返回数据集统计：总数 / 跳过数 / 时长 min/max/avg / speaker 数。
 
@@ -466,6 +514,8 @@ class BatchProcessor:
         audio_vae: AudioVAE | None = None,
         dataset_cnt: int = 1,
         device: torch.device | None = None,
+        text_normalizer: str = "text_frontend",
+        text_norm_lang: str = "auto",
     ) -> None:
         """初始化 BatchProcessor。
 
@@ -491,6 +541,8 @@ class BatchProcessor:
         self.sample_rate = int(sample_rate)
         self.max_length = int(max_length)
         self._device: torch.device | None = device
+        self._text_normalizer: str = text_normalizer
+        self._text_norm_lang: str = text_norm_lang
         # Legacy 构造路径（config + audio_vae + dataset_cnt 全给时）
         self._legacy_packer: AudioFeatureProcessingPacker | None = None
         self._legacy_audio_vae: AudioVAE | None = audio_vae
@@ -527,7 +579,12 @@ class BatchProcessor:
                 raise RuntimeError(f"读取音频失败: {path}") from nested
 
     def _tokenize(self, text: str) -> list[int]:
-        """调用 tokenizer 编码，超长时按 2x max_length 阈值警告 + 截断。"""
+        """调用 tokenizer 编码，超长时按 2x max_length 阈值警告 + 截断。
+
+        训练侧文本会先经 ``_normalize_text`` 复用推理侧归一化（P2-1，消除
+        training-serving skew）；归一化失败安全降级为原文本。
+        """
+        text = self._normalize_text(text)
         if self.tokenizer is None:
             # 没有 tokenizer 时，直接用字符级 char code（仅兜底）
             return [ord(c) for c in text[: self.max_length]]
@@ -550,6 +607,29 @@ class BatchProcessor:
             )
             ids = ids[: self.max_length]
         return ids
+
+    def _normalize_text(self, text: str) -> str:
+        """复用推理侧 text_frontend 归一化（P2-1，消除 training-serving skew）。
+
+        仅调用纯归一化（``get_frontend().normalize``），**不**走 ``normalize_text`` 的内容安全
+        拦截 —— 训练数据是用户可信的私有数据，不应因安全关键词被丢弃。
+        懒导入 + 异常降级：text_frontend 不可用时回退原文本并记一次 warning。
+
+        Args:
+            text: 待归一化文本
+
+        Returns:
+            归一化后的文本（失败则返回原文本）
+        """
+        if getattr(self, "_text_normalizer", "text_frontend") != "text_frontend":
+            return text
+        try:
+            from ..text_frontend import get_frontend
+
+            return get_frontend().normalize(text, self._text_norm_lang)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("文本归一化不可用，使用原文本（不影响训练）: %s", e)
+            return text
 
     def __call__(self, batch: list[DatasetEntry]) -> dict[str, torch.Tensor]:
         """将 DatasetEntry 列表转为模型输入张量。
@@ -695,7 +775,7 @@ def create_dataloaders(
     feature_extractor: Any | None = None,
     accelerator: Any | None = None,
     num_workers: int = 0,
-) -> tuple[DataLoader, DataLoader]:
+) -> tuple[DataLoader, DataLoader, str]:
     """根据 TrainingConfig 同时构建 train / eval 两个 DataLoader。
 
     Why num_workers 默认 0：
@@ -724,6 +804,7 @@ def create_dataloaders(
         min_duration=ds_cfg.min_duration_sec,
         max_duration=ds_cfg.max_duration_sec,
         seed=cfg.seed,
+        stratify_by_speaker=ds_cfg.stratify_by_speaker,
     )
     eval_ds = HFVoxCPMDataset(
         data_dir=ds_cfg.data_dir,
@@ -733,20 +814,26 @@ def create_dataloaders(
         min_duration=ds_cfg.min_duration_sec,
         max_duration=ds_cfg.max_duration_sec,
         seed=cfg.seed,
+        stratify_by_speaker=ds_cfg.stratify_by_speaker,
     )
     train_stats = train_ds.stats()
     eval_stats = eval_ds.stats()
     logger.info(
-        "数据集加载完成: train=%d, eval=%d, 跳过=%d",
+        "数据集加载完成: train=%d, eval=%d, 跳过=%d（归一化=%s/%s，分层切分=%s）",
         train_stats["total_count"],
         eval_stats["total_count"],
         train_stats["skipped_count"] + eval_stats["skipped_count"],
+        ds_cfg.text_normalizer,
+        ds_cfg.text_norm_lang,
+        ds_cfg.stratify_by_speaker,
     )
     batch_proc = BatchProcessor(
         tokenizer=tokenizer,
         feature_extractor=feature_extractor,
         sample_rate=ds_cfg.sample_rate,
         max_length=1024,
+        text_normalizer=ds_cfg.text_normalizer,
+        text_norm_lang=ds_cfg.text_norm_lang,
     )
 
     def _collate(batch: list[DatasetEntry]) -> dict[str, torch.Tensor]:
@@ -788,7 +875,7 @@ def create_dataloaders(
             drop_last=False,
             pin_memory=True,
         )
-    return train_loader, eval_loader
+    return train_loader, eval_loader, train_ds.dataset_fingerprint
 
 
 # ---------------------------------------------------------------------- #

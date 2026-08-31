@@ -37,12 +37,13 @@ from fastapi import APIRouter, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...audio_processing import enhance_audio
-from ...config import MAX_UPLOAD_SIZE_BYTES, SAVE_DIR
+from ...config import MAX_UPLOAD_SIZE_BYTES, SAVE_DIR, get_config
 from ...exceptions import EngineSwitchError, InsufficientVRAMError, TTSError
 from ...gpu_utils import free_gpu_memory, is_oom_error
 from ...history_db import get_history_db
 from ...model_manager import _time_estimator
 from ...monitor import get_health_monitor
+from ...security.audit import log_audit
 from ..system import increment_generation, log_operation
 
 router = APIRouter(prefix="/api/generate", tags=["generate"])
@@ -65,6 +66,62 @@ _SEMAPHORE_ACQUIRE_TIMEOUT_S: float = float(os.environ.get("TTS_SEMAPHORE_TIMEOU
 # E6-1 SECURITY/ROBUSTNESS: 单次生成硬超时 (秒) — 防止超长文本耗尽信号量池
 # 默认 600s (10 分钟)，可按硬件调优。生成超时后释放信号量，返回友好错误。
 _GENERATION_HARD_TIMEOUT_S: float = float(os.environ.get("TTS_GENERATION_TIMEOUT_S", "600.0"))
+
+
+# ---------------------------------------------------------------------------
+# 配置外置（超时 / 并发 / 信号量排队）：原硬编码 env 常量迁移到 config.yaml
+# generation.*，保留环境变量覆盖能力，回退到上面的默认值。
+# ---------------------------------------------------------------------------
+def _gen_max_concurrent() -> int:
+    env = os.environ.get("TTS_MAX_CONCURRENT_GENERATIONS")
+    if env:
+        return max(1, int(env))
+    try:
+        return max(1, int(get_config().pydantic_config.generation.max_concurrent))
+    except Exception:  # noqa: BLE001
+        return _MAX_CONCURRENT_GENERATIONS
+
+
+def _gen_semaphore_timeout() -> float:
+    env = os.environ.get("TTS_SEMAPHORE_TIMEOUT_S")
+    if env:
+        return float(env)
+    try:
+        return float(get_config().pydantic_config.generation.semaphore_acquire_timeout_s)
+    except Exception:  # noqa: BLE001
+        return _gen_semaphore_timeout()
+
+
+def _gen_hard_timeout() -> float:
+    env = os.environ.get("TTS_GENERATION_TIMEOUT_S")
+    if env:
+        return float(env)
+    try:
+        return float(get_config().pydantic_config.generation.timeout_s)
+    except Exception:  # noqa: BLE001
+        return _gen_hard_timeout()
+
+
+def _ensure_content_safe(request: Any, text: str) -> Any:
+    """M3：内容安全网关统一入口。返回 HTMLResponse（拦截）或 None（放行）。
+
+    所有 routes/generate/* 与 /v1/audio/speech 均经此单入口，避免散落调用。
+    """
+    try:
+        if not get_config().pydantic_config.security.content_safety_enabled:
+            return None
+    except Exception:  # noqa: BLE001
+        return None
+    from ..security.content_safety import get_safety_detector
+
+    result = get_safety_detector().detect(text)
+    if not result.is_safe:
+        from ...security.audit import log_audit
+
+        actor = getattr(request.state, "user", "anonymous") if hasattr(request, "state") else "anonymous"
+        log_audit("content_blocked", actor=str(actor), detail=result.category.value, outcome="blocked")
+        return _error_html(request, f"⚠️ 内容安全检测未通过：{result.message}")
+    return None
 
 # S-R4: legacy history.db 迁移控制（幂等，只执行一次）
 _legacy_history_migrated: bool = False
@@ -202,6 +259,7 @@ async def write_history_and_save_audio(
             "output_format": "wav",
             "is_success": True,
             "error_msg": None,
+            "rtf": None,  # gen_start_ts 调用链未透传，RTF 暂置 None（保持既有行为，避免 F821）
         }
     )
 
@@ -269,7 +327,7 @@ async def _get_generation_semaphore(engine: str) -> asyncio.Semaphore:
         async with _generation_semaphore_lock:
             semaphore = _generation_semaphores.get(engine)
             if semaphore is None:
-                semaphore = asyncio.Semaphore(_MAX_CONCURRENT_GENERATIONS)
+                semaphore = asyncio.Semaphore(_gen_max_concurrent())
                 _generation_semaphores[engine] = semaphore
     return semaphore
 
@@ -441,6 +499,7 @@ def _record_to_history_db(
     output_format: str = "wav",
     is_success: bool = True,
     error_msg: str | None = None,
+    audio_duration: float = 0.0,
 ) -> None:
     """将单次生成结果写入 history_db。
 
@@ -455,6 +514,7 @@ def _record_to_history_db(
         output_format: 输出文件格式（默认 wav）。
         is_success: 本次是否生成成功。
         error_msg: 失败原因（仅 is_success=False 时使用）。
+        audio_duration: 生成音频时长（秒），用于计算 RTF（实时率 = 生成耗时 / 音频时长）。
     """
     # S-R4: 首次调用时执行一次性 legacy 数据库迁移（幂等）
     _migrate_legacy_history_db_if_needed()
@@ -479,6 +539,7 @@ def _record_to_history_db(
                 "output_format": output_format,
                 "is_success": is_success,
                 "error_msg": error_msg,
+                "rtf": round(duration / audio_duration, 4) if audio_duration > 0 else None,
             }
         )
     except Exception as e:  # noqa: BLE001
@@ -596,6 +657,7 @@ def _log_generation(
         if is_degraded:
             details["degraded"] = True
         log_operation("generation", f"{endpoint_name} success ({duration:.1f}s)", details)
+        log_audit("generation", detail=f"endpoint={endpoint_name} engine={engine}", outcome="success")
     else:
         increment_generation(success=False)
         details = {
@@ -608,6 +670,7 @@ def _log_generation(
         if error_msg:
             details["error"] = str(error_msg)
         log_operation("generation", f"{endpoint_name} failed ({duration:.1f}s)", details)
+        log_audit("generation", detail=f"endpoint={endpoint_name} engine={engine}", outcome="failure")
 
 
 # ===========================================================================
@@ -1072,11 +1135,14 @@ async def _execute_generation(
     Returns:
         HTMLResponse（成功 200 / 失败 400）。
     """
+    blocked = _ensure_content_safe(request, text)
+    if blocked is not None:
+        return blocked
     semaphore: asyncio.Semaphore = await _get_generation_semaphore(engine)
     try:
         await asyncio.wait_for(
             semaphore.acquire(),
-            timeout=_SEMAPHORE_ACQUIRE_TIMEOUT_S,
+            timeout=_gen_semaphore_timeout(),
         )
     except asyncio.TimeoutError:
         return _error_html(request, "系统繁忙，请稍后再试（等待超时）")
@@ -1100,20 +1166,20 @@ async def _execute_generation(
                 oom_retry,
                 degraded_fn,
             ),
-            timeout=_GENERATION_HARD_TIMEOUT_S,
+            timeout=_gen_hard_timeout(),
         )
     except asyncio.TimeoutError:
-        logger.error(f"{endpoint_name} 生成超时 (>{_GENERATION_HARD_TIMEOUT_S}s)，文本长度={len(text)}")
+        logger.error(f"{endpoint_name} 生成超时 (>{_gen_hard_timeout()}s)，文本长度={len(text)}")
         _log_generation(
             endpoint_name,
             text,
             engine,
             voice_or_persona,
             False,
-            _GENERATION_HARD_TIMEOUT_S,
-            error_msg=f"generation timeout (>{_GENERATION_HARD_TIMEOUT_S}s)",
+            _gen_hard_timeout(),
+            error_msg=f"generation timeout (>{_gen_hard_timeout()}s)",
         )
-        return _error_html(request, f"生成超时（超过 {_GENERATION_HARD_TIMEOUT_S:.0f} 秒），请尝试缩短文本或减少并发")
+        return _error_html(request, f"生成超时（超过 {_gen_hard_timeout():.0f} 秒），请尝试缩短文本或减少并发")
     finally:
         semaphore.release()
 

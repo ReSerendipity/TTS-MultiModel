@@ -46,6 +46,12 @@ from enum import Enum
 
 logger = logging.getLogger("tts_multimodel")
 
+# P2-8 提示词模板版本号：prompt 漂移治理的核心。
+# 所有 expand/apply_template 产出都隐含此版本；任何模板修改必须 bump 此版本，
+# 否则「同一输入得到不同输出」的 prompt drift 将无法被检测与回滚。
+# 配套 golden 基线测试见 tests/test_prompt_expander.py::test_template_version_pinned。
+PROMPT_TEMPLATE_VERSION = "1.0.0"
+
 # ---------------------------------------------------------------------------
 # 枚举与常量
 # ---------------------------------------------------------------------------

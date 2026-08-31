@@ -22,6 +22,8 @@ if _APP_DIR not in sys.path:
 
 os.environ.setdefault("TTS_SKIP_MODEL_LOAD", "1")
 
+pytestmark = pytest.mark.integration
+
 
 # ============================================================================
 # Fixtures

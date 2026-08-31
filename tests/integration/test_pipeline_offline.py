@@ -15,10 +15,14 @@ import os
 import sys
 from unittest.mock import MagicMock
 
+import pytest
+
 # Ensure app/ is on sys.path
 _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "app")
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
+
+pytestmark = pytest.mark.integration
 
 
 # ---------------------------------------------------------------------------

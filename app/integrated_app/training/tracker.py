@@ -360,6 +360,8 @@ class TrainingTracker:
         avg_train_loss: float | None = None,
         eval_loss: float | None = None,
         state: TrainingState | None = None,
+        early_stopping_patience: int = 0,
+        early_stopping_min_delta: float = 0.0,
     ) -> dict[str, Any]:
         """每个 epoch 结束回调：更新 EMA epoch 时间 / best loss / SSE 推送。
 
@@ -415,6 +417,12 @@ class TrainingTracker:
         self._current_epoch_loss_sum = 0.0
         self._current_epoch_loss_cnt = 0
 
+        early_stop = False
+        if state is not None and early_stopping_patience > 0:
+            early_stop = self.should_stop_early(
+                state, early_stopping_patience, early_stopping_min_delta
+            )
+
         info: dict[str, Any] = {
             "epoch": int(epoch),
             "avg_train_loss": float(avg_train_loss),
@@ -425,6 +433,7 @@ class TrainingTracker:
             "ema_epoch_sec": self._ema_epoch_sec,
             "best_eval_loss": best_eval_loss,
             "best_epoch": int(best_epoch),
+            "early_stop": bool(early_stop),
             "eta_seconds": self._eta_impl(),
             "progress_percent": self._progress_impl(),
             "timestamp": now,
@@ -453,6 +462,34 @@ class TrainingTracker:
         except Exception as exc:  # noqa: BLE001
             logger.warning("on_epoch_end 非关键异常: %s", exc)
         return info
+
+    def should_stop_early(
+        self,
+        state: TrainingState,
+        patience: int,
+        min_delta: float,
+    ) -> bool:
+        """判断是否满足 early stopping 条件（P2-4）。
+
+        规则：取最近 ``patience`` 个 epoch 的 eval loss 窗口，若窗口内最佳值相对全局
+        ``best_eval_loss`` 的改进小于 ``min_delta``，说明模型已连续 ``patience`` 个 epoch
+        无显著改善，应停止训练以节省算力并防止过拟合。
+
+        Args:
+            state: 当前 TrainingState（含 eval_loss_history / best_eval_loss）
+            patience: 连续无改善的 epoch 数阈值；<=0 表示禁用
+            min_delta: 视为「有改善」的最小 eval loss 下降量
+
+        Returns:
+            True=应早停；False=继续
+        """
+        if patience <= 0:
+            return False
+        hist = list(state.eval_loss_history)
+        if len(hist) <= patience:
+            return False
+        recent_best = min(hist[-patience:])
+        return (state.best_eval_loss - recent_best) < min_delta
 
     def on_train_end(
         self,

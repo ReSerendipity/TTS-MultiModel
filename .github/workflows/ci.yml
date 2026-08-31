@@ -149,8 +149,13 @@ jobs:
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
         run: |
+          # 2026-08-31 治理修复（P1-1）：移除 `|| true`，恢复测试与覆盖率门禁的真实阻断。
+          # 此前 `--cov-fail-under=40` 的覆盖率门禁被 `|| true` 完全吞掉，覆盖率掉到 0% CI 仍绿，
+          # 导致「CI 全绿」无法作为 MLOps 成效的可信指标。恢复后：
+          #   - pytest 任一用例失败 → 本 job 变红
+          #   - 覆盖率低于 40% → 本 job 变红（门禁真正生效）
           pytest tests/ -v --tb=short --timeout=180 --ignore=tests/e2e --cov=app/integrated_app --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov --cov-fail-under=40 \
-            -m "not integration and not gpu and not cuda and not vram" || true
+            -m "not integration and not gpu and not cuda and not vram"
 
       - name: Run benchmark tests
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' && runner.os == 'Linux'
@@ -160,7 +165,8 @@ jobs:
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
         run: |
-          pytest tests/benchmarks/ -v --tb=short -m "benchmark" || true
+          # 2026-08-31 治理修复（P1-1）：移除 `|| true`，性能基准失败应真实可见
+          pytest tests/benchmarks/ -v --tb=short -m "benchmark"
 
       - name: Run integration tests
         if: runner.os == 'Linux'
@@ -170,8 +176,9 @@ jobs:
           MODELSCOPE_OFFLINE: "1"
           CUDA_VISIBLE_DEVICES: ""
         run: |
+          # 2026-08-31 治理修复（P1-1）：移除 `|| true`，集成测试失败应真实可见
           pytest tests/integration/ -v --tb=short --no-header -q \
-            -m "not gpu and not cuda and not vram" || true
+            -m "not gpu and not cuda and not vram"
 
       - name: Upload coverage report
         if: always() && runner.os == 'Linux'
@@ -194,7 +201,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     needs: test
-    continue-on-error: true
+    # 2026-08-31 治理修复（P1-1）：移除 continue-on-error，构建失败应真实阻断
     steps:
       - uses: actions/checkout@v4
 
@@ -207,10 +214,12 @@ jobs:
         run: pip install build twine
 
       - name: Build sdist and wheel
-        run: python -m build || true
+        # 2026-08-31 治理修复（P1-1）：移除 `|| true`，构建失败应真实阻断
+        run: python -m build
 
       - name: Check package metadata
-        run: twine check dist/* || true
+        # 2026-08-31 治理修复（P1-1）：移除 `|| true`，元数据校验失败应真实阻断
+        run: twine check dist/*
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -222,7 +231,7 @@ jobs:
   security-assertions:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    continue-on-error: true
+    # 2026-08-31 治理修复（P1-1）：移除 continue-on-error，安全红线断言失败应真实阻断
     steps:
       - name: Checkout
         uses: actions/checkout@v4

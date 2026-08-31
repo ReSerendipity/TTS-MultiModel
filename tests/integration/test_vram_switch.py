@@ -12,10 +12,13 @@ import os
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("CUDA_VISIBLE_DEVICES", "") == "" and not os.environ.get("TTS_RUN_GPU_TESTS"),
-    reason="需要 GPU 环境。设置 TTS_RUN_GPU_TESTS=1 或清除 CUDA_VISIBLE_DEVICES 来运行。",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        os.environ.get("CUDA_VISIBLE_DEVICES", "") == "" and not os.environ.get("TTS_RUN_GPU_TESTS"),
+        reason="需要 GPU 环境。设置 TTS_RUN_GPU_TESTS=1 或清除 CUDA_VISIBLE_DEVICES 来运行。",
+    ),
+]
 
 
 class TestVRAMSwitch:

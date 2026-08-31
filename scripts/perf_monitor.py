@@ -11,6 +11,25 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
+import yaml
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _resolve_base_url() -> str:
+    """读取 config.yaml 的 server.port，回退 127.0.0.1:7869（项目默认端口）。
+
+    离线工作约束（AGENTS.md 硬约束 #5）：仅解析本地 config.yaml，不请求外部资源。
+    """
+    host, port = "127.0.0.1", 7869
+    try:
+        cfg_path = PROJECT_ROOT / "config.yaml"
+        with open(cfg_path, "r", encoding="utf-8") as fh:
+            cfg = yaml.safe_load(fh) or {}
+        port = int(cfg.get("server", {}).get("port", port))
+    except Exception:
+        pass
+    return f"http://{host}:{port}"
 
 
 def benchmark():
@@ -18,7 +37,8 @@ def benchmark():
     print("\n🔧 TTS_MultiModel 性能基准测试")
     print("=" * 50)
 
-    health_url = "http://127.0.0.1:8000/api/system/health"
+    base_url = _resolve_base_url()
+    health_url = f"{base_url}/api/system/health"
 
     try:
         response = requests.get(health_url, timeout=3)
@@ -49,7 +69,7 @@ def benchmark():
 
     except requests.exceptions.ConnectionError:
         print("[TTS_MultiModel] ⚠️ 服务未运行")
-        print("请先启动：python -m uvicorn app.integrated_app.app_server:app --host 127.0.0.1 --port 8000")
+        print(f"请先启动：python -m uvicorn app.integrated_app.app_server:app --host 127.0.0.1 --port {base_url.split(':')[-1]}")
         return {"error": "Service not running"}
     except Exception as e:
         print(f"[TTS_MultiModel] ❌ 异常：{e}")

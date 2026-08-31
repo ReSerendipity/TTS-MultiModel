@@ -24,10 +24,13 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-pytestmark = pytest.mark.skipif(
-    not PLAYWRIGHT_AVAILABLE,
-    reason="Playwright not installed. Install with: pip install playwright && playwright install",
-)
+pytestmark = [
+    pytest.mark.e2e,
+    pytest.mark.skipif(
+        not PLAYWRIGHT_AVAILABLE,
+        reason="Playwright not installed. Install with: pip install playwright && playwright install",
+    ),
+]
 
 BASE_URL = os.environ.get("TTS_SERVER_URL", "http://127.0.0.1:7869")
 

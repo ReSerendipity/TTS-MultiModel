@@ -82,6 +82,14 @@ class TrainingState:
     last_checkpoint_path: Path | None = None
     start_time_ts: float = field(default_factory=time.time)
 
+    # 数据集血缘 / 归一化策略（P2-2 / P2-1：写入 checkpoint 元数据，支撑复现与 skew 治理）
+    dataset_fingerprint: str = ""
+    data_dir: str = ""
+    text_normalizer: str = ""
+    text_norm_lang: str = ""
+    git_commit: str = ""
+    config_snapshot_hash: str = ""
+
     # 运行时对象引用（不序列化，保证向后兼容）
     generator: Any = None
     optimizer: Any = None
@@ -105,6 +113,12 @@ class TrainingState:
             "eval_loss_history",
             "last_checkpoint_path",
             "start_time_ts",
+            "dataset_fingerprint",
+            "data_dir",
+            "text_normalizer",
+            "text_norm_lang",
+            "git_commit",
+            "config_snapshot_hash",
         },
         init=False,
         repr=False,

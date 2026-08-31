@@ -23,6 +23,8 @@ _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
+pytestmark = pytest.mark.integration
+
 
 # ---------------------------------------------------------------------------
 # Engine switch + model_manager 联动 (mocked)
