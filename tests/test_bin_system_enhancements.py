@@ -41,17 +41,39 @@ def test_log_rotation():
 
 
 def test_cached_static_files():
-    """Test that CachedStaticFiles class exists and works."""
-    from integrated_app.app_server import _NO_CACHE_EXTENSIONS, CachedStaticFiles
+    """Test that CachedStaticFiles class exists and works.
+
+    Note (2026-08-31 同步): 实现采用「差异化缓存策略」（app_server.py P1-1，
+    来源 Seedvr2 VersionedStaticFiles）——CSS/JS/HTML/JSON no-cache；字体缓存 30 天；
+    图片缓存 1 天。旧断言把 .png/.svg/.woff2 也放进 no-cache 与该文档化决策相悖，
+    已按实现修正：分别断言三类扩展名落在各自正确的集合中。
+    """
+    from integrated_app.app_server import (
+        _FONT_EXTENSIONS,
+        _IMAGE_EXTENSIONS,
+        _NO_CACHE_EXTENSIONS,
+        CachedStaticFiles,
+    )
 
     # Verify cache configurations
     assert CachedStaticFiles is not None, "CachedStaticFiles class should be defined"
     assert len(_NO_CACHE_EXTENSIONS) > 0, "Should have no-cache extensions configured"
 
-    # Test that no-cache extensions cover expected types
-    expected_no_cache = [".html", ".json", ".css", ".js", ".png", ".svg", ".woff2"]
-    for ext in expected_no_cache:
+    # 经常改动的文本资源：no-cache, must-revalidate
+    for ext in [".html", ".json", ".css", ".js", ".map"]:
         assert ext in _NO_CACHE_EXTENSIONS, f"{ext} should be in no-cache set"
+
+    # 字体：缓存 30 天（内容稳定、体积大）
+    for ext in [".woff2", ".woff", ".ttf"]:
+        assert ext in _FONT_EXTENSIONS, f"{ext} should be in font cache set"
+
+    # 图片：缓存 1 天（配合 ?v= 版本参数做失效）
+    for ext in [".png", ".svg", ".jpg", ".ico"]:
+        assert ext in _IMAGE_EXTENSIONS, f"{ext} should be in image cache set"
+
+    # 三类集合互斥，避免同扩展名命中歧义分支
+    assert not (_NO_CACHE_EXTENSIONS & _FONT_EXTENSIONS), "no-cache 与 font 集合不应重叠"
+    assert not (_NO_CACHE_EXTENSIONS & _IMAGE_EXTENSIONS), "no-cache 与 image 集合不应重叠"
 
     # Test that the class inherits from StaticFiles
     from fastapi.staticfiles import StaticFiles
@@ -97,10 +119,18 @@ def test_database_optimizations():
             "idx_history_engine_created",
             "idx_history_persona_created",
             "idx_history_is_success",
-            "idx_history_filepath",
+            # 注（2026-08-31 同步）：idx_history_filepath 已在重构 I2-1 中有意移除——
+            # filepath 列的 UNIQUE 约束自带隐式索引（sqlite_autoindex_*），再建显式索引纯属冗余，
+            # 徒增写入开销。此处改为断言「filepath 的 UNIQUE 隐式索引存在」以保留同等覆盖。
         ]
         for idx in expected_indexes:
             assert idx in indexes, f"Index {idx} missing"
+
+        # Test 4b: filepath UNIQUE 约束必须自带隐式索引（I2-1 移除显式索引后的等价覆盖）
+        cursor = conn.execute("PRAGMA index_list(generation_history)")
+        index_info = {row[1]: row[2] for row in cursor.fetchall()}  # name -> unique(0/1)
+        unique_indexes = [name for name, is_unique in index_info.items() if is_unique]
+        assert unique_indexes, "filepath UNIQUE 约束应产生至少一个唯一索引"
 
         # Test 5: Test batch insert
         test_records = [

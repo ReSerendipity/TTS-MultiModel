@@ -126,6 +126,11 @@ def test_basic_functionality():
         assert len(records) == 1, f"Should have 1 record, got {len(records)}"
         assert records[0]["filename"] == "test.wav"
 
+        # Windows 修复：必须在 TemporaryDirectory 退出前关闭 SQLite 连接，
+        # 否则打开的 history.db / -wal / -shm 句柄会令 rmtree 抛
+        # PermissionError(WinError 32: 文件被另一进程占用)。
+        db.close_all()
+
     # Test PersonaMetadata
     from integrated_app.persona_metadata import PersonaMetadata
 
