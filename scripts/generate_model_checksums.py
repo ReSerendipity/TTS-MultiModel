@@ -11,6 +11,7 @@
 ``runtime.integrity.expected_model_hashes`` 指向它。
 注意：model/ 为权重禁区，本脚本只读扫描，不修改任何权重。
 """
+
 from __future__ import annotations
 
 import argparse

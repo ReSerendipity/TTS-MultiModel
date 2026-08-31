@@ -1,0 +1,40 @@
+# TTS_MultiModel —— Kubernetes ConfigMap
+# 将 config.yaml 作为 ConfigMap 注入（配置与镜像解耦，符合 12-Factor III）。
+# 用法：kubectl create configmap tts-config --from-file=config.yaml=./config.yaml -n tts
+# 或直接 kubectl apply -f 本文件后用 kubectl edit configmap tts-config 维护。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tts-config
+  namespace: tts
+  labels:
+    app: tts-multimodel
+data:
+  # 注意：此处的 config.yaml 仅为占位骨架，请以仓库顶层 config.yaml 为准同步。
+  # 关键覆盖项：server.host=0.0.0.0（K8s Service 前置于集群内网）、api_auth.enabled=true。
+  config.yaml: |
+    version: "2.2.1"
+    server:
+      host: "0.0.0.0"
+      port: 7869
+      auto_load_model: true
+    api_auth:
+      enabled: true
+      # token 应通过 Secret 注入（见 deployment.yaml 的 TTS_API_AUTH_TOKEN），
+      # 切勿把明文 token 写在此处。
+    observability:
+      slo:
+        availability: 99.5
+        min_success_rate: 99.0
+        max_avg_latency_ms: 30000.0
+      alerting:
+        enabled: true
+        min_success_rate: 95.0
+        vram_usage_warn_pct: 85.0
+        webhook_url: ""
+      capacity_sampling:
+        enabled: true
+        interval_seconds: 30
+    history:
+      db_path: /data/history.db
+      keep_days: 0

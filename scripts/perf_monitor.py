@@ -24,7 +24,7 @@ def _resolve_base_url() -> str:
     host, port = "127.0.0.1", 7869
     try:
         cfg_path = PROJECT_ROOT / "config.yaml"
-        with open(cfg_path, "r", encoding="utf-8") as fh:
+        with open(cfg_path, encoding="utf-8") as fh:
             cfg = yaml.safe_load(fh) or {}
         port = int(cfg.get("server", {}).get("port", port))
     except Exception:
@@ -69,7 +69,9 @@ def benchmark():
 
     except requests.exceptions.ConnectionError:
         print("[TTS_MultiModel] ⚠️ 服务未运行")
-        print(f"请先启动：python -m uvicorn app.integrated_app.app_server:app --host 127.0.0.1 --port {base_url.split(':')[-1]}")
+        print(
+            f"请先启动：python -m uvicorn app.integrated_app.app_server:app --host 127.0.0.1 --port {base_url.split(':')[-1]}"
+        )
         return {"error": "Service not running"}
     except Exception as e:
         print(f"[TTS_MultiModel] ❌ 异常：{e}")

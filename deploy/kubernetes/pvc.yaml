@@ -1,0 +1,16 @@
+# TTS_MultiModel —— 持久卷声明（历史库 / 缓存等可写数据）
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tts-data
+  namespace: tts
+  labels:
+    app: tts-multimodel
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  # storageClassName 按集群实际提供方调整（如 rook-cephfs / local-storage / ebs-sc）
+  # storageClassName: standard

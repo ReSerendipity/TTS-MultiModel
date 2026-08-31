@@ -1,0 +1,133 @@
+# TTS_MultiModel —— Kubernetes Deployment / Service / 探针 / GPU 资源
+# 设计要点（对齐容器化评估 P2-9 与 SRE 评估 §1.4）：
+#   - 单副本 StatefulSet 语义（有状态：依赖本地 GPU 与挂载存储），此处以 Deployment 简化呈现；
+#     若需多副本推理，需先解决「单 Worker 串行」硬约束与多卡调度（见 SRE §1.4）。
+#   - 显式 liveness/readiness 探针复用 /api/health/ping 与 /api/system/health/ready。
+#   - securityContext：非 root、只读根文件系统、丢弃全部 capabilities（与 docker-compose 对齐）。
+#   - GPU 通过 nvidia.com/gpu 资源请求独占（单卡 SPOF，与单机一致）。
+#   - 优雅停机：terminationGracePeriodSeconds 与 uvicorn timeout_graceful_shutdown=60 对齐。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tts-multimodel
+  namespace: tts
+  labels:
+    app: tts-multimodel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tts-multimodel
+  template:
+    metadata:
+      labels:
+        app: tts-multimodel
+    spec:
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: tts
+          image: ghcr.io/reserendipity/tts-multimodel:2.2.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7869
+              name: http
+          env:
+            - name: TTS_BIND_HOST
+              value: "0.0.0.0"
+            - name: TTS_BIND_PORT
+              value: "7869"
+            - name: TTS_API_AUTH_ENABLED
+              value: "1"
+            - name: TTS_API_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tts-auth
+                  key: api_token
+            - name: TTS_LOG_FORMAT
+              value: "json"
+            - name: TTS_CONFIG_PATH
+              value: "/app/config.yaml"
+            - name: TTS_HISTORY_DB_PATH
+              value: "/data/history.db"
+            - name: TTS_GRACEFUL_SHUTDOWN_S
+              value: "60"
+          envFrom:
+            - configMapRef:
+                name: tts-config
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            limits:
+              cpu: "4"
+              memory: 16Gi
+              nvidia.com/gpu: 1
+            requests:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: 1
+          readinessProbe:
+            httpGet:
+              path: /api/system/health/ready
+              port: 7869
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health/ping
+              port: 7869
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet:
+              path: /api/health/ping
+              port: 7869
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 18
+      volumes:
+        - name: config
+          configMap:
+            name: tts-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: tts-data
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tts-multimodel
+  namespace: tts
+  labels:
+    app: tts-multimodel
+spec:
+  selector:
+    app: tts-multimodel
+  ports:
+    - name: http
+      port: 7869
+      targetPort: 7869
+  type: ClusterIP

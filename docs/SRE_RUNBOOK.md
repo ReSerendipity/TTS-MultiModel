@@ -91,9 +91,21 @@ SHA-256 复验（`scripts/generate_model_checksums.py` 生成，C1 加载链路�
 
 ### 3.3 数据备份
 
-- `history_db`（SQLite）：每日全量备份 + WAL 一致性快照；PII 字段按 `security.pii_retention_days`
+- `history_db`（SQLite）：每日全量备份 + 一致性快照；PII 字段按 `security.pii_retention_days`
   留存，到期由启动期清理任务删除（`history_db.purge_expired`）。
-- 权重：`model/` 离线冷备，恢复后必须 SHA-256 复验。
+- **落地脚本**：`scripts/backup_db.py` 已提供（对应评估 P3-1「无 DB/历史数据备份」）。
+  它使用 SQLite 在线备份 API 做一致性快照（不阻塞在线写入），并一并备份审计日志与
+  `config.yaml`，本地按时间命名轮转（默认保留 14 份），支持 `--restore` 一键恢复
+  （恢复前自动备份当前版本防误操作）。
+
+  ```bash
+  # 每日全量备份（建议由 cron / k8s CronJob 调用）
+  python scripts/backup_db.py --retain 14
+  # 从指定备份恢复历史库
+  python scripts/backup_db.py --restore backups/history-20260831-030000.db
+  ```
+
+- 权重：`model/` 离线冷备，恢复后必须 SHA-256 复验（见 `scripts/verify_model_checksums.py`）。
 - 密钥：使用外部 Secret 管理（KMS / CI secrets），禁止明文入库。
 
 ---

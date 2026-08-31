@@ -27,6 +27,9 @@ repos:
       - id: end-of-file-fixer
         exclude: \.md$
       - id: check-yaml
+        # --multi：允许一个文件含多个 YAML 文档（deploy/kubernetes/*.yaml 是
+        # k8s 多资源清单，用 --- 分隔 Deployment/Service/ConfigMap，属合法写法）
+        args: [--multi]
         files: \.(yaml|yml)$
         exclude: ^\.github/workflows/
       - id: check-json

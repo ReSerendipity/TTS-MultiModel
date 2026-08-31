@@ -1,32 +1,53 @@
-version: "3.8"
-
+# TTS MultiModel —— 单机容器编排（开发 / 自托管）
+# 注意：本文件仅提供单机 docker compose 能力；生产集群请使用 deploy/kubernetes/ 下清单。
 services:
   tts:
     build: .
+    # 把镜像端口发布到宿主机（开发用）。生产建议置于反向代理之后并仅暴露 127.0.0.1。
     ports:
       - "7869:7869"
-    volumes:
-      # M5 整改：配置运行时挂载，不 baked 进镜像（见 .dockerignore）
-      - ./config.yaml:/app/config.yaml:ro
-      - ./model:/app/model
-      - ./outputs:/app/outputs
-      - ./personas:/app/personas
-      - ./lora:/app/lora
-      - ./cache:/app/cache
     environment:
-      # M5 整改：API token 通过环境变量/secret 注入，禁止硬编码（配合 .env 或 CI secrets）
-      - TTS_API_AUTH_TOKEN=${TTS_API_AUTH_TOKEN:-changeme}
+      # 绑定地址/端口（run_server 读取）
+      - TTS_BIND_HOST=0.0.0.0
+      - TTS_BIND_PORT=7869
+      # API 认证：0.0.0.0 监听强制要求认证。
+      # 请在宿主机 .env 中设置 TTS_API_AUTH_TOKEN；留空则由容器生成一次性 token 并打印日志。
+      - TTS_API_AUTH_ENABLED=1
+      - TTS_API_AUTH_TOKEN=${TTS_API_AUTH_TOKEN:-}
+      # 自动加载模型（app_server.lifespan 实际消费，非死配置）
       - TTS_AUTO_LOAD_MODEL=1
       - TTS_AUTO_LOAD_ENGINE=voxcpm2
-      - TRANSFORMERS_OFFLINE=1
-      - HF_HUB_OFFLINE=1
-      - MODELSCOPE_OFFLINE=1
+      # 结构化日志：json 便于采集
+      - TTS_LOG_FORMAT=text
+      # 挂载的 config.yaml 经此环境变量生效（12-Factor III 配置外部化）
+      - TTS_CONFIG_PATH=/app/config.yaml
+      # 历史库路径外部化（覆盖容器内默认 data/history.db）
+      - TTS_HISTORY_DB_PATH=/app/data/history.db
+    # 只读根文件系统（不可变基础设施）：仅下列目录/路径可写。
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      # 模型权重（只读挂载，约 26GB+，不进镜像）
+      - ./model:/app/model:ro
+      # 配置可被宿主覆盖（只读）
+      - ./config.yaml:/app/config.yaml:ro
+      # 可写运行态（持久化）
+      - ./data:/app/data
+      - ./cache:/app/cache
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+      - ./lora:/app/lora
+      # 音色库（只读）
+      - ./personas:/app/personas:ro
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7869/api/health/ping')"]
       interval: 30s
       timeout: 10s
-      start_period: 60s
+      # 模型加载较慢，给足启动宽限
+      start_period: 120s
       retries: 3
+    # 资源约束（compose v2 已支持 deploy.resources.limits）
     deploy:
       resources:
         reservations:
@@ -37,6 +58,18 @@ services:
         limits:
           memory: 16G
           cpus: "4.0"
-    restart: unless-stopped
+          # GPU 硬上限（需 nvidia-container-toolkit + compose v2.27+）
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # PyTorch DataLoader / 多 worker 需要更大的 /dev/shm，默认 64MB 易 OOM
+    shm_size: "2gb"
+    # 限制进程数，防止 fork 炸弹
+    pids_limit: 512
+    # 丢弃全部 Linux capabilities，进一步缩小攻击面
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
+    restart: unless-stopped
