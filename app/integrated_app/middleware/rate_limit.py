@@ -24,7 +24,15 @@ from starlette.types import ASGIApp
 logger = logging.getLogger("tts_multimodel")
 
 #: 需要速率限制的路径前缀列表
-_RATE_LIMITED_PREFIXES = ("/api/generate/", "/api/model/load", "/api/model/unload")
+_RATE_LIMITED_PREFIXES = (
+    "/api/generate/",
+    "/api/model/load",
+    "/api/model/unload",
+    "/v1/audio/speech",
+    "/v1/",
+    "/api/audio/upload",
+    "/api/persona/save",
+)
 
 #: 默认配置
 _DEFAULT_REQUESTS_PER_MINUTE = 10
@@ -49,11 +57,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         enabled: bool = True,
         requests_per_minute: int = _DEFAULT_REQUESTS_PER_MINUTE,
         burst: int = _DEFAULT_BURST,
+        trusted_proxies: list[str] | None = None,
     ) -> None:
         super().__init__(app)
         self.enabled = enabled
         self.max_requests = max(requests_per_minute, 1)
         self.burst = max(burst, 1)
+        self.trusted_proxies = set(trusted_proxies or [])
         # IP -> list of timestamps
         self._requests: dict[str, list[float]] = defaultdict(list)
         self._last_cleanup = time.time()
@@ -70,11 +80,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         Returns:
             客户端 IP 地址字符串。
         """
-        forwarded = request.headers.get("X-Forwarded-For", "")
-        if forwarded:
-            # 取第一个 IP（最原始的客户端）
-            return forwarded.split(",")[0].strip()
-        return request.client.host if request.client else "unknown"
+        # M2 整改：仅当直连客户端属于可信代理时才信任 X-Forwarded-For，防伪造绕过限流
+        direct_ip = request.client.host if request.client else "unknown"
+        if self.trusted_proxies and direct_ip in self.trusted_proxies:
+            forwarded = request.headers.get("X-Forwarded-For", "")
+            if forwarded:
+                return forwarded.split(",")[0].strip()
+        return direct_ip
 
     def _is_rate_limited(self, path: str) -> bool:
         """判断请求路径是否需要速率限制。
@@ -134,7 +146,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         timestamps = self._requests[client_ip]
 
         # 检查是否超限
-        if len(timestamps) >= self.max_requests:
+        if len(timestamps) >= self.max_requests + self.burst:
             retry_after = int(_WINDOW_SECONDS - (now - timestamps[0])) + 1
             logger.warning(
                 "[RateLimit] IP %s 请求频率超限: %d/%d (60s)，路径: %s",
