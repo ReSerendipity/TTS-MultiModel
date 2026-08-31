@@ -58,8 +58,7 @@ def _build_metrics_text() -> str:
         db = get_history_db()
         with db.connection() as conn:
             row = conn.execute(
-                "SELECT COUNT(*), COALESCE(SUM(is_degraded), 0), "
-                "COALESCE(AVG(rtf), 0.0) FROM generation_history"
+                "SELECT COUNT(*), COALESCE(SUM(is_degraded), 0), COALESCE(AVG(rtf), 0.0) FROM generation_history"
             ).fetchone()
         total = int(row[0] or 0)
         degraded = int(row[1] or 0)

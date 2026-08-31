@@ -8,6 +8,7 @@
 - ``detail`` 只存必要元信息（如引擎/模式/分类），**不写完整 PII 文本**，满足最小采集。
 - 模块级函数懒加载 ``config``，避免与 ``config`` 形成导入环。
 """
+
 from __future__ import annotations
 
 import json
@@ -84,4 +85,4 @@ def log_audit(
 def get_recent_audit(limit: int = 100) -> list[dict[str, Any]]:
     """返回最近 limit 条审计事件（内存环）。"""
     with _audit_lock:
-        return list(_audit_ring)[-max(1, limit):]
+        return list(_audit_ring)[-max(1, limit) :]
