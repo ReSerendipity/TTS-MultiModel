@@ -128,7 +128,7 @@ def _decrypt_pii(stored: str) -> str:
     if cipher is None:
         return stored
     try:
-        return cipher.decrypt(stored[len(_PII_PREFIX):].encode("utf-8")).decode("utf-8")
+        return cipher.decrypt(stored[len(_PII_PREFIX) :].encode("utf-8")).decode("utf-8")
     except Exception as exc:  # noqa: BLE001
         logger.warning("[history_db] PII 解密失败，返回密文占位: %s", exc)
         return stored
