@@ -25,6 +25,7 @@ import logging
 import struct
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -620,7 +621,7 @@ def watermark_audio(
 
     watermarked, result = embed_watermark(audio, sample_rate, source_id=source_id)
 
-    metadata = {
+    metadata: dict[str, Any] = {
         "watermarked": result.success,
         "snr_db": round(result.snr_db, 1),
     }

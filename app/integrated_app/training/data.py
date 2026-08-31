@@ -378,7 +378,7 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
                 (
                     str(e.audio_path),
                     round(float(e.duration), 3),
-                    hashlib.md5(text.encode("utf-8")).hexdigest()[:12],
+                    hashlib.md5(text.encode("utf-8"), usedforsecurity=False).hexdigest()[:12],
                 )
             )
         blob = json.dumps(payloads, ensure_ascii=False, sort_keys=True)
