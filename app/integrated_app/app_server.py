@@ -33,6 +33,7 @@ import uvicorn
 from fastapi import FastAPI, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -918,11 +919,19 @@ def create_app() -> FastAPI:
         return await system_ready()
 
     @app.get("/readyz")
-    async def readyz() -> dict[str, Any]:
-        """k8s 风格 readiness 探针别名（与 /api/health/ready 同语义）。"""
+    async def readyz() -> Response:
+        """k8s 风格 readiness 探针：模型未加载时返回 503（真正的流量闸门）。
+
+        Why 与 /api/health/ready 分离：后者是"深度健康报告"（degraded 仍 200，
+        供 WebUI 展示告警），不能作为 k8s readinessProbe —— 否则未加载模型的
+        Pod 也会被 Service 选中，生成请求全部 5xx。此处以 model_loaded 为闸门。
+        """
         from .routes.system.health import ready as system_ready
 
-        return await system_ready()
+        result = await system_ready()
+        if not result.get("model_loaded", False):
+            return JSONResponse(status_code=503, content=result)
+        return result
 
     @app.get("/metrics")
     async def prometheus_metrics() -> Response:
