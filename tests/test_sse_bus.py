@@ -38,11 +38,17 @@ class TestSSEEventBus:
         asyncio.run(run())
 
     def test_notify_none_only_wakes_event(self, bus):
-        """Notify with None should wake up the internal event."""
+        """Notify with None should wake up the internal event.
+
+        注意：notify() 通过 ``loop.call_soon_threadsafe`` 异步调度 ``_event.set``，
+        因此断言前必须 ``await asyncio.sleep(0)`` 让出事件循环控制权，
+        使排队的回调得以执行，否则会因竞态误报。
+        """
 
         async def run():
             await bus.subscribe()
             bus.notify(None)  # Old pattern: only wakes Event
+            await asyncio.sleep(0)  # 让 call_soon_threadsafe 排队的回调执行
             # Verify the event was actually set (not just always-true)
             assert bus._event.is_set()
 

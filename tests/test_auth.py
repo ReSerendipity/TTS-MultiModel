@@ -188,8 +188,9 @@ class TestAuthConfiguration:
 
     def test_api_auth_token_field_exists_and_str(self):
         """API auth config has token field (SecretStr, L2 整改：避免明文泄漏)。"""
-        from integrated_app.config import get_config
         from pydantic import SecretStr
+
+        from integrated_app.config import get_config
 
         config = get_config()
         auth = config.api_auth

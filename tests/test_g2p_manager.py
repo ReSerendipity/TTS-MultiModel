@@ -60,12 +60,17 @@ class TestG2PManagerBasic:
         assert result.engine_name in ("pypinyin", "passthrough")
 
     def test_english_passthrough_or_phonemes(self):
-        """英文文本应被处理（g2p_en 可用时返回音素，否则透传）。"""
+        """英文文本应被处理（g2p_en 可用时返回音素，否则透传）。
+
+        降级路径有两种：后端未安装返回 ``passthrough``；后端已安装但运行
+        时失败（如 NLTK 数据缺失）由 ``_do_convert`` 兜底返回
+        ``passthrough_fallback``。两种都属合法降级，均应接受。
+        """
         result = self.manager.convert("Hello world", "en")
         assert isinstance(result, G2PResult)
         assert result.language == "en"
         assert result.text
-        assert result.engine_name in ("g2p_en", "passthrough")
+        assert result.engine_name in ("g2p_en", "passthrough", "passthrough_fallback")
 
     def test_japanese_passthrough_or_phonemes(self):
         """日文文本应被处理。"""

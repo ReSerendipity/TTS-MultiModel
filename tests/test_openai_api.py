@@ -348,12 +348,23 @@ class TestRouterStaticMethods:
         assert result is None
 
     def test_generate_voxcpm2_success(self):
-        """_generate_voxcpm2 should return path on success."""
+        """_generate_voxcpm2 should return path on success.
+
+        VoxCPM2 实际返回结构为 ``((sample_rate, wav, filename), message)``，
+        且实现会校验路径真实存在后才返回（修复 500「音频生成失败」的整改）。
+        mock 需符合该契约，并让返回的 basename 指向一个真实存在的临时文件。
+        """
         body = SpeechRequest(input="hello")
         engine = MagicMock()
-        engine.generate_voice_clone.return_value = ("/tmp/out.wav", 1.5)
-        result = OpenAICompatibleRouter._generate_voxcpm2(engine, body)
-        assert result == "/tmp/out.wav"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            f.write(b"RIFF" + b"\x00" * 40)
+            out_path = f.name
+        try:
+            engine.generate_voice_clone.return_value = ((24000, [], out_path), "ok")
+            result = OpenAICompatibleRouter._generate_voxcpm2(engine, body)
+            assert result == out_path
+        finally:
+            os.unlink(out_path)
 
     def test_generate_indextts2_no_engine(self):
         """_generate_indextts2 should return None on exception."""

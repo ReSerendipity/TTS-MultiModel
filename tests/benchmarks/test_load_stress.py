@@ -23,10 +23,15 @@ _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("TTS_SKIP_STRESS", "1") == "1",
-    reason="Stress tests skipped by default. Set TTS_SKIP_STRESS=0 to run.",
-)
+# 2026-08-31 治理修复（P2-2）：挂载 stress marker，便于 CI 用 -m "stress" 精确触发，
+# 主轮用 -m "not stress" 排除。skip 判定仍由 TTS_SKIP_STRESS 控制（默认跳过）。
+pytestmark = [
+    pytest.mark.stress,
+    pytest.mark.skipif(
+        os.environ.get("TTS_SKIP_STRESS", "1") == "1",
+        reason="Stress tests skipped by default. Set TTS_SKIP_STRESS=0 to run.",
+    ),
+]
 
 
 class TestConcurrentAPIAccess:

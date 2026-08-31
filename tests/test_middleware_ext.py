@@ -74,9 +74,13 @@ class TestRateLimitMiddleware:
             assert resp.status_code == 200
 
     def test_rate_limited_path_returns_429_when_exceeded(self, rate_limit_app):
-        """超过限额后返回 429。"""
+        """超过限额后返回 429。
+
+        M2 整改后阈值语义为 ``max_requests + burst``（burst 允许窗口起始突发）：
+        fixture 配置 requests_per_minute=3 + burst=3，即前 6 次放行、第 7 次起 429。
+        """
         client = TestClient(rate_limit_app)
-        for _ in range(3):
+        for _ in range(6):
             resp = client.get("/api/generate/test")
             assert resp.status_code == 200
         resp = client.get("/api/generate/test")
@@ -111,14 +115,28 @@ class TestRateLimitMiddleware:
         assert mw._is_rate_limited("/api/health/ping") is False
 
     def test_get_client_ip_from_forwarded_for(self):
-        """_get_client_ip 优先读取 X-Forwarded-For。"""
-        mw = RateLimitMiddleware(app=FastAPI(), enabled=True)
+        """_get_client_ip 在可信代理场景下优先读取 X-Forwarded-For。
+
+        M2 安全整改：仅当直连客户端属于 ``trusted_proxies`` 时才信任 XFF，
+        防止攻击者伪造 X-Forwarded-For 绕过限流。
+        """
+        mw = RateLimitMiddleware(app=FastAPI(), enabled=True, trusted_proxies=["127.0.0.1"])
         mock_request = MagicMock()
         mock_request.headers = {"X-Forwarded-For": "1.2.3.4, 5.6.7.8"}
         mock_request.client = MagicMock()
         mock_request.client.host = "127.0.0.1"
         ip = mw._get_client_ip(mock_request)
         assert ip == "1.2.3.4"
+
+    def test_get_client_ip_ignores_forwarded_for_from_untrusted_client(self):
+        """不可信直连客户端传入的 X-Forwarded-For 必须被忽略（防伪造绕过限流）。"""
+        mw = RateLimitMiddleware(app=FastAPI(), enabled=True)  # 未配置可信代理
+        mock_request = MagicMock()
+        mock_request.headers = {"X-Forwarded-For": "1.2.3.4, 5.6.7.8"}
+        mock_request.client = MagicMock()
+        mock_request.client.host = "198.51.100.7"
+        ip = mw._get_client_ip(mock_request)
+        assert ip == "198.51.100.7"
 
     def test_get_client_ip_fallback_to_client_host(self):
         """无 X-Forwarded-For 时回退到 client.host。"""
@@ -131,9 +149,9 @@ class TestRateLimitMiddleware:
         assert ip == "192.168.1.1"
 
     def test_429_response_has_retry_after_header(self, rate_limit_app):
-        """429 响应包含 Retry-After 头。"""
+        """429 响应包含 Retry-After 头（阈值 = max_requests + burst = 6）。"""
         client = TestClient(rate_limit_app)
-        for _ in range(3):
+        for _ in range(6):
             client.get("/api/generate/test")
         resp = client.get("/api/generate/test")
         assert resp.status_code == 429

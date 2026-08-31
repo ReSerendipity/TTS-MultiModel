@@ -227,6 +227,7 @@ markers = [
     "vram: tests for VRAM switching / memory management",
     "e2e: end-to-end tests with browser/server",
     "smoke: quick smoke tests for basic functionality",
+    "stress: concurrent load/stress tests (run in nightly workflow)",
 ]
 
 [tool.coverage.run]

@@ -15,9 +15,12 @@ def test_health_ready(client):
     assert response.status_code == 200
     data = response.json()
     assert "status" in data
-    assert "models_available" in data
-    assert "loading" in data
-    assert "progress" in data
+    # 2026-08-31 同步新契约：/api/health/ready 委托给 routes/system/health.ready，
+    # 返回深度探针结构（model_loaded/db_connected/gpu_available），
+    # 替代旧的 models_available/loading/progress 三段式。
+    assert "model_loaded" in data
+    assert "db_connected" in data
+    assert "gpu_available" in data
 
 
 def test_auth_middleware_disabled(client):
