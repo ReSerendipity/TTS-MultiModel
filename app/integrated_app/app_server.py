@@ -292,7 +292,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # P0-3: 核心模块完整性自校验 (CWE-912 防御，来源：Seedvr2)
     # 在 HistoryDB 初始化之前、config 加载之后执行
-    # 自检失败只告警不阻塞启动（避免误伤），用 ERROR 级日志 + 醒目分隔线
+    # 自检失败默认只告警不阻塞启动（避免误伤）；可按 runtime.integrity.block_startup_on_failure 阻断
+    from .config import get_config
+
     try:
         from .security.integrity_selfcheck import run_startup_selfcheck
 
@@ -306,6 +308,50 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             )
     except Exception as e:
         logger.debug(f"核心模块完整性自检跳过: {e}")
+        selfcheck = {"failed": 0, "failed_files": []}
+
+    # M1 整改：按配置可在自检失败时阻断启动（默认关闭）
+    if selfcheck["failed"] > 0 and get_config().pydantic_config.runtime.integrity.block_startup_on_failure:
+        raise RuntimeError(
+            f"核心模块完整性自检失败 ({selfcheck['failed']} 项)，"
+            "按 runtime.integrity.block_startup_on_failure 配置阻断启动"
+        )
+
+    # C1 整改：模型权重哈希校验（加载链路，默认关闭；清单缺失时不阻塞）
+    try:
+        from .model_manager import verify_model_integrity
+
+        mi = verify_model_integrity()
+        if mi.get("enabled"):
+            if mi.get("mismatched") or mi.get("missing"):
+                logger.warning(
+                    "[SECURITY] 模型权重哈希校验：不匹配 %s，缺失 %s",
+                    mi.get("mismatched"),
+                    mi.get("missing"),
+                )
+                if get_config().pydantic_config.runtime.integrity.block_on_model_mismatch:
+                    raise RuntimeError(
+                        f"模型权重哈希校验失败（不匹配 {mi.get('mismatched')}），"
+                        "按 runtime.integrity.block_on_model_mismatch 配置阻断启动"
+                    )
+            else:
+                logger.info("[SECURITY] 模型权重哈希校验通过（已检 %d 项）", mi.get("checked", 0))
+    except RuntimeError:
+        raise
+    except Exception as e:
+        logger.debug(f"模型权重哈希校验跳过: {e}")
+
+    # H3 整改：PII 留存清理（启动时执行一次；默认保留 90 天）
+    try:
+        from .history_db import get_history_db
+
+        retention = get_config().pydantic_config.security.pii_retention_days
+        if retention > 0:
+            deleted = get_history_db().purge_expired(retention)
+            if deleted:
+                logger.info("[lifespan] PII 留存清理删除 %d 条过期记录", deleted)
+    except Exception as e:
+        logger.debug(f"PII 留存清理跳过: {e}")
 
     try:
         from .history_db import get_history_db
@@ -586,10 +632,12 @@ def create_app() -> FastAPI:
     Returns:
         配置完成的 FastAPI 实例。
     """
+    from .config import get_config
+
     app = FastAPI(
         title="TTS MultiModel Voice Studio",
         description="多模型语音合成平台，支持 VoxCPM2 和 IndexTTS2 引擎",
-        version="2.0.2",
+        version=get_config().version,
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
@@ -618,7 +666,10 @@ def create_app() -> FastAPI:
             "http://localhost",
             "http://127.0.0.1:7869",
             "http://localhost:7869",
-            "http://0.0.0.0:7869",
+            # 安全评估报告 L1：已移除无效/误导性 origin ``http://0.0.0.0:7869``。
+            # 0.0.0.0 不是合法浏览器来源，且 `allow_credentials=True` 下保留它
+            # 会误导运维以为「监听 0.0.0.0 也能被 CORS 放行」，与「禁止 0.0.0.0
+            # 监听」红线（security-assertions CI）精神冲突。
             "http://host.docker.internal:7869",
         ]
 
@@ -651,8 +702,6 @@ def create_app() -> FastAPI:
 
     app.add_middleware(CSRFMiddleware, secret_key=csrf_secret)
 
-    from .config import get_config
-
     api_auth = get_config().api_auth_dict
     app.add_middleware(
         APIAuthMiddleware,
@@ -660,8 +709,15 @@ def create_app() -> FastAPI:
         token=api_auth.get("token", ""),
     )
 
-    # P2 安全修复：API 速率限制 — 防止单 IP 狂发生成请求打爆 GPU
-    app.add_middleware(RateLimitMiddleware, enabled=True, requests_per_minute=10, burst=5)
+    # P2 安全修复：API 速率限制 — 防止单 IP 狂发生成请求打爆 GPU（M2：配置外置 + 可信代理 XFF）
+    rl_cfg = get_config().pydantic_config.rate_limit
+    app.add_middleware(
+        RateLimitMiddleware,
+        enabled=rl_cfg.enabled,
+        requests_per_minute=rl_cfg.requests_per_minute,
+        burst=rl_cfg.burst,
+        trusted_proxies=rl_cfg.trusted_proxies,
+    )
 
     # --- 静态文件挂载：/static ---
     static_dir = os.path.join(_BASE_DIR, "static")
@@ -726,40 +782,17 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health/ready")
     async def health_ready() -> dict[str, Any]:
-        """Readiness probe -- checks if core models are available, with loading progress.
+        """Readiness 探针 —— 统一委托给 routes/system/health.ready（深度检查，避免双探针语义分歧）。"""
+        from .routes.system.health import ready as system_ready
 
-        Returns:
-            包含 status / models_available / loading / progress / missing_models
-            的就绪状态响应；模型缺失时附加 download_hints。
-        """
-        models_ok = getattr(app.state, "models_ok", False)
-        model_loading = getattr(app.state, "model_loading", False)
-        model_load_progress = getattr(app.state, "model_load_progress", "")
+        return await system_ready()
 
-        if models_ok:
-            status = "ok"
-        elif model_loading:
-            status = "loading"
-        else:
-            status = "degraded"
+    @app.get("/readyz")
+    async def readyz() -> dict[str, Any]:
+        """k8s 风格 readiness 探针别名（与 /api/health/ready 同语义）。"""
+        from .routes.system.health import ready as system_ready
 
-        result: dict[str, Any] = {
-            "status": status,
-            "models_available": models_ok,
-            "loading": model_loading,
-            "progress": model_load_progress,
-            "missing_models": getattr(app.state, "missing_models", []),
-        }
-
-        if not models_ok:
-            try:
-                from .config import get_download_hints
-
-                result["download_hints"] = get_download_hints()
-            except Exception:
-                result["download_hints"] = {}
-
-        return result
+        return await system_ready()
 
     # --- 自动发现并挂载路由，单个模块失败不影响其他路由 ---
     from . import routes
@@ -843,7 +876,15 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
         version,
     )
 
-    uvicorn.run(app, host=ip, port=int(port))
+    # H2 整改：SSL 接线 —— 当 config 配置且证书文件存在时启用 HTTPS（uvicorn ssl 上下文）
+    ssl_kwargs: dict[str, str] = {}
+    _ssl = get_config().pydantic_config.server.ssl
+    if _ssl.certfile and _ssl.keyfile and os.path.exists(_ssl.certfile) and os.path.exists(_ssl.keyfile):
+        ssl_kwargs = {"ssl_certfile": _ssl.certfile, "ssl_keyfile": _ssl.keyfile}
+        logger.info("[run_server] 已启用 HTTPS (SSL): cert=%s", _ssl.certfile)
+    else:
+        logger.info("[run_server] 以 HTTP 模式运行（对外暴露请通过反向代理终止 TLS）")
+    uvicorn.run(app, host=ip, port=int(port), **ssl_kwargs)
 
 
 if __name__ == "__main__":
