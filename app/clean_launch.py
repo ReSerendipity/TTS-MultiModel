@@ -346,10 +346,9 @@ def start_app():
 
     # M8 整改：关键二进制 SHA256 完整性校验（默认关闭；设 TTS_VERIFY_BINARIES=1 启用）。
     # 仅当校验清单存在且哈希不匹配时拒绝启动；清单缺失则跳过（不阻断）。
-    if os.environ.get("TTS_VERIFY_BINARIES") == "1":
-        if not verify_binaries():
-            logger.error("[start_app] 二进制完整性校验失败，拒绝启动")
-            sys.exit(1)
+    if os.environ.get("TTS_VERIFY_BINARIES") == "1" and not verify_binaries():
+        logger.error("[start_app] 二进制完整性校验失败，拒绝启动")
+        sys.exit(1)
 
     # Auto-select port if 7869 is occupied
     def _find_available_port(start_port, max_attempts=10):
