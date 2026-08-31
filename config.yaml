@@ -18,6 +18,7 @@ models:
   # 注意：shared 模式下路径结构须与 portable 一致：
   #   {shared_root}/VoxCPM2/, {shared_root}/SenseVoiceSmall/, {shared_root}/IndexTTS-2.5/, {shared_root}/IndexTTS-2.0/ 等
   model_source_mode: portable
+  vram_safety_margin_gb: 1.5  # VRAM 安全余量倍数：加载预检所需显存 = 引擎基线需求 × 该倍数
   shared_models_root: ""   # 例如：C:/AI_Shared_Models
   voxcpm2:
     model_path: "model/VoxCPM2"
@@ -82,6 +83,11 @@ runtime:
     checkpoint_dir: "data/checkpoints"
     checkpoint_every: 5
     auto_recover: false
+  integrity:
+    block_startup_on_failure: false
+    verify_binaries: false
+    expected_model_hashes: ""   # C1：模型权重期望哈希清单路径（JSON）；为空则不校验
+    block_on_model_mismatch: false
 
 watermark:
   enabled_in_code: true
@@ -90,3 +96,23 @@ watermark:
   embed_timestamp: true
   embed_task_id: true
   strength: 0.008
+
+# ── API 速率限制（M2 整改：覆盖 /v1 与上传端点 + 可信代理 XFF） ──
+rate_limit:
+  enabled: true
+  requests_per_minute: 10
+  burst: 5
+  trusted_proxies: []
+
+# ── 安全 / PII / 内容安全 / 审计（H3 / M3 / M7 整改） ──
+security:
+  content_safety_enabled: true          # M3：生成前文本安全检测网关
+  pii_encryption_enabled: false         # H3：历史记录 PII 字段列级加密落库（默认关闭，避免无密钥时无法读取旧数据）
+  pii_retention_days: 90                # H3：PII 留存期限（天），0 表示永久保留
+  audit_enabled: false                  # M7：结构化审计日志（独立 JSONL 持久化 data/audit.log）
+
+# ── 生成流程参数（配置外置：超时 / 并发 / 信号量排队） ──
+generation:
+  timeout_s: 600                        # 单次生成硬超时（秒）
+  max_concurrent: 1                     # 每引擎最大并发生成数
+  semaphore_acquire_timeout_s: 120      # 获取生成信号量排队等待上限（秒）

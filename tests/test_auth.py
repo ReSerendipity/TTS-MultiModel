@@ -187,10 +187,12 @@ class TestAuthConfiguration:
         assert isinstance(auth.enabled, bool)
 
     def test_api_auth_token_field_exists_and_str(self):
-        """API auth config has token field of str type."""
+        """API auth config has token field (SecretStr, L2 整改：避免明文泄漏)。"""
         from integrated_app.config import get_config
+        from pydantic import SecretStr
 
         config = get_config()
         auth = config.api_auth
         assert hasattr(auth, "token")
-        assert isinstance(auth.token, str)
+        assert isinstance(auth.token, SecretStr)
+        assert isinstance(auth.token.get_secret_value(), str)

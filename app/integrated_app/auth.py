@@ -207,23 +207,22 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
         if path == "/":
             return await call_next(request)
 
-        # Why 跳过 /api/sse 端点：
-        #   EventSource API (浏览器 SSE 标准) 不支持自定义 HTTP Header，
-        #   只能携带 Cookie。如果此处强制 Bearer Token，前端 SSE 连接会
-        #   全部 401。前端改为通过 CSRF Cookie + query param token 双重校验
-        #   更稳妥（CSRF 已在前一层中间件完成防御）。
+        # M6 整改：SSE 端点允许 Bearer header 或 ?token= query（EventSource 无法自定义 Header）
         if path.startswith("/api/sse"):
-            return await call_next(request)
+            if self._authorize_request(request):
+                return await call_next(request)
+            self._audit_auth_failure(request)
+            return self._unauthorized_response()
 
-        if not path.startswith("/api/"):
-            return await call_next(request)
+        # H1 整改：鉴权扩展至 /v1/*（OpenAI 兼容端点统一要求 Bearer）
+        if path.startswith(("/api/", "/v1/")):
+            auth_header = request.headers.get("Authorization", "")
+            if self._verify_bearer(auth_header):
+                return await call_next(request)
+            self._audit_auth_failure(request)
+            return self._unauthorized_response()
 
-        auth_header: str = request.headers.get("Authorization", "")
-        if not self._verify_bearer(auth_header):
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "未授权访问：缺少或无效的 Bearer Token"},
-            )
+        # 其余（Web 页面）放行
         return await call_next(request)
 
     def _verify_bearer(self, auth_header: str) -> bool:
@@ -269,3 +268,34 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
         if not ok:
             logger.info("APIAuth failed")
         return ok
+
+    def _authorize_request(self, request: Request) -> bool:
+        """SSE 授权：Bearer header 或 ?token= query 任一匹配即放行（M6）。"""
+        auth_header = request.headers.get("Authorization", "")
+        if self._verify_bearer(auth_header):
+            return True
+        token = request.query_params.get("token", "")
+        if token and self._token_bytes:
+            return hmac.compare_digest(token.encode("utf-8"), self._token_bytes)
+        return False
+
+    def _unauthorized_response(self) -> Response:
+        """返回 401 未授权响应（与既有 401 文案保持一致）。"""
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "未授权访问：缺少或无效的 Bearer Token"},
+        )
+
+    def _audit_auth_failure(self, request: Request) -> None:
+        """M7：鉴权失败时记录审计事件（actor=anonymous）。"""
+        try:
+            from .security.audit import log_audit
+
+            log_audit(
+                "auth_failure",
+                actor="anonymous",
+                detail=request.url.path,
+                outcome="failure",
+            )
+        except Exception:  # noqa: BLE001
+            pass

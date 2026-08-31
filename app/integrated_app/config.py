@@ -232,9 +232,19 @@ def _parse_api_auth(yaml_config: dict) -> ApiAuthConfig:
     try:
         auth_cfg = yaml_config.get("api_auth", {})
         if isinstance(auth_cfg, dict):
+            token = str(auth_cfg.get("token", ""))
+            # M5 整改：允许通过环境变量 TTS_API_AUTH_TOKEN 注入 Bearer Token，
+            # 避免将明文 token 固化进 config.yaml / 容器镜像层。
+            import os as _os
+
+            from pydantic import SecretStr as _SecretStr
+
+            env_token = _os.environ.get("TTS_API_AUTH_TOKEN", "")
+            if env_token:
+                token = env_token
             return ApiAuthConfig(
                 enabled=bool(auth_cfg.get("enabled", False)),
-                token=str(auth_cfg.get("token", "")),
+                token=_SecretStr(token),
             )
     except Exception as e:
         import logging
@@ -334,7 +344,7 @@ class AppConfig:
     def api_auth_dict(self) -> dict:
         """API auth as a plain dict (backward compat with API_AUTH)."""
         self._ensure_loaded()
-        return {"enabled": self._api_auth.enabled, "token": self._api_auth.token}
+        return {"enabled": self._api_auth.enabled, "token": self._api_auth.token.get_secret_value()}
 
 
 # ---------------------------------------------------------------------------

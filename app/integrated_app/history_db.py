@@ -48,9 +48,98 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
+from cryptography.fernet import Fernet
+
 from .exceptions import TTSError
 
 logger = logging.getLogger("tts_multimodel")
+
+
+# ---------------------------------------------------------------------------
+# H3 整改：PII 字段级加密（text_preview 列级加密落库）
+# 设计要点：
+#   - 密文以 "enc:" 前缀存储，旧明文行（无前缀）读取时原样返回 → 向后兼容。
+#   - 密钥解析优先级：环境变量 TTS_PII_FERNET_KEY → config.yaml
+#     security.pii_encryption_key → data/.pii_key 自动生成（0600）。
+#   - 未启用 / 密钥不可用时降级为明文存储，避免阻断业务。
+# ---------------------------------------------------------------------------
+_PII_PREFIX = "enc:"
+
+
+def _get_pii_cipher() -> "Fernet | None":
+    """H3：惰性获取 PII 加密 Fernet 实例；未启用或不可用时返回 None。"""
+    try:
+        from .config import get_config
+
+        cfg = get_config().pydantic_config.security
+    except Exception:  # noqa: BLE001 — 配置不可用时降级明文
+        return None
+    if not cfg.pii_encryption_enabled:
+        return None
+    key: str = os.environ.get("TTS_PII_FERNET_KEY", "") or cfg.pii_encryption_key.get_secret_value()
+    if key:
+        try:
+            return Fernet(key.encode("utf-8") if isinstance(key, str) else key)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[history_db] PII 加密密钥无效，降级为明文存储: %s", exc)
+            return None
+    # 回退：自动生成并持久化到 data/.pii_key
+    try:
+        key_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", ".pii_key"
+        )
+        os.makedirs(os.path.dirname(key_path), exist_ok=True)
+        if os.path.exists(key_path):
+            with open(key_path, encoding="utf-8") as f:
+                raw = f.read().strip()
+            if raw:
+                return Fernet(raw.encode("utf-8"))
+        import secrets as _secrets
+
+        new_key = _secrets.token_urlsafe(44)
+        with open(key_path, "w", encoding="utf-8") as f:
+            f.write(new_key)
+        os.chmod(key_path, 0o600)
+        return Fernet(new_key.encode("utf-8"))
+    except OSError as exc:
+        logger.warning("[history_db] PII 密钥文件不可用，降级为明文存储: %s", exc)
+        return None
+
+
+def _encrypt_pii(plaintext: str) -> str:
+    """H3：加密 PII 文本；未启用或失败时原样返回（向后兼容旧明文行）。"""
+    if not plaintext:
+        return plaintext
+    cipher = _get_pii_cipher()
+    if cipher is None:
+        return plaintext
+    try:
+        return _PII_PREFIX + cipher.encrypt(plaintext.encode("utf-8")).decode("utf-8")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[history_db] PII 加密失败，降级为明文存储: %s", exc)
+        return plaintext
+
+
+def _decrypt_pii(stored: str) -> str:
+    """H3：解密 PII 文本；非加密值（旧明文行）原样返回。"""
+    if not stored or not stored.startswith(_PII_PREFIX):
+        return stored
+    cipher = _get_pii_cipher()
+    if cipher is None:
+        return stored
+    try:
+        return cipher.decrypt(stored[len(_PII_PREFIX):].encode("utf-8")).decode("utf-8")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[history_db] PII 解密失败，返回密文占位: %s", exc)
+        return stored
+
+
+def _decrypt_record(record: dict[str, Any]) -> dict[str, Any]:
+    """H3：解密记录字典中的 PII 字段（text_preview）。"""
+    if "text_preview" in record:
+        record["text_preview"] = _decrypt_pii(record["text_preview"])
+    return record
+
 
 # --- 常量提取 (H-R3/A3-1 消除魔法数字) ---
 # REFACTOR: [H-R3] 统一 PRAGMA 配置，消除三处重复
@@ -95,9 +184,9 @@ _INSERT_FIELDS: str = (
     "filename, filepath, created_at, file_size_bytes, duration_seconds, "
     "text_preview, engine, model_type, model_size, lang, persona_name, "
     "output_format, temperature, seed, speed, is_success, error_msg, "
-    "is_degraded, tags, hidden, created_timestamp"
+    "is_degraded, tags, hidden, created_timestamp, rtf"
 )
-_INSERT_PLACEHOLDERS: str = ", ".join(["?"] * 21)
+_INSERT_PLACEHOLDERS: str = ", ".join(["?"] * 22)
 # Why INSERT OR REPLACE 而不是 INSERT OR IGNORE：
 # 用户重新生成相同文件名的音频时（如"换个语气再来一次"），希望覆盖旧的
 # 元数据（error_msg / duration_seconds / is_success 等可能已变化）。
@@ -207,6 +296,7 @@ class HistoryDatabase:
         self._migrate_add_created_timestamp_column()
         self._migrate_add_file_missing_column()
         self._migrate_add_hmac_columns()
+        self._migrate_add_column("rtf", "REAL")  # P2-7: 实时率指标列，支持质量趋势监控
         self._optimize_pragmas()
         self._ensure_indexes()
         self._ensure_fts()
@@ -537,7 +627,8 @@ class HistoryDatabase:
                     tags TEXT DEFAULT '',
                     hidden INTEGER NOT NULL DEFAULT 0,
                     created_timestamp REAL NOT NULL DEFAULT 0,
-                    file_missing INTEGER NOT NULL DEFAULT 0
+                    file_missing INTEGER NOT NULL DEFAULT 0,
+                    rtf REAL
                 )
             """)
 
@@ -708,7 +799,7 @@ class HistoryDatabase:
                 从 record["created_timestamp"] 取值，再否则取当前 ``time.time()``。
 
         Returns:
-            与 _INSERT_SQL 占位符一一对应的有序元组，长度恒为 21。
+            与 _INSERT_SQL 占位符一一对应的有序元组，长度恒为 22。
         """
         if timestamp is None:
             timestamp = record.get("created_timestamp", time.time())
@@ -718,7 +809,7 @@ class HistoryDatabase:
             record.get("created_at", ""),
             record.get("file_size_bytes", 0),
             record.get("duration_seconds"),
-            record.get("text_preview", ""),
+            _encrypt_pii(record.get("text_preview", "")),
             record.get("engine", "unknown"),
             record.get("model_type"),
             record.get("model_size"),
@@ -734,6 +825,7 @@ class HistoryDatabase:
             record.get("tags", ""),
             1 if record.get("hidden", False) else 0,
             timestamp,
+            record.get("rtf"),
         )
 
     # ------------------------------------------------------------------
@@ -750,6 +842,7 @@ class HistoryDatabase:
         engine: str = "unknown",
         persona_name: str | None = None,
         duration_seconds: float = 0.0,
+        rtf: float = 0.0,
     ) -> int:
         """添加一条新的生成历史记录（便捷方法）。
 
@@ -775,6 +868,7 @@ class HistoryDatabase:
             "created_at": created_at,
             "file_size_bytes": file_size,
             "duration_seconds": duration_seconds,
+            "rtf": rtf,
             "text_preview": text_preview,
             "engine": engine,
             "persona_name": persona_name,
@@ -881,15 +975,22 @@ class HistoryDatabase:
 
         try:
             secret = self._get_hmac_secret()
-            # 获取上一条记录的 HMAC
+            # 获取上一条记录的 HMAC（链头）
             cursor = conn.execute(
                 "SELECT record_hmac FROM generation_history WHERE id < ? ORDER BY id DESC LIMIT 1", (rowid,)
             )
             row = cursor.fetchone()
             prev_hash = row[0] if row else ""
 
-            # 构建记录摘要（关键字段）
-            record_str = f"{record.get('filename', '')}|{record.get('filepath', '')}|{record.get('created_at', '')}|{record.get('engine', '')}|{record.get('text_preview', '')}"
+            # 从落库行取实际值（已是加密后的 text_preview），保证与校验口径一致，避免加密导致链断裂
+            rec = conn.execute(
+                "SELECT filename, filepath, created_at, engine, text_preview FROM generation_history WHERE id = ?",
+                (rowid,),
+            ).fetchone()
+            if rec is None:
+                return
+            filename, filepath, created_at, engine, text_preview = rec
+            record_str = f"{filename}|{filepath}|{created_at}|{engine}|{text_preview}"
             record_hash = hashlib.sha256(record_str.encode("utf-8")).hexdigest()
 
             # 计算 HMAC: HMAC(secret, prev_hash + record_hash)
@@ -901,6 +1002,46 @@ class HistoryDatabase:
             )
         except Exception as exc:
             logger.warning("[history_db] HMAC 链计算失败（已忽略）: %s", exc)
+
+    def purge_expired(self, retention_days: int) -> int:
+        """H3：按留存期限清理过期历史记录及其音频文件。
+
+        Args:
+            retention_days: 保留天数；<=0 表示不清理（永久保留）。
+
+        Returns:
+            实际删除的记录数。
+        """
+        if retention_days <= 0:
+            return 0
+        cutoff = time.time() - retention_days * 86400
+        try:
+            cursor = self._execute(
+                "SELECT id, filepath FROM generation_history WHERE created_timestamp < ?",
+                (cutoff,),
+            )
+            rows = cursor.fetchall()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[history_db] 留存清理查询失败: %s", exc)
+            return 0
+        deleted = 0
+        for row in rows:
+            _id, filepath = row["id"], row["filepath"]
+            try:
+                with self._transaction() as conn:
+                    conn.execute("DELETE FROM generation_history WHERE id = ?", (_id,))
+                deleted += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("[history_db] 留存清理删除记录 %s 失败: %s", _id, exc)
+                continue
+            if filepath and os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except OSError as exc:
+                    logger.debug("[history_db] 留存清理删除文件 %s 失败: %s", filepath, exc)
+        if deleted:
+            logger.info("[history_db] 留存清理已删除 %d 条超过 %d 天的记录", deleted, retention_days)
+        return deleted
 
     def verify_chain_integrity(self) -> dict[str, Any]:
         """P2: 验证历史记录 HMAC 链的完整性。
@@ -993,7 +1134,7 @@ class HistoryDatabase:
         sql = f"SELECT id, filename, filepath FROM generation_history WHERE id IN ({placeholders})"  # nosec B608: 占位符仅生成 ?，ids 全部参数绑定
         try:
             cursor = self._execute(sql, list(ids))
-            return [dict(row) for row in cursor.fetchall()]
+            return [_decrypt_record(dict(row)) for row in cursor.fetchall()]
         except Exception as e:
             logger.error(f"[history_db] 按 id 查询历史记录失败: {e}", exc_info=True)
             return []
@@ -1086,7 +1227,7 @@ class HistoryDatabase:
             (*params, limit, offset),
         )
 
-        items = [dict(row) for row in cursor.fetchall()]
+        items = [_decrypt_record(dict(row)) for row in cursor.fetchall()]
         loaded = offset + len(items)
         has_more = loaded < total
 
@@ -1226,7 +1367,7 @@ class HistoryDatabase:
             f"LIMIT ?",
             (*params, limit + 1),
         )
-        rows = [dict(row) for row in cursor.fetchall()]
+        rows = [_decrypt_record(dict(row)) for row in cursor.fetchall()]
 
         has_more = len(rows) > limit
         items = rows[:limit]

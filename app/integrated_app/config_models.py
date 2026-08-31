@@ -39,6 +39,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    SecretStr,
     ValidationError,
     field_validator,
     model_validator,
@@ -89,6 +90,20 @@ class AdvancedParamsConfig(BaseModel):
         return self.model_dump()
 
 
+class SSLConfig(BaseModel):
+    """TLS/SSL 配置（H2 整改：SSL 接线）。
+
+    Attributes:
+        certfile: 服务器证书文件路径（PEM）。
+        keyfile: 私钥文件路径（PEM）。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    certfile: str = Field(default="", description="SSL 证书文件路径 (PEM)")
+    keyfile: str = Field(default="", description="SSL 私钥文件路径 (PEM)")
+
+
 class ServerConfig(BaseModel):
     """HTTP 服务器相关配置。
 
@@ -113,6 +128,7 @@ class ServerConfig(BaseModel):
     port_fallback_max: int = Field(default=8090, ge=1, le=65535)
     open_browser: bool = Field(default=True, description="Auto-open browser on startup")
     workers: int = Field(default=1, ge=1, le=4, description="Worker count (1 for GPU)")
+    ssl: SSLConfig = Field(default_factory=SSLConfig, description="TLS/SSL 配置（H2）")
 
     @field_validator("host")
     @classmethod
@@ -148,6 +164,24 @@ class GenerationConfig(BaseModel):
     default_speed: float = Field(default=1.0, gt=0, le=3.0, description="Default speech speed")
     default_seed: int = Field(default=42, description="Default random seed")
     script_studio_silence_secs: float = Field(default=0.4, gt=0, le=2.0, description="Silence between script segments")
+
+    # 配置外置：生成超时 / 并发 / 信号量排队（原硬编码 env 常量迁移到配置）
+    timeout_s: float = Field(
+        default=600.0,
+        gt=0,
+        description="单次生成硬超时（秒），超时后释放信号量并返回友好错误",
+    )
+    max_concurrent: int = Field(
+        default=1,
+        ge=1,
+        le=8,
+        description="每引擎最大并发生成数（per-engine 信号量容量）",
+    )
+    semaphore_acquire_timeout_s: float = Field(
+        default=120.0,
+        gt=0,
+        description="获取生成信号量的排队等待上限（秒），超时返回系统繁忙",
+    )
 
 
 class MemoryConfig(BaseModel):
@@ -263,6 +297,11 @@ class ModelConfig(BaseModel):
     base_dir: str = Field(default="model", description="Base directory for model weights")
     voxcpm_vram: float = Field(default=6.0, gt=0, description="VoxCPM2 VRAM requirement (GB)")
     indextts2_vram: float = Field(default=6.0, gt=0, description="IndexTTS 2.5 VRAM requirement (GB)")
+    vram_safety_margin_gb: float = Field(
+        default=1.5,
+        gt=0,
+        description="VRAM 安全余量倍数：加载预检所需显存 = 引擎基线需求 × 该倍数",
+    )
     engines: dict[str, EngineSpecConfig] = Field(
         default_factory=dict,
         description="声明式引擎注册表，key 为引擎名称",
@@ -376,16 +415,46 @@ class RuntimeTaskConfig(BaseModel):
     )
 
 
+class IntegrityConfig(BaseModel):
+    """完整性自检配置（M1/M8 整改：自检可配置阻塞 + 二进制校验）。
+
+    Attributes:
+        block_startup_on_failure: 核心模块完整性自检失败时是否阻断启动。
+        verify_binaries: 启动时是否执行关键二进制 SHA256 校验（失败即阻断）。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    block_startup_on_failure: bool = Field(
+        default=False,
+        description="核心模块完整性自检失败时阻断启动（默认 False 以避免误伤）",
+    )
+    verify_binaries: bool = Field(
+        default=False,
+        description="启动时执行关键二进制 SHA256 校验（失败即阻断）",
+    )
+    expected_model_hashes: str = Field(
+        default="",
+        description="C1：模型权重期望哈希清单路径（JSON，相对项目根或绝对）；为空则不校验",
+    )
+    block_on_model_mismatch: bool = Field(
+        default=False,
+        description="C1：权重哈希不匹配时是否阻断启动/加载（默认 False 仅告警）",
+    )
+
+
 class RuntimeConfig(BaseModel):
     """运行时配置。
 
     Attributes:
         task: 任务队列与断点续跑配置。
+        integrity: 完整性自检与二进制校验配置。
     """
 
     model_config = ConfigDict(extra="ignore")
 
     task: RuntimeTaskConfig = Field(default_factory=RuntimeTaskConfig)
+    integrity: IntegrityConfig = Field(default_factory=IntegrityConfig)
 
 
 class ApiAuthConfig(BaseModel):
@@ -399,7 +468,7 @@ class ApiAuthConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     enabled: bool = Field(default=False, description="Whether API auth is enabled")
-    token: str = Field(default="", description="API auth token")
+    token: SecretStr = Field(default=SecretStr(""), description="API auth token (SecretStr)")
 
     @model_validator(mode="after")
     def validate_auth_config(self) -> "ApiAuthConfig":
@@ -425,7 +494,7 @@ class ApiAuthConfig(BaseModel):
         #   因此选择"看起来坏了"的行为（所有请求被拒），引导用户立刻
         #   发现配置缺失并补上正确 token，遵循安全设计的"默认拒绝"原则。
         # ------------------------------------------------------------------
-        if self.enabled and not self.token:
+        if self.enabled and not self.token.get_secret_value():
             import warnings
 
             warnings.warn(
@@ -493,6 +562,50 @@ class SecurityConfig(BaseModel):
         description="文本内容安全检测置信度阈值（0.0~1.0），默认 0.3：单条强关键词命中（置信度≈0.333）即可拦截",
     )
 
+    # H3 / M3 / M7 整改：PII 加密、内容安全网关开关、结构化审计日志
+    content_safety_enabled: bool = Field(
+        default=True,
+        description="M3：是否启用文本内容安全网关（生成前对输入文本做安全检测）",
+    )
+    pii_encryption_enabled: bool = Field(
+        default=False,
+        description="H3：是否对历史记录中的 PII 字段（text_preview）列级加密落库",
+    )
+    pii_retention_days: int = Field(
+        default=90,
+        ge=0,
+        description="H3：PII 留存期限（天），0 表示永久保留；到期记录由清理任务删除",
+    )
+    pii_encryption_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="H3：PII 加密 Fernet 密钥；为空则回退环境变量 TTS_PII_FERNET_KEY 或 data/.pii_key 自动生成",
+    )
+    audit_enabled: bool = Field(
+        default=False,
+        description="M7：是否启用结构化审计日志（auth 失败/配置变更/PII 访问导出/模型加载等）",
+    )
+
+
+class RateLimitConfig(BaseModel):
+    """API 速率限制配置（M2 整改：覆盖 /v1 与上传端点 + 可信代理 XFF）。
+
+    Attributes:
+        enabled: 是否启用速率限制。
+        requests_per_minute: 每分钟最大请求数。
+        burst: 允许的突发请求数。
+        trusted_proxies: 可信反向代理 IP 列表；仅当 request.client.host 在列表中时才读取 X-Forwarded-For。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool = Field(default=True, description="是否启用速率限制")
+    requests_per_minute: int = Field(default=10, ge=1, description="每分钟最大请求数")
+    burst: int = Field(default=5, ge=1, description="突发请求数")
+    trusted_proxies: list[str] = Field(
+        default_factory=list,
+        description="可信反向代理 IP；仅当客户端 IP 在列表中才信任 X-Forwarded-For",
+    )
+
 
 class AppConfig(BaseModel):
     """根应用配置模型 — 整个配置树的顶层容器。
@@ -530,6 +643,7 @@ class AppConfig(BaseModel):
     ui: UIConfig = Field(default_factory=UIConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
+    rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
 
     @field_validator("server")
     @classmethod
@@ -632,4 +746,5 @@ def load_config_dict(yaml_data: Any) -> AppConfig:
         ui=yaml_data.get("ui", {}),
         runtime=yaml_data.get("runtime", {}),
         security=yaml_data.get("security", {}),
+        rate_limit=yaml_data.get("rate_limit", {}),
     )
