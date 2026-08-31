@@ -155,7 +155,7 @@ jobs:
           #   - pytest 任一用例失败 → 本 job 变红
           #   - 覆盖率低于 40% → 本 job 变红（门禁真正生效）
           pytest tests/ -v --tb=short --timeout=180 --ignore=tests/e2e --cov=app/integrated_app --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov --cov-fail-under=40 \
-            -m "not integration and not gpu and not cuda and not vram"
+            -m "not integration and not gpu and not cuda and not vram and not benchmark and not stress"
 
       - name: Run benchmark tests
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' && runner.os == 'Linux'

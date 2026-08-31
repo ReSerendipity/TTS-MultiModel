@@ -42,6 +42,25 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-benchmark
 
+      # 2026-08-31 治理修复（P2-1）：跨 run 基线持久化。
+      # 此前 `last_run` 的 cp 复制只存在于单次 runner 内、无缓存持久化，
+      # 导致对比步 `if [ -d output/benchmarks/last_run ]` 几乎永远为假，
+      # 趋势对比（--benchmark-compare-fail=mean:20%）从未真正生效。
+      # 现在用 actions/cache 持久化 pytest-benchmark 的 storage 目录：
+      #   - main push：restore 历史 → 保存新 run → post 自动 save（key 含 sha，
+      #     精确 key 不命中，restore 命中 restore-key，post 会执行 save 更新基线）。
+      #   - PR：restore 命中 main 分支的基线缓存 → 对比步取到真实历史。
+      #   - 非 fork 内 PR 共享仓库级缓存；fork PR 无法读缓存时走无基线降级路径。
+      - name: Restore benchmark storage cache
+        id: bench-cache
+        uses: actions/cache@v4
+        with:
+          path: output/benchmarks
+          key: benchmark-storage-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            benchmark-storage-refs/heads/main
+            benchmark-storage-
+
       - name: Run performance benchmarks
         env:
           TRANSFORMERS_OFFLINE: "1"
@@ -56,31 +75,39 @@ jobs:
             --benchmark-storage=output/benchmarks \
             --benchmark-save=ci-${{ github.sha }}
 
-      - name: Compare benchmark results
+      # 趋势对比（regression gate）：仅 PR 且能取到历史基线时阻断。
+      # pytest-benchmark 的 --benchmark-compare 会与 storage 中最近的 run 对比，
+      # --benchmark-compare-fail=mean:20% 表示均值回退超过 20% 即失败。
+      - name: Compare benchmark results (regression gate)
         if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        env:
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_OFFLINE: "1"
+          MODELSCOPE_OFFLINE: "1"
+          CUDA_VISIBLE_DEVICES: ""
         run: |
           echo "## Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Install pytest-benchmark to compare with previous runs
-          pip install pytest-benchmark
-          
-          # Try to compare with baseline (may fail if no baseline exists)
-          if [ -d "output/benchmarks/last_run" ]; then
-            pytest tests/benchmarks/ \
+
+          # 统计 storage 中已有的 run 数量（不含刚保存的本轮）
+          RUNS=$(find output/benchmarks -name '*.json' 2>/dev/null | grep -v "ci-${{ github.sha }}" | wc -l)
+          echo "历史基线 run 数: $RUNS"
+
+          if [ "$RUNS" -gt 0 ]; then
+            echo "存在历史基线，执行回归对比（mean 回退 >20% 即失败）..."
+            pytest tests/benchmarks/ -q \
+              -m "benchmark" \
               --benchmark-only \
+              --benchmark-columns=mean,median,stddev,min,max \
+              --benchmark-storage=output/benchmarks \
               --benchmark-compare \
               --benchmark-compare-fail=mean:20% \
-              --benchmark-storage=output/benchmarks
+              --benchmark-autosave \
+              >> $GITHUB_STEP_SUMMARY 2>&1 || exit 1
           else
-            echo "No baseline found. First benchmark run saved."
+            echo "未取到历史基线（首次 run 或 fork PR 无缓存），仅记录本次结果，跳过回归门禁。"
+            echo "建议在 main 分支跑通一次后重跑本 PR 以开启趋势对比。"
           fi
-
-      - name: Save baseline for next comparison
-        if: always()
-        run: |
-          mkdir -p output/benchmarks/last_run
-          cp -r output/benchmarks/* output/benchmarks/last_run/ || true
 
       - name: Upload benchmark results
         if: always()

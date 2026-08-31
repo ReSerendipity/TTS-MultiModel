@@ -1,0 +1,71 @@
+name: Frontend Smoke
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'app/integrated_app/templates/**'
+      - 'app/integrated_app/static/**'
+      - 'tests/frontend/**'
+      - 'tests/scripts/render_pages.py'
+      - '.github/workflows/frontend.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/integrated_app/templates/**'
+      - 'app/integrated_app/static/**'
+      - 'tests/frontend/**'
+      - 'tests/scripts/render_pages.py'
+      - '.github/workflows/frontend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-smoke:
+    name: Frontend Smoke (jsdom)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 2026-08-31 治理修复（P3）：前端冒烟测试接入 CI。
+      # 此前 tests/frontend/smoke.js 与 tests/package.json 的 test:frontend 存在，
+      # 但全仓 .github/** 无任何工作流引用 —— "写了不跑"的孤儿测试。
+      # 本工作流在触及模板/静态资源的 PR 上强制运行：render_pages.py 只驱动
+      # Jinja2 模板环境（不拉起 FastAPI / torch），离线、快速、可阻断。
+      - name: Install minimal Python deps
+        run: |
+          pip install --upgrade pip
+          pip install jinja2 pyyaml
+
+      - name: Render pages (Jinja2)
+        run: |
+          python tests/scripts/render_pages.py
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install jsdom
+        working-directory: tests
+        run: npm install --no-audit --no-fund
+
+      - name: Run frontend smoke tests (jsdom)
+        run: node tests/frontend/smoke.js
+
+      - name: Upload rendered pages (debug artifact)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-rendered
+          path: tests/frontend/_rendered/
+          retention-days: 7

@@ -1,0 +1,49 @@
+name: Stress Tests (nightly)
+
+on:
+  schedule:
+    # Run daily at 03:00 UTC（避开 benchmark 周更窗口，错峰）
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stress:
+    name: Concurrent Load Stress
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      # 2026-08-31 治理修复（P2-2）：压力测试接入 nightly CI。
+      # 此前 test_load_stress 默认 TTS_SKIP_STRESS=1 跳过、且无任何 workflow 引用，
+      # 属于"写了不跑"的死覆盖；并发访问与串行信号量（AGENTS.md 硬约束 #4）
+      # 从未在 CI 中验证。此处显式设 TTS_SKIP_STRESS=0 强制执行。
+      - name: Run concurrent load stress tests
+        env:
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_OFFLINE: "1"
+          MODELSCOPE_OFFLINE: "1"
+          CUDA_VISIBLE_DEVICES: ""
+          TTS_AUTO_LOAD_MODEL: "0"
+          TTS_SKIP_STRESS: "0"
+        run: |
+          pytest tests/benchmarks/test_load_stress.py -v --tb=short \
+            -m "stress" \
+            --timeout=300

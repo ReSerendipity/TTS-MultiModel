@@ -121,6 +121,10 @@ generation:
   timeout_s: 600                        # 单次生成硬超时（秒）
   max_concurrent: 1                     # 每引擎最大并发生成数
   semaphore_acquire_timeout_s: 120      # 获取生成信号量排队等待上限（秒）
+  # 生成结果缓存（BACKEND_DESIGN_ASSESSMENT 长期项）：相同请求短 TTL 命中，降低重复 GPU 推理成本。
+  # 默认关闭（零风险）；开启后命中时复用既有音频文件、跳过推理，但仍计入历史与监控统计。
+  cache_enabled: false
+  cache_ttl_seconds: 300                # 缓存条目基础生存时间（秒），实际过期叠加随机抖动防雪崩
 
 # ── 可观测性（SRE 评估 P0~P2 落地） ──
 # 全部可选：缺省时各消费模块使用内置默认值，离线可运行；外部 exporter / webhook 仅作增强。
