@@ -108,3 +108,55 @@ def get_persona_cache() -> AdaptiveLRUCache:
             压力自适应调整；key 为 persona 名，value 为预计算的音色嵌入张量。
     """
     return _persona_embedding_cache
+
+
+def verify_model_integrity() -> dict[str, Any]:
+    """C1：模型权重哈希校验（加载链路）。
+
+    读取 ``runtime.integrity.expected_model_hashes`` 指向的 JSON 清单
+    （{相对 model/ 的路径: 期望 sha256}），对实际权重文件计算 sha256 比对。
+    清单缺失时返回 enabled=False（不阻塞）。不匹配时由调用方按
+    ``block_on_model_mismatch`` 决定是否阻断启动。
+
+    Returns:
+        {"enabled", "checked", "mismatched": [...], "missing": [...]}
+    """
+    import hashlib
+    import json as _json
+    import os
+
+    try:
+        from .config import get_config, get_project_root
+
+        cfg = get_config().pydantic_config.runtime.integrity
+    except Exception as exc:  # noqa: BLE001
+        return {"enabled": False, "reason": f"config unavailable: {exc}"}
+    manifest_path = cfg.expected_model_hashes
+    if not manifest_path:
+        return {"enabled": False, "reason": "no expected_model_hashes configured"}
+    if not os.path.isabs(manifest_path):
+        manifest_path = os.path.join(get_project_root(), manifest_path)
+    if not os.path.exists(manifest_path):
+        return {"enabled": True, "checked": 0, "mismatched": [], "missing": [], "reason": "manifest not found"}
+    try:
+        with open(manifest_path, encoding="utf-8") as f:
+            manifest = _json.load(f)
+        model_root = os.path.join(get_project_root(), "model")
+        mismatched: list[str] = []
+        missing: list[str] = []
+        checked = 0
+        for rel, expected in manifest.items():
+            abspath = os.path.join(model_root, rel)
+            if not os.path.exists(abspath):
+                missing.append(rel)
+                continue
+            h = hashlib.sha256()
+            with open(abspath, "rb") as fh:
+                for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                    h.update(chunk)
+            checked += 1
+            if h.hexdigest() != expected:
+                mismatched.append(rel)
+        return {"enabled": True, "checked": checked, "mismatched": mismatched, "missing": missing}
+    except Exception as exc:  # noqa: BLE001
+        return {"enabled": True, "checked": 0, "mismatched": [], "missing": [], "reason": str(exc)}

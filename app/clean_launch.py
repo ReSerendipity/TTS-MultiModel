@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 TTS MultiModel - 应用启动脚本
 ==============================
@@ -206,6 +205,15 @@ def _kill_port_occupant(port, ip="127.0.0.1"):
         - 需要相应权限才能终止其他进程
         - 终止后等待 1 秒确保端口释放
     """
+    # L4 整改：端口强杀前需人工确认（CI/容器无 stdin 时自动取消，不误杀）
+    if not os.environ.get("TTS_SKIP_PORT_KILL_CONFIRM"):
+        try:
+            _confirm = input(f"端口 {port} 被占用，将终止占用进程以继续启动，是否继续？(y/N): ")
+        except (EOFError, KeyboardInterrupt):
+            _confirm = "n"
+        if _confirm.strip().lower() != "y":
+            logger.info("已取消端口强杀，占用进程保留。")
+            return
     try:
         import psutil
 
@@ -251,7 +259,7 @@ def verify_binaries():
         return True
 
     entries = []
-    with open(checksum_file, "r", encoding="utf-8") as f:
+    with open(checksum_file, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
@@ -335,6 +343,13 @@ def start_app():
 
     # Kill any leftover process on the target port before selecting
     _kill_port_occupant(int(port), ip)
+
+    # M8 整改：关键二进制 SHA256 完整性校验（默认关闭；设 TTS_VERIFY_BINARIES=1 启用）。
+    # 仅当校验清单存在且哈希不匹配时拒绝启动；清单缺失则跳过（不阻断）。
+    if os.environ.get("TTS_VERIFY_BINARIES") == "1":
+        if not verify_binaries():
+            logger.error("[start_app] 二进制完整性校验失败，拒绝启动")
+            sys.exit(1)
 
     # Auto-select port if 7869 is occupied
     def _find_available_port(start_port, max_attempts=10):
@@ -441,6 +456,16 @@ def start_app():
         # 不再使用 input() 阻塞等待回车：缺失引擎（如 IndexTTS 2.5）可能长期不下载，
         # 每次启动都要求手动确认会造成无效阻塞。警告信息照常打印后自动继续。
         # Skip startup block | 跳过启动阻断 # sys.exit(1)
+
+    # M8 整改：关键二进制 SHA256 校验（默认关闭，开启后失败即阻断启动）
+    try:
+        from integrated_app.config import get_config
+
+        if get_config().pydantic_config.runtime.integrity.verify_binaries and not verify_binaries():
+            logger.error("[start_app] 关键二进制校验失败，按 runtime.integrity.verify_binaries 配置阻断启动")
+            sys.exit(1)
+    except Exception as e:
+        logger.debug(f"二进制校验跳过: {e}")
 
     threading.Thread(target=auto_open_browser, args=(ip, actual_port), daemon=True).start()
     loop = asyncio.new_event_loop()
