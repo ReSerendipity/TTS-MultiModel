@@ -1866,8 +1866,29 @@ def _check_content_safety(text: str) -> None:
     """
     if not text or not text.strip():
         return
+    # M3 整改：内容安全受 config.security.content_safety_enabled 开关控制
+    try:
+        from .config import get_config
+
+        if not get_config().pydantic_config.security.content_safety_enabled:
+            return
+    except Exception:  # noqa: BLE001
+        pass
     result = check_safety(text)
     if not result.is_safe:
+        # M7：记录内容拦截审计（detail 仅含类别，不写完整 PII 文本）
+        try:
+            from .security.audit import log_audit
+
+            log_audit(
+                "content_blocked",
+                actor="user",
+                detail=f"category={result.category.value}",
+                severity="warning",
+                outcome="blocked",
+            )
+        except Exception:  # noqa: BLE001
+            pass
         logger.warning(
             "内容安全拦截: category=%s, confidence=%.4f, patterns=%s",
             result.category.value,
