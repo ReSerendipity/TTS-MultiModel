@@ -419,9 +419,7 @@ class TrainingTracker:
 
         early_stop = False
         if state is not None and early_stopping_patience > 0:
-            early_stop = self.should_stop_early(
-                state, early_stopping_patience, early_stopping_min_delta
-            )
+            early_stop = self.should_stop_early(state, early_stopping_patience, early_stopping_min_delta)
 
         info: dict[str, Any] = {
             "epoch": int(epoch),

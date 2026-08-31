@@ -789,11 +789,11 @@ class OpenAICompatibleRouter:
 
             # M3 内容安全网关：对输入文本做统一安全检测（与 routes/generate/* 同入口）
             try:
-                from ..config import get_config
+                from .config import get_config
 
                 if get_config().pydantic_config.security.content_safety_enabled:
-                    from ...security.audit import log_audit
-                    from ..security.content_safety import get_safety_detector
+                    from .security.audit import log_audit
+                    from .security.content_safety import get_safety_detector
 
                     _safety = get_safety_detector().detect(body.input)
                     if not _safety.is_safe:

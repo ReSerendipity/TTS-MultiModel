@@ -187,6 +187,35 @@ def _ensure_dirs():
 # ---------------------------------------------------------------------------
 
 
+def _resolve_config_path(config_path: str | None = None) -> str:
+    """解析配置文件绝对路径（12-Factor III 配置外部化）。
+
+    优先级（从高到低）：
+        1. 显式传入的 ``config_path`` 参数；
+        2. 环境变量 ``TTS_CONFIG_PATH``（容器/集群注入挂载的 config.yaml 用）；
+        3. ``ROOT_DIR/config.yaml``（开发态默认位置）；
+        4. ``/app/config.yaml``（wheel 安装到 site-packages 后，源码仍在 /app 的容器兜底）。
+
+    Args:
+        config_path: 调用方显式指定的路径（可为 None）。
+
+    Returns:
+        str: 解析后的配置路径。
+    """
+    if config_path:
+        return os.path.abspath(config_path)
+    env_path = os.environ.get("TTS_CONFIG_PATH", "").strip()
+    if env_path:
+        return os.path.abspath(env_path)
+    default = os.path.join(ROOT_DIR, "config.yaml")
+    if os.path.exists(default):
+        return default
+    container_default = "/app/config.yaml"
+    if os.path.exists(container_default):
+        return container_default
+    return default
+
+
 def _load_yaml_config() -> dict:
     """Load config.yaml and return parsed dict, or empty dict on failure.
 
@@ -194,6 +223,48 @@ def _load_yaml_config() -> dict:
     自动回退到原始 YAML 加载，保证启动不被配置错误阻塞。
     """
     return load_config(None)
+
+
+def get_history_db_path() -> str:
+    """返回历史记录数据库文件路径（消除 config.yaml 死配置）。
+
+    读取 ``config.yaml -> history.db_path``（相对项目根目录），缺省回退到
+    ``data/history.db``。该路径现与代码实际使用的数据库保持一致，使配置从
+    "死值" 变为可治理的单一事实来源。
+
+    Returns:
+        str: 历史库 sqlite 文件的绝对路径。
+    """
+    default_rel = "data/history.db"
+    # 优先级（12-Factor III 配置外部化）：环境变量 TTS_HISTORY_DB_PATH > config.yaml > 默认值
+    env_path = os.environ.get("TTS_HISTORY_DB_PATH", "").strip()
+    if env_path:
+        return os.path.abspath(env_path)
+    try:
+        cfg = _load_yaml_config()
+        raw = (cfg.get("history") or {}).get("db_path")
+        if not raw:
+            raw = default_rel
+    except Exception:
+        raw = default_rel
+    return os.path.join(ROOT_DIR, raw)
+
+
+def get_history_keep_days() -> int:
+    """返回历史记录保留天数（消除 config.yaml 死配置）。
+
+    ``config.yaml -> history.keep_days``：
+    - ``0`` 或不配置 → 永久保留（默认，向后兼容）；
+    - ``>0`` → 启动与定期任务将裁剪超过该天数的记录。
+
+    Returns:
+        int: 保留天数（>=0）。
+    """
+    try:
+        cfg = _load_yaml_config()
+        return int((cfg.get("history") or {}).get("keep_days", 0) or 0)
+    except Exception:
+        return 0
 
 
 def _parse_version(yaml_config: dict) -> str:
@@ -226,24 +297,43 @@ def _parse_generation_defaults(yaml_config: dict) -> GenerationDefaultsConfig:
 
 
 def _parse_api_auth(yaml_config: dict) -> ApiAuthConfig:
-    """Parse API auth settings from config.yaml api_auth section."""
+    """Parse API auth settings from config.yaml api_auth section.
+
+    配置外部化（12-Factor III）：以下项均可经环境变量覆盖，优先级高于 config.yaml，
+    便于容器/集群无重建镜像即调整认证策略：
+
+    - ``TTS_API_AUTH_ENABLED``：``1/true/yes/on`` 开启，其余关闭（覆盖 yaml 的 enabled）。
+    - ``TTS_API_AUTH_TOKEN``：注入 Bearer Token，避免明文固化进镜像层（M5 整改）。
+    - 当 ``enabled=True`` 但未提供 token 时，自动生成一次性随机 token 并打印到日志，
+      保证 ``0.0.0.0`` 监听场景下安全网（app_server.run_server）可被满足而正常启动。
+    """
     if not yaml_config:
         return ApiAuthConfig()
     try:
         auth_cfg = yaml_config.get("api_auth", {})
         if isinstance(auth_cfg, dict):
             token = str(auth_cfg.get("token", ""))
-            # M5 整改：允许通过环境变量 TTS_API_AUTH_TOKEN 注入 Bearer Token，
-            # 避免将明文 token 固化进 config.yaml / 容器镜像层。
-            import os as _os
+            enabled = bool(auth_cfg.get("enabled", False))
 
+            env_enabled = os.environ.get("TTS_API_AUTH_ENABLED")
+            if env_enabled is not None:
+                enabled = env_enabled.strip().lower() in ("1", "true", "yes", "on")
             from pydantic import SecretStr as _SecretStr
 
-            env_token = _os.environ.get("TTS_API_AUTH_TOKEN", "")
+            env_token = os.environ.get("TTS_API_AUTH_TOKEN", "")
             if env_token:
                 token = env_token
+            # 启用但无 token：生成一次性 token（容器便捷默认），并记录日志供调用方使用。
+            if enabled and not token:
+                import secrets
+
+                token = secrets.token_hex(16)
+                logger.warning(
+                    "[config] api_auth 已启用但未提供 TTS_API_AUTH_TOKEN，已生成一次性 Bearer Token（重启后失效）：%s",
+                    token,
+                )
             return ApiAuthConfig(
-                enabled=bool(auth_cfg.get("enabled", False)),
+                enabled=enabled,
                 token=_SecretStr(token),
             )
     except Exception as e:
@@ -346,6 +436,18 @@ class AppConfig:
         self._ensure_loaded()
         return {"enabled": self._api_auth.enabled, "token": self._api_auth.token.get_secret_value()}
 
+    @property
+    def observability_dict(self) -> dict:
+        """可观测性配置（alerting / slo / exporter），读取 config.yaml ``observability`` 段。
+
+        该段为可选配置；缺省时返回空字典，由各消费模块使用内置默认值。
+        设计原则（AGENTS.md 硬约束 #5 离线优先）：所有值均可本地配置，
+        不依赖任何外部服务即可生效，外部 exporter / webhook 仅作为可选增强。
+        """
+        self._ensure_loaded()
+        raw = self._yaml_config.get("observability", {}) or {}
+        return raw if isinstance(raw, dict) else {}
+
 
 # ---------------------------------------------------------------------------
 # Singleton accessor
@@ -399,7 +501,7 @@ def save_config(config_dict: dict, config_path: str | None = None) -> None:
     import yaml
 
     if config_path is None:
-        config_path = os.path.join(ROOT_DIR, "config.yaml")
+        config_path = _resolve_config_path()
 
     config_dir = os.path.dirname(config_path)
     if config_dir:
@@ -440,7 +542,7 @@ def load_config(config_path: str | None = None) -> dict:
         dict: 配置字典。配置文件不存在时返回空字典 ``{}``。
     """
     if config_path is None:
-        config_path = os.path.join(ROOT_DIR, "config.yaml")
+        config_path = _resolve_config_path()
 
     # 尝试 Pydantic 严格验证
     try:

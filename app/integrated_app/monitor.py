@@ -183,6 +183,21 @@ class HealthMonitor:
                 f"建议检查是否存在未释放的中间张量或缓存未清理。"
             )
             logger.warning(warning)
+            # SRE P0-2：显存泄漏即发告警
+            try:
+                from .observability.alerting import Alert, AlertSeverity, get_alert_manager
+
+                get_alert_manager().emit(
+                    Alert(
+                        severity=AlertSeverity.WARNING,
+                        title="潜在 GPU 显存泄漏",
+                        detail=f"显存较基线上升约 {diff:.0f}MB（当前 {samples_list[-1]:.0f}MB）",
+                        source="vram_leak",
+                        labels={"rule": "memory_leak"},
+                    )
+                )
+            except Exception:  # noqa: BLE001
+                pass
             return warning
         return None
 
@@ -280,6 +295,22 @@ class HealthMonitor:
         # 实际用户可用只有 95%，90% 触发留 5% 安全裕度让当前推理优雅退出而非内核崩溃
         if usage_pct > self.VRAM_CIRCUIT_BREAKER_PCT:
             self._circuit_breaker_trips += 1
+            # SRE P0-2：熔断触发即发告警（去重由 AlertManager 处理）
+            try:
+                from .observability.alerting import Alert, AlertSeverity, get_alert_manager
+
+                get_alert_manager().emit(
+                    Alert(
+                        severity=AlertSeverity.CRITICAL,
+                        title="显存熔断触发",
+                        detail=f"VRAM 占用 {usage_pct:.1f}% 超过阈值 {self.VRAM_CIRCUIT_BREAKER_PCT}%",
+                        source="vram_circuit_breaker",
+                        labels={"rule": "circuit_breaker"},
+                    ),
+                    force=True,
+                )
+            except Exception:  # noqa: BLE001 — 告警失败绝不阻断熔断主流程
+                pass
             reason = (
                 f"VRAM 占用 {usage_pct:.1f}% 超过阈值 {self.VRAM_CIRCUIT_BREAKER_PCT}%，"
                 f"累计熔断触发 {self._circuit_breaker_trips} 次。请立即终止推理并清理显存。"
@@ -539,6 +570,59 @@ class HealthMonitor:
         if "success_rate_pct" in report and "success_rate" not in report:
             report["success_rate"] = report["success_rate_pct"]
         return report
+
+    # ---------------------------------------------------------------------------
+    # SRE P2-1：累计计数器跨重启持久化（依赖 history_db.meta_kv）
+    # 失败全部静默降级：离线 / DB 不可用时仅内存计数，不影响主流程。
+    # ---------------------------------------------------------------------------
+
+    def load_persisted_state(self) -> None:
+        """从 history_db 恢复累计计数器（重启后保持连续性）。
+
+        仅在当前计数为 0 时恢复，避免重复累加；调用时机应在 DB 就绪之后。
+        """
+        try:
+            from .history_db import get_history_db
+
+            db = get_history_db()
+            if db is None:
+                return
+            counters = db.load_metric_counters()
+            if not counters:
+                return
+            if self._total_generations == 0 and "total_generations" in counters:
+                self._total_generations = counters.get("total_generations", 0)
+                self._total_errors = counters.get("total_errors", 0)
+                self._total_oom_retries = counters.get("total_oom_retries", 0)
+                self._circuit_breaker_trips = counters.get("circuit_breaker_trips", 0)
+                logger.info(
+                    "[HealthMonitor] 已恢复持久化计数器：生成 %d / 错误 %d / OOM重试 %d / 熔断 %d",
+                    self._total_generations,
+                    self._total_errors,
+                    self._total_oom_retries,
+                    self._circuit_breaker_trips,
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[HealthMonitor] 持久化计数器恢复跳过: %s", exc)
+
+    def save_persisted_state(self) -> None:
+        """将当前累计计数器写入 history_db（幂等 UPSERT）。"""
+        try:
+            from .history_db import get_history_db
+
+            db = get_history_db()
+            if db is None:
+                return
+            db.save_metric_counters(
+                {
+                    "total_generations": self._total_generations,
+                    "total_errors": self._total_errors,
+                    "total_oom_retries": self._total_oom_retries,
+                    "circuit_breaker_trips": self._circuit_breaker_trips,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[HealthMonitor] 持久化计数器保存跳过: %s", exc)
 
 
 _health_monitor = HealthMonitor()

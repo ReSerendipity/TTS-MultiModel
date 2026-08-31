@@ -68,7 +68,12 @@ ui:
   language: zh-CN
   show_onboarding: true
 history:
-  db_path: data/tts_history.db
+  # 历史记录数据库路径（相对项目根目录）。此前该值为死配置（代码硬编码 data/history.db），
+  # 现由 app/integrated_app/config.py::get_history_db_path() 实际消费，作为路径的单一事实来源。
+  # 优先级：环境变量 TTS_HISTORY_DB_PATH > 本配置 > data/history.db
+  db_path: data/history.db
+  # 历史记录保留天数：0 = 永久保留（默认，与历史行为一致）；>0 = 启动时自动裁剪超过该天数的记录。
+  # 实现见 HistoryDatabase.prune_old_records()，仅删除 DB 记录，不删除磁盘音频文件。
   keep_days: 0
 logging:
   level: INFO
@@ -116,3 +121,27 @@ generation:
   timeout_s: 600                        # 单次生成硬超时（秒）
   max_concurrent: 1                     # 每引擎最大并发生成数
   semaphore_acquire_timeout_s: 120      # 获取生成信号量排队等待上限（秒）
+
+# ── 可观测性（SRE 评估 P0~P2 落地） ──
+# 全部可选：缺省时各消费模块使用内置默认值，离线可运行；外部 exporter / webhook 仅作增强。
+# 无需任何外部服务即可生效（硬约束 #5 离线优先）。
+observability:
+  # SLO / SLI 目标（P1-1）：可用性 / 生成成功率 / 平均生成耗时上限
+  slo:
+    availability: 99.5            # 目标可用性 %
+    min_success_rate: 99.0        # 目标生成成功率 %
+    max_avg_latency_ms: 30000.0   # 目标平均生成耗时上限 ms
+  # 告警规则阈值（P0-2）：指标越过阈值即触发对应告警通道
+  alerting:
+    enabled: true
+    min_success_rate: 95.0        # 成功率低于此值触发 CRITICAL（样本 >=10 时）
+    vram_usage_warn_pct: 85.0     # 显存占用 >= 此值触发 WARNING（接近 90% 熔断线）
+    webhook_url: ""               # 可选：企业微信/飞书/Slack 兼容 incoming webhook（留空仅写日志）
+  # 容量采样后台任务（P2-3）：固定频率采集 GPU/CPU/内存时序
+  capacity_sampling:
+    enabled: true
+    interval_seconds: 30
+  # 指标 / 日志（P2-8 / 12-Factor XI）：TTS_LOG_FORMAT=json 时输出 JSON 结构化日志便于集中采集
+  logging:
+    text_format: "[%(asctime)s] [%(levelname)s] [PID:%(process)d TID:%(thread)d] [%(name)s:%(filename)s:%(lineno)d] [req=%(request_id)s] %(message)s"
+    json_format: true             # 仅作声明，真实开关走环境变量 TTS_LOG_FORMAT=json

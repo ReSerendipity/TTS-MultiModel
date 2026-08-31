@@ -244,8 +244,12 @@ class TrainingConfig(BaseModel if BaseModel is not None else object):  # type: i
         lora: LoRAConfig
         optimizer: OptimizerConfig
         epochs: int = Field(10, ge=1, le=200, description="总训练 epoch 数")
-        early_stopping_patience: int = Field(0, ge=0, le=50, description="早停耐心值：连续 N 个 epoch eval loss 无改善则停止；0=禁用（P2-4）")
-        early_stopping_min_delta: float = Field(0.0, ge=0.0, description="早停最小改善量：eval loss 改进小于该值视为无改善（P2-4）")
+        early_stopping_patience: int = Field(
+            0, ge=0, le=50, description="早停耐心值：连续 N 个 epoch eval loss 无改善则停止；0=禁用（P2-4）"
+        )
+        early_stopping_min_delta: float = Field(
+            0.0, ge=0.0, description="早停最小改善量：eval loss 改进小于该值视为无改善（P2-4）"
+        )
         batch_size: int = Field(2, ge=1, le=32, description="单卡每步 batch 大小")
         grad_accum_steps: int = Field(4, ge=1, le=32, description="梯度累积步数")
         warmup_steps: int = Field(100, ge=0, description="学习率 warmup 的 step 数")

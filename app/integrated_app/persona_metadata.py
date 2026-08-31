@@ -26,6 +26,7 @@
     - 被 routes/api/persona.py 调用：标签查询、分类查询、导入导出接口。
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -252,8 +253,9 @@ class PersonaExporter:
                     arcname = os.path.join(persona_name, filename)
                     zf.write(filepath, arcname)
 
-            meta_path = os.path.join(persona_dir, "metadata.json")
+            meta_path = os.path.join(persona_dir, f"{persona_name}.metadata.json")
             if not os.path.exists(meta_path):
+                # 优先由 .txt 生成结构化元数据，再写入独立的 <name>.metadata.json
                 meta = PersonaMetadata(name=persona_name)
                 txt_path = os.path.join(persona_dir, f"{persona_name}.txt")
                 if os.path.exists(txt_path):
@@ -262,7 +264,7 @@ class PersonaExporter:
                 with open(meta_path, "w", encoding="utf-8") as f:
                     json.dump(meta.to_dict(), f, ensure_ascii=False, indent=2)
 
-            zf.write(meta_path, os.path.join(persona_name, "metadata.json"))
+            zf.write(meta_path, os.path.join(persona_name, f"{persona_name}.metadata.json"))
 
         return output_path
 
@@ -296,18 +298,31 @@ class PersonaExporter:
             names = zf.namelist()
             if names:
                 persona_name = names[0].split("/")[0]
+                # 兼容旧版 zip 中的共享 metadata.json：重命名为 per-persona 文件
+                # zip 内部布局为 <persona_name>/...，故共享文件位于子目录内
+                legacy = os.path.join(persona_dir, persona_name, "metadata.json")
+                if os.path.exists(legacy):
+                    with contextlib.suppress(OSError):
+                        os.replace(legacy, os.path.join(persona_dir, persona_name, f"{persona_name}.metadata.json"))
                 return persona_name
 
         return os.path.splitext(os.path.basename(zip_path))[0]
 
 
 def load_persona_metadata(persona_dir: str, persona_name: str) -> PersonaMetadata:
-    """加载音色元数据，优先读取 metadata.json，回退旧版 .txt 格式。
+    """加载音色元数据，优先读取 <persona_name>.metadata.json，回退旧版 .txt 格式。
+
+    存储策略（数据治理修复：此前所有音色共享同一个 ``metadata.json``，
+    导致最后写入者覆盖、且根目录残留的测试数据污染所有音色）：
+        - 每个音色独立存储为 ``{persona_dir}/{persona_name}.metadata.json``；
+        - 兼容旧版 ``{persona_name}.txt`` 三行格式作为兜底；
+        - 仍兼容极少数历史 ``{persona_dir}/metadata.json`` 单文件（迁移期）。
 
     加载策略：
-        1. 尝试读取 metadata.json（新版结构化元数据）；
-        2. 若 metadata.json 不存在或解析失败，尝试读取同名 .txt（旧版三行格式）；
-        3. 若两者均失败，返回仅含 name 的默认元数据对象。
+        1. 尝试读取 ``<persona_name>.metadata.json``（新版结构化元数据）；
+        2. 若其不存在或解析失败，尝试读取同名 .txt（旧版三行格式）；
+        3. 若两者均失败，尝试读取旧的共享 ``metadata.json``；
+        4. 若仍失败，返回仅含 name 的默认元数据对象。
 
     Args:
         persona_dir: 音色文件所在目录（通常为 PERSONA_DIR）。
@@ -316,7 +331,8 @@ def load_persona_metadata(persona_dir: str, persona_name: str) -> PersonaMetadat
     Returns:
         PersonaMetadata: 加载到的元数据实例，永远不会返回 None。
     """
-    meta_path = os.path.join(persona_dir, "metadata.json")
+    legacy_shared = os.path.join(persona_dir, "metadata.json")
+    meta_path = os.path.join(persona_dir, f"{persona_name}.metadata.json")
 
     if os.path.exists(meta_path):
         try:
@@ -324,7 +340,7 @@ def load_persona_metadata(persona_dir: str, persona_name: str) -> PersonaMetadat
                 data = json.load(f)
                 return PersonaMetadata.from_dict(data)
         except Exception as e:
-            logger.warning(f"加载 {persona_name} 的 metadata.json 失败: {e}")
+            logger.warning(f"加载 {persona_name} 的 {persona_name}.metadata.json 失败: {e}")
 
     txt_path = os.path.join(persona_dir, f"{persona_name}.txt")
     if os.path.exists(txt_path):
@@ -334,21 +350,32 @@ def load_persona_metadata(persona_dir: str, persona_name: str) -> PersonaMetadat
         except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
             pass
 
+    # 迁移期兜底：兼容极少数历史共享 metadata.json
+    if os.path.exists(legacy_shared):
+        try:
+            with open(legacy_shared, encoding="utf-8") as f:
+                data = json.load(f)
+                # 仅当共享文件恰好描述当前音色时才采用，避免再次污染
+                if data.get("name") == persona_name:
+                    return PersonaMetadata.from_dict(data)
+        except Exception:  # nosec B110 - 兜底异常处理
+            pass
+
     return PersonaMetadata(name=persona_name)
 
 
 def save_persona_metadata(persona_dir: str, persona_name: str, meta: PersonaMetadata):
-    """保存音色元数据到 metadata.json，并同步更新旧版 .txt 文件。
+    """保存音色元数据到 <persona_name>.metadata.json，并同步更新旧版 .txt 文件。
 
-    双写策略保证新旧版本兼容性：新代码读取 metadata.json 获取完整信息，
-    旧代码仍可从 .txt 获取基础语音类型/描述/特征。
+    双写策略保证新旧版本兼容性：新代码读取 ``<persona_name>.metadata.json``
+    获取完整信息，旧代码仍可从 .txt 获取基础语音类型/描述/特征。
 
     Args:
         persona_dir: 音色文件所在目录（通常为 PERSONA_DIR）。
-        persona_name: 音色名称，用于生成 .txt 文件名。
+        persona_name: 音色名称，用于生成 .metadata.json / .txt 文件名。
         meta: 待保存的元数据实例。
     """
-    meta_path = os.path.join(persona_dir, "metadata.json")
+    meta_path = os.path.join(persona_dir, f"{persona_name}.metadata.json")
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta.to_dict(), f, ensure_ascii=False, indent=2)
 

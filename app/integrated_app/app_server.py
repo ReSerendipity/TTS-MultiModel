@@ -130,6 +130,30 @@ class CachedStaticFiles(StaticFiles):
         return response
 
 
+class _JsonLogFormatter(logging.Formatter):
+    """将日志记录序列化为单行 JSON（便于 Loki/ELK 采集，12-Factor XI）。
+
+    保留与文本格式等价的字段：time / level / logger / request_id / pid / tid / message。
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        import json
+        from datetime import datetime, timezone
+
+        log_record = {
+            "time": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "request_id": getattr(record, "request_id", "-"),
+            "pid": record.process,
+            "tid": record.thread,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            log_record["exc_info"] = self.formatException(record.exc_info)
+        return json.dumps(log_record, ensure_ascii=False)
+
+
 def setup_logging() -> None:
     """配置日志：控制台 + 按大小轮转的文件（单文件 10MB，保留 3 个备份）。
 
@@ -153,11 +177,15 @@ def setup_logging() -> None:
     level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, level_name, logging.INFO)
 
-    formatter = logging.Formatter(
-        "[%(asctime)s] [%(levelname)s] [PID:%(process)d TID:%(thread)d] "
-        "[%(name)s:%(filename)s:%(lineno)d] [req=%(request_id)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    # 结构化日志：TTS_LOG_FORMAT=json 时输出 JSON 便于集中采集（12-Factor XI）
+    if os.environ.get("TTS_LOG_FORMAT", "text").lower() == "json":
+        formatter: logging.Formatter = _JsonLogFormatter()
+    else:
+        formatter = logging.Formatter(
+            "[%(asctime)s] [%(levelname)s] [PID:%(process)d TID:%(thread)d] "
+            "[%(name)s:%(filename)s:%(lineno)d] [req=%(request_id)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
 
     # 控制台输出（开发/调试时可见）
     stream_handler = logging.StreamHandler()
@@ -388,10 +416,68 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from .monitor import get_health_monitor
 
         hm = get_health_monitor()
+        hm.load_persisted_state()
         hm.start_background(delay_seconds=30)
         logger.info("[lifespan] HealthMonitor 后台线程已启动")
     except Exception as e:
         logger.debug(f"[lifespan] HealthMonitor 启动跳过: {e}")
+
+    # SRE P2-3：容量采样后台任务（持续采集 GPU/CPU，供 /api/system/capacity 与告警使用）
+    _capacity_stop = asyncio.Event()
+    try:
+        from .observability.capacity_sampler import capacity_sampling_loop
+
+        _cap_cfg = get_config().observability_dict.get("capacity_sampling", {}) or {}
+        _cap_interval = float(_cap_cfg.get("interval_seconds", 30)) if _cap_cfg.get("enabled", True) else 0.0
+        if _cap_interval <= 0:
+            raise RuntimeError("capacity_sampling 已禁用")
+        _capacity_task = asyncio.create_task(capacity_sampling_loop(interval=_cap_interval, stop_event=_capacity_stop))
+        logger.info("[lifespan] 容量采样后台任务已启动")
+    except Exception as e:
+        logger.debug(f"[lifespan] 容量采样任务启动跳过: {e}")
+        _capacity_task = None
+
+    # SRE P0-2：告警规则周期评估（将指标阈值事件转为告警通道通知）
+    _alert_stop = asyncio.Event()
+    try:
+        from .observability.alerting import evaluate_rules, get_alert_manager
+
+        async def _alert_eval_loop() -> None:
+            from .config import get_config
+            from .observability.metrics import collect_metrics
+
+            while not _alert_stop.is_set():
+                try:
+                    metrics = collect_metrics()
+                    cfg = get_config().observability_dict
+                    alerts = evaluate_rules(metrics, cfg.get("alerting", {}))
+                    am = get_alert_manager()
+                    for a in alerts:
+                        am.emit(a)
+                    # 同步既有 HTTP 层仪表（prometheus_client 安装时才生效）
+                    from . import metrics as _m
+
+                    if _m.ENABLED:
+                        from .task_queue import get_queue_status as _qs
+
+                        _m.set_queue_depth(int(_qs().get("queue_size", 0) or 0))
+                        from .model_registry import registry
+
+                        _m.set_models_ok(bool(registry.is_engine_ready()))
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("[alert-eval] 规则评估异常（忽略）: %s", exc)
+                try:
+                    await asyncio.wait_for(_alert_stop.wait(), timeout=60)
+                except asyncio.TimeoutError:
+                    continue
+                except asyncio.CancelledError:
+                    break
+
+        _alert_task = asyncio.create_task(_alert_eval_loop())
+        logger.info("[lifespan] 告警规则评估后台任务已启动")
+    except Exception as e:
+        logger.debug(f"[lifespan] 告警规则评估任务启动跳过: {e}")
+        _alert_task = None
 
     # 初始化异步生成任务队列（参考 VoiceBox 串行队列设计）
     try:
@@ -569,6 +655,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except (asyncio.TimeoutError, Exception):
         _cleanup_task.cancel()
 
+    # SRE：停止容量采样与告警评估后台任务
+    _capacity_stop.set()
+    if _capacity_task is not None:
+        try:
+            await asyncio.wait_for(_capacity_task, timeout=5)
+        except (asyncio.TimeoutError, Exception):
+            _capacity_task.cancel()
+    _alert_stop.set()
+    if _alert_task is not None:
+        try:
+            await asyncio.wait_for(_alert_task, timeout=5)
+        except (asyncio.TimeoutError, Exception):
+            _alert_task.cancel()
+
     try:
         from .model_manager import unload_all_models
 
@@ -577,6 +677,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("[lifespan] 所有模型已卸载")
     except Exception:
         logger.exception("[lifespan] 模型卸载过程出现异常")
+
+    # SRE P2-1：关闭 DB 前先落盘累计计数器（保证跨重启连续）
+    try:
+        from .monitor import get_health_monitor
+
+        get_health_monitor().save_persisted_state()
+    except Exception:
+        logger.debug("[lifespan] 累计计数器持久化跳过")
 
     try:
         from .history_db import get_history_db
@@ -632,6 +740,7 @@ def create_app() -> FastAPI:
     Returns:
         配置完成的 FastAPI 实例。
     """
+    from . import metrics as _metrics
     from .config import get_config
 
     app = FastAPI(
@@ -719,6 +828,27 @@ def create_app() -> FastAPI:
         trusted_proxies=rl_cfg.trusted_proxies,
     )
 
+    # --- Prometheus 请求计数中间件（可观测性，P2-8）---
+    # Why 放在最内层（最后注册）：只统计真正进入路由的请求，
+    # 被外层中间件（限流/鉴权/CSRF）直接拒绝的请求不计入业务指标，避免误报。
+    @app.middleware("http")
+    async def _metrics_middleware(request, call_next):  # noqa: ANN001, ANN202
+        if not _metrics.ENABLED:
+            return await call_next(request)
+        _metrics.INFLIGHT.inc()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        except Exception:
+            status_code = 500
+            raise
+        finally:
+            _metrics.INFLIGHT.dec()
+            with contextlib.suppress(Exception):  # 指标错误不得影响请求
+                _metrics.REQUEST_COUNT.labels(request.method, request.url.path, status_code).inc()
+
     # --- 静态文件挂载：/static ---
     static_dir = os.path.join(_BASE_DIR, "static")
     os.makedirs(static_dir, exist_ok=True)
@@ -793,6 +923,13 @@ def create_app() -> FastAPI:
         from .routes.system.health import ready as system_ready
 
         return await system_ready()
+
+    @app.get("/metrics")
+    async def prometheus_metrics() -> Response:
+        """标准 Prometheus scrape 端点（根路径，便于默认 scrape_config）。"""
+        from .observability.metrics import build_metrics_text
+
+        return Response(content=build_metrics_text(), media_type="text/plain; version=0.0.4")
 
     # --- 自动发现并挂载路由，单个模块失败不影响其他路由 ---
     from . import routes
@@ -884,7 +1021,17 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
         logger.info("[run_server] 已启用 HTTPS (SSL): cert=%s", _ssl.certfile)
     else:
         logger.info("[run_server] 以 HTTP 模式运行（对外暴露请通过反向代理终止 TLS）")
-    uvicorn.run(app, host=ip, port=int(port), **ssl_kwargs)
+    # P2-7：显式优雅停机宽限期（秒）。容器收到 SIGTERM 后，uvicorn 在此窗口内
+    # 排空在途请求（含正在进行的 GPU 推理）再退出，避免硬切断导致推理半成品/客户端报错。
+    # 与 Dockerfile 的 STOPSIGNAL SIGTERM、compose 的默认 terminationGracePeriodSeconds 配合。
+    graceful_timeout = int(os.environ.get("TTS_GRACEFUL_SHUTDOWN_S", "60"))
+    uvicorn.run(
+        app,
+        host=ip,
+        port=int(port),
+        timeout_graceful_shutdown=graceful_timeout,
+        **ssl_kwargs,
+    )
 
 
 if __name__ == "__main__":

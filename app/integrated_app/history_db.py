@@ -1043,6 +1043,82 @@ class HistoryDatabase:
             logger.info("[history_db] 留存清理已删除 %d 条超过 %d 天的记录", deleted, retention_days)
         return deleted
 
+    # ---------------------------------------------------------------------------
+    # SRE P2-1：指标跨重启持久化（KV 表）
+    # 设计：将累计型计数器（生成总数/错误数/OOM 重试/熔断次数）写入 meta_kv，
+    # 进程重启后由 HealthMonitor.load_persisted_state() 恢复，使成功率/SLO 跨重启连续。
+    # 与 generation_history 解耦，不影响既有查询路径。
+    # ---------------------------------------------------------------------------
+
+    def _ensure_meta_kv_table(self) -> None:
+        """惰性创建 meta_kv 表（幂等）。"""
+        with self._transaction() as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS meta_kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+
+    def save_kv(self, key: str, value: str) -> None:
+        """写入/更新一个 KV（UPSERT）。
+
+        Args:
+            key: 键。
+            value: 值（字符串；数字请先 str()）。
+        """
+        self._ensure_meta_kv_table()
+        with self._transaction() as conn:
+            conn.execute(
+                "INSERT INTO meta_kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (key, value),
+            )
+
+    def load_kv(self, key: str) -> str | None:
+        """读取一个 KV，不存在返回 None。
+
+        Args:
+            key: 键。
+
+        Returns:
+            str | None: 值或 None。
+        """
+        try:
+            self._ensure_meta_kv_table()
+            cursor = self._execute("SELECT value FROM meta_kv WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            return row["value"] if row else None
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[history_db] load_kv(%s) 失败: %s", key, exc)
+            return None
+
+    def save_metric_counters(self, counters: dict[str, int]) -> None:
+        """批量持久化累计计数器。
+
+        Args:
+            counters: 指标名 → 整数值。
+        """
+        for k, v in counters.items():
+            try:
+                self.save_kv(f"metric:{k}", str(int(v)))
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("[history_db] save_metric_counters(%s) 失败: %s", k, exc)
+
+    def load_metric_counters(self) -> dict[str, int]:
+        """读取全部持久化的累计计数器。
+
+        Returns:
+            dict[str, int]: 指标名 → 整数值（解析失败的项跳过）。
+        """
+        result: dict[str, int] = {}
+        try:
+            self._ensure_meta_kv_table()
+            cursor = self._execute("SELECT key, value FROM meta_kv WHERE key LIKE 'metric:%'")
+            for row in cursor.fetchall():
+                name = row["key"].split(":", 1)[-1]
+                try:
+                    result[name] = int(row["value"])
+                except (ValueError, TypeError):
+                    continue
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[history_db] load_metric_counters 失败: %s", exc)
+        return result
+
     def verify_chain_integrity(self) -> dict[str, Any]:
         """P2: 验证历史记录 HMAC 链的完整性。
 
@@ -2011,6 +2087,51 @@ class HistoryDatabase:
             logger.info(f"已标记 {len(orphan_ids)} 条孤立记录为 file_missing")
         return len(orphan_ids)
 
+    def estimate_size_bytes(self) -> int:
+        """返回历史库文件总体积（主库 + WAL + SHM），用于磁盘容量治理。
+
+        Returns:
+            int: 字节数；文件不存在时记为 0。
+        """
+        total = 0
+        for suffix in ("", "-wal", "-shm"):
+            path = f"{self._db_path}{suffix}"
+            if os.path.exists(path):
+                with contextlib.suppress(OSError):
+                    total += os.path.getsize(path)
+        return total
+
+    def prune_old_records(self, keep_days: int) -> int:
+        """按保留天数裁剪历史记录（数据生命周期治理）。
+
+        对应 ``config.yaml -> history.keep_days``：
+        - ``0`` 或负数 → **不裁剪**（永久保留，与历史行为一致）；
+        - ``>0`` → 删除 ``created_timestamp`` 早于 ``now - keep_days 天`` 的记录。
+
+        **只删 DB 记录，不删磁盘音频文件**（音频由用户手动或 outputs 清理逻辑
+        管理，避免误删仍可播放的素材）。``created_timestamp == 0`` 的极旧记录
+        （早于该字段引入）被视为无有效时间，不参与裁剪，防止误删。
+
+        Args:
+            keep_days: 保留天数。
+
+        Returns:
+            int: 实际删除的记录条数。
+        """
+        if not keep_days or keep_days <= 0:
+            return 0
+
+        cutoff = time.time() - keep_days * 86400.0
+        with self._transaction() as conn:
+            cursor = conn.execute(
+                "DELETE FROM generation_history WHERE created_timestamp > 0 AND created_timestamp < ?",
+                (cutoff,),
+            )
+            deleted = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        if deleted:
+            logger.info(f"已按 keep_days={keep_days} 裁剪 {deleted} 条过期历史记录")
+        return deleted
+
     def validate_integrity(self) -> tuple[bool, str]:
         """执行 PRAGMA integrity_check 验证数据库完整性。
 
@@ -2126,7 +2247,8 @@ def get_history_db() -> HistoryDatabase:
     """获取全局 HistoryDatabase 单例实例（线程安全双重检查锁定）。
 
     单例模式确保全应用共享同一个数据库连接池和索引，避免多线程各自实例化
-    导致连接泄漏和数据不一致。首次调用时自动创建数据目录并运行 JSON 迁移。
+    导致连接泄漏和数据不一致。首次调用时自动创建数据目录、运行 JSON 迁移，
+    并按 ``config.yaml -> history.keep_days`` 执行一次历史裁剪。
 
     Returns:
         HistoryDatabase: 全局共享的历史记录数据库实例。
@@ -2136,14 +2258,24 @@ def get_history_db() -> HistoryDatabase:
         with _singleton_lock:
             # 双重检查，避免锁内重复创建
             if _history_db is None:
-                from .config import SAVE_DIR
+                from .config import get_history_db_path, get_history_keep_days
 
-                db_dir = os.path.dirname(SAVE_DIR)
-                db_path = os.path.join(db_dir, "data", "history.db")
+                # 路径优先级：TTS_HISTORY_DB_PATH 环境变量 > config.yaml history.db_path
+                # > data/history.db 默认值。环境变量用于容器持久化卷挂载场景；
+                # config.yaml 由"死配置"改为可治理的单一事实来源。
+                db_path = os.environ.get("TTS_HISTORY_DB_PATH") or get_history_db_path()
                 os.makedirs(os.path.dirname(db_path), exist_ok=True)
                 _history_db = HistoryDatabase(db_path)
                 # Run JSON migration on first initialization
                 _history_db._migrate_from_json()
+
+                # 按 keep_days 自动裁剪历史记录（0 = 永久保留，默认行为不变）
+                try:
+                    pruned = _history_db.prune_old_records(get_history_keep_days())
+                    if pruned:
+                        logger.info(f"[history_db] 启动裁剪：已删除 {pruned} 条过期历史记录")
+                except Exception as e:  # nosec B110 - 裁剪失败不应阻断启动
+                    logger.warning(f"[history_db] 启动裁剪历史记录失败（已忽略）: {e}")
     return _history_db
 
 

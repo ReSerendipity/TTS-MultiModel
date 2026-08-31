@@ -23,6 +23,7 @@ import html
 import json
 import logging
 import os
+import random
 import sqlite3
 import threading
 import time
@@ -66,6 +67,109 @@ _SEMAPHORE_ACQUIRE_TIMEOUT_S: float = float(os.environ.get("TTS_SEMAPHORE_TIMEOU
 # E6-1 SECURITY/ROBUSTNESS: 单次生成硬超时 (秒) — 防止超长文本耗尽信号量池
 # 默认 600s (10 分钟)，可按硬件调优。生成超时后释放信号量，返回友好错误。
 _GENERATION_HARD_TIMEOUT_S: float = float(os.environ.get("TTS_GENERATION_TIMEOUT_S", "600.0"))
+
+# ---------------------------------------------------------------------------
+# 生成结果缓存（BACKEND_DESIGN_ASSESSMENT §长期能力建设 T9）：相同请求短 TTL 命中，
+# 经 config.yaml generation.cache_enabled 开启（默认关闭，零风险）。
+# 仅缓存成功文件名（音频文件持久化于 SAVE_DIR），命中即复用既有文件、跳过 GPU 推理。
+# ---------------------------------------------------------------------------
+_GENERATION_CACHE: Any = None  # 惰性单例：`GenerationResultCache` 或 sentinel False
+_GENERATION_CACHE_LOCK = threading.Lock()
+
+# 幂等键缓存（同报告 §中期根治）：对携带 Idempotency-Key 的请求去重，防止客户端
+# 网络重试导致重复生成。窗口 5 分钟，命中直接复用上次结果文件。
+_IDEMPOTENCY_CACHE: dict[str, tuple[float, str]] = {}
+_IDEMPOTENCY_LOCK = threading.Lock()
+_IDEMPOTENCY_TTL_S: float = 300.0
+
+
+def _get_generation_cache() -> Any:
+    """惰性获取生成结果缓存单例（配置关闭时返回 None）。
+
+    Returns:
+        GenerationResultCache 实例（cache_enabled=true）或 None（关闭 / 配置异常）。
+    """
+    global _GENERATION_CACHE
+    if _GENERATION_CACHE is not None:
+        return _GENERATION_CACHE
+    with _GENERATION_CACHE_LOCK:
+        if _GENERATION_CACHE is not None:
+            return _GENERATION_CACHE
+        try:
+            if get_config().pydantic_config.generation.cache_enabled:
+                from ...generation_cache import GenerationResultCache
+
+                ttl = float(get_config().pydantic_config.generation.cache_ttl_seconds)
+                _GENERATION_CACHE = GenerationResultCache(ttl_seconds=ttl)
+                logger.info("[gen-cache] 生成结果缓存已启用 (ttl=%.0fs)", ttl)
+            else:
+                _GENERATION_CACHE = False  # sentinel：已初始化且为关闭
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[gen-cache] 初始化失败，缓存关闭: %s", exc)
+            _GENERATION_CACHE = False
+    return None if _GENERATION_CACHE is False else _GENERATION_CACHE
+
+
+def _build_generation_cache_key(
+    engine: str,
+    text: str,
+    voice_or_persona: str,
+    tempo_factor: float,
+    voice_enhancement: str,
+    target_lufs: float,
+) -> str:
+    """构造生成缓存键（覆盖所有影响最终输出的可见维度）。
+
+    Args:
+        engine: 引擎名。
+        text: 生成文本。
+        voice_or_persona: 音色/角色名（影响克隆结果）。
+        tempo_factor: 语速因子。
+        voice_enhancement: 增强开关。
+        target_lufs: 目标响度。
+
+    Returns:
+        确定性缓存键。
+    """
+    from ...generation_cache import GenerationResultCache
+
+    return GenerationResultCache.make_cache_key(
+        engine,
+        text,
+        voice_or_persona=voice_or_persona,
+        tempo_factor=tempo_factor,
+        voice_enhancement=str(voice_enhancement),
+        target_lufs=target_lufs,
+    )
+
+
+def _idempotency_lookup(key: str) -> str | None:
+    """查询幂等缓存，命中且未过期返回缓存文件名（文件仍需存在）。"""
+    with _IDEMPOTENCY_LOCK:
+        entry = _IDEMPOTENCY_CACHE.get(key)
+        if not entry:
+            return None
+        expire_at, filename = entry
+        if time.monotonic() >= expire_at:
+            _IDEMPOTENCY_CACHE.pop(key, None)
+            return None
+        path = filename if os.path.isabs(filename) else os.path.join(SAVE_DIR, filename)
+        if os.path.isfile(path):
+            return filename
+        _IDEMPOTENCY_CACHE.pop(key, None)
+        return None
+
+
+def _idempotency_store(key: str, filename: str) -> None:
+    """写入幂等缓存（带 TTL 与容量裁剪）。"""
+    with _IDEMPOTENCY_LOCK:
+        _IDEMPOTENCY_CACHE[key] = (time.monotonic() + _IDEMPOTENCY_TTL_S, filename)
+        # 简易容量保护：超过 1024 条时清理过期项
+        if len(_IDEMPOTENCY_CACHE) > 1024:
+            now = time.monotonic()
+            expired = [k for k, (exp, _) in _IDEMPOTENCY_CACHE.items() if now >= exp]
+            for k in expired[: len(expired) - 512]:
+                _IDEMPOTENCY_CACHE.pop(k, None)
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +216,7 @@ def _ensure_content_safe(request: Any, text: str) -> Any:
             return None
     except Exception:  # noqa: BLE001
         return None
-    from ..security.content_safety import get_safety_detector
+    from ...security.content_safety import get_safety_detector
 
     result = get_safety_detector().detect(text)
     if not result.is_safe:
@@ -122,6 +226,7 @@ def _ensure_content_safe(request: Any, text: str) -> Any:
         log_audit("content_blocked", actor=str(actor), detail=result.category.value, outcome="blocked")
         return _error_html(request, f"⚠️ 内容安全检测未通过：{result.message}")
     return None
+
 
 # S-R4: legacy history.db 迁移控制（幂等，只执行一次）
 _legacy_history_migrated: bool = False
@@ -737,15 +842,23 @@ def _apply_post_processing_to_file(
         # P2 安全修复（对齐 _save_wav_compatible）：后处理输出 *_pp.wav 同样嵌入
         # FFT 扩频水印（16-20kHz，source_id=WATERMARK_SOURCE_ID），确保经后处理
         # 导出的音频仍可溯源。水印失败仅记录 warning，不阻塞后处理（与主路径一致）。
+        # 包装通用熔断器（BACKEND_DESIGN_ASSESSMENT §反模式 #6）：水印是「可选依赖」，
+        # 其持续失败（如底层算子异常）会触发熔断，快速跳过水印而非反复重试拖慢主路径。
         try:
+            from ...circuit_breaker import CircuitBreakerOpenError, get_circuit_breaker
             from ...watermark import WATERMARK_SOURCE_ID, watermark_audio
 
-            processed, wm_meta = watermark_audio(
-                processed.astype(np.float32),
-                sr,
-                enable=True,
-                source_id=WATERMARK_SOURCE_ID,
-            )
+            _cb = get_circuit_breaker("watermark_svc")
+
+            def _embed(audio: "np.ndarray") -> tuple:
+                return watermark_audio(
+                    audio.astype(np.float32),
+                    sr,
+                    enable=True,
+                    source_id=WATERMARK_SOURCE_ID,
+                )
+
+            processed, wm_meta = _cb.call(_embed, processed)
             if wm_meta.get("watermarked"):
                 logger.debug(
                     "后处理水印嵌入成功: source=%s, snr=%.1fdB, hash=%s",
@@ -755,6 +868,8 @@ def _apply_post_processing_to_file(
                 )
             else:
                 logger.debug("后处理水印嵌入失败，*_pp.wav 已写入但无来源标识: %s", new_path)
+        except CircuitBreakerOpenError as cboe:
+            logger.warning("[后处理水印] 熔断器已打开，跳过水印嵌入（音频正常写出）: %s", cboe)
         except Exception as wm_exc:  # noqa: BLE001
             logger.debug("后处理水印嵌入异常（已忽略，音频正常写入）: %s", wm_exc)
 
@@ -1052,6 +1167,14 @@ def _run_with_oom_retry(
 
         while retry_count < max_retries:
             retry_count += 1
+            # 指数退避 + 抖动（BACKEND_DESIGN_ASSESSMENT §反模式 #6 中期项）：
+            # 连续 OOM 往往是显存尚未完全释放，立即重试成功率低且加剧抖动；
+            # 退避给 GPU 显存回收留出时间。base=1s，caps 在 8s，叠加 ±20% 抖动。
+            backoff = min(1.0 * (2 ** (retry_count - 1)), 8.0)
+            jitter = backoff * 0.2 * random.uniform(-1.0, 1.0)
+            sleep_s = max(0.0, backoff + jitter)
+            logger.info("%s OOM 重试前退避 %.1fs（第 %d/%d 次）", endpoint_name, sleep_s, retry_count, max_retries)
+            time.sleep(sleep_s)
             try:
                 degraded_note = "由于显存限制，已自动降低生成质量参数以完成生成。"
                 if degraded_fn:
@@ -1068,6 +1191,28 @@ def _run_with_oom_retry(
         raise RuntimeError(
             "显存不足，已尝试降级重试但仍失败。请尝试缩短文本、关闭其他GPU程序，或在设置中切换到CPU模式"
         ) from None
+
+
+def _store_generation_result(filename: str, idem_key: str | None, cache_key: str | None) -> None:
+    """将一次成功生成的结果文件名写入缓存与幂等键（供后续命中短路）。
+
+    Args:
+        filename: 生成（含后处理）后的音频文件名（相对 SAVE_DIR）。
+        idem_key: 请求携带的 Idempotency-Key（无则 None）。
+        cache_key: 生成缓存键（缓存未启用则 None）。
+    """
+    try:
+        if idem_key:
+            _idempotency_store(idem_key, filename)
+    except Exception as ie:  # noqa: BLE001
+        logger.debug("[idempotency] 写入异常（忽略）: %s", ie)
+    try:
+        if cache_key:
+            cache = _get_generation_cache()
+            if cache is not None:
+                cache.put(cache_key, filename)
+    except Exception as ce:  # noqa: BLE001
+        logger.debug("[gen-cache] 写入异常（忽略）: %s", ce)
 
 
 def _parse_bool_form(value: Any) -> bool:
@@ -1200,12 +1345,50 @@ async def _execute_generation_impl(
 ) -> HTMLResponse:
     """生成核心实现：线程池执行同步 run_fn → 记录历史 → 后处理 → 返回 HTML。
 
+    短路逻辑（在真正进入 GPU 推理前）：
+        1. 幂等键：若请求携带 ``Idempotency-Key`` 且近期命中，直接复用上次结果文件；
+        2. 生成缓存：若 ``generation.cache_enabled`` 且该 (引擎+文本+参数) 已缓存，
+           复用既有音频文件，跳过 GPU 推理。
+
     Args:
         同 _execute_generation。
 
     Returns:
-        HTMLResponse（成功 / OOM 降级成功 / 失败）。
+        HTMLResponse（成功 / OOM 降级成功 / 失败 / 幂等或缓存命中）。
     """
+    # --- 短路 1：幂等键去重（防止客户端重试重复生成）---
+    idem_key: str | None = None
+    try:
+        idem_key = getattr(request, "headers", {}).get("Idempotency-Key") if hasattr(request, "headers") else None
+        if idem_key:
+            hit_file = _idempotency_lookup(idem_key)
+            if hit_file:
+                logger.info("[idempotency] 命中幂等键，复用结果: %s", hit_file)
+                _log_generation(endpoint_name, text, engine, voice_or_persona, True, 0.0)
+                monitor = get_health_monitor()
+                monitor.record_generation(success=True)
+                return _success_html(hit_file, "生成成功（幂等命中）")
+    except Exception as ide:  # noqa: BLE001
+        logger.debug("[idempotency] 查询异常（忽略）: %s", ide)
+
+    # --- 短路 2：生成结果缓存 ---
+    cache_key: str | None = None
+    try:
+        cache = _get_generation_cache()
+        if cache is not None:
+            cache_key = _build_generation_cache_key(
+                engine, text, voice_or_persona, tempo_factor, voice_enhancement, target_lufs
+            )
+            hit_file = cache.get(cache_key)
+            if hit_file and os.path.isfile(hit_file if os.path.isabs(hit_file) else os.path.join(SAVE_DIR, hit_file)):
+                logger.info("[gen-cache] 命中，复用结果: %s", hit_file)
+                _log_generation(endpoint_name, text, engine, voice_or_persona, True, 0.0)
+                monitor = get_health_monitor()
+                monitor.record_generation(success=True)
+                return _success_html(hit_file, "生成成功（缓存命中）")
+    except Exception as ce:  # noqa: BLE001
+        logger.debug("[gen-cache] 查询异常（忽略）: %s", ce)
+
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     start_time: float = time.monotonic()
     try:
@@ -1242,6 +1425,8 @@ async def _execute_generation_impl(
         filename = await asyncio.to_thread(
             _apply_post_processing_to_file, filename, tempo_factor, pp_voice_enhancement, target_lufs
         )
+        # 写回生成缓存 / 幂等缓存（命中即可复用本次结果文件，跳过下次 GPU 推理）
+        _store_generation_result(filename, idem_key, cache_key)
         if degraded_note:
             return _partial_success_html(filename, msg, degraded_note)
         return _success_html(filename, msg)

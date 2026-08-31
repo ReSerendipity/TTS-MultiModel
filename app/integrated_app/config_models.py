@@ -182,6 +182,16 @@ class GenerationConfig(BaseModel):
         gt=0,
         description="获取生成信号量的排队等待上限（秒），超时返回系统繁忙",
     )
+    cache_enabled: bool = Field(
+        default=False,
+        description="生成结果缓存开关：相同请求（引擎+文本+后处理参数）短 TTL 命中，"
+        "降低重复 GPU 推理成本（BACKEND_DESIGN_ASSESSMENT 长期项）。默认关闭。",
+    )
+    cache_ttl_seconds: float = Field(
+        default=300.0,
+        gt=0,
+        description="生成结果缓存条目的基础生存时间（秒），实际过期叠加随机抖动防雪崩",
+    )
 
 
 class MemoryConfig(BaseModel):
