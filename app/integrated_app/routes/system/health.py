@@ -28,6 +28,14 @@ logger = logging.getLogger("tts_multimodel")
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
+
+@router.get("/audit")
+async def get_audit(limit: int = 100) -> dict[str, Any]:
+    """M7：返回最近 limit 条审计事件（内存环，供管理员回溯；受 /api/* 鉴权中间件保护）。"""
+    return {"items": get_recent_audit(limit)}
+
+
+from ...security.audit import get_recent_audit  # noqa: E402
 from .gpu import _get_gpu_device, _get_gpu_utilization  # noqa: E402
 
 _SESSION_START_TS: float = time.time()

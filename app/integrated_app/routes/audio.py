@@ -616,6 +616,10 @@ async def batch_export_history(request: Request) -> Response:
     if err_msg:
         return JSONResponse({"status": "error", "message": err_msg}, status_code=400)
 
+    from ..security.audit import log_audit
+
+    log_audit("pii_export", detail=f"ids={len(ids)}", outcome="attempt")
+
     history_manager = get_history_db()
     try:
         records = history_manager.get_records_by_ids(valid_ids)

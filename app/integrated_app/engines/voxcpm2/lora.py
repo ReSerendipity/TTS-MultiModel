@@ -43,6 +43,12 @@ class LoRAMeta(NamedTuple):
     trained_steps: int
     enabled: bool
     weight: float
+    # P2-6 血缘/版本 provenance：回答「这个 LoRA 由哪批数据、哪个基础模型、哪个 commit 训练而来」
+    version: str = ""
+    created_at: str = ""
+    git_commit: str = ""
+    dataset_fingerprint: str = ""
+    base_model: str = ""
 
 
 """LoRA 元数据 NamedTuple，描述单个 LoRA 适配器的完整信息。
@@ -164,6 +170,12 @@ class LoRAManager:
                 "trained_steps": 0,
                 # P2: origin 元数据字段 — 标记 LoRA 权重来源，便于版权追溯
                 "origin": "TTS_MultiModel LoRA Pipeline",
+                # P2-6 provenance：读取方按需提供，缺省空字符串（不伪造）
+                "version": "",
+                "created_at": "",
+                "git_commit": "",
+                "dataset_fingerprint": "",
+                "base_model": "",
             }
         try:
             with open(meta_path, encoding="utf-8") as f:
@@ -366,6 +378,11 @@ class LoRAManager:
                 trained_steps=trained_steps,
                 enabled=False,
                 weight=1.0,
+                version=raw_meta.get("version", ""),
+                created_at=raw_meta.get("created_at", ""),
+                git_commit=raw_meta.get("git_commit", ""),
+                dataset_fingerprint=raw_meta.get("dataset_fingerprint", ""),
+                base_model=raw_meta.get("base_model", ""),
             )
             self._loaded[lora_id] = {
                 "meta": meta_obj,

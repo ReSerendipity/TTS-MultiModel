@@ -32,6 +32,10 @@ import json
 import logging
 import os
 import sys
+import tempfile
+import time
+import uuid
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -183,6 +187,66 @@ def _is_training_running() -> bool:
     return _training_process is not None and _training_process.returncode is None
 
 
+# --------------------------------------------------------------------------- #
+# P2-5 训练任务持久化 + liveness 心跳
+# --------------------------------------------------------------------------- #
+_TRAINING_STATUS_PATH = Path(tempfile.gettempdir()) / "tts_multimodel_training_status.json"
+_training_heartbeat_task: asyncio.Task | None = None
+_HEARTBEAT_INTERVAL_SEC = 30.0
+_HEARTBEAT_STALE_SEC = 300.0
+
+
+def _save_task_status(status: dict[str, Any]) -> None:
+    """把当前训练任务状态持久化到临时目录 JSON（应用重启后可恢复与查询）。"""
+    with contextlib.suppress(OSError):
+        _TRAINING_STATUS_PATH.write_text(json.dumps(status, ensure_ascii=False), encoding="utf-8")
+
+
+def _load_task_status() -> dict[str, Any]:
+    """读取持久化的训练任务状态；文件缺失或损坏时返回空 dict。"""
+    try:
+        if _TRAINING_STATUS_PATH.exists():
+            return json.loads(_TRAINING_STATUS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def _cancel_heartbeat() -> None:
+    global _training_heartbeat_task
+    if _training_heartbeat_task is not None and not _training_heartbeat_task.done():
+        _training_heartbeat_task.cancel()
+    _training_heartbeat_task = None
+
+
+def _mark_training_finished(returncode: int | None) -> None:
+    """训练进程退出后更新任务状态并停止心跳（P2-5）。"""
+    status = _load_task_status()
+    if not status:
+        return
+    status["status"] = "finished" if returncode == 0 else "failed"
+    status["returncode"] = returncode
+    status["finished_ts"] = time.time()
+    _save_task_status(status)
+    _cancel_heartbeat()
+
+
+async def _heartbeat_loop() -> None:
+    """训练任务 liveness 心跳（P2-5）：只要子进程存活就周期刷新 last_heartbeat_ts。
+
+    报告反模式 4.3/4.12 指出「长任务无 liveness 检测」会让 hang 住的训练无人察觉；
+    本循环即使训练脚本自身不 emit 心跳，也能通过子进程存活推断存活，并在进程
+    死亡后及时把状态翻为 finished，避免状态卡在 running。
+    """
+    while _is_training_running():
+        status = _load_task_status()
+        if status:
+            status["last_heartbeat_ts"] = time.time()
+            status["status"] = "running"
+            _save_task_status(status)
+        await asyncio.sleep(_HEARTBEAT_INTERVAL_SEC)
+
+
 async def _read_training_output(process: asyncio.subprocess.Process) -> None:
     """异步读取训练子进程的 stdout，追加到全局日志缓存。
 
@@ -205,6 +269,11 @@ async def _read_training_output(process: asyncio.subprocess.Process) -> None:
     except (asyncio.CancelledError, OSError, ValueError) as read_err:
         async with _training_log_lock:
             _training_log += f"\nLog read error: {read_err}\n"
+    finally:
+        # 进程 stdout 关闭即视为退出，刷新任务状态并停心跳（P2-5）
+        with contextlib.suppress(Exception):
+            await process.wait()
+        _mark_training_finished(process.returncode)
 
 
 @router.post("/start", summary="开始训练", description="启动 VoxCPM2 LoRA 微调训练子进程")
@@ -378,6 +447,24 @@ async def start_training(request: Request) -> JSONResponse:
 
         _training_reader_task = asyncio.create_task(_read_training_output(_training_process))
 
+        task_status = {
+            "task_id": uuid.uuid4().hex,
+            "status": "running",
+            "pid": _training_process.pid,
+            "start_ts": time.time(),
+            "last_heartbeat_ts": time.time(),
+            "config": {
+                "pretrained_path": pretrained_path,
+                "train_manifest": train_manifest,
+                "save_path": save_path,
+                "learning_rate": learning_rate,
+                "num_iters": num_iters,
+                "batch_size": batch_size,
+            },
+        }
+        _save_task_status(task_status)
+        _training_heartbeat_task = asyncio.create_task(_heartbeat_loop())
+
         return JSONResponse({"status": "ok", "process_id": _training_process.pid})
     except (OSError, RuntimeError, ValueError) as spawn_err:
         logger.error(f"训练启动失败: {spawn_err}")
@@ -409,6 +496,7 @@ async def stop_training() -> JSONResponse:
         except asyncio.TimeoutError:
             _training_process.kill()
             await _training_process.wait()
+        _mark_training_finished(_training_process.returncode)
         if _training_reader_task is not None:
             _training_reader_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -433,4 +521,16 @@ async def get_training_log() -> JSONResponse:
     running: bool = _is_training_running()
     async with _training_log_lock:
         log: str = _training_log
-    return JSONResponse({"log": log, "running": running})
+    status = _load_task_status()
+    last_hb = status.get("last_heartbeat_ts")
+    hb_age = (time.time() - last_hb) if last_hb else None
+    stale = bool(running and hb_age is not None and hb_age > _HEARTBEAT_STALE_SEC)
+    return JSONResponse(
+        {
+            "log": log,
+            "running": running,
+            "heartbeat_age_sec": hb_age,
+            "stale": stale,
+            "task_status": status.get("status"),
+        }
+    )

@@ -159,6 +159,13 @@ def _check_vram_prereq(engine_name: str, backend: Any, gpu_device: Any) -> float
     from ..model_registry import ENGINE_VRAM_REQUIREMENTS
 
     needed_gb: float = ENGINE_VRAM_REQUIREMENTS.get(engine_name, 6.0)
+    # VRAM 安全余量倍数字段外置（配置 models.vram_safety_margin_gb）；回退 1.5
+    try:
+        from ..config import get_config
+
+        needed_gb = needed_gb * get_config().pydantic_config.models.vram_safety_margin_gb
+    except Exception:  # noqa: BLE001
+        needed_gb = needed_gb * 1.5
 
     # CPU 模式或无 GPU 设备：跳过显存预检
     if backend == GPUBackend.CPU or gpu_device is None:

@@ -145,6 +145,10 @@ async def persona_save(
     if not name:
         return _persona_status_html("请先填写音色名称", "error")
 
+    from ..security.audit import log_audit
+
+    log_audit("persona_save", detail=f"name={name}", outcome="attempt")
+
     staged_path: str | None = None
     audio_input: str | None = None
 

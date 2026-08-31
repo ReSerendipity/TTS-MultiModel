@@ -220,6 +220,9 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
     """
     MAX_RETRIES = 2
     try:
+        from ..security.audit import log_audit
+
+        log_audit("model_load", detail=f"engine={engine}", outcome="attempt")
         loop = asyncio.get_running_loop()
         if engine == "indextts2":
             load_fn = load_indextts2
@@ -327,6 +330,9 @@ async def unload_model_endpoint(request: Request) -> Response:
         JSON：``{"status": "ok"|"error", "message": ...}``。
     """
     try:
+        from ..security.audit import log_audit
+
+        log_audit("model_unload", outcome="attempt")
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, unload_model)
         return JSONResponse({"status": "ok", "message": "Model unloaded, VRAM released"})
@@ -507,8 +513,18 @@ async def lora_load_endpoint(request: Request) -> Response:
         lora_path = body.get("lora_path", "")
         if not lora_path:
             return JSONResponse({"status": "error", "message": "lora_path is required"})
+        # L3 整改：LoRA 路径白名单 —— 仅允许项目内 lora/ 目录，拒绝任意绝对路径
+        _lora_root = os.path.abspath(
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "lora")
+        )
+        _abs_path = os.path.abspath(lora_path)
+        if _abs_path != _lora_root and not _abs_path.startswith(_lora_root + os.sep):
+            return JSONResponse({"status": "error", "message": "lora_path 必须在允许的目录内 (lora/)"})
         success = fn_voxcpm_load_lora(lora_path)
         if success:
+            from ..security.audit import log_audit
+
+            log_audit("lora_load", detail=lora_path, outcome="success")
             return JSONResponse({"status": "ok", "message": f"LoRA loaded: {lora_path}"})
         return JSONResponse({"status": "error", "message": "LoRA load returned False"})
     except HTTPException:

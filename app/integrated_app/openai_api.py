@@ -787,6 +787,25 @@ class OpenAICompatibleRouter:
                     detail="引擎实例不可用",
                 )
 
+            # M3 内容安全网关：对输入文本做统一安全检测（与 routes/generate/* 同入口）
+            try:
+                from ..config import get_config
+
+                if get_config().pydantic_config.security.content_safety_enabled:
+                    from ...security.audit import log_audit
+                    from ..security.content_safety import get_safety_detector
+
+                    _safety = get_safety_detector().detect(body.input)
+                    if not _safety.is_safe:
+                        log_audit(
+                            "content_blocked", actor="openai_client", detail=_safety.category.value, outcome="blocked"
+                        )
+                        raise HTTPException(status_code=400, detail=f"内容安全检测未通过：{_safety.message}")
+            except HTTPException:
+                raise
+            except Exception:  # noqa: BLE001
+                pass
+
             # 注册任务以支持取消
             task_id = self._cancel_manager.register()
 

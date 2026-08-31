@@ -54,6 +54,12 @@ Singleton 实现方式
         engine = registry.get_current_engine()
 【职责】模型加载状态与规格登记（EngineName 枚举、VRAM 规格、已加载标记）。【边界】不执行加载动作（动作在 model_manager）；不做 YAML 读写。
 
+⚠️ 命名澄清（MLOps 治理 2026-08-31）：本模块是「运行时引擎状态总线」，**不是** MLOps 意义的
+Model Registry。它只登记「哪个引擎已加载、加载状态、规格缓存」，不含模型版本号、训练数据血缘、
+评估门禁、promotion/stage、访问控制。真正的模型资产版本/血缘能力见新增的
+``app/integrated_app/model_versioning.py``（见 AGENTS.md §3 与评估报告 P3 章节）。
+凡依赖清单、自检清单、文档中引用 ``ModelRegistry`` 之处，均指「状态总线」而非「模型注册表」。
+
 """
 
 from __future__ import annotations
