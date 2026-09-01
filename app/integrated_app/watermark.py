@@ -569,10 +569,10 @@ def detect_watermark(
         version = bit_bytes[0]
         if version == _WATERMARK_VERSION_V2:
             # v2 紧凑格式：8 字节完整载荷（source 枚举 / timestamp 秒 / hash 2 字节）
-            payload = _parse_payload_v2(bit_bytes)
+            payload = _parse_payload_v2(bytes(bit_bytes))
         elif version == _WATERMARK_VERSION:
             # v1 旧格式：64-bit 截断语义（timestamp/content_hash 置默认值）
-            payload = _parse_payload_v1(bit_bytes)
+            payload = _parse_payload_v1(bytes(bit_bytes))
         else:
             raise ValueError(f"水印版本不合法: {version}")
 
