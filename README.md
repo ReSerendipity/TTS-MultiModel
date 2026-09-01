@@ -96,6 +96,8 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 
 **方式一：使用系统 Python（推荐，节省磁盘空间）**
 
+> 💡 本项目依赖已装入项目根 `.venv`（系统 Python 3.12.10 @ `C:\Python312` 创建）。命令行开发请先 `.venv\Scripts\activate`；或直接运行 `install.bat` / `start.bat`（脚本会自行检测并复用该环境）。
+
 ```bash
 git clone https://github.com/ReSerendipity/TTS_MultiModel.git
 cd TTS_MultiModel
@@ -295,6 +297,8 @@ TTS_MultiModel/
 │   │   │   └── ui/                 # UI 组件
 │   ├── clean_launch.py         # 清理启动脚本
 │   └── ffmpeg.exe / ffplay.exe # 音频工具
+├── reference_repos/             # 参考/上游仓库源码（用于学习与对齐）
+├── cache/                       # 运行时缓存（如 ModelScope 下载缓存）
 ├── data/                        # 运行时数据
 ├── docs/                        # 项目文档
 ├── examples/                    # 训练示例数据
