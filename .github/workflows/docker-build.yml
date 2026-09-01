@@ -31,6 +31,13 @@ jobs:
           tags: tts-multimodel:ci
 
       # 供应链安全：Trivy 扫描关键/高危漏洞，未修复则阻断合并
+      - name: Free disk space for scan
+        # runner 临时盘 14GB：torch 镜像构建缓存 + trivy 镜像解包双份占用会
+        # 触发 no space left on device（analysis pipeline 崩溃）。先清缓存再扫。
+        run: |
+          docker builder prune -af
+          docker image prune -f
+          df -h / | tail -1
       - name: Trivy scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 (SHA pin 防 tag 强更，与 docker-publish/security 一致)
         with:

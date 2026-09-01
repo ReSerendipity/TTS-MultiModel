@@ -87,6 +87,11 @@ dependencies = [
     "httpx>=0.24.0",
     "aiofiles>=23.0",
     "cryptography>=41.0.0",
+    # psutil 被 routes/system/health.py 与系统维护端点（stats/gpu/队列/内存泄漏检测）
+    # 在模块导入期直接 import。此前仅作为传递依赖存在于 requirements-lock.txt，
+    # 而 CI 按 requirements.txt 安装，导致 pytest 全矩阵 ImportError（M4/M5 安全批次引入）。
+    # 显式声明与 librosa 同理：避免上游依赖树变动后运行路径静默 ImportError。
+    "psutil>=5.9.0",
     # === 繁简转换（纯 Python 替代 opencc 源码编译）===
     "opencc-python-reimplemented>=0.1.0",
     # === 数据校验 ===
@@ -233,7 +238,7 @@ markers = [
 [tool.coverage.run]
 source = ["app/integrated_app"]
 branch = true
-omit = ["*/tests/*", "*/templates/*", "*/static/*"]
+omit = ["*/tests/*", "*/templates/*", "*/static/*", "*/vendor/*"]
 
 [tool.coverage.report]
 # 覆盖率门槛：分阶段提升计划（随测试补充逐步调高）
