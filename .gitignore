@@ -1,6 +1,11 @@
 # Model files - Download separately (see README.md)
-models/
-model/
+# WHY 必须以 `/` 锚定仓库根：不带斜杠的 `model/` 是「任意层级匹配」，会把
+# upstream 源码 app/integrated_app/vendor/voxcpm/model/*.py 一并吞掉 ——
+# 这 4 个文件因此从未入库，本地有、CI 上没有，于是
+# tests/test_smoke.py::test_no_wrong_depth_relative_imports 在 CI 恒定报错
+# 「from ..vendor.voxcpm.model.voxcpm -> 目标不存在」，而本地怎么跑都是绿的。
+/models/
+/model/
 cache/
 outputs/
 
