@@ -33,17 +33,13 @@ from typing import Any
 
 
 def _reexec_with_venv_python() -> None:
-    """torch 导入失败且存在 .venv 时，用 .venv 解释器重跑自身。
+    """存在项目 .venv 且当前解释器非 .venv 时，用 .venv 解释器重跑自身。
 
-    pre-commit 的 language:system 钩子可能解析到未装引擎依赖的系统
-    python；此时切到项目 venv 重跑，保证检测结果反映真实运行环境。
+    pre-commit 的 language:system 钩子可能解析到系统 python（可能已装 CPU torch
+    却缺 transformers/funasr 等运行依赖），导致误判 FAIL；只要项目带 .venv 就
+    一律切到 .venv 重跑，保证检测结果反映真实运行环境。
+    跨平台：Windows 为 .venv/Scripts/python.exe；无 .venv（如 CI）时保持原行为。
     """
-    try:
-        import torch  # noqa: F401
-    except ImportError:
-        pass
-    else:
-        return
     venv_python = Path(__file__).resolve().parents[1] / ".venv" / "Scripts" / "python.exe"
     if venv_python.exists() and Path(sys.executable).resolve() != venv_python.resolve():
         os.execv(str(venv_python), [str(venv_python), __file__, *sys.argv[1:]])
