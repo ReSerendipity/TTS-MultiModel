@@ -47,6 +47,7 @@ from .middleware.error_handler import (
 )
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.request_id import RequestIDLogFilter, RequestIDMiddleware
+from .middleware.security_headers import SecurityHeadersMiddleware
 from .model_registry import EngineName
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -759,6 +760,11 @@ def create_app() -> FastAPI:
     app.add_exception_handler(Exception, generic_error_handler)
 
     # --- 中间件注册顺序（重要！先注册的先处理请求）---
+    # SecurityHeadersMiddleware 置于最外层（最先 add_middleware = 执行链最外）：
+    # 确保 CSRF/APIAuth 自身产生的 401/403 响应也携带 CSP / nosniff / frame-ancestors
+    # 等安全头（对应安全评估 M-02）。默认开启，经 config.security.headers 可关闭。
+    app.add_middleware(SecurityHeadersMiddleware, config=get_config().pydantic_config)
+
     # Why RequestIDMiddleware 必须是第一个：
     #   后续 CSRF、APIAuth、路由 handler、异常 handler 中的所有 logger
     #   都依赖 RequestIDLogFilter 读取 request_id。如果 RequestID 注入晚了，

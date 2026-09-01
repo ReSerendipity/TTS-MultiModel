@@ -43,6 +43,13 @@ jobs:
         run: |
           ruff format app/integrated_app/ scripts/ tests/ --check --diff
 
+      - name: Config-vs-code consistency gate (security)
+        # 对应安全评估根因门禁：config.yaml 中声明的 security/runtime 配置项
+        # 必须被代码真实消费，否则 CI 直接失败（杜绝「配置幻觉」式假控制）。
+        run: |
+          pip install pyyaml
+          python scripts/check_config_refs.py
+
   typecheck:
     # 独立成 job（原先挂在 lint 的最后一步）：mypy 与 ruff 的处置节奏完全不同，
     # 混在一个 job 里会让「ruff 已可阻断」这件事被 mypy 的存量债务拖住。
