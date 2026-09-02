@@ -323,7 +323,6 @@ personas/
 # e2e regression baseline screenshots (align with SeedVR2 policy)
 tests/e2e/screenshots/*.png
 # ===== Local-only content (restored locally, not on remote — 2026-08-17) =====
-CHANGELOG.md
 CI-LESSONS.md
 CONTRIBUTING.md
 capture-screenshots.bat
