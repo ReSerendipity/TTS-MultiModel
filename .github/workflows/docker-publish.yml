@@ -50,7 +50,7 @@ jobs:
       # 注意：镜像不含模型权重（.dockerignore 已排除 model/），
       # 运行时必须挂载权重（见 deploy/kubernetes/ 与 docker-compose.yml）。
       - name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -100,3 +100,7 @@ jobs:
           format: table
           # 只跑漏洞扫描：secret/misconfig 扫描对 25GB 镜像是纯多余开销，会拖长导出与解包时间
           scanners: vuln
+          # 本项目镜像约 25GB 展开，Trivy 默认 5m 内部超时会在分析阶段被
+          # "context deadline exceeded" 打断（见 dependabot docker/build-push-action-7 PR，
+          # 与 docker-build.yml 同步修复）
+          timeout: "10m"
