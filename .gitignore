@@ -395,6 +395,7 @@ docs/_devarchive/
 docs/plans/
 docs/project/
 docs/整理记录_20260823.md
+docs/六大项目文档整理与核对.md
 
 # 本地预检脚本（不入库）
 precheck.ps1
