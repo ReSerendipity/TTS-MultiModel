@@ -65,3 +65,7 @@ jobs:
           ignore-unfixed: true
           # 只跑漏洞扫描：secret/misconfig 对 25GB 镜像是纯多余开销，会拖长导出与解包时间
           scanners: vuln
+          # 本项目镜像约 25GB 展开，Trivy 默认 5m 内部超时会在分析阶段被
+          # "context deadline exceeded" 打断（见 dependabot docker/build-push-action-7 PR，
+          # run 33582820315：扫描跑满 300s 后 FATAL）。拉长到 10m，job 上限 60m 仍余量充足。
+          timeout: "10m"
