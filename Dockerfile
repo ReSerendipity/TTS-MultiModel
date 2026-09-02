@@ -36,7 +36,11 @@ FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y \
+# 安全更新：拉取 Ubuntu 22.04 安全补丁，修复 Trivy 扫描发现的 14 个 HIGH CVE
+# （openssl CVE-2026-45447、gnupg/dirmngr CVE-2025-68973 等；修复版本均已在 22.04 安全仓库发布）。
+# 基础镜像 nvidia/cuda:12.1.0-runtime-ubuntu22.04 自带未打补丁的 openssl/libssl3/dirmngr 等，
+# 不显式升级则 Trivy 安全门禁会因未修复的高危漏洞持续报红。DEBIAN_FRONTEND=noninteractive 已设，无交互阻塞。
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     python3.10 python3-pip ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r ttsuser \
