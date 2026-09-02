@@ -29,7 +29,7 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio httpx
+          pip install pytest pytest-asyncio httpx pytest-timeout
 
       # 2026-08-31 治理修复（P2-2）：压力测试接入 nightly CI。
       # 此前 test_load_stress 默认 TTS_SKIP_STRESS=1 跳过、且无任何 workflow 引用，
