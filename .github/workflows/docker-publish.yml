@@ -61,11 +61,42 @@ jobs:
           # provenance=false：跳过 SBOM/provenance 内联，缩小镜像并避免与单架构冲突
           provenance: false
 
+      # 镜像引用必须全小写：${{ github.repository }} 展开为 "ReSerendipity/TTS_MultiModel"，
+      # 含大写字母，而 OCI 引用规范只允许小写。Trivy 在解析阶段就直接 FATAL
+      # （"could not parse reference: ghcr.io/ReSerendipity/TTS_MultiModel:<sha>"），
+      # 扫描根本没开始，表现为「HIGH/CRITICAL 门禁失败」的假象（见 run 33526733250）。
+      # 另一个隐藏 bug：metadata-action 的 type=sha,format=long 推出的 tag 带 "sha-" 前缀，
+      # 直接拼 ":${{ github.sha }}" 指向的是一个并不存在的 tag。
+      - name: Resolve immutable scan ref (lowercase)
+        id: scanref
+        run: |
+          ref="$(printf '%s' "${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}" | tr '[:upper:]' '[:lower:]')"
+          echo "resolved scan ref: $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      # Trivy 会先把镜像整体导出到 $TMPDIR 再逐层解包分析。本项目镜像约 10.8GB（压缩层）
+      # / 约 25GB（展开），而 runner 构建完成后 / 仅剩约 31G，不清理会
+      # "failed to copy the image: ... no space left on device"（见 run 33526733209）。
+      - name: Free disk space for scan
+        run: |
+          docker buildx prune -af || true
+          for b in $(docker buildx ls --format '{{.Name}}' | grep -E '^builder-'); do
+            docker buildx rm -f "$b" || true
+          done
+          docker image prune -f
+          # 卸掉 runner 预装但本流水线用不到的大型工具链（合计约 25GB）
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost \
+            /opt/az /usr/share/swift /usr/local/julia* /usr/local/graalvm /usr/share/miniconda \
+            /usr/local/share/powershell /usr/lib/google-cloud-sdk
+          df -h / | tail -1
+
       - name: Trivy image scan (HIGH/CRITICAL gate)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 (SHA pin 防 tag 强更)
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          image-ref: ${{ steps.scanref.outputs.ref }}
           severity: CRITICAL,HIGH
           exit-code: '1'
           ignore-unfixed: true
           format: table
+          # 只跑漏洞扫描：secret/misconfig 扫描对 25GB 镜像是纯多余开销，会拖长导出与解包时间
+          scanners: vuln

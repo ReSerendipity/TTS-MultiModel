@@ -14,7 +14,9 @@ jobs:
   build:
     name: Build & Scan Image
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 30 分钟不够：镜像导出耗时 217s + 层导入约 3m + Trivy 拉漏洞库（~110MB）与
+    # 解包 25GB 镜像需 10-20m，合计常逼近 30m 上限被 cancel，造成「假红」。
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,13 +33,28 @@ jobs:
           tags: tts-multimodel:ci
 
       # 供应链安全：Trivy 扫描关键/高危漏洞，未修复则阻断合并
+      #
+      # Trivy 会先把镜像整体导出到 $TMPDIR 再逐层解包分析（docker-export-*）。
+      # 本项目镜像约 10.8GB（压缩层）/ 约 25GB（展开），而 docker/build-push-action
+      # 已经把它 load 进 daemon 占了一份；runner / 盘 145G、构建后仅剩约 31G，
+      # 不清理必然 "no space left on device"（见 run 33526733209，导出层
+      # sha256:7b9433fba79b 时爆盘）。
+      # 只清 dangling 层（docker image prune -f）不够：buildx 用 docker-container 驱动，
+      # 构建缓存落在 / 上的 state volume，docker builder prune 对当前 builder 生效但
+      # 回收为 0B，必须先 prune 再移除 builder 才能真正释放。
       - name: Free disk space for scan
-        # runner 临时盘 14GB：torch 镜像构建缓存 + trivy 镜像解包双份占用会
-        # 触发 no space left on device（analysis pipeline 崩溃）。先清缓存再扫。
         run: |
-          docker builder prune -af
+          docker buildx prune -af || true
+          for b in $(docker buildx ls --format '{{.Name}}' | grep -E '^builder-'); do
+            docker buildx rm -f "$b" || true
+          done
           docker image prune -f
+          # 卸掉 runner 预装但本流水线用不到的大型工具链（合计约 25GB）
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost \
+            /opt/az /usr/share/swift /usr/local/julia* /usr/local/graalvm /usr/share/miniconda \
+            /usr/local/share/powershell /usr/lib/google-cloud-sdk
           df -h / | tail -1
+
       - name: Trivy scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 (SHA pin 防 tag 强更，与 docker-publish/security 一致)
         with:
@@ -46,3 +63,5 @@ jobs:
           exit-code: "1"
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
+          # 只跑漏洞扫描：secret/misconfig 对 25GB 镜像是纯多余开销，会拖长导出与解包时间
+          scanners: vuln
