@@ -154,8 +154,7 @@ class VoiceboxEngine:
         """
         # SCAFFOLD：不编造真实推理。返回明确的未接入结果，交由上层（MCP/路由）提示用户。
         logger.warning(
-            "[VoiceboxEngine] SCAFFOLD: voice_conversion() 未接入真实后端，"
-            "source=%s target=%s",
+            "[VoiceboxEngine] SCAFFOLD: voice_conversion() 未接入真实后端，source=%s target=%s",
             source_audio,
             target_audio,
         )

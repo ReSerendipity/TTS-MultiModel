@@ -25,7 +25,6 @@ SCAFFOLD 说明：
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -171,8 +170,7 @@ async def _handle_list_voicebox_models(keyword: str = "", **kwargs: Any) -> dict
             "count": 0,
             "engine": VOICEBOX_ENGINE_ID,
             "note": (
-                "SCAFFOLD: 尚未接入真实语音转换后端，暂无可用模型。"
-                "请在 engines/voicebox_engine.py 实现后补充读取逻辑。"
+                "SCAFFOLD: 尚未接入真实语音转换后端，暂无可用模型。请在 engines/voicebox_engine.py 实现后补充读取逻辑。"
             ),
         }
     except Exception as e:  # noqa: BLE001
