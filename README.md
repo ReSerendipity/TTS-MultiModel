@@ -329,7 +329,7 @@ TTS_MultiModel/
 3. **提交代码** - Fork → Branch → Commit → Push → Pull Request
 4. **改进文档** - 修复错别字、添加示例、翻译内容
 
-详见 [贡献指南](.github/CONTRIBUTING.md)。
+详见 [贡献指南](https://github.com/ReSerendipity/.github/blob/main/CONTRIBUTING.md)（组织默认，Conventional Commits + DCO）。
 
 ## 模型许可说明
 
