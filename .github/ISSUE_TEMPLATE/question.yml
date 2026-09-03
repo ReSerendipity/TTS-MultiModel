@@ -1,25 +1,66 @@
----
-name: Question
-about: Ask a question about TTS MultiModel setup or usage
+name: 提问
+description: 咨询 TTS MultiModel 的安装、配置或使用问题
 title: "[QUESTION] "
-labels: question
-assignees: ""
----
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你的提问！请尽量描述清楚问题背景，方便社区协助解答。
 
-## Your Question
-A clear description of your question.
+  - type: textarea
+    id: question
+    attributes:
+      label: 你的问题
+      description: 清晰描述你的问题
+      placeholder: "例如：如何配置本地模型路径？"
+    validations:
+      required: true
 
-## Context
-What are you trying to achieve?
+  - type: textarea
+    id: context
+    attributes:
+      label: 背景 / 想达成的目标
+      description: 你在做什么？想要达到什么效果？
+    validations:
+      required: false
 
-## What You've Tried
-Describe any steps you've already taken to resolve this.
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已尝试的方法
+      description: 你已经尝试过哪些步骤？
+    validations:
+      required: false
 
-## Environment
-- OS: [e.g., Windows 11, Ubuntu 22.04]
-- Python version: [e.g., 3.12.0]
-- GPU: [e.g., NVIDIA RTX 3060]
-- TTS MultiModel version: [e.g., 2.0.0]
+  - type: input
+    id: version
+    attributes:
+      label: 项目版本
+      description: README 徽章或 config.yaml version 字段
+      placeholder: "例如：2.0.0"
+    validations:
+      required: false
 
-## Additional Context
-Any other context, screenshots, or references.
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - Windows 10
+        - Windows 11
+        - Ubuntu 22.04
+        - Ubuntu 24.04
+        - Debian 12
+        - macOS
+        - 其他
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 还有其他需要说明的吗？
+    validations:
+      required: false

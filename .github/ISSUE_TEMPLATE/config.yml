@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: "Questions & Discussions"
-    url: https://github.com/ReSerendipity/TTS_MultiModel/discussions
-    about: "Ask questions, share ideas, or get help from the community"
-  - name: "Documentation"
-    url: https://github.com/ReSerendipity/TTS_MultiModel/tree/master/docs
-    about: "Read the project documentation before filing an issue"
+  - name: 安全问题报告
+    url: https://github.com/ReSerendipity/TTS_MultiModel/security/policy
+    about: 请通过 SECURITY.md 中的方式私下报告安全问题，勿公开提交 Issue。
+  - name: 项目文档
+    url: https://github.com/ReSerendipity/TTS_MultiModel#readme
+    about: 查看项目 README、部署指南、架构文档等。

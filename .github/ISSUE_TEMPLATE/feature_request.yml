@@ -1,22 +1,77 @@
----
-name: Feature Request
-about: Suggest a feature for TTS MultiModel
+name: 功能请求
+description: 提出一个新功能建议
 title: "[FEATURE] "
-labels: enhancement
-assignees: ""
----
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你提出功能建议！请详细描述你的需求，帮助我们理解其价值。
 
-## Feature Description
-A clear description of the feature you'd like to see.
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 动机 / 要解决的问题
+      description: 你为什么需要这个功能？它解决了什么问题？
+      placeholder: "例如：我需要在批量合成时能够为每段文本设置不同的音色参数，目前只能全局设置"
+    validations:
+      required: true
 
-## Use Case
-Why is this feature needed? What problem does it solve?
+  - type: textarea
+    id: solution
+    attributes:
+      label: 建议方案
+      description: 你希望怎么实现？描述你期望的功能行为
+      placeholder: "例如：在批量合成界面新增音色参数列表，允许逐条配置"
+    validations:
+      required: true
 
-## Proposed Solution
-How should this feature work?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案
+      description: 你是否考虑过其他实现方式？为什么当前方案更好？
+    validations:
+      required: false
 
-## Alternatives Considered
-Any alternative approaches you've considered.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 涉及范围
+      description: 这个功能主要涉及哪一部分？
+      options:
+        - 前端 UI
+        - 后端 API / 核心引擎
+        - 模型 / 推理管线
+        - 部署 / 运维
+        - 不确定
+    validations:
+      required: true
 
-## Additional Context
-Any other context, screenshots, or references.
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 优先级
+      description: 这个功能对你的重要程度
+      options:
+        - 高 - 严重影响使用体验
+        - 中 - 有更好，没有也能用
+        - 低 - 锦上添花
+    validations:
+      required: true
+
+  - type: textarea
+    id: mockup
+    attributes:
+      label: UI/UX 建议（可选）
+      description: 如果涉及界面改动，描述你期望的交互方式或附上草图
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 还有其他需要说明的吗？
+    validations:
+      required: false

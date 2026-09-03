@@ -168,8 +168,9 @@ docker run -d --gpus all -p 7869:7869 \
 
 ### VoxCPM2 引擎所需模型
 
-| 模型 | 说明 | 存放目录 | 下载源 |
-| -- | -- | ---- | --- |
+| 模型     | 说明     | 存放目录   | 下载源    |
+| ------ | ------ | ------ | ------ |
+| <br /> | <br /> | <br /> | <br /> |
 
 ### 引擎所需模型
 
@@ -328,7 +329,7 @@ TTS_MultiModel/
 3. **提交代码** - Fork → Branch → Commit → Push → Pull Request
 4. **改进文档** - 修复错别字、添加示例、翻译内容
 
-详见 [贡献指南](CONTRIBUTING.md)。
+详见 [贡献指南](.github/CONTRIBUTING.md)。
 
 ## 模型许可说明
 
