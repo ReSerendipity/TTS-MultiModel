@@ -36,7 +36,7 @@ TTS_MultiModel 项目代码采用 [Apache License 2.0](LICENSE)。
 
 ### `vendor/voxcpm`（VoxCPM2 引擎代码）
 
-- **上游**: 见 [vendor/voxcpm/SOURCE.md](vendor/voxcpm/SOURCE.md)
+- **上游**: OpenBMB/VoxCPM（vendored 目录为本地保留、未随仓库发布；`vendor/voxcpm/SOURCE.md` 源码出处说明为本地文件）
 - **许可**: Apache-2.0（与项目主许可一致）
 
 ### `vendor/tn`（文本规范化，中文/英文）

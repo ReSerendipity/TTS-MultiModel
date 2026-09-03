@@ -10,6 +10,8 @@
 - get_model_status: 获取模型加载状态
 - load_model: 加载指定引擎模型
 - generate_voice: 统一语音生成接口
+- voice_conversion: 语音转换（voicebox，由 mcp_voicebox_bridge 注册，SCAFFOLD）
+- list_voicebox_models: 列出语音转换模型（由 mcp_voicebox_bridge 注册，SCAFFOLD）
 
 支持的传输方式：
 - stdio: 标准输入输出（默认，用于 Claude Desktop 等桌面客户端）
@@ -133,6 +135,15 @@ class MCPServer:
 
     def _register_default_tools(self) -> None:
         """注册默认的 TTS 相关工具。"""
+        # 集成 voicebox（语音转换）MCP 桥接：与现有工具同实例挂载，出现在 tools/list。
+        # 使用延迟导入 + 异常保护，确保桥接模块缺失时主 MCP 服务器仍可正常启动。
+        try:
+            from .mcp_voicebox_bridge import register_voicebox_tools
+
+            register_voicebox_tools(self)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[MCP] 注册 voicebox 工具失败（已跳过）: {e}")
+
         self.register_tool(
             MCPTool(
                 name="text_to_speech",

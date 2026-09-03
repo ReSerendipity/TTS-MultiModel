@@ -403,3 +403,6 @@ checkpoints/
 data/
 
 .git.backup/
+
+# AGENTS 瘦身重构下沉子文档（仅本地保留，随 AGENTS.md 一起不入库，2026-09-03）
+docs/agents/
