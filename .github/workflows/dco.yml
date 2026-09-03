@@ -17,5 +17,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check DCO
-        uses: dcoapp/dco@v1
+      - name: Verify Signed-off-by
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          if [[ -z "$base_sha" || -z "$head_sha" ]]; then
+            echo "::error::Could not determine PR base/head SHA"
+            exit 1
+          fi
+          fails=0
+          while IFS= read -r commit; do
+            if ! git log -1 --format='%B' "$commit" | grep -q 'Signed-off-by:'; then
+              echo "::error::Commit $commit is missing 'Signed-off-by:' trailer (run: git commit -s)"
+              fails=1
+            fi
+          done < <(git rev-list "$base_sha..$head_sha")
+          exit $fails
