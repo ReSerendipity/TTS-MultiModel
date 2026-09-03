@@ -50,56 +50,26 @@ jobs:
           pip install pyyaml
           python scripts/check_config_refs.py
 
+  # 类型门禁（mypy ratchet，家族底线；2026-09-03 接入组织级 reusable workflow）
+  # 门禁逻辑统一维护在 ReSerendipity/.github 的 python-quality-baseline.yml，
+  # 本仓只传参数。模板口径与历史内联实现完全一致（mypy==2.3.1、
+  # --ignore-missing-imports --no-error-summary、只装 mypy 不装项目依赖、
+  # 基线 .ci/mypy_baseline.txt），迁移零漂移。
+  # 独立成 job 的理由不变：mypy 与 ruff 处置节奏不同，
+  # 不让「ruff 已可阻断」被 mypy 的存量债务拖住。
+  # ⚠️ 改 mypy 版本或依赖集 = 换测量口径，必须用基线注释命令重算基线。
+  #（原内联实现见 git 历史；迁移记录 docs/reports/家族模板迁移_mypy_ratchet_20260903.md）
   typecheck:
-    # 独立成 job（原先挂在 lint 的最后一步）：mypy 与 ruff 的处置节奏完全不同，
-    # 混在一个 job 里会让「ruff 已可阻断」这件事被 mypy 的存量债务拖住。
     name: Typecheck (mypy ratchet)
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    # 阻断的是「债务上升」，不是「债务为零」。存量类型错误不要求一次性清零，
-    # 但任何人新增一处类型回归都会让本 job 变红 —— 这是唯一能让 268 项存量
-    # 不再继续增长的可执行办法。
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install mypy
-        run: pip install mypy==2.3.1
-
-      # 基线 .ci/mypy_baseline.txt 与「本 job 只装 mypy、不装项目依赖」强耦合：
-      # 缺 torch/soundfile 时这些第三方符号在 mypy 眼里是 Any，attr-defined /
-      # assignment 一类错误不会浮现。实测同一份代码 —— 本 job 口径 141 项，
-      # 而本机全依赖 venv 口径 268 项。因此**任何改动本 job 依赖集或 mypy 版本
-      # 的 PR，都必须用相同命令重新生成基线**，否则门禁会以假阳性变红：
-      #   pip install mypy==<同版本>
-      #   mypy app/integrated_app/ --ignore-missing-imports --no-error-summary | grep -c 'error:'
-      - name: Run mypy and enforce ratchet
-        run: |
-          mypy app/integrated_app/ --ignore-missing-imports --no-error-summary > mypy.log 2>&1 || true
-          # 注意：grep -c 在零匹配时**依然打印 0**、只是退出码为 1，
-          # 所以这里只能 `|| true`，绝不能写 `|| echo 0`（那样变量会变成 "0\n0"，
-          # 一旦类型债务真的清零，本步骤反而会在数值比较处崩掉）。
-          COUNT=$(grep -c 'error:' mypy.log || true)
-          BASELINE=$(tr -d '[:space:]' < .ci/mypy_baseline.txt)
-          COUNT=${COUNT:-0}
-          if ! [ "$COUNT" -eq "$COUNT" ] 2>/dev/null || ! [ "$BASELINE" -eq "$BASELINE" ] 2>/dev/null; then
-            echo "::error::计数解析失败 (COUNT='$COUNT' BASELINE='$BASELINE')，门禁本身出错，拒绝放行"
-            exit 1
-          fi
-          echo "mypy 错误数: $COUNT（基线 $BASELINE）"
-          echo "### mypy: $COUNT errors (baseline $BASELINE)" >> "$GITHUB_STEP_SUMMARY"
-          head -n 60 mypy.log
-          if [ "$COUNT" -gt "$BASELINE" ]; then
-            echo "::error::类型债务上升：$BASELINE -> $COUNT。本门禁只降不升；如确需新增，请连同基线一起说明原因。"
-            exit 1
-          fi
-          if [ "$COUNT" -lt "$BASELINE" ]; then
-            echo "::warning::类型债务已降至 $COUNT，请把 .ci/mypy_baseline.txt 从 $BASELINE 下调以固化成果。"
-          fi
+    uses: ReSerendipity/.github/.github/workflows/python-quality-baseline.yml@main
+    with:
+      package: app/integrated_app
+      include_tests: false
+      mypy_target: app/integrated_app/
+      mypy_baseline_file: .ci/mypy_baseline.txt
+      pip_cache_dependency_path: requirements.txt
+    permissions:
+      contents: read
 
   test:
     name: Test (pytest)
