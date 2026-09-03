@@ -1,0 +1,160 @@
+# .github/workflows/gpu-smoke.yml
+# Weekly + manual REAL-INFERENCE smoke on a self-hosted GPU runner (label: gpu).
+#
+# 补齐 TTS_MultiModel 在「GPU 真机推理 CI」维度的历史缺口：
+# 此前 CI 的 runs-on 全为 GitHub 托管 runner（27 GB 权重无法在 CI 加载），
+# 「权重加载失败 / 显存 OOM / CUDA 版本不兼容」三类故障在 CI 中完全不可见。
+#
+# 设计借鉴 SeedVR2-lite 的 gpu-smoke.yml（runner-precheck + gpu-smoke 双 job）。
+# 与 SeedVR2 不同：本项目以 FastAPI 服务形态运行，故真机冒烟 = 拉起真实服务
+# （TTS_AUTO_LOAD_MODEL=1 自动加载 voxcpm2）→ 两个引擎各跑一条最短合成 →
+# 校验返回的是真实音频字节。
+#
+# 运行前提（一次性，在 GPU 机器上）：
+#   1. 注册 self-hosted runner，额外打 `gpu` label
+#      (Settings -> Actions -> Runners -> New self-hosted runner -> --labels gpu)
+#   2. 预置 Python 虚拟环境（含 torch CUDA + 本项目依赖）；路径通过仓库变量
+#      GPU_SMOKE_VENV 指定（如 /opt/venv-tts/bin）。未配置时回退到默认 python
+#      并尝试 pip install -r requirements.txt（不推荐，权重环境应预置）。
+#   3. 模型权重就位：model/VoxCPM2、model/IndexTTS2 等目录需存在。
+#   4. NVIDIA 驱动可用；约 27 GB 空闲显存（IndexTTS2 全量加载）。
+#   5. 仓库 Secrets 配置 REPO_ADMIN_TOKEN（具备 actions:read / admin 权限），
+#      供 runner-precheck 查询 runner 在线状态。
+# 无 gpu runner 在线时，周更作业经 runner-precheck 优雅跳过（available=false），不会长期飘红。
+
+name: GPU Smoke (real inference, self-hosted)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/tag/sha to smoke (empty = default branch)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 3 * * 1" # every Monday 03:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  runner-precheck:
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
+      - name: Check for an online self-hosted GPU runner
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.REPO_ADMIN_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::REPO_ADMIN_TOKEN secret not configured - cannot query runner status, skipping smoke"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # runners 列表 API 需要管理员级 token（GITHUB_TOKEN 即使 actions:read 也 403）
+          COUNT=$(gh api "repos/${{ github.repository }}/actions/runners" \
+            --jq '[.runners[] | select(.status == "online") | select(any(.labels[]; .name == "gpu"))] | length')
+          echo "online gpu-labelled runners: ${COUNT}"
+          if [ "${COUNT}" -gt 0 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::no online self-hosted runner with label 'gpu'; weekly smoke skipped"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  gpu-smoke:
+    needs: runner-precheck
+    if: needs.runner-precheck.outputs.available == 'true'
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 150
+    env:
+      TTS_AUTO_LOAD_MODEL: "1"
+      TTS_AUTO_LOAD_ENGINE: "voxcpm2"
+      CUDA_VISIBLE_DEVICES: "0"
+    steps:
+      - name: Fetch source via codeload (avoid git smart-HTTP stall on GPU runner)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $ref = "${{ github.event.inputs.ref || github.ref_name }}"
+          if (-not $ref) { $ref = '${{ github.ref_name }}' }
+          Invoke-WebRequest "https://codeload.github.com/${{ github.repository }}/tar.gz/refs/heads/$ref" -OutFile src.tgz -UseBasicParsing
+          New-Item -ItemType Directory -Path repo -Force | Out-Null
+          tar -xzf src.tgz -C repo --strip-components=1
+          Remove-Item src.tgz -Force
+          Get-ChildItem repo | Select-Object Name
+
+      - name: Resolve Python interpreter
+        id: py
+        shell: pwsh
+        run: |
+          $venv = "${{ vars.GPU_SMOKE_VENV }}"
+          if ($venv -and (Test-Path $venv)) {
+            "python=$venv/bin/python" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding ascii -Append
+          } else {
+            "python=python" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding ascii -Append
+          }
+
+      - name: Install deps (fallback if no prebuilt venv configured)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not "${{ vars.GPU_SMOKE_VENV }}") {
+            & ${{ steps.py.outputs.python }} -m pip install -r requirements.txt
+          } else {
+            Write-Host "using prebuilt venv; skipping pip install"
+          }
+
+      - name: CUDA / torch sanity gate
+        shell: pwsh
+        run: |
+          & ${{ steps.py.outputs.python }} -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'; print('CUDA', torch.cuda.get_device_name(0))"
+
+      - name: Boot service + GPU real-inference smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          cd repo/app
+          $env:PYTHONPATH = (Get-Location).Path
+          # 后台拉起真实服务（TTS_AUTO_LOAD_MODEL=1 自动加载 voxcpm2）
+          $p = Start-Process -NoNewWindow -PassThru -FilePath ${{ steps.py.outputs.python }} `
+            -ArgumentList "-u","-m","integrated_app.app_server","--host","127.0.0.1","--port","7869" `
+            -RedirectStandardOutput $env:RUNNER_TEMP/server.log -RedirectStandardError $env:RUNNER_TEMP/server.err
+          try {
+            # 等待 /readyz（model_loaded 闸门，最长 600s，含权重加载时间）
+            $ok = $false
+            for ($i=1; $i -le 200; $i++) {
+              try { $r = Invoke-WebRequest -Uri http://127.0.0.1:7869/readyz -UseBasicParsing -TimeoutSec 5; if ($r.StatusCode -eq 200) { $ok=$true; break } } catch {}
+              Start-Sleep -Seconds 3
+            }
+            if (-not $ok) { Write-Host "=== server.log ==="; Get-Content $env:RUNNER_TEMP/server.log -Tail 100; throw "service not ready within 600s" }
+            Write-Host "service ready"
+            # 跑真机冒烟：voxcpm2 + indextts2 各一条最短真实合成
+            & ${{ steps.py.outputs.python }} ../scripts/gpu_smoke_minimal.py --base-url http://127.0.0.1:7869 --output gpu_smoke_report.json
+            $rc = $LASTEXITCODE
+            if ($rc -ne 0) { throw "GPU smoke failed (rc=$rc)" }
+          } finally {
+            if (-not $p.HasExited) { $p.Kill() }
+          }
+
+      - name: Report GPU status
+        if: always()
+        shell: pwsh
+        run: |
+          nvidia-smi || true
+
+      - name: Upload smoke report + server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-smoke-report-${{ github.run_number }}
+          path: |
+            repo/app/gpu_smoke_report.json
+            ${{ runner.temp }}/server.log
+            ${{ runner.temp }}/server.err
+          if-no-files-found: ignore
+          retention-days: 7
