@@ -79,8 +79,8 @@ jobs:
 
       - name: Commit and push baselines
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "ReSerendipity"
+          git config user.email "zengyangc@outlook.com"
           if ! git diff --quiet tests/e2e/screenshots/; then
             git add tests/e2e/screenshots/
             git commit -m "chore(e2e): update visual regression baselines"

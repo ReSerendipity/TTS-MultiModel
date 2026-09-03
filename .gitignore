@@ -401,3 +401,5 @@ precheck.ps1
 # 模型权重与运行数据（禁止提交）
 checkpoints/
 data/
+
+.git.backup/

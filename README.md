@@ -15,7 +15,7 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C.svg?logo=pytorch\&logoColor=white)](https://pytorch.org/)
 [![Docker](https://img.shields.io/badge/Docker-Supported-2496ED.svg?logo=docker\&logoColor=white)](https://www.docker.com/)
 
-[English](#english) · [中文](#中文) · [Features](#-features) · [Quick Start](#-quick-start) · [Documentation](#-documentation) · [API](#-api-endpoints) · \[Contributing]
+[中文](#中文) · [功能亮点](#功能亮点) · [快速开始](#快速开始) · [模型下载](#模型下载) · [文档](#文档) · [API](#api-端点) · [许可证](#许可证)
 
 ## 🧪 在线模拟演示（GitHub Pages）
 
@@ -179,7 +179,7 @@ docker run -d --gpus all -p 7869:7869 \
 python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.5（IndexTeam/IndexTTS-2.5）
 ```
 
-详细说明见[模型下载指南（本地文档，未随仓库发布）](docs/plans/MODEL_DOWNLOADS.md)。
+详细说明见 `docs/plans/MODEL_DOWNLOADS.md`（本地文档，未随仓库发布）。
 
 ## 配置
 
@@ -195,7 +195,7 @@ python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.
 
 - **断点续跑**: `runtime.task.checkpoint_dir` 配置 checkpoint 存储目录
 
-详见 [参数调整指南（本地文档，未随仓库发布）](docs/project/ADJUSTABLE_PARAMETERS.md)。
+详见 `docs/project/ADJUSTABLE_PARAMETERS.md`（本地文档，未随仓库发布）。
 
 ## 安全与可靠性
 
@@ -328,7 +328,7 @@ TTS_MultiModel/
 3. **提交代码** - Fork → Branch → Commit → Push → Pull Request
 4. **改进文档** - 修复错别字、添加示例、翻译内容
 
-详见 [贡献指南（本地文档，未随仓库发布）](CONTRIBUTING.md)。
+详见 [贡献指南](CONTRIBUTING.md)。
 
 ## 模型许可说明
 
@@ -355,13 +355,13 @@ Copyright (c) 2026 ReSerendipity
 
 ## 文档
 
-- [模型下载指南（本地文档，未随仓库发布）](docs/plans/MODEL_DOWNLOADS.md) - 模型下载与配置
-- [模型扩展指南（本地文档，未随仓库发布）](docs/plans/MODEL_EXTENSION_GUIDE.md) - 添加新 TTS 引擎
-- [IndexTTS 2.5 集成指南（本地文档，未随仓库发布）](docs/plans/INDEXTTS2_INTEGRATION_GUIDE.md) - IndexTTS 2.5 集成详情
-- [项目架构（本地文档，未随仓库发布）](docs/project/PROJECT_ARCHITECTURE.md) - 系统架构概览
-- [参数调整（本地文档，未随仓库发布）](docs/project/ADJUSTABLE_PARAMETERS.md) - 配置参数参考
-- [UI 开发指南（本地文档，未随仓库发布）](docs/plans/UI开发指南_README.md) - Web UI 开发指南
-- [改进手册（本地文档，未随仓库发布）](docs/plans/IMPROVEMENT_GUIDEBOOK.md) - 优化和改进建议
+- `docs/plans/MODEL_DOWNLOADS.md`（本地文档，未随仓库发布）- 模型下载与配置
+- `docs/plans/MODEL_EXTENSION_GUIDE.md`（本地文档，未随仓库发布）- 添加新 TTS 引擎
+- `docs/plans/INDEXTTS2_INTEGRATION_GUIDE.md`（本地文档，未随仓库发布）- IndexTTS 2.5 集成详情
+- `docs/project/PROJECT_ARCHITECTURE.md`（本地文档，未随仓库发布）- 系统架构概览
+- `docs/project/ADJUSTABLE_PARAMETERS.md`（本地文档，未随仓库发布）- 配置参数参考
+- `docs/plans/UI开发指南_README.md`（本地文档，未随仓库发布）- Web UI 开发指南
+- `docs/plans/IMPROVEMENT_GUIDEBOOK.md`（本地文档，未随仓库发布）- 优化和改进建议
 
 ## 相关项目
 

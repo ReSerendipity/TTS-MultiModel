@@ -15,6 +15,11 @@ jobs:
     name: Release Please
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      GIT_AUTHOR_NAME: ReSerendipity
+      GIT_AUTHOR_EMAIL: zengyangc@outlook.com
+      GIT_COMMITTER_NAME: ReSerendipity
+      GIT_COMMITTER_EMAIL: zengyangc@outlook.com
     steps:
       - uses: googleapis/release-please-action@v4
         with:
