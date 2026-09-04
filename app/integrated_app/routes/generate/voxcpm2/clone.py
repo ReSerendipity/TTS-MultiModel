@@ -252,6 +252,8 @@ async def generate_voxcpm_ultimate(
     denoise: str = Form("true"),
     steps: int = Form(10),
     seed: int = Form(-1),
+    denoise_strength: float | None = Form(None),
+    ref_audio_upload: UploadFile | None = File(None),
     lang: str = Form("Auto"),
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
@@ -273,6 +275,9 @@ async def generate_voxcpm_ultimate(
         denoise: 参考音频降噪强度（true→1.0，false→0.0）。
         steps: 推理步数。
         seed: 随机种子，-1 表示随机；其他正值可复现结果。
+        denoise_strength: 降噪强度 0.0-1.0 连续值（极致页滑杆/数字控件）；
+            提供时覆盖 denoise 布尔语义（超出 [0,1] 自动截断）。
+        ref_audio_upload: 用户上传的参考音频文件（优先级最高，与可控克隆一致）。
         lang: 语言/方言标识。
         tempo_factor: 后处理变速倍率。
         voice_enhancement: 是否人声增强。
@@ -289,6 +294,14 @@ async def generate_voxcpm_ultimate(
 
     actual_ref_path: str | None = ref_audio_path if ref_audio_path else None
 
+    # 3.1 UploadFile 上传文件（优先级最高，与可控克隆的三级回退链一致）
+    upload_path: str | None
+    upload_path, err = await save_uploaded_audio(request, ref_audio_upload)
+    if err is not None:
+        return err
+    if upload_path:
+        actual_ref_path = upload_path
+
     if not actual_ref_path and persona_name:
         ref_path, err = await resolve_persona_ref(request, persona_name)
         if err is not None:
@@ -298,7 +311,11 @@ async def generate_voxcpm_ultimate(
             logger.info(f"[VoxCPM极致克隆] 已加载音色 '{os.path.basename(persona_name)}' 的参考音频")
 
     advanced_norm: bool = _parse_bool_form(norm)
-    advanced_denoise: float = 1.0 if _parse_bool_form(denoise) else 0.0
+    # 降噪强度：denoise_strength（0.0-1.0 连续值）优先；未提供时回退 denoise 布尔语义。
+    if denoise_strength is not None:
+        advanced_denoise: float = min(1.0, max(0.0, float(denoise_strength)))
+    else:
+        advanced_denoise = 1.0 if _parse_bool_form(denoise) else 0.0
 
     def _run():
         """正常参数下执行极致克隆生成"""
@@ -354,7 +371,6 @@ async def generate_voxcpm_prompt_continue(
     text: str = Form(""),
     prompt_wav: UploadFile | None = File(None),
     prompt_text: str = Form(""),
-    lang: str = Form("Auto"),
     tempo_factor: float = Form(1.0),
     voice_enhancement: bool = Form(False),
     target_lufs: float | None = Form(None),
@@ -370,7 +386,6 @@ async def generate_voxcpm_prompt_continue(
         text: 要续写的新文本。
         prompt_wav: 上传的 Prompt 音频文件（必须与 prompt_text 严格逐字对应）。
         prompt_text: Prompt 音频的逐字稿（必须与音频逐字对应，否则会风格漂移）。
-        lang: 语言/方言标识（当前仅用于日志，模型内部自动识别）。
         tempo_factor: 后处理变速倍率，1.0 为原速。
         voice_enhancement: 是否启用人声增强后处理。
         target_lufs: 响度归一化目标 (LUFS)，None 时使用默认 -16.0。

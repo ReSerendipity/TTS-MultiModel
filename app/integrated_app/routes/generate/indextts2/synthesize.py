@@ -134,7 +134,6 @@ async def generate_indextts2(
     text: str = Form(""),
     lang: str = Form("Auto"),
     ref_audio: UploadFile | None = File(None),
-    ref_text: str = Form(""),
     seed: int = Form(0),
     emo_text: str = Form(""),
     emo_audio: UploadFile | None = File(None),
@@ -150,6 +149,7 @@ async def generate_indextts2(
     emo_alpha_text: float = Form(0.8),
     emo_alpha_audio: float = Form(0.8),
     target_duration: float = Form(0.0),
+    duration_scale: float = Form(1.0),
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
     target_lufs: float = Form(-16.0),
@@ -172,7 +172,7 @@ async def generate_indextts2(
         text: 待合成的朗读文本，必填，<= MAX_TEXT_LENGTH。
         lang: 语言标识（当前仅日志用，IndexTTS2 内部自动识别语种）。
         ref_audio: 克隆音色用的参考音频文件（可选；不传则用默认说话人）。
-        ref_text: 参考音频的逐字稿（可选；提供后 speaker embedding 质量更高）。
+        ref_text: 已移除——引擎 infer 无此参数，历史声明从未被消费（报告 B9）。
         seed: 随机种子，0 表示随机；正数可复现生成结果。
         emo_text: 情感文本描述（优先级最高）。
         emo_audio: 情感参考音频（优先级次高）。
@@ -187,7 +187,9 @@ async def generate_indextts2(
         emo_alpha: 默认情感强度混合比 [0, 1]（1 = 完全用情感条件，0 = 完全中性）。
         emo_alpha_text: 当使用 emo_text 模式时的 alpha（覆盖默认 emo_alpha）。
         emo_alpha_audio: 当使用 emo_audio 模式时的 alpha（覆盖默认 emo_alpha）。
-        target_duration: 目标总时长（秒），> 0 时启用精确时长控制（覆盖 speed）。
+        target_duration: 目标总时长（秒），> 0 时启用精确时长控制（覆盖 duration_scale）。
+        duration_scale: 相对语速倍率（0.5x-2.0x，变速不变调），透传为引擎 duration_factor；
+            target_duration > 0 时被覆盖。
         tempo_factor: 后处理变速倍率（1.0 原速），推荐配合 target_duration 一起用。
         voice_enhancement: 是否启用人声增强后处理（"true"/"false"）。
         target_lufs: 响度归一化目标 (LUFS)，默认 -16.0。
@@ -236,16 +238,18 @@ async def generate_indextts2(
     # ------------------------------------------------------------------
     emotion_mode: str | None = None
     emotion_data: Any = None
-    emotion_alpha: float = emo_alpha
+    # emo_alpha 服务端钳制：UI 允许 0-1.4（情感权重超过 1 时更"贴"情感参考），
+    # 但不信任客户端——越界值直接截断而非透传给引擎（报告 B12）。
+    emotion_alpha: float = min(1.4, max(0.0, float(emo_alpha)))
 
     if emo_text and emo_text.strip():
         emotion_mode = _EMOTION_MODE_TEXT
         emotion_data = emo_text.strip()
-        emotion_alpha = emo_alpha_text
+        emotion_alpha = min(1.4, max(0.0, float(emo_alpha_text)))
     elif emo_audio_path:
         emotion_mode = _EMOTION_MODE_AUDIO
         emotion_data = emo_audio_path
-        emotion_alpha = emo_alpha_audio
+        emotion_alpha = min(1.4, max(0.0, float(emo_alpha_audio)))
     else:
         # 8 维情感向量（构造 dict，方便后续做"缺 0 / 多报错"校验）
         emotion_dict: dict[str, float] = {
@@ -299,11 +303,17 @@ async def generate_indextts2(
     # ------------------------------------------------------------------
     # 4. 时长控制处理
     # target_duration（精确总时长秒）优先级高于 speed；> 0 时启用。
+    # duration_scale（相对倍速，0.5x-2.0x）来自时长/克隆 Tab 的语速控件，
+    # 透传给 engine.infer 的 duration_factor（变速不变调）；两者同时给出时
+    # target_duration 优先（与 engine 内部优先级一致）。
     # 注意：speed 的 0.5x-2.0x 限制在 IndexTTS2 engine 内部按 target_duration /
     # 文本自然时长 隐式校验，如果超出范围 engine 会在内部 clamp 并打日志。
     # 此处不做双重校验以避免与 engine 内部逻辑漂移。
     # ------------------------------------------------------------------
     target_dur: float | None = target_duration if target_duration > 0 else None
+    duration_factor: float | None = (
+        duration_scale if (target_dur is None and duration_scale > 0 and duration_scale != 1.0) else None
+    )
 
     # ------------------------------------------------------------------
     # 5. 构造生成闭包（按 segment 拆分 -> 每段 infer -> 合并 -> 写盘）
@@ -339,6 +349,8 @@ async def generate_indextts2(
             infer_kwargs["emo_alpha"] = emotion_alpha
             if target_dur is not None:
                 infer_kwargs["target_duration"] = target_dur
+            elif duration_factor is not None:
+                infer_kwargs["duration_factor"] = duration_factor
             if seed > 0:
                 infer_kwargs["seed"] = seed
 

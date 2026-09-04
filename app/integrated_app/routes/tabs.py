@@ -214,7 +214,7 @@ async def load_tab(request: Request, tab_name: str, lang: str = "zh-CN") -> Resp
     # 3) 构建 Tab 特定上下文
     ctx: dict[str, Any] = _common_context(request, tab_name=tab_name)
 
-    if tab_name in {"voice_design", "voice_clone", "ultimate_clone", "voxcpm2"}:
+    if tab_name in {"voice_design", "voice_clone", "ultimate_clone", "voxcpm2", "script"}:
         try:
             ctx["persona_list"] = get_persona_list()
         except Exception as exc:  # noqa: BLE001

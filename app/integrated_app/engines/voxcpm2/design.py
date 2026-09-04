@@ -122,6 +122,7 @@ def fn_voxcpm_design(
     denoise: bool = True,
     ref_audio_path: str | None = None,
     normalize: bool = True,
+    seed: int = -1,
 ) -> tuple[tuple[int, np.ndarray, str] | None, str]:
     """VoxCPM2 语音设计主入口：根据文本描述生成定制音色语音。
 
@@ -150,6 +151,8 @@ def fn_voxcpm_design(
             再叠加 instruction 的风格修饰。
         normalize: 是否对输出音频执行响度归一化（LUFS）。
             默认 True，保证多次生成音量一致性。
+        seed: 随机数种子。-1（默认）表示每次随机；指定正整数可确定性复现
+            生成（经 generate_with_template 的 per-chunk seed 机制逐段递增）。
 
     Returns:
         Tuple[Optional[Tuple[int, np.ndarray, str]], str]:
@@ -255,6 +258,10 @@ def fn_voxcpm_design(
                     min_len=2,
                     **_advanced_kwargs(),
                 )
+                if seed is not None and seed > 0:
+                    # 确定性复现：generate_with_template 探测到 kwargs["seed"] 后
+                    # 会按段递增（per-chunk seed），保证同 seed 同文本结果可复现。
+                    kwargs["seed"] = seed
                 if ref_path:
                     kwargs["reference_wav_path"] = ref_path
                 return kwargs

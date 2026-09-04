@@ -34,6 +34,7 @@ from ..persona_manager import (
     delete_persona,
     fn_save_persona,
     get_persona_detail_table,
+    get_persona_list,
     get_total_persona_count,
 )
 from .generate.utils import ALLOWED_AUDIO_EXTENSIONS, save_uploaded_audio
@@ -115,6 +116,7 @@ async def persona_save(
     request: Request,
     save_name: str = Form(""),
     ref_audio: UploadFile | None = File(None),
+    ref_audio_upload: UploadFile | None = File(None),
     result_audio: str = Form(""),
     ref_text: str = Form(""),
     instruction: str = Form(""),
@@ -122,15 +124,17 @@ async def persona_save(
 ) -> HTMLResponse:
     """保存音色（voice_design / voice_clone / ultimate_clone 三页共用）。
 
-    音频来源二选一，优先级：上传的 ``ref_audio`` > 生成结果 ``result_audio``。
-    克隆/极致克隆页表单自带参考音频，走前者；语音设计页无参考音频，
-    固化的是「最近一次生成的结果音频」，由前端把结果片段上的
+    音频来源二选一，优先级：上传的 ``ref_audio`` > ``ref_audio_upload``（克隆/极致
+    克隆页生成表单的文件控件名，保存按钮随该表单提交，故此处两个名字都要收）>
+    生成结果 ``result_audio``。克隆/极致克隆页表单自带参考音频，走前者；语音设计页
+    无参考音频，固化的是「最近一次生成的结果音频」，由前端把结果片段上的
     ``data-audio-filename`` 回填进隐藏字段。
 
     Args:
         request: FastAPI Request（CSRF 由中间件统一校验，此处无需二次处理）。
         save_name: 目标音色名，交由 ``fn_save_persona`` 做白名单与越界校验。
-        ref_audio: 用户上传的参考音频。
+        ref_audio: 用户上传的参考音频（设计页/历史表单使用的字段名）。
+        ref_audio_upload: 用户上传的参考音频（克隆/极致克隆页生成表单的字段名别名）。
         result_audio: outputs/ 目录内的生成结果文件名。
         ref_text: 音色参考文本（克隆页）。
         instruction: 音色风格描述（设计页，作为 ref_text 的替代来源）。
@@ -152,14 +156,18 @@ async def persona_save(
     staged_path: str | None = None
     audio_input: str | None = None
 
-    if ref_audio is not None and ref_audio.filename:
+    # 克隆/极致克隆页的「保存音色」按钮随生成表单提交，文件控件名是
+    # ref_audio_upload；设计页/历史表单用 ref_audio。两个名字都收，前者优先。
+    effective_upload = ref_audio if (ref_audio is not None and ref_audio.filename) else ref_audio_upload
+
+    if effective_upload is not None and effective_upload.filename:
         # 复用 routes/generate/utils.save_uploaded_audio：它已实现扩展名白名单、
         # 体积上限与安全文件名处理，落盘后返回绝对路径。
         # WHY 不把 bytes 直接喂给 fn_save_persona：其 docstring 声称支持 bytes，
         # 但底层 preprocess_and_save_temp 实际只接受 文件路径 / UploadFile /
         # np.ndarray，传 bytes 会得到「不支持的音频输入类型: <class 'bytes'>」——
         # 文档与实现不符，以实现为准。
-        staged_path, err = await save_uploaded_audio(request, ref_audio, title_key="op_failed")
+        staged_path, err = await save_uploaded_audio(request, effective_upload, title_key="op_failed")
         if err is not None:
             # 校验失败时 _error_html 返回 HTTP 400。但 HTMX 默认只把 2xx 响应换进
             # 目标容器，而 app_init.js 的 htmx:responseError 监听器只做 console.warn
@@ -205,6 +213,35 @@ async def persona_save(
         return response
 
     return _persona_status_html(message, "success" if message.startswith("✅") else "error")
+
+
+@router.get(
+    "/list",
+    summary="音色名下拉片段",
+    description="返回音色名 <option> 片段，供克隆/设计页「刷新列表」按钮局部刷新下拉框",
+)
+async def persona_list_options(request: Request) -> HTMLResponse:
+    """返回音色下拉框的 ``<option>`` HTML 片段（HTMX innerHTML swap 专用）。
+
+    WHY：voice_clone / ultimate_clone 两页的「刷新列表」按钮历史上指向
+    ``hx-get="/api/persona/list"``、voice_design 页指向 ``/api/persona/options``，
+    而后端从未注册这两个 GET 端点（实际命中 405，htmx 对 4xx 不 swap、全局
+    responseError 只 console.warn → 按钮静默失效）。列表本体由 tab 渲染时的
+    ``ctx.persona_list`` 服务端注入；本端点与 tab 渲染共用 ``get_persona_list()``
+    数据源，避免两处漂移。
+
+    Args:
+        request: FastAPI 请求对象（未用 query 参数；保留签名与同文件风格一致）。
+
+    Returns:
+        HTMLResponse: ``<option>`` 片段；音色库为空时返回占位 option（与
+        模板空态文案一致，路由层片段沿用 persona_save 的中文文案约定）。
+    """
+    names: list[str] = get_persona_list()
+    options = "".join(f'<option value="{html.escape(n, quote=True)}">{html.escape(n)}</option>' for n in names)
+    if not options:
+        options = '<option value="" disabled selected>暂无已保存音色，请先上传或生成</option>'
+    return HTMLResponse(options)
 
 
 @router.get("/table", summary="音色表格", description="获取音色库表格数据，支持关键词过滤")

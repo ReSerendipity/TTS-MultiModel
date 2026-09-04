@@ -102,7 +102,6 @@ _SCRIPT_MAX_CHARACTERS_PER_LINE: int = 500
 async def generate_voxcpm_script(
     request: Request,
     text: str = Form(""),
-    instruction: str = Form(""),
     lang: str = Form("Auto"),
     cfg: float = Form(2.0),
     norm: str = Form("true"),
@@ -122,9 +121,6 @@ async def generate_voxcpm_script(
     Args:
         request: FastAPI Request 对象。
         text: 剧本格式文本，每行 ``[角色名] 台词``；空行会被跳过。
-        instruction: 全局风格/情感描述文本，作用于所有角色（如"整个剧本都用
-            舞台腔朗读"）。具体角色的个性化风格由 engine.generate_script()
-            内部按行解析角色标签。
         lang: 语言/方言标识，传递给 engine。
         cfg: 全局 CFG 强度；per-character override 由 engine 内部读取
             persona 元数据或高级参数实现（此处为了向后兼容保持单值入口）。

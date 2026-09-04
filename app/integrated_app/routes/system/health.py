@@ -35,7 +35,7 @@ async def get_audit(limit: int = 100) -> dict[str, Any]:
     return {"items": get_recent_audit(limit)}
 
 
-from ...security.audit import get_recent_audit  # noqa: E402
+from ...security.audit import get_recent_audit, log_audit  # noqa: E402
 from .gpu import _get_gpu_device, _get_gpu_utilization  # noqa: E402
 
 _SESSION_START_TS: float = time.time()
@@ -124,12 +124,20 @@ def ping() -> dict[str, Any]:
         一小时 360 次就累计 1.8s GPU 占用；此处只做内存级响应，耗时 <1ms，
         对推理零干扰。
 
+    Why 与根路径 ``/api/health/ping`` 同构（报告 D1）：
+        两套 ping 曾各自为政（``ts`` vs ``timestamp``、有无 version），消费方
+        （Docker HEALTHCHECK / runbook / 测试）全部指向根路径版。现将本实现
+        定为唯一规范形态，根路径改为委托这里，消除双探针语义分歧。
+
     Returns:
-        固定结构 ``{"status": "ok", "ts": <unix_ms>}``。
+        固定结构 ``{"status": "ok", "timestamp": <unix_s>, "version": ..., "attribution": ...}``。
     """
+    from ...config import get_config
+
     return {
         "status": "ok",
-        "ts": int(time.time() * 1000),
+        "timestamp": time.time(),
+        "version": get_config().version,
         "attribution": "TTS_MultiModel © ReSerendipity, Apache 2.0",
     }
 
@@ -498,13 +506,21 @@ async def get_health() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/shutdown", summary="优雅关闭服务器", description="请求服务器优雅关闭，延迟 1 秒后停止进程")
+@router.post("/shutdown", summary="关闭服务器（强制退出）", description="请求关闭服务器，延迟 1 秒后强制退出进程")
 def shutdown_server() -> dict[str, Any]:
-    """请求服务器优雅关闭。
+    """请求关闭服务器（**强制退出，非优雅停机**）。
 
     在后台延迟执行，给响应留出返回时间。
+
+    Why 用 ``os._exit(0)`` 而非信号量优雅停机（报告 D4 如实记录）：
+        此处绕过了 uvicorn 的 ``timeout_graceful_shutdown`` 排水流程，在途推理
+        可能被硬切。保留此行为的理由：本地单机部署的"一键关闭"按钮优先保证
+        进程确定性退出（悬挂的 GPU 线程常导致 signal 优雅停机卡死）；调用方
+        （设置页按钮）已有双重确认。生产/容器环境请用 SIGTERM 触发优雅停机，
+        不要依赖本端点。
     """
-    logger.info("[SHUTDOWN] 收到关闭请求，将在 1 秒后关闭服务器...")
+    logger.info("[SHUTDOWN] 收到关闭请求，将在 1 秒后强制退出服务器...")
+    log_audit("system_shutdown", detail="force exit via settings panel", outcome="attempt")
 
     def _do_shutdown() -> None:
         time.sleep(1)

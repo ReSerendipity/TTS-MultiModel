@@ -93,6 +93,8 @@ async def generate_voxcpm_design(
     cfg: float = Form(2.0),
     steps: int = Form(10),
     denoise: str = Form("true"),
+    norm: str = Form("true"),
+    seed: int = Form(-1),
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
     target_lufs: float = Form(-16.0),
@@ -114,6 +116,8 @@ async def generate_voxcpm_design(
             值越高风格越鲜明但可能失真。
         steps: 推理步数 (timesteps)，范围 [4, 50]，越多质量越高但越慢。
         denoise: 是否对参考音频降噪（"true"/"false" 字符串）。
+        norm: 是否对输出音频执行响度归一化（"true"/"false" 字符串）。
+        seed: 随机种子，-1 随机；正整数可复现生成。
         tempo_factor: 后处理变速倍率，1.0 为原速。
         voice_enhancement: 是否启用人声增强后处理。
         target_lufs: 响度归一化目标值 (LUFS)，默认 -16.0。
@@ -161,6 +165,7 @@ async def generate_voxcpm_design(
     # ------------------------------------------------------------------
     instruction = _merge_dialect(instruction, lang)
     advanced_denoise: bool = _parse_bool_form(denoise)
+    advanced_norm: bool = _parse_bool_form(norm)
 
     # ------------------------------------------------------------------
     # 3. Persona 参考音频加载（可选锚点）
@@ -209,6 +214,8 @@ async def generate_voxcpm_design(
             cfg_value=cfg,
             inference_timesteps=steps,
             denoise=advanced_denoise,
+            normalize=advanced_norm,
+            seed=seed,
             ref_audio_path=actual_ref_path,
         )
 
@@ -222,6 +229,8 @@ async def generate_voxcpm_design(
             cfg_value=cfg,
             inference_timesteps=degraded_steps,
             denoise=False,
+            normalize=advanced_norm,
+            seed=seed,
             ref_audio_path=actual_ref_path,
         )
 
