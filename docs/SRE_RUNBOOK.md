@@ -130,6 +130,8 @@ SHA-256 复验（`scripts/generate_model_checksums.py` 生成，C1 加载链路�
 | 就绪探针 | `GET /api/health/ready` 或 `GET /readyz` |
 | 生成统计 | `GET /api/system/stats` |
 | Prometheus 指标 | `GET /api/system/metrics` |
+| SLO/SLI 报告（错误预算） | `GET /api/system/slo`（observability，报告 C4 补录） |
+| 容量采样时序（GPU/CPU/内存） | `GET /api/system/capacity`（observability，报告 C4 补录） |
 | 审计日志（近 N 条） | `GET /api/system/audit?limit=100`（受 `/api/*` 鉴权保护） |
 | 优雅关闭 | `POST /api/system/shutdown` |
 | 权重哈希清单生成 | `python scripts/generate_model_checksums.py --out model_checksums.json` |

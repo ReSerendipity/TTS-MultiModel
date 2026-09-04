@@ -49,10 +49,8 @@ def _post_form(url: str, fields: dict, timeout: float):
     boundary = "----gpusmokeboundary"
     parts = []
     for k, v in fields.items():
-        parts.append(
-            f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode("utf-8")
-        )
-    body = b"".join(parts) + f"--{boundary}--\r\n".encode("utf-8")
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+    body = b"".join(parts) + f"--{boundary}--\r\n".encode()
     req = urllib.request.Request(
         url,
         data=body,
@@ -142,10 +140,9 @@ def main() -> int:
     switched = False
     for _ in range(200):
         st2, sb = _get(f"{base}/api/model/status", 10, parse=True)
-        if st2 == 200 and isinstance(sb, dict):
-            if sb.get("current_engine") == "indextts2" and sb.get("model_loaded"):
-                switched = True
-                break
+        if st2 == 200 and isinstance(sb, dict) and sb.get("current_engine") == "indextts2" and sb.get("model_loaded"):
+            switched = True
+            break
         time.sleep(3)
     if not step("switch_indextts2", switched, "switched + loaded" if switched else f"switch HTTP {st}, not ready"):
         return _finish(report, args.output)
