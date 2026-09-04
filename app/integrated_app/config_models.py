@@ -93,13 +93,18 @@ class AdvancedParamsConfig(BaseModel):
 class SSLConfig(BaseModel):
     """TLS/SSL 配置（H2 整改：SSL 接线）。
 
+    与 Image_MultiModel 约定对齐：``enabled`` 显式开关（默认关闭），
+    HTTPS 仅在 ``enabled=true`` 且证书文件存在时启用，否则回退 HTTP。
+
     Attributes:
+        enabled: 是否启用 HTTPS（默认 false，本地开发走 HTTP）。
         certfile: 服务器证书文件路径（PEM）。
         keyfile: 私钥文件路径（PEM）。
     """
 
     model_config = ConfigDict(extra="ignore")
 
+    enabled: bool = Field(default=False, description="是否启用 HTTPS（需证书文件同时存在）")
     certfile: str = Field(default="", description="SSL 证书文件路径 (PEM)")
     keyfile: str = Field(default="", description="SSL 私钥文件路径 (PEM)")
 

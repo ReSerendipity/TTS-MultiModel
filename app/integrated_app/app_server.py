@@ -907,15 +907,15 @@ def create_app() -> FastAPI:
     async def health_ping() -> dict[str, Any]:
         """Quick liveness probe -- returns 200 if the server is running.
 
+        报告 D1：委托给 routes/system/health.ping（唯一规范实现），消除双探针
+        语义分歧（此前两处返回结构不同：ts vs timestamp、有无 version）。
+
         Returns:
             包含 status / timestamp / version 的健康心跳响应。
         """
-        return {
-            "status": "ok",
-            "timestamp": time.time(),
-            "version": getattr(app.state, "version", "unknown"),
-            "attribution": "TTS_MultiModel © ReSerendipity, Apache 2.0",
-        }
+        from .routes.system.health import ping as system_ping
+
+        return system_ping()
 
     @app.get("/api/health/ready")
     async def health_ready() -> dict[str, Any]:
@@ -982,12 +982,56 @@ def create_app() -> FastAPI:
     return app
 
 
+def find_available_port(start_port: int, max_attempts: int = 20, host: str = "127.0.0.1") -> int:
+    """从 ``start_port`` 开始递增查找一个可用端口（被占用时自动 +1）。
+
+    用于启动脚本在默认端口被占用时自动切换到下一个可用端口，
+    避免因为端口冲突而启动失败或阻塞等待人工确认。
+
+    检测策略（双重校验，避免竞态与 ``TIME_WAIT`` 误判）：
+
+    1. ``connect_ex`` 返回 ``0`` 表示该端口当前可连接（已被占用），跳过；
+    2. 看似空闲时再实际 ``bind`` 一次，确认端口真正可用。
+
+    Args:
+        start_port: 起始端口号。
+        max_attempts: 最大尝试次数（默认 20，即最多尝试到 ``start_port + 19``）。
+        host: 绑定的主机地址，默认 ``127.0.0.1``。
+
+    Returns:
+        int: 找到的可用端口；若所有尝试端口都不可用则回退返回 ``start_port``。
+    """
+    import socket
+
+    for attempt in range(max_attempts):
+        test_port = start_port + attempt
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                if s.connect_ex((host, test_port)) == 0:
+                    continue  # 端口被占用，尝试下一个
+                s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                try:
+                    s2.bind((host, test_port))
+                    s2.close()
+                    return test_port
+                except OSError:
+                    s2.close()
+                    continue
+        except OSError:
+            continue
+    return start_port
+
+
 def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
     """启动 uvicorn 服务器。
 
+    若目标端口被占用，会自动向后寻找第一个可用端口（7869 → 7870 → …），
+    不会因端口冲突而阻塞或启动失败。
+
     Args:
         ip: 监听地址，默认 ``127.0.0.1``。
-        port: 监听端口，默认 ``7869``。
+        port: 监听端口，默认 ``7869``（被占用时自动递增选择）。
     """
     from .config import check_models_available, force_load_config, get_config
 
@@ -1028,22 +1072,47 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
         version,
     )
 
-    # H2 整改：SSL 接线 —— 当 config 配置且证书文件存在时启用 HTTPS（uvicorn ssl 上下文）
+    # H2 整改：SSL 接线 —— 与 Image_MultiModel 约定对齐：仅当 ssl.enabled=true
+    # 且证书文件存在时启用 HTTPS（uvicorn ssl 上下文），否则回退 HTTP
     ssl_kwargs: dict[str, str] = {}
     _ssl = get_config().pydantic_config.server.ssl
-    if _ssl.certfile and _ssl.keyfile and os.path.exists(_ssl.certfile) and os.path.exists(_ssl.keyfile):
+    if not _ssl.enabled:
+        logger.info(
+            "[run_server] 以 HTTP 模式运行（如需 HTTPS 设 server.ssl.enabled=true；对外暴露请通过反向代理终止 TLS）"
+        )
+    elif _ssl.certfile and _ssl.keyfile and os.path.exists(_ssl.certfile) and os.path.exists(_ssl.keyfile):
         ssl_kwargs = {"ssl_certfile": _ssl.certfile, "ssl_keyfile": _ssl.keyfile}
         logger.info("[run_server] 已启用 HTTPS (SSL): cert=%s", _ssl.certfile)
     else:
-        logger.info("[run_server] 以 HTTP 模式运行（对外暴露请通过反向代理终止 TLS）")
+        logger.warning(
+            "[run_server] ssl.enabled=true 但证书文件缺失（cert=%s, key=%s），已回退 HTTP",
+            _ssl.certfile,
+            _ssl.keyfile,
+        )
     # P2-7：显式优雅停机宽限期（秒）。容器收到 SIGTERM 后，uvicorn 在此窗口内
     # 排空在途请求（含正在进行的 GPU 推理）再退出，避免硬切断导致推理半成品/客户端报错。
     # 与 Dockerfile 的 STOPSIGNAL SIGTERM、compose 的默认 terminationGracePeriodSeconds 配合。
     graceful_timeout = int(os.environ.get("TTS_GRACEFUL_SHUTDOWN_S", "60"))
+
+    # 自动端口转换：若目标端口被占用，向后寻找第一个可用端口
+    actual_port = find_available_port(int(port), host=ip)
+    if actual_port != int(port):
+        logger.warning("[run_server] 端口 %s 已被占用，自动切换到可用端口 %s", int(port), actual_port)
+    else:
+        logger.info("[run_server] 监听端口: %s", actual_port)
+
+    # 将实际监听端口写入 .server_port，供启动器/探针等外部工具读取
+    try:
+        _sp_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".server_port")
+        with open(_sp_path, "w", encoding="utf-8") as _spf:
+            _spf.write(str(actual_port))
+    except Exception:
+        pass
+
     uvicorn.run(
         app,
         host=ip,
-        port=int(port),
+        port=actual_port,
         timeout_graceful_shutdown=graceful_timeout,
         **ssl_kwargs,
     )

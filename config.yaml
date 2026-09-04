@@ -4,9 +4,11 @@ server:
   host: "127.0.0.1"
   port: 7869
   auto_load_model: false
-  # SSL configuration (currently not active - server runs on HTTP)
-  # To enable HTTPS, configure uvicorn in clean_launch.py with ssl_certfile/ssl_keyfile
+  # SSL configuration - disabled by default (aligned with Image_MultiModel):
+  # HTTPS only activates when ssl.enabled=true AND certfile/keyfile exist on disk.
+  # To enable HTTPS, set enabled: true (certs are already trusted for 127.0.0.1).
   ssl:
+    enabled: false
     certfile: "app/cert.pem"
     keyfile: "app/key.pem"
 

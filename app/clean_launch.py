@@ -144,43 +144,6 @@ def silent_exception_handler(loop, context):
     loop.default_exception_handler(context)
 
 
-def auto_open_browser(ip, port, timeout=300):
-    """
-    等待服务就绪后自动打开浏览器
-
-    功能说明:
-        在后台线程中运行，轮询检测服务端口是否可连接。服务启动就绪后，
-        等待 2 秒确保 HTTP 服务完全可用，然后使用系统默认浏览器打开 WebUI 页面。
-        如果超时仍未检测到服务，则记录警告并放弃打开浏览器。
-
-    Args:
-        ip: 服务监听的 IP 地址，通常为 "127.0.0.1"
-        port: 服务监听的端口号
-        timeout: 最长等待时间（秒），默认 300 秒（5 分钟）
-
-    工作流程:
-        1. 每秒轮询一次目标端口是否可连接
-        2. 连接成功后额外等待 2 秒（确保 FastAPI 完全启动）
-        3. 调用 webbrowser.open() 打开默认浏览器
-        4. 超时则输出警告日志并返回
-    """
-    url = f"http://{ip}:{port}"
-    logger.info("正在等待引擎加载...")
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(1)
-            if sock.connect_ex((ip, int(port))) == 0:
-                break
-        time.sleep(1)
-    else:
-        logger.warning(f"等待引擎加载超时（{timeout}秒），未打开浏览器")
-        return
-    time.sleep(2)
-    logger.info("服务就绪，正在弹出网页...")
-    webbrowser.open(url)
-
-
 def _kill_port_occupant(port, ip="127.0.0.1"):
     """
     终止占用指定端口的进程（Windows 专用）
@@ -243,6 +206,53 @@ def _kill_port_occupant(port, ip="127.0.0.1"):
             time.sleep(1)
         except Exception:
             pass
+
+
+def auto_open_browser(ip, port, timeout=300):
+    """
+    等待服务就绪后自动打开浏览器
+
+    功能说明:
+        在后台线程中运行，轮询检测服务端口是否可连接。服务启动就绪后，
+        等待 2 秒确保 HTTP 服务完全可用，然后使用系统默认浏览器打开 WebUI 页面。
+        如果超时仍未检测到服务，则记录警告并放弃打开浏览器。
+
+    Args:
+        ip: 服务监听的 IP 地址，通常为 "127.0.0.1"
+        port: 服务监听的端口号
+        timeout: 最长等待时间（秒），默认 300 秒（5 分钟）
+
+    工作流程:
+        1. 每秒轮询一次目标端口是否可连接
+        2. 连接成功后额外等待 2 秒（确保 FastAPI 完全启动）
+        3. 调用 webbrowser.open() 打开默认浏览器
+        4. 超时则输出警告日志并返回
+    """
+    # 协议跟随服务端：ssl.enabled=true 且证书文件存在时 app_server.run_server 才启用 HTTPS，
+    # 弹出 URL 必须使用相同协议，否则 HTTP 请求打到 TLS 端口会得到空响应（ERR_EMPTY_RESPONSE）
+    scheme = "http"
+    try:
+        _ssl_cfg = (globals().get("_cfg") or {}).get("server", {}).get("ssl", {}) or {}
+        _cert, _key = _ssl_cfg.get("certfile"), _ssl_cfg.get("keyfile")
+        if _ssl_cfg.get("enabled") and _cert and _key and os.path.exists(_cert) and os.path.exists(_key):
+            scheme = "https"
+    except Exception:
+        pass
+    url = f"{scheme}://{ip}:{port}"
+    logger.info("正在等待引擎加载...")
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            if sock.connect_ex((ip, int(port))) == 0:
+                break
+        time.sleep(1)
+    else:
+        logger.warning(f"等待引擎加载超时（{timeout}秒），未打开浏览器")
+        return
+    time.sleep(2)
+    logger.info("服务就绪，正在弹出网页...")
+    webbrowser.open(url)
 
 
 def verify_binaries():
@@ -340,6 +350,9 @@ def start_app():
         os.environ["PATH"] = sox_dir + os.pathsep + os.environ["PATH"]
     if os.path.isdir(ffmpeg_dir):
         os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ["PATH"]
+
+    # 端口自动转换：若默认端口被占用，向后寻找第一个可用端口（7869 → 7870 → …），
+    # 不再交互式询问是否强杀占用进程（避免启动被阻塞在 y/N 等待上）。
 
     # Kill any leftover process on the target port before selecting
     _kill_port_occupant(int(port), ip)
