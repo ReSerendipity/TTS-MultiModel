@@ -26,6 +26,7 @@ from pathlib import Path
 _TESTS_DIR = Path(__file__).resolve().parent.parent
 _APP_DIR = _TESTS_DIR.parent / "app"
 _REPO_ROOT = _TESTS_DIR.parent
+_TPL_DIR = _APP_DIR / "integrated_app" / "templates"
 if str(_APP_DIR) not in sys.path:
     sys.path.insert(0, str(_APP_DIR))
 
@@ -38,13 +39,24 @@ PAGES: dict[str, tuple[str, dict]] = {
 
 
 def main() -> int:
-    from integrated_app.routes.tabs import templates  # 复用注册过 i18n 过滤器的环境
+    # Why 不 import integrated_app.routes.tabs（尽管那里有现成的 templates）：
+    # tabs 模块顶层拉起 fastapi / persona_manager / model_manager 整条重依赖链，
+    # 而本脚本的设计意图（见模块 docstring）是"只驱动 Jinja2、离线快渲染"，
+    # CI 的 Frontend Smoke 仅安装 jinja2+pyyaml。i18n 过滤器注册位于 i18n.py
+    # （顶层零重依赖），自建最小环境即可与线上同构。
+    # 2026-09-04 修复：CI Frontend Smoke Render pages 步骤 ModuleNotFoundError: fastapi。
+    from jinja2 import Environment, FileSystemLoader
+
+    from integrated_app.i18n import register_i18n_filters
+
+    env = Environment(loader=FileSystemLoader(str(_TPL_DIR)))
+    register_i18n_filters(env)
 
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     ok = 0
     for out_name, (template_name, ctx) in PAGES.items():
         try:
-            html = templates.env.get_template(template_name).render(**ctx)
+            html = env.get_template(template_name).render(**ctx)
             out_path = _OUTPUT_DIR / out_name
             out_path.write_text(html, encoding="utf-8")
             print(f"rendered {out_name} -> {out_path} ({len(html)} chars)")
