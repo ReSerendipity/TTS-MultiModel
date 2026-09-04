@@ -7,9 +7,6 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="it2d-form" hx-post="/api/generate/indextts2" hx-target="#it2d-result" hx-swap="innerHTML" hx-indicator="#it2d-spinner" hx-encoding="multipart/form-data" x-data="{ it2dMode: 'free' }">
-                        {% include 'partials/output_format.html' %}
-                <input type="hidden" name="mode" value="duration">
-
                 <!-- Card: 时长控制模式 -->
                 <div class="card">
                     <div class="card-hdr">
@@ -139,31 +136,10 @@
                                     <label class="fl" for="it2d-seed">{{ "random_seed"|t(lang) }}</label>
                                     <input type="number" id="it2d-seed" name="seed" class="fi" value="-1" min="-1">
                                 </div>
-                                <div class="form-col">
-                                    <label class="fl" for="it2d-samplerate">{{ "sample_rate"|t(lang) }}</label>
-                                    <select id="it2d-samplerate" name="sample_rate" class="fs">
-                                        <option value="24000" selected>24000</option>
-                                        <option value="16000">16000</option>
-                                        <option value="44100">44100</option>
-                                    </select>
-                                </div>
                             </div>
-                            <div class="toggle-row" style="border-top:1px solid var(--border-lt);margin-top:6px;padding-top:8px">
-                                <div>
-                                    <label class="fl" style="margin-bottom:0">{{ "enable_loudness_norm"|t(lang) }}</label>
-                                    <div class="fh">{{ "loudness_norm_hint"|t(lang) }}</div>
-                                </div>
-                                <div class="toggle on" onclick="toggleSwitch(this)"></div>
-                                <input type="hidden" name="loudness_norm" value="true">
-                            </div>
-                            <div class="toggle-row">
-                                <div>
-                                    <label class="fl" style="margin-bottom:0">{{ "enable_vad_trim"|t(lang) }}</label>
-                                    <div class="fh">{{ "vad_trim_hint"|t(lang) }}</div>
-                                </div>
-                                <div class="toggle on" onclick="toggleSwitch(this)"></div>
-                                <input type="hidden" name="vad_trim" value="true">
-                            </div>
+                            {# 前后端一致性整改（报告 B3/B12）：sample_rate / loudness_norm / vad_trim 控件已删除——
+                               indextts2 端点不声明这些字段（恒输出引擎原生 22050Hz、恒 -16 LUFS 归一化），
+                               此前为静默忽略的装饰控件；如需恢复请先补齐端点与引擎能力。 #}
                         </div>
                     </div>
                 </div>
@@ -266,6 +242,29 @@
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
             document.getElementById('it2d-form').requestSubmit();
+        }
+    });
+})();
+</script>
+
+<script>
+// 报告 B13：IndexTTS 版本守卫——后端按当前激活引擎路由权重，版本不匹配时阻断而非静默错跑
+(function() {
+    window.__CURRENT_ENGINE__ = window.__CURRENT_ENGINE__ || '{{ current_engine }}';
+    var form = document.getElementById('it2d-form');
+    if (!form) return;
+    form.addEventListener('htmx:beforeRequest', function(evt) {
+        var eng = window.__CURRENT_ENGINE__;
+        if (eng && eng !== 'indextts2') {
+            evt.preventDefault();
+            var msg = '当前激活引擎为 ' + eng + '；本页需 IndexTTS 2.5 权重，请先到模型页切换引擎后再生成';
+            var st = document.getElementById('it2d-status');
+            if (st) {
+                st.className = 'status-message error';
+                st.textContent = msg;
+            } else if (typeof window.showToast === 'function') {
+                window.showToast(msg, 'error');
+            }
         }
     });
 })();

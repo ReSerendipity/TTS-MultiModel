@@ -6,9 +6,6 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="pc-form" hx-post="/api/generate/voxcpm_prompt_continue" hx-target="#pc-result" hx-swap="innerHTML" hx-indicator="#pc-spinner" hx-encoding="multipart/form-data" x-data="{}">
-                        {% include 'partials/output_format.html' %}
-                <input type="hidden" name="mode" value="voxcpm_prompt_continue">
-
                 <!-- Card: 提示词前缀 -->
                 <div class="card">
                     <div class="card-hdr">
@@ -28,33 +25,9 @@
                                       data-auto-resize="true"></textarea>
                             <div class="cc" id="pc-char-counter">0/{{ engine_max_total_chars }} | {{ "per_segment"|t(lang) }} {{ gen_split_max_chars }}{{ "chars"|t(lang) }}</div>
                         </div>
-
-                        <div class="form-row">
-                            <div class="form-col">
-                                <label class="fl" for="pc-lang-select">{{ "language"|t(lang) }}</label>
-                                <select name="lang" id="pc-lang-select" class="fs">
-                                    {% for l in langs %}
-                                    <option value="{{ l[0] }}" {% if l[0] == '中文' %}selected{% endif %}>{{ l[1] }}</option>
-                                    {% endfor %}
-                                    {% if dialects %}
-                                    <optgroup label="{{ 'chinese_dialects'|t(lang) }}">
-                                        {% for dialect in dialects %}
-                                        <option value="{{ dialect[0] }}">{{ dialect[1] }}</option>
-                                        {% endfor %}
-                                    </optgroup>
-                                    {% endif %}
-                                </select>
-                            </div>
-                            <div class="form-col">
-                                <label class="fl" for="pc-target-length">{{ "target_length"|t(lang) }}</label>
-                                <select id="pc-target-length" name="target_length" class="fs">
-                                    <option value="auto" selected>Auto</option>
-                                    <option value="short">{{ "length_short"|t(lang) }} (1-3s)</option>
-                                    <option value="medium">{{ "length_medium"|t(lang) }} (3-8s)</option>
-                                    <option value="long">{{ "length_long"|t(lang) }} (8-15s)</option>
-                                </select>
-                            </div>
-                        </div>
+                        {# 前后端一致性整改（报告 B7）：lang / target_length 控件已删除——
+                           引擎 generate_with_prompt 从 Prompt 音频自动继承语言与时长，
+                           此前两个控件发送的字段后端从不消费（静默忽略）。 #}
                     </div>
                 </div>
 
@@ -132,7 +105,7 @@
                             <div class="form-col">
                                 <label class="fl" for="pc-pp-tempo">{{ "speed_factor"|t(lang) }}</label>
                                 <div style="display:flex;align-items:center;gap:8px">
-                                    <input type="range" id="pc-pp-tempo" min="0.5" max="2.0" step="0.1" value="1.0" style="flex:1" oninput="document.getElementById('pc-pp-tempo-val').textContent=this.value">
+                                    <input type="range" id="pc-pp-tempo" data-no-submit min="0.5" max="2.0" step="0.1" value="1.0" style="flex:1" oninput="document.getElementById('pc-pp-tempo-val').textContent=this.value">
                                     <span id="pc-pp-tempo-val" style="font-size:12px;min-width:28px;text-align:center">1.0</span>
                                 </div>
                             </div>

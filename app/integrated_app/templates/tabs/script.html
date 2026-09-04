@@ -7,9 +7,6 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="script-form" hx-post="/api/generate/voxcpm_script" hx-target="#sc-result" hx-swap="innerHTML" hx-indicator="#sc-spinner" x-data="{}">
-                        {% include 'partials/output_format.html' %}
-                <input type="hidden" name="mode" value="voxcpm_script">
-
                 <!-- Card: 剧本工坊 -->
                 <div class="card">
                     <div class="card-hdr">
@@ -45,10 +42,41 @@
                             <div class="cc" id="sc-char-counter">0/{{ engine_max_total_chars }} | {{ "per_segment"|t(lang) }} {{ gen_split_max_chars }}{{ "chars"|t(lang) }}</div>
                         </div>
 
+                        {# 前后端一致性整改（报告 B9）：控制指令输入已删除——voxcpm_script 端点虽声明
+                           instruction 字段但从不透传给引擎（generate_script 仅支持 advanced_*/lang），
+                           此前该输入框为静默失效的装饰控件。 #}
+
+                        {# 前后端一致性整改（报告 C1）：persona_names 是后端「角色名→已注册音色」映射的唯一入口，
+                           此前页面无任何入口，多角色剧本全部走引擎默认音色。 #}
                         <div class="fg">
-                            <label class="fl" for="sc-instruction">{{ "control_instruction"|t(lang) }} <span style="font-size:10px;color:var(--t3);font-weight:400">({{ 'optional'|t(lang) }})</span></label>
-                            <input type="text" name="instruction" id="sc-instruction" class="fi" placeholder="{{ 'instruction_placeholder'|t(lang) }}">
+                            <label class="fl" for="sc-persona-names">角色音色映射 <span style="font-size:10px;color:var(--t3);font-weight:400">(可选，逗号分隔)</span></label>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <input type="text" name="persona_names" id="sc-persona-names" class="fi" style="flex:1"
+                                       list="sc-persona-datalist" placeholder="旁白,小明,妈妈（须与剧本 [角色名] 完全一致，且为已注册音色）">
+                                <datalist id="sc-persona-datalist">
+                                    {% for p in persona_list %}
+                                    <option value="{{ p }}"></option>
+                                    {% endfor %}
+                                </datalist>
+                                <button type="button" class="btn btn-o btn-sm" onclick="extractScRoles()" style="white-space:nowrap">从剧本提取角色</button>
+                            </div>
+                            <div class="fh">为剧本中的每个 [角色名] 指定已保存音色；留空则全部使用引擎默认音色。</div>
                         </div>
+                        <script>
+                            // 从剧本 textarea 提取全部 [角色名]，去重后填入 persona_names
+                            function extractScRoles() {
+                                var textEl = document.getElementById('sc-text');
+                                var input = document.getElementById('sc-persona-names');
+                                if (!textEl || !input) return;
+                                var roles = [];
+                                var re = /\[([^\[\]\n]{1,50})\]/g, m;
+                                while ((m = re.exec(textEl.value)) !== null) {
+                                    var name = m[1].trim();
+                                    if (name && roles.indexOf(name) === -1) roles.push(name);
+                                }
+                                input.value = roles.join(',');
+                            }
+                        </script>
 
                         <!-- Collapsible: 高级参数 -->
                         <div style="margin-top:8px">
@@ -137,7 +165,7 @@
                             <div class="form-col">
                                 <label class="fl" for="sc-pp-tempo">{{ "speed_factor"|t(lang) }}</label>
                                 <div style="display:flex;align-items:center;gap:8px">
-                                    <input type="range" id="sc-pp-tempo" min="0.5" max="2.0" step="0.1" value="1.0" style="flex:1" oninput="document.getElementById('sc-pp-tempo-val').textContent=this.value">
+                                    <input type="range" id="sc-pp-tempo" data-no-submit min="0.5" max="2.0" step="0.1" value="1.0" style="flex:1" oninput="document.getElementById('sc-pp-tempo-val').textContent=this.value">
                                     <span id="sc-pp-tempo-val" style="font-size:12px;min-width:28px;text-align:center">1.0</span>
                                 </div>
                             </div>

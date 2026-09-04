@@ -9,9 +9,6 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="it20c-form" hx-post="/api/generate/indextts2" hx-target="#it20c-result" hx-swap="innerHTML" hx-indicator="#it20c-spinner" hx-encoding="multipart/form-data">
-                        {% include 'partials/output_format.html' %}
-                <input type="hidden" name="mode" value="clone">
-
                 <!-- Card: 参考音频 -->
                 <div class="card">
                     <div class="card-hdr">
@@ -147,6 +144,29 @@
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
             document.getElementById('it20c-form').requestSubmit();
+        }
+    });
+})();
+</script>
+
+<script>
+// 报告 B13：IndexTTS 版本守卫——后端按当前激活引擎路由权重，版本不匹配时阻断而非静默错跑
+(function() {
+    window.__CURRENT_ENGINE__ = window.__CURRENT_ENGINE__ || '{{ current_engine }}';
+    var form = document.getElementById('it20c-form');
+    if (!form) return;
+    form.addEventListener('htmx:beforeRequest', function(evt) {
+        var eng = window.__CURRENT_ENGINE__;
+        if (eng && eng !== 'indextts20') {
+            evt.preventDefault();
+            var msg = '当前激活引擎为 ' + eng + '；本页需 IndexTTS 2.0 权重，请先到模型页切换引擎后再生成';
+            var st = document.getElementById('it20c-status');
+            if (st) {
+                st.className = 'status-message error';
+                st.textContent = msg;
+            } else if (typeof window.showToast === 'function') {
+                window.showToast(msg, 'error');
+            }
         }
     });
 })();

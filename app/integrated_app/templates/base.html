@@ -36,7 +36,7 @@
             window.getCsrfToken = getCsrfToken;
         })();
     </script>
-    <script src="/static/js/htmx.ext.sse.js?v={{ app_version }}"></script>
+    <!-- htmx.ext.sse.js 已随报告 D3 移除：SSE 走 sse_manager.js 原生 EventSource，该扩展从未被任何元素使用 -->
     <link rel="stylesheet" href="/static/css/main.css?v={{ app_version }}">
     <link rel="stylesheet" href="/static/css/tabs.css?v={{ app_version }}">
     <link rel="stylesheet" href="/static/css/components.css?v={{ app_version }}">
@@ -327,7 +327,7 @@
                     </div>
                 </div>
 
-                <!-- 输出格式选择器已移入各生成 tab 的输入设置卡（partials/output_format.html） -->
+                <!-- 输出格式选择器已随一致性整改（报告 B8）移除：后端恒输出 wav，此前各表单的 wav/mp3 单选后端从不读取 -->
 
                 <!-- Tab Content Area -->
                 <h1 class="tts-visually-hidden">{{ "app_title"|t(lang, default="TTS MultiModel 语音工坊") }}</h1>

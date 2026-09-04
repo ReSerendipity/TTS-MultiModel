@@ -160,6 +160,8 @@ window.switchModel = function(modelName) {
         if (modelName === 'none') {
             window._modelSwitching = false;
             window._setModelTabsDisabled(false);
+            // 报告 B13：卸载后清空全局引擎缓存
+            window.__CURRENT_ENGINE__ = null;
             window.updateEngineStatus('none', (window.I18N && window.I18N['model_none']) || 'None', '');
             if (window._unloadCurrentModel) {
                 window._unloadCurrentModel();
@@ -172,6 +174,8 @@ window.switchModel = function(modelName) {
         fetch('/api/model/status').then(function(res) { return res.json(); }).then(function(statusData) {
             var isLoaded = statusData && statusData.loaded;
             var currentEngine = statusData ? statusData.engine : null;
+            // 报告 B13：维护全局当前引擎缓存，供各 Tab 的版本守卫同步读取
+            if (currentEngine) { window.__CURRENT_ENGINE__ = currentEngine; }
             var isSwitching = isLoaded && currentEngine && currentEngine !== modelName;
             var apiPath = isSwitching ? '/api/model/switch' : '/api/model/load';
             var csrfToken2 = window.getCsrfToken ? window.getCsrfToken() : '';
@@ -185,8 +189,11 @@ window.switchModel = function(modelName) {
         }).then(function(data) {
             window._modelSwitching = false;
             if (data.status === 'ok') {
+                // 报告 B13：切换成功即更新全局引擎缓存
+                window.__CURRENT_ENGINE__ = modelName;
                 window.updateEngineStatus('loaded', modelName, (window.I18N && window.I18N['ready']) || 'Ready');
             } else if (data.message === '引擎已就绪，无需切换') {
+                window.__CURRENT_ENGINE__ = modelName;
                 window.updateEngineStatus('loaded', modelName, (window.I18N && window.I18N['ready']) || 'Ready');
             } else {
                 window.updateEngineStatus('error', modelName, data.message || (window.I18N && window.I18N['error']) || 'Error');

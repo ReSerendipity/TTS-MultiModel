@@ -6,9 +6,6 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="uc-form" hx-post="/api/generate/voxcpm_ultimate" hx-target="#uc-result" hx-swap="innerHTML" hx-indicator="#uc-spinner" hx-encoding="multipart/form-data" x-data="{ ucTab: 'saved' }">
-                        {% include 'partials/output_format.html' %}
-                <input type="hidden" name="mode" value="voxcpm_ultimate">
-
                 <!-- Card: 合成文本 -->
                 <div class="card">
                     <div class="card-hdr">
@@ -31,9 +28,8 @@
                         <div class="fg">
                             <label class="fl" for="uc-lang-select">{{ "language"|t(lang) }}</label>
                             <select name="lang" id="uc-lang-select" class="fs">
-                                {% for l in langs %}
-                                <option value="{{ l[0] }}" {% if l[0] == '中文' %}selected{% endif %}>{{ l[1] }}</option>
-                                {% endfor %}
+                                {# 报告 B10：VoxCPM2 自动识别普通语种，后端仅对方言生效，故只保留自动识别 + 方言 #}
+                                <option value="" selected>{{ "lang_auto_detect"|t(lang, default="自动识别（中/英/日/韩等，模型自动判断）") }}</option>
                                 {% if dialects %}
                                 <optgroup label="{{ 'chinese_dialects'|t(lang) }}">
                                     {% for dialect in dialects %}
@@ -79,7 +75,7 @@
                             <div class="fg">
                                 <label class="fl">{{ "ref_audio"|t(lang) }}</label>
                                 <div class="upload-zone" onclick="this.querySelector('input').click()">
-                                    <input type="file" name="ref_audio_path" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none">
+                                    <input type="file" name="ref_audio_upload" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                                     <p><span id="uc-selected-filename">{{ "no_file_selected"|t(lang) }}</span></p>
                                     <p style="font-size:10px;margin-top:2px">{{ "supported_formats"|t(lang) }} (5-30s)</p>
@@ -128,57 +124,17 @@
                                 <input type="number" id="uc-denoise" name="denoise_strength" class="fi" value="0.6" step="0.05" min="0" max="1">
                             </div>
                         </div>
+                        {# 语速 → tempo_factor（后处理变速，>1 更快），语义与引擎一致 #}
                         <div class="form-row">
-                            <div class="form-col">
-                                <label class="fl" for="uc-samplerate">{{ "sample_rate"|t(lang) }}</label>
-                                <select id="uc-samplerate" name="sample_rate" class="fs">
-                                    <option value="24000" selected>24000</option>
-                                    <option value="16000">16000</option>
-                                    <option value="44100">44100</option>
-                                    <option value="48000">48000</option>
-                                </select>
-                            </div>
                             <div class="form-col">
                                 <label class="fl" for="uc-speed">{{ "speed_factor"|t(lang) }}</label>
-                                <input type="number" id="uc-speed" name="speed" class="fi" value="1.0" step="0.1" min="0.5" max="2.0">
+                                <input type="number" id="uc-speed" name="tempo_factor" class="fi" value="1.0" step="0.1" min="0.5" max="2.0">
                             </div>
+                            <div class="form-col"></div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-col">
-                                <label class="fl" for="uc-prosody">{{ "prosody_intensity"|t(lang) }}</label>
-                                <input type="number" id="uc-prosody" name="prosody_intensity" class="fi" value="1.0" step="0.1" min="0.1" max="2.0">
-                            </div>
-                            <div class="form-col">
-                                <label class="fl" for="uc-emotion">{{ "emotion_intensity"|t(lang) }}</label>
-                                <input type="number" id="uc-emotion" name="emotion_intensity" class="fi" value="1.0" step="0.1" min="0.1" max="2.0">
-                            </div>
-                        </div>
-
-                        <!-- Toggle switches for audio post-processing -->
-                        <div class="toggle-row" style="border-top:1px solid var(--border-lt);margin-top:6px;padding-top:8px">
-                            <div>
-                                <label class="fl" style="margin-bottom:0">{{ "enable_loudness_norm"|t(lang) }}</label>
-                                <div class="fh">{{ "loudness_norm_hint"|t(lang) }}</div>
-                            </div>
-                            <div class="toggle on" onclick="toggleSwitch(this)"></div>
-                            <input type="hidden" name="loudness_norm" value="true" data-toggle-source="uc-loudness-norm">
-                        </div>
-                        <div class="toggle-row">
-                            <div>
-                                <label class="fl" style="margin-bottom:0">{{ "enable_vad_trim"|t(lang) }}</label>
-                                <div class="fh">{{ "vad_trim_hint"|t(lang) }}</div>
-                            </div>
-                            <div class="toggle on" onclick="toggleSwitch(this)"></div>
-                            <input type="hidden" name="vad_trim" value="true" data-toggle-source="uc-vad-trim">
-                        </div>
-                        <div class="toggle-row">
-                            <div>
-                                <label class="fl" style="margin-bottom:0">{{ "enable_stream_segment"|t(lang) }}</label>
-                                <div class="fh">{{ "stream_segment_hint"|t(lang) }}</div>
-                            </div>
-                            <div class="toggle" onclick="toggleSwitch(this)"></div>
-                            <input type="hidden" name="stream_segment" value="false" data-toggle-source="uc-stream-segment">
-                        </div>
+                        {# 前后端一致性整改（报告 B4）：sample_rate / prosody_intensity / emotion_intensity /
+                           loudness_norm / vad_trim / stream_segment 后端从不读取，此前为"静默忽略"的装饰控件，
+                           已删除；如需恢复请先在 voxcpm_ultimate 端点与引擎层补齐对应能力。 #}
                     </div>
                 </div>
 
@@ -197,7 +153,6 @@
                     </div>
                     {# 重名时后端回 X-Persona-Confirm 头，app_init.js 把它翻成 true，再点一次即覆盖 #}
                     <input type="hidden" name="overwrite" value="false">
-                    <input type="hidden" name="ref_text" value="">
                     <button type="button" class="btn btn-o" style="height:34px;white-space:nowrap" hx-post="/api/persona/save" hx-target="#uc-status" hx-swap="innerHTML">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-6-8-6 8"/><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
                         {{ "save_persona"|t(lang) }}
@@ -243,7 +198,7 @@
                             <div class="form-col">
                                 <label class="fl" for="uc-pp-tempo">{{ "speed_factor"|t(lang) }}</label>
                                 <div style="display:flex;align-items:center;gap:6px">
-                                    <input type="range" id="uc-pp-tempo" min="0.5" max="2.0" step="0.1" value="1.0" style="flex:1" oninput="document.getElementById('uc-pp-tempo-val').textContent=this.value">
+                                    <input type="range" id="uc-pp-tempo" data-no-submit min="0.5" max="2.0" step="0.1" value="1.0" style="flex:1" oninput="document.getElementById('uc-pp-tempo-val').textContent=this.value">
                                     <span id="uc-pp-tempo-val" style="font-size:11px;min-width:28px;text-align:center;font-family:var(--mono)">1.0</span>
                                 </div>
                             </div>
@@ -417,7 +372,7 @@
     };
 
     // File upload feedback
-    var ucFileInput = document.querySelector('input[type="file"][name="ref_audio_path"]');
+    var ucFileInput = document.querySelector('input[type="file"][name="ref_audio_upload"]');
     var ucFilenameSpan = document.getElementById('uc-selected-filename');
     var UC_MAX_SIZE = 100 * 1024 * 1024;
     if (ucFileInput && ucFilenameSpan) {

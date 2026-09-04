@@ -5,8 +5,6 @@
     </div>
     <div class="tts-card-desc">{{ "indextts2_desc"|t(lang) }}</div>
     <form id="it2-form" hx-post="/api/generate/indextts2" hx-target="#it2-result" hx-swap="innerHTML" hx-indicator="#it2-spinner">
-                        {% include 'partials/output_format.html' %}
-        <input type="hidden" name="mode" value="indextts2">
         {% with prefix='it2', label='synthesis_text'|t(lang), placeholder='indextts2_default_text'|t(lang), max_chars=engine_max_total_chars, segment_max_chars=gen_split_max_chars, textarea_class='it2-auto-resize', textarea_rows=3 %}
         {% include 'partials/text_input.html' %}
         {% endwith %}
@@ -29,10 +27,8 @@
                     <div id="it2-ref-audio-name" class="tts-file-name">{{ "supported_formats"|t(lang) }}</div>
                 </div>
 
-                <div class="tts-form-group">
-                    <label class="tts-form-label" for="it2-ref-text">{{ "ref_text"|t(lang) }} <span class="tts-text-muted">{{ "optional"|t(lang) }}</span></label>
-                    <input type="text" name="ref_text" id="it2-ref-text" placeholder="{{ 'ref_text_placeholder'|t(lang) }}" class="tts-input-textbox tts-full-width">
-                </div>
+                {# 前后端一致性整改（报告 B9）：参考文本输入已删除——indextts2 端点虽声明 ref_text
+                   字段但从不消费（引擎 infer 无此参数），docstring 宣称的音质收益与实现不符。 #}
 
                 <div class="tts-form-group">
                     <label class="tts-form-label" for="it2-seed">{{ "random_seed"|t(lang) }} <svg class="tts-help-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></label>
@@ -70,35 +66,35 @@
                         <div class="it2-emotion-grid">
                             <div class="it2-emotion-item">
                                 <div class="it2-emotion-label"><span>{{ "emotion_happy"|t(lang) }}</span><span class="it2-emotion-value" id="it2-emo-happy-val">0.0</span></div>
-                                <input type="range" class="tts-emotion-slider" id="it2-emo-happy" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('happy', this.value)">
+                                <input type="range" class="tts-emotion-slider" id="it2-emo-happy" name="emo_happy" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('happy', this.value)">
                             </div>
                             <div class="it2-emotion-item">
                                 <div class="it2-emotion-label"><span>{{ "emotion_angry"|t(lang) }}</span><span class="it2-emotion-value" id="it2-emo-angry-val">0.0</span></div>
-                                <input type="range" class="tts-emotion-slider" id="it2-emo-angry" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('angry', this.value)">
+                                <input type="range" class="tts-emotion-slider" id="it2-emo-angry" name="emo_angry" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('angry', this.value)">
                             </div>
                             <div class="it2-emotion-item">
                                 <div class="it2-emotion-label"><span>{{ "emotion_sad"|t(lang) }}</span><span class="it2-emotion-value" id="it2-emo-sad-val">0.0</span></div>
-                                <input type="range" class="tts-emotion-slider" id="it2-emo-sad" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('sad', this.value)">
+                                <input type="range" class="tts-emotion-slider" id="it2-emo-sad" name="emo_sad" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('sad', this.value)">
                             </div>
                             <div class="it2-emotion-item">
                                 <div class="it2-emotion-label"><span>{{ "emotion_afraid"|t(lang) }}</span><span class="it2-emotion-value" id="it2-emo-afraid-val">0.0</span></div>
-                                <input type="range" class="tts-emotion-slider" id="it2-emo-afraid" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('afraid', this.value)">
+                                <input type="range" class="tts-emotion-slider" id="it2-emo-afraid" name="emo_afraid" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('afraid', this.value)">
                             </div>
                             <div class="it2-emotion-item">
                                 <div class="it2-emotion-label"><span>{{ "emotion_disgusted"|t(lang) }}</span><span class="it2-emotion-value" id="it2-emo-disgusted-val">0.0</span></div>
-                                <input type="range" class="tts-emotion-slider" id="it2-emo-disgusted" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('disgusted', this.value)">
+                                <input type="range" class="tts-emotion-slider" id="it2-emo-disgusted" name="emo_disgusted" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('disgusted', this.value)">
                             </div>
                             <div class="it2-emotion-item">
                                 <div class="it2-emotion-label"><span>{{ "emotion_melancholic"|t(lang) }}</span><span class="it2-emotion-value" id="it2-emo-melancholic-val">0.0</span></div>
-                                <input type="range" class="tts-emotion-slider" id="it2-emo-melancholic" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('melancholic', this.value)">
+                                <input type="range" class="tts-emotion-slider" id="it2-emo-melancholic" name="emo_melancholic" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('melancholic', this.value)">
                             </div>
                             <div class="it2-emotion-item">
                                 <div class="it2-emotion-label"><span>{{ "emotion_surprised"|t(lang) }}</span><span class="it2-emotion-value" id="it2-emo-surprised-val">0.0</span></div>
-                                <input type="range" class="tts-emotion-slider" id="it2-emo-surprised" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('surprised', this.value)">
+                                <input type="range" class="tts-emotion-slider" id="it2-emo-surprised" name="emo_surprised" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('surprised', this.value)">
                             </div>
                             <div class="it2-emotion-item">
                                 <div class="it2-emotion-label"><span>{{ "emotion_calm"|t(lang) }}</span><span class="it2-emotion-value" id="it2-emo-calm-val">0.0</span></div>
-                                <input type="range" class="tts-emotion-slider" id="it2-emo-calm" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('calm', this.value)">
+                                <input type="range" class="tts-emotion-slider" id="it2-emo-calm" name="emo_calm" min="0" max="1" step="0.1" value="0" oninput="updateIt2EmotionValue('calm', this.value)">
                             </div>
                         </div>
 
@@ -120,7 +116,7 @@
                         <div class="it2-emotion-alpha">
                             <label class="tts-form-label">{{ "emotion_alpha"|t(lang) }} <svg class="tts-help-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></label>
                             <div class="tts-range-row">
-                                <input type="range" id="it2-emo-alpha" class="tts-range-input" min="0" max="1" step="0.1" value="0.8" oninput="document.getElementById('it2-emo-alpha-val').textContent = this.value">
+                                <input type="range" id="it2-emo-alpha" name="emo_alpha" class="tts-range-input" min="0" max="1" step="0.1" value="0.8" oninput="document.getElementById('it2-emo-alpha-val').textContent = this.value">
                                 <span id="it2-emo-alpha-val" class="tts-range-value">0.8</span>
                             </div>
                         </div>
@@ -133,7 +129,7 @@
                         <div class="it2-emotion-alpha">
                             <label class="tts-form-label">{{ "emotion_alpha"|t(lang) }} <svg class="tts-help-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></label>
                             <div class="tts-range-row">
-                                <input type="range" id="it2-emo-alpha-text" class="tts-range-input" min="0" max="1" step="0.1" value="0.8" oninput="document.getElementById('it2-emo-alpha-text-val').textContent = this.value">
+                                <input type="range" id="it2-emo-alpha-text" name="emo_alpha_text" class="tts-range-input" min="0" max="1" step="0.1" value="0.8" oninput="document.getElementById('it2-emo-alpha-text-val').textContent = this.value">
                                 <span id="it2-emo-alpha-text-val" class="tts-range-value">0.8</span>
                             </div>
                         </div>
@@ -143,7 +139,7 @@
                     <div id="it2-emo-audio-mode" style="display: none;">
                         <label for="it2-emo-audio-input">{{ "emotion_audio_prompt"|t(lang) }}</label>
                         <div class="tts-file-upload" onclick="document.getElementById('it2-emo-audio-input').click()">
-                            <input type="file" id="it2-emo-audio-input" accept=".wav,.mp3,.flac,.ogg" onchange="updateIt2FileName(this, 'it2-emo-audio-name')">
+                            <input type="file" id="it2-emo-audio-input" name="emo_audio" accept=".wav,.mp3,.flac,.ogg" onchange="updateIt2FileName(this, 'it2-emo-audio-name')">
                             <svg class="tts-upload-icon" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             <div class="tts-upload-text">{{ "upload_emotion_audio"|t(lang) }}</div>
                             <div id="it2-emo-audio-name" class="tts-file-name">{{ "supported_formats"|t(lang) }}</div>
@@ -151,7 +147,7 @@
                         <div class="it2-emotion-alpha">
                             <label class="tts-form-label">{{ "emotion_alpha"|t(lang) }} <svg class="tts-help-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></label>
                             <div class="tts-range-row">
-                                <input type="range" id="it2-emo-alpha-audio" class="tts-range-input" min="0" max="1" step="0.1" value="0.8" oninput="document.getElementById('it2-emo-alpha-audio-val').textContent = this.value">
+                                <input type="range" id="it2-emo-alpha-audio" name="emo_alpha_audio" class="tts-range-input" min="0" max="1" step="0.1" value="0.8" oninput="document.getElementById('it2-emo-alpha-audio-val').textContent = this.value">
                                 <span id="it2-emo-alpha-audio-val" class="tts-range-value">0.8</span>
                             </div>
                         </div>
@@ -313,6 +309,29 @@
         var tabPanel = input.closest('.inner-tab-panel');
         if (tabPanel) {
             input.disabled = (tabPanel.style.display === 'none');
+        }
+    });
+})();
+</script>
+
+<script>
+// 报告 B13：IndexTTS 版本守卫——后端按当前激活引擎路由权重，版本不匹配时阻断而非静默错跑
+(function() {
+    window.__CURRENT_ENGINE__ = window.__CURRENT_ENGINE__ || '{{ current_engine }}';
+    var form = document.getElementById('it2-form');
+    if (!form) return;
+    form.addEventListener('htmx:beforeRequest', function(evt) {
+        var eng = window.__CURRENT_ENGINE__;
+        if (eng && eng !== 'indextts2') {
+            evt.preventDefault();
+            var msg = '当前激活引擎为 ' + eng + '；本页需 IndexTTS 2.5 权重，请先到模型页切换引擎后再生成';
+            var st = document.getElementById('it2-status');
+            if (st) {
+                st.className = 'status-message error';
+                st.textContent = msg;
+            } else if (typeof window.showToast === 'function') {
+                window.showToast(msg, 'error');
+            }
         }
     });
 })();

@@ -344,9 +344,14 @@
           category: '语言',
           icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
           action: function() {
-            fetch('/api/set-lang?lang=' + l.code, { method: 'POST' })
-              .then(function() { location.reload(); })
-              .catch(function() { location.reload(); });
+            // 语言切换走 theme_lang.js 的统一入口（写 localStorage+cookie 后带
+            // ?lang= 跳转）。历史上这里 fetch 不存在的 /api/set-lang，404 被
+            // .then 吞掉后无条件 reload，语言纹丝不动（静默失效）。
+            if (typeof window.setLang === 'function') {
+              window.setLang(l.code);
+            } else {
+              location.reload();
+            }
           }
         });
       });

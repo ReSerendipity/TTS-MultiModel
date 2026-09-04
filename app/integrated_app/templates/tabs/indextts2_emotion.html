@@ -8,9 +8,7 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="it2e-form" hx-post="/api/generate/indextts2" hx-target="#it2e-result" hx-swap="innerHTML" hx-indicator="#it2e-spinner" hx-encoding="multipart/form-data" x-data="{ it2eMode: 'same' }">
-                        {% include 'partials/output_format.html' %}
-                <input type="hidden" name="mode" value="emotion">
-                <input type="hidden" name="emotion_mode" id="it2e-emotion-mode" value="same">
+                <input type="hidden" id="it2e-emotion-mode" value="same">
 
                 <!-- Card: 模式选择 -->
                 <div class="card">
@@ -38,7 +36,7 @@
                             <div class="fg">
                                 <label class="fl">{{ "ref_audio"|t(lang) }}</label>
                                 <div class="upload-zone" onclick="this.querySelector('input').click()">
-                                    <input type="file" id="it2e-same-audio-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-same-name')">
+                                    <input type="file" id="it2e-same-audio-input" name="ref_audio" :disabled="it2eMode !== 'same'" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-same-name')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                                     <p><span id="it2e-same-name">{{ "upload_ref_audio_desc"|t(lang) }}</span></p>
                                     <p style="font-size:10px;margin-top:2px">{{ "supported_formats"|t(lang) }}</p>
@@ -51,14 +49,14 @@
                             <div class="fg">
                                 <label class="fl">{{ "timbre_ref_audio"|t(lang) }}</label>
                                 <div class="upload-zone" style="padding:14px" onclick="this.querySelector('input').click()">
-                                    <input type="file" id="it2e-diff-timbre-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-diff-timbre-name')">
+                                    <input type="file" id="it2e-diff-timbre-input" name="ref_audio" :disabled="it2eMode !== 'diff'" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-diff-timbre-name')">
                                     <p style="font-size:12px"><span id="it2e-diff-timbre-name">{{ "upload_timbre_ref"|t(lang) }}</span></p>
                                 </div>
                             </div>
                             <div class="fg">
                                 <label class="fl">{{ "emotion_ref_audio"|t(lang) }}</label>
                                 <div class="upload-zone" style="padding:14px" onclick="this.querySelector('input').click()">
-                                    <input type="file" id="it2e-diff-emotion-input" name="emo_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-diff-emotion-name')">
+                                    <input type="file" id="it2e-diff-emotion-input" name="emo_audio" :disabled="it2eMode !== 'diff'" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-diff-emotion-name')">
                                     <p style="font-size:12px"><span id="it2e-diff-emotion-name">{{ "upload_emotion_ref_desc"|t(lang) }}</span></p>
                                 </div>
                             </div>
@@ -77,7 +75,7 @@
                             <div class="fg">
                                 <label class="fl">{{ "timbre_ref_audio"|t(lang) }}</label>
                                 <div class="upload-zone" style="padding:14px" onclick="this.querySelector('input').click()">
-                                    <input type="file" id="it2e-text-timbre-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-text-timbre-name')">
+                                    <input type="file" id="it2e-text-timbre-input" name="ref_audio" :disabled="it2eMode !== 'text'" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateIt2eFileName(this, 'it2e-text-timbre-name')">
                                     <p style="font-size:12px"><span id="it2e-text-timbre-name">{{ "upload_timbre_ref"|t(lang) }}</span></p>
                                 </div>
                             </div>
@@ -134,7 +132,15 @@
                                     {{ "emotion_calm"|t(lang) }}
                                 </span>
                             </div>
-                            <input type="hidden" name="preset_emotion" id="it2e-preset-emotion" value="">
+                            {# 端点不接收 preset 名，只接收 8 维向量；预设由 JS 展开写入这些 hidden input（与 indextts20_emotion.html 同一方案）#}
+                            <input type="hidden" name="emo_happy" id="it2e-emo-happy" value="0">
+                            <input type="hidden" name="emo_angry" id="it2e-emo-angry" value="0">
+                            <input type="hidden" name="emo_sad" id="it2e-emo-sad" value="0">
+                            <input type="hidden" name="emo_afraid" id="it2e-emo-afraid" value="0">
+                            <input type="hidden" name="emo_disgusted" id="it2e-emo-disgusted" value="0">
+                            <input type="hidden" name="emo_melancholic" id="it2e-emo-melancholic" value="0">
+                            <input type="hidden" name="emo_surprised" id="it2e-emo-surprised" value="0">
+                            <input type="hidden" name="emo_calm" id="it2e-emo-calm" value="0">
                         </div>
 
                         <div class="fg">
@@ -248,10 +254,29 @@
         }
     };
 
+    // 预设名 -> 8 维情感向量（端点只认向量，与 indextts20_emotion.html 同一映射）。
+    // 历史上这里只写 preset_emotion 隐藏域，而端点根本不接收该字段 → 预设点击静默失效。
+    var PRESET_VECTORS = {
+        angry:     { emo_angry: 1.0 },
+        cry:       { emo_sad: 0.8, emo_melancholic: 0.4 },
+        fear:      { emo_afraid: 1.0 },
+        depressed: { emo_melancholic: 0.8, emo_sad: 0.4 },
+        happy:     { emo_happy: 1.0 },
+        surprise:  { emo_surprised: 1.0 },
+        calm:      { emo_calm: 1.0 }
+    };
+    var VECTOR_KEYS = ['emo_happy', 'emo_angry', 'emo_sad', 'emo_afraid',
+                       'emo_disgusted', 'emo_melancholic', 'emo_surprised', 'emo_calm'];
+
     window.selectIt2ePresetEmotion = function(emotion, btn) {
         document.querySelectorAll('.emotion-presets .emotion-pill').forEach(function(p){ p.classList.remove('active'); });
         btn.classList.add('active');
-        document.getElementById('it2e-preset-emotion').value = emotion;
+        var vector = PRESET_VECTORS[emotion] || {};
+        VECTOR_KEYS.forEach(function(key) {
+            var el = document.getElementById('it2e-' + key.replace('emo_', ''));
+            if (el) el.value = String(vector[key] !== undefined ? vector[key] : 0);
+        });
+        updateEmotionViz();
     };
 
     // Emotion visualization update
@@ -277,6 +302,29 @@
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
             document.getElementById('it2e-form').requestSubmit();
+        }
+    });
+})();
+</script>
+
+<script>
+// 报告 B13：IndexTTS 版本守卫——后端按当前激活引擎路由权重，版本不匹配时阻断而非静默错跑
+(function() {
+    window.__CURRENT_ENGINE__ = window.__CURRENT_ENGINE__ || '{{ current_engine }}';
+    var form = document.getElementById('it2e-form');
+    if (!form) return;
+    form.addEventListener('htmx:beforeRequest', function(evt) {
+        var eng = window.__CURRENT_ENGINE__;
+        if (eng && eng !== 'indextts2') {
+            evt.preventDefault();
+            var msg = '当前激活引擎为 ' + eng + '；本页需 IndexTTS 2.5 权重，请先到模型页切换引擎后再生成';
+            var st = document.getElementById('it2e-status');
+            if (st) {
+                st.className = 'status-message error';
+                st.textContent = msg;
+            } else if (typeof window.showToast === 'function') {
+                window.showToast(msg, 'error');
+            }
         }
     });
 })();
