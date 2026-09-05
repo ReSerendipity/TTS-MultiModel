@@ -52,6 +52,34 @@ class TestOpenAPISchema:
         paths = schema["paths"]
         assert "/api/model/status" in paths
 
+    def test_openapi_has_all_model_routes(self, client):
+        """遍历 /api/model/* 全量路由存在性（运维稳定性评估 P2 事故防线）。
+
+        Why 逐端点断言：KNOWN_GOTCHAS #21 事故——pre-commit ruff --fix 删除
+        model_manager.py re-export 门面 → 路由模块 import 时静默消失 →
+        /api/model/* 全 404，而 success_rate 类指标只统生成侧、端点级失效
+        对监控不可见。本测试把「每个模型端点必须出现在 schema」固化为门禁，
+        同类事故在 CI 即被拦截，不再依赖 per-file-ignores 白名单逐文件豁免。
+        """
+        schema = client.get("/openapi.json").json()
+        paths = schema["paths"]
+        expected_model_paths = [
+            "/api/model/status",
+            "/api/model/load",
+            "/api/model/unload",
+            "/api/model/preload",
+            "/api/model/preload/status",
+            "/api/model/switch",
+            "/api/model/lora/load",
+            "/api/model/lora/unload",
+            "/api/model/lora/toggle",
+            "/api/model/lora/state",
+            "/api/model/lora/list",
+            "/api/model/download_hints",
+        ]
+        missing = [p for p in expected_model_paths if p not in paths]
+        assert not missing, f"模型端点从 OpenAPI schema 消失（疑似 re-export 门面被误删）: {missing}"
+
 
 class TestAPIResponseContract:
     """API 响应格式契约测试。"""

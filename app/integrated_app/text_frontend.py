@@ -1623,17 +1623,18 @@ class G2PProcessor:
 
         manager = self._get_manager()
         if manager is None:
-            logger.debug("G2P 透传（manager 不可用）: lang=%s, text='%s'", lang, text[:50])
+            # 运维稳定性评估 P2：debug 日志不再携带用户文本，只记长度。
+            logger.debug("G2P 透传（manager 不可用）: lang=%s, text_length=%d", lang, len(text))
             return text
 
         try:
             result = manager.convert_text(text, lang)
             logger.debug(
-                "G2P 处理: lang=%s, engine=%s, text='%s' -> '%s'",
+                "G2P 处理: lang=%s, engine=%s, text_length=%d -> %d",
                 lang,
                 manager.get_engine_name(lang),
-                text[:50],
-                result[:50],
+                len(text),
+                len(result),
             )
             return result
         except Exception as e:

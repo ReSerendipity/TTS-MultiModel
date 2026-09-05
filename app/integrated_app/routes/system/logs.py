@@ -32,12 +32,60 @@ from collections import deque
 from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("tts_multimodel")
 
 router = APIRouter(prefix="/api/system", tags=["system"])
+
+
+# 运维稳定性评估 P1-1：操作日志端点访问控制
+# ---------------------------------------------------------------------------
+# GET /api/system/logs 与 DELETE /api/system/logs/clean 此前无任何端点级校验。
+# APIAuthMiddleware 只在 enabled=True 时对 /api/* 强制 Bearer；默认（本机自托管
+# enabled=False）时，若用户按容器指南把 host 设为 0.0.0.0 或局域网可达而未配
+# token，日志（含操作元数据）可被匿名读取，清理端点可被匿名触发（破坏审计）。
+#
+# 放行条件（任一）：
+#   ① api_auth 已启用 —— 能到达本 handler 说明 Bearer 校验已在中间件层通过；
+#   ② 客户端为回环地址（127.0.0.1 / ::1 / localhost）—— 本机浏览器/进程访问；
+#   ③ 测试态（TestClient 注入的 client.host == "testclient" 或无 client）。
+# 三者都不满足 → 403，堵死"对外暴露 + 无鉴权"的匿名读写日志路径。
+_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
+
+
+def _api_auth_enabled() -> bool:
+    """读取 api_auth.enabled（读取失败按 False 处理，走更严的回环判定）。"""
+    try:
+        from ...config import get_config
+
+        return bool(get_config().pydantic_config.api_auth.enabled)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def require_logs_access(request: Request) -> None:
+    """操作日志端点访问控制依赖（运维稳定性评估 P1-1）。
+
+    Args:
+        request: 当前请求（由 FastAPI 依赖注入）。
+
+    Raises:
+        HTTPException: 403，当请求既不来自回环、api_auth 又未启用时。
+    """
+    if _api_auth_enabled():
+        # 中间件已强制 Bearer，能到这里即已认证
+        return
+    client = request.client
+    host = getattr(client, "host", None)
+    if host is None or host in _LOOPBACK_HOSTS:
+        return
+    # 反向代理场景：真实来源已由部署层保证，这里按最严拒绝非回环直连
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="操作日志端点仅允许本机访问或启用 API 认证后访问",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +352,7 @@ def get_logs(
     page_size: int = Query(default=50, ge=1, le=500, description="每页 1-500 条"),
     start_ts: int | None = Query(default=None, description="起始时间戳（毫秒，含）"),
     end_ts: int | None = Query(default=None, description="结束时间戳（毫秒，含）"),
+    _access: None = Depends(require_logs_access),
 ) -> LogListResponse:
     """分页查询操作日志。
 
@@ -449,7 +498,9 @@ def _query_from_memory(
 
 
 @router.delete("/logs/clean", summary="清理旧日志", description="清理 30 天前或超过 10 万条之前的操作日志")
-def clean_logs() -> dict[str, Any]:
+def clean_logs(
+    _access: None = Depends(require_logs_access),
+) -> dict[str, Any]:
     """按双重阈值清理操作日志。
 
     双重阈值 Why：

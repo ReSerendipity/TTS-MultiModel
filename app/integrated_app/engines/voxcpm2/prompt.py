@@ -481,7 +481,8 @@ def _fn_voxcpm_prompt_continue_impl(
     from ...model_registry import registry
 
     _progress_mgr.update_phase("Prompt 延续推理中...")
-    logger.info(f"[VoxCPM Prompt延续] Prompt: {prompt_text[:50]}...")
+    # 运维稳定性评估 P2：不再打印 prompt 文本前 50 字（用户内容不入日志），只留长度。
+    logger.info(f"[VoxCPM Prompt延续] prompt_length={len(prompt_text)}")
 
     wav = registry.voxcpm_model.generate(
         text=text,
