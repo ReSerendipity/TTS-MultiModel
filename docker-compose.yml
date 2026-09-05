@@ -17,12 +17,15 @@ services:
       # 自动加载模型（app_server.lifespan 实际消费，非死配置）
       - TTS_AUTO_LOAD_MODEL=1
       - TTS_AUTO_LOAD_ENGINE=voxcpm2
-      # 结构化日志：json 便于采集
-      - TTS_LOG_FORMAT=text
+      # 结构化日志：json 便于采集（与 k8s deployment 的 TTS_LOG_FORMAT=json 对齐，P2-6）
+      - TTS_LOG_FORMAT=json
       # 挂载的 config.yaml 经此环境变量生效（12-Factor III 配置外部化）
       - TTS_CONFIG_PATH=/app/config.yaml
       # 历史库路径外部化（覆盖容器内默认 data/history.db）
       - TTS_HISTORY_DB_PATH=/app/data/history.db
+      # 优雅排水时长：显式设为应用默认 60s，与 Dockerfile 注释、k8s 三处对齐（P2-4）。
+      # 配合下方 stop_grace_period=90s（60s 排水 + 30s 缓冲）。
+      - TTS_GRACEFUL_SHUTDOWN_S=60
     # 只读根文件系统（不可变基础设施）：仅下列目录/路径可写。
     read_only: true
     tmpfs:
@@ -44,7 +47,7 @@ services:
     # readiness 闸门仅在 k8s 通过 /readyz 实现（模型未加载→503）；
     # docker-compose 无独立 readiness 概念，此处保持 ping 即可。
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7869/api/health/ping')"]
+      test: ["CMD", "python3.12", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7869/api/health/ping')"]
       interval: 30s
       timeout: 10s
       # 模型加载较慢，给足启动宽限
@@ -75,4 +78,7 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # 优雅停机宽限：SIGTERM 后给 uvicorn 60s 排水在途请求 + 30s 缓冲（P2-4 三处对齐）。
+    # docker 默认 10s 会在排水完成前 SIGKILL，切断长合成任务。
+    stop_grace_period: 90s
     restart: unless-stopped
