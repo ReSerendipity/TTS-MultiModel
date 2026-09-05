@@ -1,0 +1,185 @@
+# TTS_MultiModel —— 容器/编排冒烟（云原生评估·路线图 P0/P1 交叉项）
+# 填补验证空白：gpu-smoke 跑的是裸进程，覆盖不到「镜像能起 + 只读根 fs 不崩 +
+# 卷挂对 + 探针语义正确」这一层。本工作流在 CPU runner 上：
+#   1) docker build → 容器以与 docker-compose 相同的加固参数启动（不依赖 GPU）
+#   2) 验证 liveness(/api/health/ping)=200、readiness(/readyz)=503（无模型时正确拒流）
+#   3) 验证只读根 fs 生效（/app 写失败）且挂载卷可写（/app/outputs 写成功）
+#   4) 验证鉴权安全网（无 token→401，Bearer→200）与 SIGTERM 优雅退出（非 137）
+#   5) docker compose config 语法/合并校验 + k8s 清单静态校验（守护 P0-1 挂载面回归）
+name: Docker Smoke (boot + read-only + probes)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "deploy/kubernetes/**"
+      - ".dockerignore"
+      - ".github/workflows/docker-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "deploy/kubernetes/**"
+      - ".dockerignore"
+  schedule:
+    - cron: "30 3 * * 1" # 每周一 03:30 UTC，与 gpu-smoke（03:00）错峰；捕捉 base 镜像漂移
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Boot hardened container & probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      IMAGE: tts-multimodel:smoke
+      SMOKE_TOKEN: ci-smoke-token-not-a-real-secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 与 docker-build.yml 同款磁盘腾挪：base 镜像展开约 25GB，runner 仅剩约 31G
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost \
+            /opt/az /usr/share/swift /usr/local/julia* /usr/local/graalvm /usr/share/miniconda \
+            /usr/local/share/powershell /usr/lib/google-cloud-sdk
+          df -h / | tail -1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ env.IMAGE }}
+
+      - name: Compose file validity (syntax + merge)
+        run: docker compose -f docker-compose.yml config -q
+
+      - name: K8s manifests static gate (guard P0-1 mount surface)
+        run: |
+          python3 - <<'PY'
+          import sys, yaml
+          docs = [d for d in yaml.safe_load_all(open('deploy/kubernetes/deployment.yaml', encoding='utf-8')) if d]
+          pod = docs[0]['spec']['template']['spec']
+          c = pod['containers'][0]
+          mounts = {m['mountPath'] for m in c['volumeMounts']}
+          need = {'/app/config.yaml', '/app/model', '/app/data', '/app/outputs',
+                  '/app/logs', '/app/cache', '/app/lora', '/app/personas', '/tmp'}
+          missing = need - mounts
+          if missing:
+              sys.exit(f'deployment.yaml 缺少挂载: {sorted(missing)}（P0-1 回归）')
+          if not pod.get('initContainers'):
+              sys.exit('initContainers 缺失：subPath 子目录无人预建，Pod 起不来')
+          for f in ('deploy/kubernetes/pvc.yaml', 'deploy/kubernetes/secret.example.yaml',
+                    'deploy/kubernetes/servicemonitor.example.yaml'):
+              list(yaml.safe_load_all(open(f, encoding='utf-8')))  # 语法即胜
+          print('k8s manifests OK: mounts complete, initContainers present, all YAML parse')
+          PY
+
+      - name: Prepare runtime dirs (mirror compose volumes)
+        run: |
+          mkdir -p smoke/{model,data,outputs,logs,cache,lora,personas}
+          chmod -R 777 smoke
+
+      - name: Boot container with compose-equivalent hardening
+        # 与 docker-compose.yml 对齐：只读根 fs + tmpfs + cap_drop ALL + no-new-privileges
+        # + pids 上限 + shm 2g。CPU runner 无 GPU 属预期（推理冒烟归 gpu-smoke.yml）。
+        run: |
+          docker run -d --name tts-smoke \
+            --read-only --tmpfs /tmp \
+            --cap-drop=ALL --security-opt=no-new-privileges:true \
+            --pids-limit=512 --shm-size=2g \
+            -p 127.0.0.1:7869:7869 \
+            -e TTS_BIND_HOST=0.0.0.0 -e TTS_BIND_PORT=7869 \
+            -e TTS_API_AUTH_ENABLED=1 -e TTS_API_AUTH_TOKEN="$SMOKE_TOKEN" \
+            -e TTS_AUTO_LOAD_MODEL=0 -e TTS_LOG_FORMAT=json \
+            -e TTS_GRACEFUL_SHUTDOWN_S=60 \
+            -v "$PWD/config.yaml:/app/config.yaml:ro" \
+            -v "$PWD/smoke/model:/app/model:ro" \
+            -v "$PWD/smoke/data:/app/data" \
+            -v "$PWD/smoke/outputs:/app/outputs" \
+            -v "$PWD/smoke/logs:/app/logs" \
+            -v "$PWD/smoke/cache:/app/cache" \
+            -v "$PWD/smoke/lora:/app/lora" \
+            -v "$PWD/smoke/personas:/app/personas:ro" \
+            "$IMAGE"
+
+      - name: Wait for liveness (ping 200, max 180s)
+        run: |
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7869/api/health/ping || true)
+            if [ "$code" = "200" ]; then echo "ping OK after ${i}x2s"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::ping 未在 180s 内 200（容器日志见 artifact）"
+          docker logs --tail 200 tts-smoke
+          exit 1
+
+      - name: Probe readiness semantics (/readyz must be 503 without model)
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7869/readyz)
+          if [ "$code" != "503" ]; then
+            echo "::error::/readyz 返回 $code，期望 503（无模型时 readiness 必须拒绝接流）"
+            exit 1
+          fi
+          echo "readyz gate OK (503 as designed)"
+
+      - name: Probe auth network (401 without token / 200 with)
+        run: |
+          anon=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7869/api/model/status)
+          authed=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SMOKE_TOKEN" http://127.0.0.1:7869/api/model/status)
+          [ "$anon" = "401" ] || { echo "::error::无 token 期望 401 实得 $anon"; exit 1; }
+          [ "$authed" = "200" ] || { echo "::error::带 token 期望 200 实得 $authed"; exit 1; }
+          echo "auth probes OK (401/200)"
+
+      - name: Probe metrics scrape endpoint
+        run: |
+          out=$(curl -fsS http://127.0.0.1:7869/metrics | head -50)
+          echo "$out" | grep -q '^tts_' || { echo "::error::/metrics 无 tts_ 指标"; exit 1; }
+          echo "metrics OK"
+
+      - name: Probe read-only rootfs enforcement + writable volumes
+        run: |
+          ro=$(docker exec tts-smoke python3.12 -c "
+          try:
+              open('/app/_rootfs_write_test','w'); print('RW')
+          except OSError: print('RO')
+          ")
+          [ "$ro" = "RO" ] || { echo "::error::根文件系统可写！read_only 未生效"; exit 1; }
+          docker exec tts-smoke python3.12 -c "open('/app/outputs/_smoke.txt','w').write('ok')"
+          docker exec tts-smoke python3.12 -c "assert open('/app/outputs/_smoke.txt').read()=='ok'"
+          echo "rootfs read-only OK; mounted volumes writable OK"
+
+      - name: Graceful shutdown (SIGTERM, exit must not be 137)
+        run: |
+          docker stop -t 90 tts-smoke
+          code=$(docker inspect --format '{{.State.ExitCode}}' tts-smoke)
+          if [ "$code" = "137" ]; then
+            echo "::error::排水超时被 SIGKILL（exit 137），优雅停机链断裂"
+            exit 1
+          fi
+          echo "graceful exit code: $code"
+
+      - name: Collect container log
+        if: always()
+        run: docker logs tts-smoke > tts-smoke-server.log 2>&1 || true
+
+      - name: Upload smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-smoke-log-${{ github.run_number }}
+          path: tts-smoke-server.log
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f tts-smoke || true
