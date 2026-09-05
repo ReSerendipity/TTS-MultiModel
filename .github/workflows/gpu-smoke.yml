@@ -141,6 +141,18 @@ jobs:
             if (-not $p.HasExited) { $p.Kill() }
           }
 
+      - name: Training minimal smoke (1-step LoRA fine-tune)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          cd repo
+          # 训练依赖（datasets / einops / argbind / tensorboard）
+          & ${{ steps.py.outputs.python }} -m pip install -e ".[training]"
+          # 1 步 LoRA 训练冒烟：合成数据集 → 训练 1 步 → 校验 checkpoint 非空
+          & ${{ steps.py.outputs.python }} scripts/gpu_training_smoke.py --pretrained model/VoxCPM2 --timeout 600
+          if ($LASTEXITCODE -ne 0) { throw "training smoke failed (rc=$LASTEXITCODE)" }
+
       - name: Report GPU status
         if: always()
         shell: pwsh

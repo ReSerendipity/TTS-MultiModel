@@ -1,0 +1,50 @@
+{
+  "_description": "TTS 音质 Golden Set — 固定输入用于回归测试与确定性校验。每个 case 定义固定文本、音色、种子、引擎与温度，用于验证合成输出的稳定性与有效性。新增 case 时请保持文本简短（<50字）以加快测试速度。",
+  "_version": "1.0.0",
+  "_created": "2026-09-05",
+  "cases": [
+    {
+      "id": "voxcpm2_hanli_basic",
+      "engine": "voxcpm2",
+      "persona": "韩立",
+      "text": "吾辈修士，当以正道为本，不可心存侥幸。",
+      "seed": 42,
+      "temperature": 0.8,
+      "speed": 1.0,
+      "min_duration_sec": 1.0,
+      "max_duration_sec": 30.0
+    },
+    {
+      "id": "voxcpm2_narrator_long",
+      "engine": "voxcpm2",
+      "persona": "旁白",
+      "text": "夜色渐深，月光洒在古老的城墙上，远处传来阵阵钟声。",
+      "seed": 12345,
+      "temperature": 0.7,
+      "speed": 1.0,
+      "min_duration_sec": 1.5,
+      "max_duration_sec": 30.0
+    },
+    {
+      "id": "voxcpm2_gf1_emotion",
+      "engine": "voxcpm2",
+      "persona": "gf1",
+      "text": "今天天气真好，我们一起出去走走吧！",
+      "seed": 7,
+      "temperature": 0.9,
+      "speed": 1.05,
+      "min_duration_sec": 1.0,
+      "max_duration_sec": 30.0
+    }
+  ],
+  "determinism": {
+    "_description": "确定性校验：同一 case 连续生成两次，音频 SHA256 必须完全一致。若不一致说明存在非确定性来源（未设 seed、CUDA 非确定性算子、随机数泄漏）。",
+    "repeat_count": 2,
+    "tolerance": "exact"
+  },
+  "validity": {
+    "_description": "输出有效性校验：每次生成的音频必须为非空 WAV/MP3，时长在 [min, max] 范围内，采样率与引擎声明一致。",
+    "min_file_size_bytes": 1024,
+    "check_sample_rate": true
+  }
+}
