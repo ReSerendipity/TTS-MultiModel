@@ -44,6 +44,7 @@ _LAUNCH_SCRIPT = _PROJECT_ROOT / "app" / "clean_launch.py"
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 7869
 _PING_TIMEOUT = 120.0  # 最长等待 120 秒
+_ENGINE_READY_TIMEOUT = 600.0  # /readyz 变 200 的最长等待（大模型加载预留 10 分钟）
 _POLL_INTERVAL = 0.2  # 轮询间隔 200ms
 
 
@@ -81,7 +82,13 @@ def _wait_for_endpoint(
             last_status = resp.status_code
             if resp.status_code == 200:
                 return (time.perf_counter() - start) * 1000, 200
-        except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError, OSError):
+        except (
+            httpx.ConnectError,
+            httpx.ConnectTimeout,
+            httpx.ReadTimeout,
+            httpx.RemoteProtocolError,
+            OSError,
+        ):
             pass
         time.sleep(interval)
     return (time.perf_counter() - start) * 1000, last_status
@@ -118,16 +125,21 @@ def measure_cold_start(
     # 抑制浏览器自动打开
     env["TTS_NO_BROWSER"] = "1"
 
-    print(f"[cold-start] 启动服务器: {python_exe} {_LAUNCH_SCRIPT}")
+    # 修复（运维稳定性实施 2026-09-05）：此前 stdout=PIPE 但从不读取，
+    # 服务日志写满管道缓冲区后子进程直接死锁、端口永远无法监听，
+    # 导致 ping 120s 超时（实测两次复现）。改为落盘到临时日志文件，
+    # 失败时还能把日志尾部打印出来辅助定位。
+    _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    launch_log = _RESULTS_DIR / "cold-start_launch.log"
+    log_fh = open(launch_log, "w", encoding="utf-8", errors="replace")
+
+    print(f"[cold-start] 启动服务器: {python_exe} {_LAUNCH_SCRIPT}（日志 → {launch_log}）")
     proc = subprocess.Popen(
         [python_exe, str(_LAUNCH_SCRIPT)],
         cwd=str(_PROJECT_ROOT),
         env=env,
-        stdout=subprocess.PIPE,
+        stdout=log_fh,
         stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
     )
 
     try:
@@ -151,24 +163,24 @@ def measure_cold_start(
             results["ready_status"] = ready_status
             print(f"[cold-start] ✓ ready 就绪: {ready_ms:.0f}ms")
 
-            # 3. 可选：引擎加载
+            # 3. 可选：引擎加载 —— 轮询 /readyz 直到返回 200
+            #    /readyz 在引擎未就绪时返回 503，就绪后返回 200，
+            #    因此「ping 就绪 → /readyz 200」的间隔 = 模型加载到可用的真实耗时，
+            #    也正是 K8s readinessProbe 的判定端点（运维稳定性评估 P0 修复后一致）。
+            #    Why 不用 POST /api/model/load：该端点受 CSRF 保护，脚本无 token 会 403。
             engine_load_ms = 0.0
             if engine:
-                print(f"[cold-start] 加载引擎: {engine}")
-                t0 = time.perf_counter()
-                try:
-                    resp = client.post(
-                        "/api/model/load",
-                        data={"engine": engine},
-                        timeout=300.0,
-                    )
-                    engine_load_ms = (time.perf_counter() - t0) * 1000
-                    results["engine_load_status"] = resp.status_code
-                except Exception as e:
-                    engine_load_ms = (time.perf_counter() - t0) * 1000
-                    results["engine_load_error"] = str(e)
+                print(f"[cold-start] 等待引擎 {engine} 就绪（轮询 /readyz，需启动时设 TTS_AUTO_LOAD_MODEL=1）...")
+                engine_load_ms, readyz_status = _wait_for_endpoint(client, "/readyz", _ENGINE_READY_TIMEOUT)
+                results["readyz_status"] = readyz_status
                 results["engine_load_ms"] = round(engine_load_ms, 1)
-                print(f"[cold-start] ✓ 引擎加载: {engine_load_ms:.0f}ms")
+                if readyz_status == 200:
+                    print(f"[cold-start] ✓ 引擎就绪（/readyz 200）: {engine_load_ms:.0f}ms")
+                else:
+                    results["engine_load_error"] = (
+                        f"/readyz 未在 {_ENGINE_READY_TIMEOUT}s 内变 200 (last={readyz_status})"
+                    )
+                    print(f"[cold-start] ⚠ {results['engine_load_error']}")
 
         total = ping_ms + ready_ms + engine_load_ms
         results["total_cold_start_ms"] = round(total, 1)
@@ -176,7 +188,7 @@ def measure_cold_start(
         print(f"  进程→ping:     {ping_ms:>8.0f} ms")
         print(f"  ping→ready:    {ready_ms:>8.0f} ms")
         if engine:
-            print(f"  引擎加载:       {engine_load_ms:>8.0f} ms")
+            print(f"  ready→/readyz: {engine_load_ms:>8.0f} ms（模型加载到可用 = MTTR 核心）")
         print("  ─────────────────────────")
         print(f"  总冷启动:       {total:>8.0f} ms ({total / 1000:.2f}s)")
 
@@ -188,6 +200,19 @@ def measure_cold_start(
         except Exception:
             proc.kill()
             proc.wait()
+        finally:
+            try:
+                log_fh.close()
+            except Exception:  # noqa: BLE001
+                pass
+        # ping 未通时，打印启动日志尾部辅助定位（此前完全看不到子进程输出）
+        if results.get("ping_status") != 200:
+            try:
+                tail = launch_log.read_text(encoding="utf-8", errors="replace").splitlines()[-15:]
+                print("[cold-start] ── 启动日志尾部（诊断用）──")
+                print("\n".join(tail))
+            except Exception:  # noqa: BLE001
+                pass
 
     return results
 

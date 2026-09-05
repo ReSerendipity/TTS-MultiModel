@@ -2,7 +2,8 @@
 # 设计要点（对齐容器化评估 P2-9 与 SRE 评估 §1.4）：
 #   - 单副本 StatefulSet 语义（有状态：依赖本地 GPU 与挂载存储），此处以 Deployment 简化呈现；
 #     若需多副本推理，需先解决「单 Worker 串行」硬约束与多卡调度（见 SRE §1.4）。
-#   - 显式 liveness/readiness 探针复用 /api/health/ping 与 /api/system/health/ready。
+#   - 探针：liveness/startup 复用 /api/health/ping（进程活性），readiness 接 /readyz
+#     （引擎真实就绪闸门，未加载时返回 503，防止未就绪 Pod 接流量）。
 #   - securityContext：非 root、只读根文件系统、丢弃全部 capabilities（与 docker-compose 对齐）。
 #   - GPU 通过 nvidia.com/gpu 资源请求独占（单卡 SPOF，与单机一致）。
 #   - 优雅停机：terminationGracePeriodSeconds 与 uvicorn timeout_graceful_shutdown=60 对齐。
@@ -77,13 +78,15 @@ spec:
               memory: 8Gi
               nvidia.com/gpu: 1
           readinessProbe:
+            # P0 修复（运维稳定性评估 2026-09-05）：原指向 /api/system/health/ready，
+            # 该端点在 degraded（模型未加载）时仍返回 200，导致未就绪 Pod 被 Service
+            # 选中、流量打进来全 5xx。改接 /readyz——引擎未就绪时真实返回 503。
             httpGet:
-              path: /api/system/health/ready
+              path: /readyz
               port: 7869
-            initialDelaySeconds: 30
             periodSeconds: 15
             timeoutSeconds: 5
-            failureThreshold: 5
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /api/health/ping

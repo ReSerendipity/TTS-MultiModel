@@ -53,6 +53,8 @@ _HELP: dict[str, str] = {
     "tts_rtf_avg": "历史库平均实时率 = 生成耗时/音频时长（<1 为实时）",
     "tts_avg_gen_time_ms": "平均生成耗时（毫秒，由 rtf × 音频时长推导）",
     "tts_alerts_total": "累计发出的告警次数（按 severity 分维）",
+    "tts_errors_by_type_total": "累计生成失败次数（按类型分维：timeout/oom/param/safety/other）",
+    "tts_request_latency_seconds": "生成耗时直方图（秒，支撑 p95 与 30s SLO 尾部判定）",
 }
 
 # 指标类型
@@ -74,6 +76,8 @@ _TYPE: dict[str, str] = {
     "tts_rtf_avg": "gauge",
     "tts_avg_gen_time_ms": "gauge",
     "tts_alerts_total": "counter",
+    "tts_errors_by_type_total": "counter",
+    "tts_request_latency_seconds": "histogram",
 }
 
 # 无 label 指标的渲染顺序（保证 scrape 输出稳定，利于 diff 与单测）
@@ -204,6 +208,41 @@ def collect_alert_counts() -> dict[str, int]:
         return {}
 
 
+def collect_error_type_counts() -> dict[str, int]:
+    """按类型采集累计生成失败数（运维稳定性评估 P1：失败细分计数）。
+
+    Returns:
+        dict[str, int]: ``type -> 累计次数``；采集失败返回空字典。
+    """
+    try:
+        from ..monitor import get_health_monitor
+
+        counts = get_health_monitor().get_metrics().get("error_type_counts")
+        return dict(counts) if isinstance(counts, dict) else {}
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[metrics] 失败分类计数采集失败: %s", exc)
+        return {}
+
+
+def collect_latency_hist() -> tuple[dict[str, int], float, int]:
+    """采集生成耗时直方图快照（cumulative 桶 / 累计秒 / 观测数）。
+
+    Returns:
+        tuple: ``(buckets, sum_seconds, count)``；采集失败返回零值三元组。
+    """
+    try:
+        from ..monitor import get_health_monitor
+
+        report = get_health_monitor().get_metrics()
+        buckets = report.get("latency_buckets")
+        total = _safe_float(report.get("latency_sum_seconds"))
+        count = int(report.get("latency_count") or 0)
+        return (dict(buckets) if isinstance(buckets, dict) else {}, total, count)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[metrics] 延迟直方图采集失败: %s", exc)
+        return ({}, 0.0, 0)
+
+
 def _emit(name: str, value: float, labels: dict[str, str] | None = None) -> str:
     """格式化单个指标样本为 Prometheus 文本行。
 
@@ -248,9 +287,12 @@ def build_metrics_text() -> str:
     collected = collect_metrics()
     lines: list[str] = []
 
+    # 带 label 维度、需单独渲染的指标族（不在无 label 循环里输出）
+    _labeled = {"tts_alerts_total", "tts_errors_by_type_total", "tts_request_latency_seconds"}
+
     # 固定顺序渲染无 label 指标（保证输出稳定）
     for name in _ORDER:
-        if name == "tts_alerts_total" or name not in collected:
+        if name in _labeled or name not in collected:
             continue
         lines.append(f"# HELP {name} {_HELP[name]}")
         lines.append(f"# TYPE {name} {_TYPE[name]}")
@@ -266,5 +308,26 @@ def build_metrics_text() -> str:
     else:
         # 始终输出至少一个样本：缺失的时间序列会让 `absent()` 类告警误报
         lines.append(_emit("tts_alerts_total", 0.0, {"severity": "info"}))
+
+    # 失败分类计数按 type 分维渲染（运维稳定性评估 P1）
+    err_counts = collect_error_type_counts()
+    lines.append(f"# HELP tts_errors_by_type_total {_HELP['tts_errors_by_type_total']}")
+    lines.append(f"# TYPE tts_errors_by_type_total {_TYPE['tts_errors_by_type_total']}")
+    if err_counts:
+        for etype in sorted(err_counts):
+            lines.append(_emit("tts_errors_by_type_total", float(err_counts[etype]), {"type": etype}))
+    else:
+        # 与 alerts 同理：零值也输出有界全集，避免 absent() 误报
+        lines.append(_emit("tts_errors_by_type_total", 0.0, {"type": "other"}))
+
+    # 生成耗时直方图（cumulative 桶 + sum + count，Prometheus histogram 规范）
+    buckets, lat_sum, lat_count = collect_latency_hist()
+    lines.append(f"# HELP tts_request_latency_seconds {_HELP['tts_request_latency_seconds']}")
+    lines.append("# TYPE tts_request_latency_seconds histogram")
+    for bound in sorted(buckets, key=float):
+        lines.append(_emit("tts_request_latency_seconds_bucket", float(buckets[bound]), {"le": bound}))
+    lines.append(_emit("tts_request_latency_seconds_bucket", float(lat_count), {"le": "+Inf"}))
+    lines.append(_emit("tts_request_latency_seconds_sum", lat_sum))
+    lines.append(_emit("tts_request_latency_seconds_count", float(lat_count)))
 
     return "\n".join(lines) + "\n"

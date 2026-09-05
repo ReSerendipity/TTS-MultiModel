@@ -71,10 +71,20 @@ class HealthMonitor:
         _total_errors: 累计生成失败次数。
         _total_oom_retries: 累计 OOM 后自动重试次数。
         _circuit_breaker_trips: 累计显存熔断触发次数。
+        _error_type_counts: 失败按类型累计（timeout/oom/param/safety/other）。
+        _latency_buckets: 生成耗时直方图累计（le 标签 → 计数）。
+        _latency_sum_seconds: 生成耗时累计（秒）。
     """
 
     VRAM_CIRCUIT_BREAKER_PCT: float = 90.0
     VRAM_PRELOAD_SAFETY_FACTOR: float = 1.5
+
+    # 失败分类白名单（运维稳定性评估 P1：/metrics 缺失败细分类计数）。
+    # cardinality 有界：未知值一律归入 other。
+    ERROR_TYPES: tuple[str, ...] = ("timeout", "oom", "param", "safety", "other")
+    # 生成延迟直方图桶上界（秒）。覆盖短任务亚秒级到长文本生成，含硬超时 600s
+    # 两侧，并专门包含 30s 以支撑 SLO max_avg_latency 之外的尾部判定。
+    LATENCY_BUCKET_SECONDS: tuple[float, ...] = (0.5, 1.0, 5.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0)
 
     _vram_samples: deque[float]
     _max_samples: int
@@ -86,6 +96,10 @@ class HealthMonitor:
     _total_errors: int
     _total_oom_retries: int
     _circuit_breaker_trips: int
+    _error_type_counts: dict[str, int]
+    _latency_buckets: dict[str, int]
+    _latency_sum_seconds: float
+    _latency_count: int
 
     def __init__(self) -> None:
         """初始化健康监控器。
@@ -107,6 +121,41 @@ class HealthMonitor:
         self._total_errors = 0
         self._total_oom_retries = 0
         self._circuit_breaker_trips = 0
+        self._error_type_counts = {t: 0 for t in self.ERROR_TYPES}
+        self._latency_buckets = {f"{b:g}": 0 for b in self.LATENCY_BUCKET_SECONDS}
+        self._latency_sum_seconds = 0.0
+        self._latency_count = 0
+
+    def record_latency(self, duration_seconds: float) -> None:
+        """记录一次生成耗时到直方图桶与累计和（运维稳定性评估 P1）。
+
+        Args:
+            duration_seconds: 本次生成耗时（秒），负值按 0 处理。
+        """
+        d = duration_seconds if duration_seconds and duration_seconds > 0 else 0.0
+        self._latency_sum_seconds += d
+        self._latency_count += 1
+        for bound in self.LATENCY_BUCKET_SECONDS:
+            if d <= bound:
+                self._latency_buckets[f"{bound:g}"] += 1
+        # 超过最大桶的样本计入 _latency_count（即 le=+Inf），不进入任何有限桶
+
+    def latency_observations(self) -> tuple[dict[str, int], float, int]:
+        """返回直方图快照（cumulative 桶、累计秒、观测数），供 /metrics 渲染。"""
+        return dict(self._latency_buckets), self._latency_sum_seconds, self._latency_count
+
+    def error_type_counts(self) -> dict[str, int]:
+        """返回失败分类累计快照，供 /metrics 渲染。"""
+        return dict(self._error_type_counts)
+
+    def record_generation_error_type(self, error_type: str) -> None:
+        """按类型累计一次生成失败（运维稳定性评估 P1）。
+
+        Args:
+            error_type: timeout/oom/param/safety/other 之一；未知值归入 other。
+        """
+        key = error_type if error_type in self._error_type_counts else "other"
+        self._error_type_counts[key] += 1
 
     def record_vram_usage(self, used_mb: float) -> None:
         """记录一次 GPU 显存使用样本，用于后续泄漏诊断。
@@ -515,6 +564,20 @@ class HealthMonitor:
             result["success_rate_pct"] = 0.0
 
         try:
+            result["error_type_counts"] = dict(self._error_type_counts)
+        except Exception:
+            result["error_type_counts"] = {}
+
+        try:
+            result["latency_buckets"] = dict(self._latency_buckets)
+            result["latency_sum_seconds"] = round(self._latency_sum_seconds, 3)
+            result["latency_count"] = self._latency_count
+        except Exception:
+            result["latency_buckets"] = {}
+            result["latency_sum_seconds"] = 0.0
+            result["latency_count"] = 0
+
+        try:
             from .gpu_backend import GPUBackend, GPUBackendManager
 
             backend = GPUBackendManager.detect_backend()
@@ -605,6 +668,33 @@ class HealthMonitor:
         except Exception as exc:  # noqa: BLE001
             logger.debug("[HealthMonitor] 持久化计数器恢复跳过: %s", exc)
 
+        # 扩展计数器（失败分类 / 延迟直方图）以 JSON 单键持久化
+        try:
+            import json as _json
+
+            from .history_db import get_history_db
+
+            db = get_history_db()
+            raw = db.load_kv("metric:ext_counters")
+            if raw and self._total_generations > 0:
+                ext = _json.loads(raw)
+                counts = ext.get("error_types", {})
+                for k in self._error_type_counts:
+                    v = counts.get(k)
+                    if isinstance(v, int) and v > self._error_type_counts[k]:
+                        self._error_type_counts[k] = v
+                buckets = ext.get("latency_buckets", {})
+                for k in self._latency_buckets:
+                    v = buckets.get(k)
+                    if isinstance(v, int) and v > self._latency_buckets[k]:
+                        self._latency_buckets[k] = v
+                if isinstance(ext.get("latency_sum"), (int, float)) and ext["latency_sum"] > self._latency_sum_seconds:
+                    self._latency_sum_seconds = float(ext["latency_sum"])
+                if isinstance(ext.get("latency_count"), int) and ext["latency_count"] > self._latency_count:
+                    self._latency_count = ext["latency_count"]
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[HealthMonitor] 扩展计数器恢复跳过: %s", exc)
+
     def save_persisted_state(self) -> None:
         """将当前累计计数器写入 history_db（幂等 UPSERT）。"""
         try:
@@ -620,6 +710,20 @@ class HealthMonitor:
                     "total_oom_retries": self._total_oom_retries,
                     "circuit_breaker_trips": self._circuit_breaker_trips,
                 }
+            )
+            # 扩展计数器：JSON 单键（值可为 float，与 int-only 的 save_metric_counters 区分）
+            import json as _json
+
+            db.save_kv(
+                "metric:ext_counters",
+                _json.dumps(
+                    {
+                        "error_types": self._error_type_counts,
+                        "latency_buckets": self._latency_buckets,
+                        "latency_sum": round(self._latency_sum_seconds, 3),
+                        "latency_count": self._latency_count,
+                    }
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             logger.debug("[HealthMonitor] 持久化计数器保存跳过: %s", exc)

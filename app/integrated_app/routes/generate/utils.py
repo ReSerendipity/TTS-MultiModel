@@ -225,6 +225,15 @@ def _ensure_content_safe(request: Any, text: str) -> Any:
 
         actor = getattr(request.state, "user", "anonymous") if hasattr(request, "state") else "anonymous"
         log_audit("content_blocked", actor=str(actor), detail=result.category.value, outcome="blocked")
+        # 运维稳定性评估 P1：审核拦截计入 safety 分类（此前 /metrics 完全不可见）。
+        # 拦截发生在获取信号量之前，属于请求被拒而非生成失败，故只记分类计数、
+        # 不动 success_rate 分母（由 record_generation_error_type 单独承载）。
+        try:
+            from ...monitor import get_health_monitor
+
+            get_health_monitor().record_generation_error_type("safety")
+        except Exception:  # noqa: BLE001
+            pass
         return _error_html(request, f"⚠️ 内容安全检测未通过：{result.message}")
     return None
 
@@ -779,6 +788,32 @@ def _log_generation(
         log_audit("generation", detail=f"endpoint={endpoint_name} engine={engine}", outcome="failure")
 
 
+def _record_generation_failure(error_type: str, duration: float | None = None) -> None:
+    """把一次生成失败写入 HealthMonitor 的分类计数与成功率分母（运维稳定性评估 P1）。
+
+    Why 独立辅助 + 为什么这里必须调 record_generation(False)：
+        盘点发现失败路径此前**从未**调用 ``monitor.record_generation(success=False)``
+        （只有 5 处 success=True 调用），导致 HealthMonitor 的 errors/success_rate
+        恒为满分、SLO 侧看不到任何失败。本函数是失败进入监控器的唯一入口。
+
+    本函数绝不抛异常——监控埋点失败不能影响错误响应。
+
+    Args:
+        error_type: timeout / oom / param / safety / other。
+        duration: 可选耗时（秒），提供时同步入延迟直方图。
+    """
+    try:
+        from ...monitor import get_health_monitor
+
+        mon = get_health_monitor()
+        mon.record_generation(success=False)
+        mon.record_generation_error_type(error_type)
+        if duration is not None:
+            mon.record_latency(duration)
+    except Exception as fe:  # noqa: BLE001
+        logger.debug("[metrics] 失败分类记录跳过: %s", fe)
+
+
 # ===========================================================================
 # 音频后处理（语速 / 增强 / 响度归一化）
 # ===========================================================================
@@ -890,6 +925,7 @@ def _error_html(
     error_type: str = "general",
     engine_id: str = "",
     title_key: str = "gen_failed",
+    status_code: int = 400,
 ) -> HTMLResponse:
     """渲染 HTML 错误片段；优先使用 Jinja2 模板，模板不可用时降级返回安全字符串。
 
@@ -901,9 +937,11 @@ def _error_html(
         title_key: 标题的 i18n 键。默认 ``gen_failed``（「生成失败」一类文案）；
             非生成类端点（如音色保存）必须传更贴切的键，否则校验错误会被冠以
             「生成时遇到了一点小状况」这种与操作无关的标题。
+        status_code: HTTP 状态码，默认 400。排队超时须传 503
+            （运维稳定性评估 P1：此前 200/400+HTML 让监控统计不到这类失败）。
 
     Returns:
-        HTMLResponse（400），携带 HX-Trigger toast 头。
+        HTMLResponse（按 status_code），携带 HX-Trigger toast 头。
     """
     from ...i18n import get_lang, t
 
@@ -920,7 +958,7 @@ def _error_html(
                 "engine_id": engine_id,
                 "title_key": title_key,
             },
-            status_code=400,
+            status_code=status_code,
             headers={
                 # ensure_ascii 必须保持 True（json.dumps 的默认值，故不显式传参）。
                 # HTTP 头只允许 latin-1 字节，而 error_message 绝大多数是中文，
@@ -958,7 +996,7 @@ def _error_html(
             f'<div class="error-message">{html.escape(error_message)}</div>'
             f"{load_btn}"
             f"</div>",
-            status_code=400,
+            status_code=status_code,
         )
 
 
@@ -1340,7 +1378,15 @@ async def _execute_generation(
             timeout=_gen_semaphore_timeout(),
         )
     except asyncio.TimeoutError:
-        return _error_html(request, "系统繁忙，请稍后再试（等待超时）")
+        # 运维稳定性评估 P1：排队超时是服务过载信号，必须以 5xx 暴露并可被监控统计。
+        # 此前返回 200/400+HTML，Prometheus 侧完全看不到这次失败。
+        _record_generation_failure("timeout")
+        return _error_html(
+            request,
+            "系统繁忙，请稍后再试（等待超时）",
+            error_type="queue_timeout",
+            status_code=503,
+        )
     try:
         # E6-1 ROBUSTNESS: 为生成任务本身加硬超时，防止超长文本/死循环耗尽信号量池。
         # 注意：底层 torch 推理不响应 asyncio 取消，但 run_in_executor 的 Future
@@ -1374,7 +1420,20 @@ async def _execute_generation(
             _gen_hard_timeout(),
             error_msg=f"generation timeout (>{_gen_hard_timeout()}s)",
         )
-        return _error_html(request, f"生成超时（超过 {_gen_hard_timeout():.0f} 秒），请尝试缩短文本或减少并发")
+        # 运维稳定性评估 P1：超时纳入失败分类计数（timeout），/metrics 可见。
+        _record_generation_failure("timeout")
+        # 运维稳定性评估 P1：超时后主动清理 GPU 缓存（best-effort，后台线程执行，
+        # 不阻塞错误响应）。若底层推理线程尚未结束，empty_cache 回收有限，
+        # 但其结束后残留的临时音频文件由 lifespan 的 30 分钟周期清理任务兜底。
+        try:
+            asyncio.get_running_loop().create_task(asyncio.to_thread(free_gpu_memory))
+        except Exception as ce:  # noqa: BLE001
+            logger.debug("超时后显存清理调度失败（忽略）: %s", ce)
+        return _error_html(
+            request,
+            f"生成超时（超过 {_gen_hard_timeout():.0f} 秒），请尝试缩短文本或减少并发",
+            error_type="timeout",
+        )
     finally:
         semaphore.release()
 
@@ -1452,6 +1511,7 @@ async def _execute_generation_impl(
         duration: float = time.monotonic() - start_time
         if result is None:
             _log_generation(endpoint_name, text, engine, voice_or_persona, False, duration, error_msg=msg)
+            _record_generation_failure("other", duration)
             return _error_html(request, msg)
         is_degraded: bool = degraded_note is not None
         _log_generation(endpoint_name, text, engine, voice_or_persona, True, duration, is_degraded=is_degraded)
@@ -1470,6 +1530,8 @@ async def _execute_generation_impl(
             )
         monitor = get_health_monitor()
         monitor.record_generation(success=True)
+        # 运维稳定性评估 P1：成功耗时入直方图（支撑 p95 / 30s SLO 尾部判定）。
+        monitor.record_latency(duration)
         filename: str = result[2]
         pp_voice_enhancement: bool = _parse_bool_form(voice_enhancement)
         filename = await asyncio.to_thread(
@@ -1485,10 +1547,16 @@ async def _execute_generation_impl(
         logger.error(f"{endpoint_name} generation failed: {e}")
         _log_generation(endpoint_name, text, engine, voice_or_persona, False, duration, error_msg=str(e))
         error_type: str = "general"
+        metric_type: str = "other"
         if is_oom_error(e):
             error_type = "oom"
+            metric_type = "oom"
         elif isinstance(e, ValueError):
             error_type = "validation"
+            metric_type = "param"
+        # 运维稳定性评估 P1：失败进入监控器（此前失败从不调用 record_generation，
+        # success_rate 恒为 100%，SLO 侧存在系统性盲区）。
+        _record_generation_failure(metric_type, duration)
         return _error_html(request, _safe_error_msg(e), error_type=error_type)
 
 

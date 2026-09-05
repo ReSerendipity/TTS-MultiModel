@@ -318,7 +318,16 @@ async def _acquire_streaming_semaphore(
         await asyncio.wait_for(semaphore.acquire(), timeout=_SEMAPHORE_ACQUIRE_TIMEOUT_S)
         return semaphore, None
     except asyncio.TimeoutError:
-        return None, _error_html(request, "系统繁忙，请稍后再试（等待超时）")
+        # 运维稳定性评估 P1：排队超时统一 503（与 utils._execute_generation 一致）。
+        from ..utils import _record_generation_failure
+
+        _record_generation_failure("timeout")
+        return None, _error_html(
+            request,
+            "系统繁忙，请稍后再试（等待超时）",
+            error_type="queue_timeout",
+            status_code=503,
+        )
 
 
 # ====================================================================
@@ -876,7 +885,7 @@ async def cancel_generation(request: Request) -> dict[str, str]:
     """
     from ....model_manager import _progress_mgr
 
-    current_eng: str = registry.current_engine
+    current_eng: str | None = registry.current_engine
     was_generating: bool = not _progress_mgr._is_complete and _progress_mgr._phase != ""
     _progress_mgr.cancel()
     logger.info(f"[Cancel] Generation cancel requested (engine: {current_eng}, was generating: {was_generating})")
