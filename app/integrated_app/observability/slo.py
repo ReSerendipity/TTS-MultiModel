@@ -3,7 +3,9 @@
 报告缺口：原项目「无任何 SLO/SLI 定义」。本模块在代码层给出可度量目标：
     - availability（可用性）：由 liveness 探活 + readiness 就绪推导
     - success_rate（成功率）：生成成功 / 总次数
-    - latency（延迟）：采用 avg_gen_time_ms 作为代理 SLI（完整 p95 需接入请求级计时）
+    - avg_latency（平均延迟）：采用 avg_gen_time_ms 作为 SLI
+    - p95_latency（尾部延迟）：由 HealthMonitor 请求级直方图线性插值估算
+      （运维稳定性评估 P1 补齐——此前只有均值，30s SLO 判不了尾部）
 
 SLI 数据源统一取自 ``metrics.collect_metrics()`` / ``HealthMonitor``，
 SLO 阈值来自 config ``observability.slo``，缺省使用内置默认值。
@@ -21,6 +23,9 @@ _DEFAULT_SLO: dict[str, float] = {
     "availability": 99.5,  # 目标可用性 %
     "min_success_rate": 99.0,  # 目标生成成功率 %
     "max_avg_latency_ms": 30000.0,  # 目标平均生成耗时上限 ms
+    # p95 尾部上限：avg 目标 30s，TTS 类负载 p95 经验约为其 2-3×，取 3× = 90s
+    # 作为保守初值。必须按目标设备/文本长度分布经 config 校准；样本 <10 按达标处理。
+    "max_p95_latency_ms": 90000.0,
 }
 
 
@@ -100,9 +105,7 @@ def compute_slis() -> list[SLIResult]:
         )
     )
 
-    # 3. 延迟（代理 SLI：平均生成耗时）
-    # 说明：请求级 p95 需接入逐请求计时中间件（见 docs/ops/SLO.md 的后续项）。
-    # 此处以 HealthMonitor/model_manager 的平均生成耗时作为代理 SLI；取不到时为 0，按达标处理。
+    # 3. 延迟（平均生成耗时 SLI）
     avg_latency = float(metrics.get("tts_avg_gen_time_ms", 0.0) or 0.0)
     results.append(
         SLIResult(
@@ -111,6 +114,20 @@ def compute_slis() -> list[SLIResult]:
             target=cfg["max_avg_latency_ms"],
             unit="ms",
             met=(avg_latency <= cfg["max_avg_latency_ms"]) if avg_latency > 0 else True,
+        )
+    )
+
+    # 4. p95 尾部延迟（运维稳定性评估 P1：直方图线性插值，样本 <10 按达标避免误报）
+    p95_ms = float(metrics.get("tts_latency_p95_seconds", 0.0) or 0.0) * 1000.0
+    gen_total = float(metrics.get("tts_generations_total", 0.0) or 0.0)
+    p95_met = (gen_total < 10) or (p95_ms <= cfg["max_p95_latency_ms"])
+    results.append(
+        SLIResult(
+            name="p95_latency",
+            value=p95_ms,
+            target=cfg["max_p95_latency_ms"],
+            unit="ms",
+            met=p95_met,
         )
     )
 

@@ -185,7 +185,18 @@ class GenerationConfig(BaseModel):
     semaphore_acquire_timeout_s: float = Field(
         default=120.0,
         gt=0,
-        description="获取生成信号量的排队等待上限（秒），超时返回系统繁忙",
+        description="获取生成信号量的排队等待上限（秒），超时返回 503 系统繁忙（运维稳定性评估 P1：从 200/400 改为标准过载码）",
+    )
+
+    # 运维稳定性评估 P1-4：OOM 后受控自动重载（无 on-call 场景的自愈路径）
+    oom_auto_reload: bool = Field(
+        default=True,
+        description="OOM 重试耗尽后是否在后台自动重载当前引擎（卸载→重新加载）；重载失败则标记不健康、交由进程退出/容器重启",
+    )
+    oom_auto_reload_cooldown_s: float = Field(
+        default=300.0,
+        ge=30.0,
+        description="两次 OOM 自动重载的最小间隔（秒），防止权重损坏状态下反复重载风暴",
     )
     cache_enabled: bool = Field(
         default=False,

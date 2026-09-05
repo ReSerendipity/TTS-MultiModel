@@ -2,21 +2,20 @@
   "description": "TTS_MultiModel 核心模块完整性清单 (自动生成)",
   "algorithm": "sha256",
   "files": {
-    "app_server.py": "d0abb7e3ca3a59d6601a31e911dcb052ca429d5b147d0b772f68122dc1761e06",
-    "config.py": "dca8fd94e184d201fa219129f2dea3097900e65af8f0168db9f814f92e1e993d",
-    "config_models.py": "c3c97398f4d21d57f511dd1115bff6b53d8559874dc61b79f2e471d30a9ed3ff",
-    "engine_interface.py": "f6eb15994af702529cd36a7ea615e59400f93b48d4eb4123915e71074eb0ef5e",
-    "model_manager.py": "7c7864cad16fb71c98686858a0c955c3e83a3be70aadfdb58906a3dc951c1f8d",
+    "app_server.py": "52abbf59670dcf2ef607950b7863757258aca869daf77f313c746af2238281d4",
+    "config.py": "6dab84f72a3e52a17c9b218f2d9627031090264a336ce86b559b4e56bb290301",
+    "config_models.py": "87b98b84286b4141449870e167b322027132738d0a49b1971f93838ee74b30e4",
+    "engine_interface.py": "5102bf08a3c3650d05b01b63497079003a775eee0ad99c7f44b62410daf22ea5",
+    "model_manager.py": "39db84c5bbb760974b2bf6047cc75c1b1bd5f656001aed0cafa403e22af8b34a",
     "model_registry.py": "17664cc62e651a3705dc0f447814d2304448d710fa6c0690b6f1055f62a97a8f",
-    "task_queue.py": "be6b37929b8ed3e38574ac49c01a2f9eda848ee123af31e56d3e5a9c9d7fa415",
-    "history_db.py": "11f98184df4be2921eb9d9e137198ba70f6ebc8276735b7b893e3bae20d2ef89",
+    "history_db.py": "192b304faf329e08276bb7848e93082ae7641c2f030bf063ea0363431720ee33",
     "i18n.py": "7ffe0d9cf291b243b2a38d173ac00867923df7dbce33aa46ba9e054474a789d3",
     "auth.py": "df933a3b6a5ee2daa28a8156431fd80b8edf13882a44922983157b2bf2212aa4",
     "middleware/csrf.py": "302565eeac9dd0b2ebfa68fa41b4de36d1ff5c1e4af64fba3783ebfb2e926d97",
     "middleware/error_handler.py": "12cd0ac9abfc3c1865cd38085624644c9fbb1d5d618b60b8107b605f4c74302f",
-    "middleware/rate_limit.py": "5380bbc2eb1046f22b57e1226b208c08cc5a4ce6279624a61e5d2e90cf9dae49",
+    "middleware/rate_limit.py": "9fe4beb2e8cada5d6b5404e0d028b2155013dde55fe03463324235d07824fe60",
     "middleware/request_id.py": "7b4ed71eb744a86c4303b75da2852da3955e1a022072bf4df91dbef5d7b65b78",
     "security/integrity_check.py": "df788a55f11cab03919d434a31d1e5709c03bd4ce74fc6e58999d4f342e668c3",
-    "security/integrity_selfcheck.py": "dbedeb8a75666d10001d0b3da1de2d9847548a1b286c41d11431dc705dbec087"
+    "security/integrity_selfcheck.py": "769fe076f5ebb2d57d2b14e2948641baed2180117a94175600f733c939e23d2b"
   }
 }

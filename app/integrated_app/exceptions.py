@@ -193,6 +193,19 @@ class GenerationError(TTSError):
         super().__init__(message, code="GENERATION_ERROR", status_code=500)
 
 
+class OOMRetryExhaustedError(RuntimeError):
+    """显存不足且降级重试全部耗尽（运维稳定性评估 P1-4）。
+
+    **典型触发场景**：
+    - ``_run_with_oom_retry`` 按 max_retries 降级重试后仍 OOM。
+
+    Why 继承 ``RuntimeError`` 而非 TTSError：调用方（含既有测试）一直按
+    ``except RuntimeError`` 处理该耗尽路径，保持类型兼容；本类只是打标记，
+    让监控能把这类"中文文案、is_oom_error() 无法从字符串识别"的失败正确
+    归入 oom 分类，并触发受控自动重载。
+    """
+
+
 class EngineSwitchError(TTSError):
     """引擎切换失败异常。
 

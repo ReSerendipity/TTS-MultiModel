@@ -96,6 +96,7 @@ class HealthMonitor:
     _total_errors: int
     _total_oom_retries: int
     _circuit_breaker_trips: int
+    _total_oom_auto_recoveries: int
     _error_type_counts: dict[str, int]
     _latency_buckets: dict[str, int]
     _latency_sum_seconds: float
@@ -121,6 +122,7 @@ class HealthMonitor:
         self._total_errors = 0
         self._total_oom_retries = 0
         self._circuit_breaker_trips = 0
+        self._total_oom_auto_recoveries = 0
         self._error_type_counts = {t: 0 for t in self.ERROR_TYPES}
         self._latency_buckets = {f"{b:g}": 0 for b in self.LATENCY_BUCKET_SECONDS}
         self._latency_sum_seconds = 0.0
@@ -143,6 +145,37 @@ class HealthMonitor:
     def latency_observations(self) -> tuple[dict[str, int], float, int]:
         """返回直方图快照（cumulative 桶、累计秒、观测数），供 /metrics 渲染。"""
         return dict(self._latency_buckets), self._latency_sum_seconds, self._latency_count
+
+    def latency_quantile(self, q: float) -> float:
+        """从累计直方图估算分位数（Prometheus histogram_quantile 同款线性插值）。
+
+        Args:
+            q: 分位数（0-1，如 0.95）。
+
+        Returns:
+            float: 估算的分位耗时（秒）；无观测样本时返回 0.0。
+        """
+        count = self._latency_count
+        if count == 0:
+            return 0.0
+        target = q * count
+        # 按上界升序遍历累计桶
+        prev_bound = 0.0
+        prev_cum = 0
+        for bound in self.LATENCY_BUCKET_SECONDS:
+            cum = self._latency_buckets[f"{bound:g}"]
+            if cum >= target:
+                # 样本落在 [prev_bound, bound) 区间内：桶内均匀分布假设插值
+                span = cum - prev_cum
+                if span <= 0:
+                    return float(bound)
+                return prev_bound + (bound - prev_bound) * (target - prev_cum) / span
+            prev_bound, prev_cum = float(bound), cum
+        # 超出最大桶（尾部样本）：用 +Inf 桶线性外推，保守返回最大桶×2 作占位
+        overflow = count - prev_cum
+        if overflow <= 0:
+            return float(self.LATENCY_BUCKET_SECONDS[-1])
+        return float(self.LATENCY_BUCKET_SECONDS[-1]) * (1.0 + 0.5 * overflow / count)
 
     def error_type_counts(self) -> dict[str, int]:
         """返回失败分类累计快照，供 /metrics 渲染。"""
@@ -295,6 +328,10 @@ class HealthMonitor:
     def record_oom_retry(self) -> None:
         """记录一次 OOM 发生后的自动重试事件。"""
         self._total_oom_retries += 1
+
+    def record_oom_auto_recovery(self) -> None:
+        """记录一次 OOM 后受控自动重载成功（运维稳定性评估 P1-4）。"""
+        self._total_oom_auto_recoveries += 1
 
     def get_vram_usage_percent(self) -> float:
         """获取当前 GPU 显存占用百分比。
@@ -546,6 +583,11 @@ class HealthMonitor:
             result["circuit_breaker_trips"] = 0
 
         try:
+            result["total_oom_auto_recoveries"] = self._total_oom_auto_recoveries
+        except Exception:
+            result["total_oom_auto_recoveries"] = 0
+
+        try:
             result["model_status"] = self._model_status
         except Exception:
             result["model_status"] = "unknown"
@@ -567,6 +609,13 @@ class HealthMonitor:
             result["error_type_counts"] = dict(self._error_type_counts)
         except Exception:
             result["error_type_counts"] = {}
+
+        try:
+            result["latency_p95_seconds"] = round(self.latency_quantile(0.95), 3)
+            result["latency_p50_seconds"] = round(self.latency_quantile(0.50), 3)
+        except Exception:
+            result["latency_p95_seconds"] = 0.0
+            result["latency_p50_seconds"] = 0.0
 
         try:
             result["latency_buckets"] = dict(self._latency_buckets)
@@ -658,6 +707,7 @@ class HealthMonitor:
                 self._total_errors = counters.get("total_errors", 0)
                 self._total_oom_retries = counters.get("total_oom_retries", 0)
                 self._circuit_breaker_trips = counters.get("circuit_breaker_trips", 0)
+                self._total_oom_auto_recoveries = counters.get("total_oom_auto_recoveries", 0)
                 logger.info(
                     "[HealthMonitor] 已恢复持久化计数器：生成 %d / 错误 %d / OOM重试 %d / 熔断 %d",
                     self._total_generations,
@@ -709,6 +759,7 @@ class HealthMonitor:
                     "total_errors": self._total_errors,
                     "total_oom_retries": self._total_oom_retries,
                     "circuit_breaker_trips": self._circuit_breaker_trips,
+                    "total_oom_auto_recoveries": self._total_oom_auto_recoveries,
                 }
             )
             # 扩展计数器：JSON 单键（值可为 float，与 int-only 的 save_metric_counters 区分）

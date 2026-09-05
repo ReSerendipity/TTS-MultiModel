@@ -56,6 +56,51 @@ def test_collect_metrics_keys() -> None:
         assert isinstance(m[key], float)
 
 
+def test_metrics_text_renders_error_types_and_latency(monkeypatch) -> None:
+    """运维稳定性评估 P1：/metrics 渲染失败分类计数与延迟直方图。
+
+    通过 monkeypatch 两个采集函数注入受控数据，避免污染全局 HealthMonitor 单例。
+    """
+    from app.integrated_app.observability import metrics as obs_metrics
+
+    monkeypatch.setattr(obs_metrics, "collect_error_type_counts", lambda: {"timeout": 2, "oom": 1, "safety": 0})
+    monkeypatch.setattr(
+        obs_metrics,
+        "collect_latency_hist",
+        lambda: ({"0.5": 1, "1": 1, "30": 3, "60": 3}, 45.0, 3),
+    )
+    text = obs_metrics.build_metrics_text()
+
+    # 失败分类 counter：按 type 分维，含零值 safety
+    assert "# TYPE tts_errors_by_type_total counter" in text
+    assert 'tts_errors_by_type_total{type="timeout"} 2' in text
+    assert 'tts_errors_by_type_total{type="oom"} 1' in text
+    assert 'tts_errors_by_type_total{type="safety"} 0' in text
+
+    # 延迟直方图：cumulative 桶 + le=+Inf + sum + count
+    assert "# TYPE tts_request_latency_seconds histogram" in text
+    assert 'tts_request_latency_seconds_bucket{le="0.5"} 1' in text
+    assert 'tts_request_latency_seconds_bucket{le="30"} 3' in text
+    assert 'tts_request_latency_seconds_bucket{le="+Inf"} 3' in text
+    assert "tts_request_latency_seconds_sum 45" in text
+    assert "tts_request_latency_seconds_count 3" in text
+
+
+def test_metrics_error_types_zero_fallback(monkeypatch) -> None:
+    """失败分类为空时仍输出零值样本（避免 absent() 误报）。"""
+    from app.integrated_app.observability import metrics as obs_metrics
+
+    monkeypatch.setattr(obs_metrics, "collect_error_type_counts", lambda: {})
+    text = obs_metrics.build_metrics_text()
+    assert 'tts_errors_by_type_total{type="other"} 0' in text
+
+
+def test_slis_include_p95() -> None:
+    """运维稳定性评估 P1：SLI 列表包含 p95_latency 尾部维度。"""
+    names = {s.name for s in compute_slis()}
+    assert "p95_latency" in names
+
+
 def test_alert_manager_emit_and_dedup() -> None:
     """AlertManager.emit 计数并去重（同 source 5 分钟内不重复发）。"""
     am = AlertManager()
