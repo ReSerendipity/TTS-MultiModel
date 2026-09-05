@@ -276,7 +276,9 @@ async def _read_training_output(process: asyncio.subprocess.Process) -> None:
         _mark_training_finished(process.returncode)
 
 
-@router.post("/start", summary="开始训练", description="启动 VoxCPM2 LoRA 微调训练子进程")
+@router.post(
+    "/start", summary="开始训练", description="启动 VoxCPM2 LoRA 微调训练子进程", operation_id="start_lora_training"
+)
 async def start_training(request: Request) -> JSONResponse:
     """启动 LoRA 微调训练。
 
@@ -475,7 +477,12 @@ async def start_training(request: Request) -> JSONResponse:
         )
 
 
-@router.post("/stop", summary="停止训练", description="停止正在进行的训练（先 SIGTERM 优雅终止，超时 SIGKILL）")
+@router.post(
+    "/stop",
+    summary="停止训练",
+    description="停止正在进行的训练（先 SIGTERM 优雅终止，超时 SIGKILL）",
+    operation_id="stop_lora_training",
+)
 async def stop_training() -> JSONResponse:
     """终止当前运行中的训练子进程。
 
@@ -506,7 +513,9 @@ async def stop_training() -> JSONResponse:
     return JSONResponse({"status": "ok", "message": "No training running"})
 
 
-@router.get("/log", summary="训练日志", description="获取训练子进程的实时 stdout 日志缓存")
+@router.get(
+    "/log", summary="训练日志", description="获取训练子进程的实时 stdout 日志缓存", operation_id="get_lora_training_log"
+)
 async def get_training_log() -> JSONResponse:
     """获取训练日志缓存。
 

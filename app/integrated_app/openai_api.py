@@ -803,8 +803,17 @@ class OpenAICompatibleRouter:
                         raise HTTPException(status_code=400, detail=f"内容安全检测未通过：{_safety.message}")
             except HTTPException:
                 raise
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as e:  # noqa: BLE001
+                # P2-1：安全网关 fail-closed — 检测器异常时阻断请求，禁止静默放行
+                logger.warning(
+                    "[content_safety] OpenAI 兼容端点内容安全检测异常，fail-closed 阻断请求: %s: %s",
+                    type(e).__name__,
+                    e,
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail="内容安全检测服务暂时不可用，请求已被安全策略阻断（fail-closed）。",
+                ) from e
 
             # 注册任务以支持取消
             task_id = self._cancel_manager.register()

@@ -108,6 +108,11 @@ _VIOLENCE_PATTERNS: list[str] = [
     r"slaughter",
     r"torture",
     r"behead",
+    # P2-1：同音字 / 拼音 / 日文变体规避检测
+    r"煞[人掉]",
+    r"sha\s*ren",
+    r"殺人",
+    r"人を殺",
 ]
 
 #: 仇恨言论关键词
@@ -147,6 +152,11 @@ _SELF_HARM_PATTERNS: list[str] = [
     r"end\s*my\s*life",
     r"cut\s*myself",
     r"overdose",
+    # P2-1：同音字 / 拼音 / 日文变体规避检测
+    r"自[砂纱鲨]",
+    r"zi\s*sha",
+    r"自殺",
+    r"首を吊",
 ]
 
 #: 色情内容关键词
@@ -164,6 +174,11 @@ _SEXUAL_PATTERNS: list[str] = [
     r"rape|molest",
     r"nude|naked",
     r"explicit\s*content",
+    # P2-1：同音字 / 拼音 / 日文变体规避检测
+    r"se\s*qing",
+    r"ポルノ",
+    r"エロ",
+    r"裸の",
 ]
 
 #: 违法犯罪关键词

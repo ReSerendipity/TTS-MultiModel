@@ -141,6 +141,9 @@ def verify_model_integrity() -> dict[str, Any]:
     try:
         with open(manifest_path, encoding="utf-8") as f:
             manifest = _json.load(f)
+        # P2-3：支持两种清单格式——扁平 {path: hash} 或嵌套 {files: {path: hash}, ...}
+        if isinstance(manifest, dict) and "files" in manifest and isinstance(manifest["files"], dict):
+            manifest = manifest["files"]
         model_root = os.path.join(get_project_root(), "model")
         mismatched: list[str] = []
         missing: list[str] = []
