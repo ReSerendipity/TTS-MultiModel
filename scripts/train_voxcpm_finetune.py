@@ -44,7 +44,8 @@ TTS MultiModel - VoxCPM LoRA 微调训练脚本
             --num_iters=10000
 
 依赖要求:
-    pip install torch transformers accelerate tensorboardX argbind safetensors librosa matplotlib
+    pip install torch transformers tensorboard argbind safetensors librosa matplotlib datasets
+    （项目内一键安装：pip install -e .[training]）
 
 输出目录结构:
     checkpoints/
@@ -68,7 +69,11 @@ import sys
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / "src"))
+# 注入 vendored 包路径（app/integrated_app/vendor），使 `from voxcpm.training import ...` 可解析。
+# 原写法注入 project_root/src/，但该目录不存在，导致子进程启动训练时 ModuleNotFoundError。
+_vendor_path = project_root / "app" / "integrated_app" / "vendor"
+if str(_vendor_path) not in sys.path:
+    sys.path.insert(0, str(_vendor_path))
 
 import contextlib
 import os
@@ -76,8 +81,8 @@ import signal
 
 import argbind
 import torch
-from tensorboardX import SummaryWriter
 from torch.optim import AdamW
+from torch.utils.tensorboard import SummaryWriter
 from transformers import get_cosine_schedule_with_warmup
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -126,7 +131,24 @@ def _collect_lineage_info(**hyperparams) -> dict:
         "dataset_fingerprint": "",
         "config_snapshot_hash": "",
         "hyperparams": {},
+        "env": {},
     }
+
+    # 环境信息（torch / CUDA / GPU 型号），便于复现训练环境
+    try:
+        import torch as _torch
+
+        info["env"]["torch_version"] = _torch.__version__
+        info["env"]["cuda_available"] = _torch.cuda.is_available()
+        if _torch.cuda.is_available():
+            info["env"]["cuda_version"] = _torch.version.cuda
+            info["env"]["gpu_name"] = _torch.cuda.get_device_name(0)
+            props = _torch.cuda.get_device_properties(0)
+            info["env"]["gpu_vram_gb"] = round(props.total_memory / 1024**3, 1)
+    except Exception:
+        pass
+    info["env"]["python_version"] = sys.version.split()[0]
+    info["env"]["platform"] = sys.platform
 
     # git commit
     try:
@@ -199,7 +221,7 @@ def train(
     max_batch_tokens: int = 0,
     save_path: str = "checkpoints",
     tensorboard: str = "",
-    lambdas: dict[str, float] | None = None,
+    lambdas: dict = None,
     lora: dict = None,
     config_path: str = "",
     max_grad_norm: float = 0.0,  # gradient clipping; 0 = disabled (backward compat)

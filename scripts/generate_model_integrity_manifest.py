@@ -89,7 +89,7 @@ def main() -> int:
     manifest_files: dict[str, str] = {}
     total_size = 0
     for fpath in files:
-        rel_path = str(fpath.relative_to(_PROJECT_ROOT)).replace("\\", "/")
+        rel_path = str(fpath.relative_to(_MODEL_DIR)).replace("\\", "/")
         try:
             file_hash = compute_sha256(fpath)
             manifest_files[rel_path] = file_hash

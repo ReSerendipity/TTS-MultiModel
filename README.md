@@ -35,9 +35,9 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 
 | 优势        | 说明                                                              |
 | --------- | --------------------------------------------------------------- |
-| **一站式平台** | 集成 VoxCPM2 + IndexTTS 2.5 多引擎，声音克隆、声音设计、剧本配音、LoRA 微调，无需在多个工具间切换 |
+| **一站式平台** | 集成 VoxCPM2 + IndexTTS 2.5 多引擎，声音克隆、声音设计、剧本配音，无需在多个工具间切换（LoRA 微调为实验特性，见下方说明） |
 | **极低门槛**  | 内置 WinPython + 一键安装脚本，Windows 用户开箱即用；Docker 部署仅需一行命令            |
-| **完整工具链** | 从数据准备到模型训练到推理部署，覆盖 TTS 全生命周期                                    |
+| **完整工具链** | 从数据准备到推理部署，覆盖 TTS 全生命周期（训练链路为实验特性，未经真机验证）                                    |
 | **开源透明**  | 项目代码 Apache 2.0；**模型权重许可各异**（见「模型许可说明」），商用前请逐项核对                |
 | **多语言界面** | 支持中文、英文、日文、韩文，国际化开箱即用                                           |
 
@@ -56,13 +56,23 @@ A powerful open-source multi-model Text-to-Speech platform with voice cloning, v
 | **声音设计**     | 通过文字描述生成目标音色的语音                       |
 | **剧本配音**     | 多角色对话剧本自动分配说话人，批量生成配音                 |
 | **流式生成**     | 长文本实时流式音频输出（SSE）                      |
-| **LoRA 微调**  | 自定义数据集 LoRA 微调训练                      |
+| **LoRA 微调**  | 自定义数据集 LoRA 微调训练（⚠️ 实验特性·未经真机验证，见下方说明） |
 | **Web 界面**   | FastAPI + HTMX + Jinja2 现代化响应式 Web UI |
 | **批量处理**     | 支持批量音频生成                              |
 | **历史管理**     | SQLite 历史记录，支持搜索、筛选、分页                |
 | **多语言界面**    | 支持中文、英文、日文、韩文界面切换                     |
 | **多 GPU 后端** | NVIDIA CUDA / Apple MPS / CPU         |
 | **自定义音色库**   | 支持用户保存和管理自定义音色                        |
+
+> ⚠️ **实验特性说明（LoRA 微调 / 训练链路）**
+>
+> 本项目的 LoRA 微调与全参数训练模块（`scripts/train_voxcpm_finetune.py` + `app/integrated_app/training/`）**当前为实验特性，尚未在真实 GPU 环境完成端到端验证**。具体状态：
+> - 训练代码已实现（数据加载、LoRA 注入、混合精度、断点续训、TensorBoard 日志），单元测试 57 项全部通过；
+> - 但 `lora/` 与 `checkpoints/` 目录下无任何真机训练产物，CI 中无 GPU 训练冒烟测试；
+> - 训练依赖（`datasets` 等）为 optional extra，需 `pip install -e .[training]` 后使用；
+> - 在 12GB 显存（如 RTX 5070 Ti Laptop）上训练前**必须先卸载推理引擎**，否则将 OOM。
+>
+> 如需使用训练功能，请先在小数据集上验证单步训练可正常落盘，再扩大规模。遇到问题请提交 Issue 并附上完整日志。
 
 ## 环境要求
 

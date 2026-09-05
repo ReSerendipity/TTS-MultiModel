@@ -110,7 +110,7 @@ emotion = ["accelerate>=0.30.0"]
 # （AGENTS.md 硬约束 #3），因此不进主依赖。datasets/argbind 已改为 training.data
 # 内的可选懒加载（缺包时模块仍可 import，仅 legacy HF 路径函数抛 ImportError），
 # 使单元测试在无 datasets 环境也能真实执行（不再全 skip）。
-training = ["datasets>=2.14.0", "einops>=0.7.0", "argbind>=0.3.7"]
+training = ["datasets>=2.14.0", "einops>=0.7.0", "argbind>=0.3.7", "tensorboard>=2.10.0"]
 
 [project.scripts]
 tts-multimodel = "integrated_app.cli:main"
