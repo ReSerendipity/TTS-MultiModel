@@ -41,6 +41,7 @@ _HELP: dict[str, str] = {
     "tts_generation_errors_total": "累计生成失败次数（进程内）",
     "tts_generation_success_rate": "生成成功率（0-100）",
     "tts_oom_retries_total": "累计 OOM 后自动重试次数",
+    "tts_oom_auto_recoveries_total": "累计 OOM 后受控自动重载成功次数（运维稳定性评估 P1-4）",
     "tts_circuit_breaker_trips_total": "累计显存熔断触发次数",
     "tts_uptime_seconds": "进程运行时间（秒）",
     "tts_vram_used_mb": "GPU 已分配显存（MB）",
@@ -64,6 +65,7 @@ _TYPE: dict[str, str] = {
     "tts_generation_errors_total": "counter",
     "tts_generation_success_rate": "gauge",
     "tts_oom_retries_total": "counter",
+    "tts_oom_auto_recoveries_total": "counter",
     "tts_circuit_breaker_trips_total": "counter",
     "tts_uptime_seconds": "gauge",
     "tts_vram_used_mb": "gauge",
@@ -159,9 +161,14 @@ def collect_metrics() -> dict[str, float]:
         collected["tts_generations_total"] = _safe_float(report.get("total_generations"))
         collected["tts_generation_errors_total"] = _safe_float(report.get("total_errors"))
         collected["tts_oom_retries_total"] = _safe_float(report.get("total_oom_retries"))
+        collected["tts_oom_auto_recoveries_total"] = _safe_float(report.get("total_oom_auto_recoveries"))
         collected["tts_circuit_breaker_trips_total"] = _safe_float(report.get("circuit_breaker_trips"))
         collected["tts_uptime_seconds"] = _safe_float(report.get("uptime_seconds"))
         collected["tts_generation_success_rate"] = _safe_float(report.get("success_rate_pct"))
+        # p95 延迟（秒）：供 SLO 尾部判定。刻意不加进 _HELP/_ORDER，
+        # 因此不会作为独立 gauge 渲染到 /metrics（Prometheus 侧已可用
+        # tts_request_latency_seconds 直方图 + histogram_quantile 自行算分位）。
+        collected["tts_latency_p95_seconds"] = _safe_float(report.get("latency_p95_seconds"))
 
         gpu = report.get("gpu")
         # CPU 模式下省略 GPU 指标：避免向 Prometheus 暴露恒为 0 的假时间序列
@@ -180,13 +187,9 @@ def collect_metrics() -> dict[str, float]:
     except Exception:  # noqa: BLE001
         collected["tts_model_loaded"] = 0.0
 
-    # --- 3. 队列深度 ---
-    try:
-        from ..task_queue import get_queue_status
-
-        collected["tts_queue_size"] = _safe_float(get_queue_status().get("queue_size"))
-    except Exception:  # noqa: BLE001
-        collected["tts_queue_size"] = 0.0
+    # --- 3. 队列深度（P1-3：task_queue 已移除，生成走 per-engine 信号量；
+    #     此指标恒为 0，保留以兼容已有 dashboard，后续版本可删除）---
+    collected["tts_queue_size"] = 0.0
 
     # --- 4. 历史库聚合（跨重启维度） ---
     collected.update(_history_aggregate())

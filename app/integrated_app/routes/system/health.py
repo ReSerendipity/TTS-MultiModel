@@ -274,28 +274,26 @@ def get_stats() -> SystemStatsResponse:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/queue", summary="生成队列状态", description="异步生成任务队列状态：排队数/活跃数/已完成/已取消")
+@router.get(
+    "/queue", summary="生成队列状态", description="并发控制状态：P1-3 后生成走 per-engine 信号量，原 task_queue 已移除"
+)
 def get_queue_status() -> dict[str, Any]:
-    """返回生成任务队列的当前状态（参考 VoiceBox 队列监控设计）。
+    """返回并发控制状态。
 
-    Returns:
-        队列状态 JSON，包含 ``queue_size``、``active``、``completed``、
-        ``cancelled``、``has_active_generation`` 等字段。
+    P1-3（后端设计评估）：原 asyncio.Queue 任务队列从未被生成路径使用，
+    实际并发由 per-engine ``asyncio.Semaphore(max_concurrent=1)`` 控制。
+    此端点保留以兼容前端 /api/system/health/queue 调用，返回静态状态。
     """
-    try:
-        from ...task_queue import get_queue_status as _get_qstatus
-
-        return _get_qstatus()
-    except Exception as exc:  # noqa: BLE001
-        logger.debug(f"[queue] 队列状态读取失败: {exc}")
-        return {
-            "queue_size": 0,
-            "active": None,
-            "completed": 0,
-            "cancelled": 0,
-            "has_active_generation": False,
-            "available": False,
-        }
+    return {
+        "queue_size": 0,
+        "active": None,
+        "completed": 0,
+        "cancelled": 0,
+        "has_active_generation": False,
+        "available": True,
+        "mechanism": "semaphore",
+        "note": "task_queue 已移除，并发由 per-engine asyncio.Semaphore 控制",
+    }
 
 
 # ---------------------------------------------------------------------------

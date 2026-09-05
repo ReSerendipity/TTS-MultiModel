@@ -14,7 +14,6 @@
     - engine_interface.py        (引擎接口抽象)
     - model_manager.py           (模型管理)
     - model_registry.py          (引擎注册表)
-    - task_queue.py              (任务队列)
     - history_db.py              (历史记录数据库)
     - i18n.py                    (国际化)
     - auth.py                    (认证中间件)
@@ -53,7 +52,6 @@ _CORE_MODULES = [
     "engine_interface.py",
     "model_manager.py",
     "model_registry.py",
-    "task_queue.py",
     "history_db.py",
     "i18n.py",
     "auth.py",

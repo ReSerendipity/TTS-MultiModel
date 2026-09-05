@@ -91,13 +91,6 @@ class TestRegistryPattern:
 class TestImportSanity:
     """Basic import sanity checks for critical modules."""
 
-    def test_task_queue_module(self):
-        """Task queue module should be importable."""
-        from integrated_app.task_queue import init_queue, shutdown_queue
-
-        assert init_queue is not None
-        assert shutdown_queue is not None
-
     def test_cache_utils(self):
         """Cache utilities should be importable."""
         from integrated_app.cache import LRUCache

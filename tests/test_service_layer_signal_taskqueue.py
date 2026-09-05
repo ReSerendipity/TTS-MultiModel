@@ -1,13 +1,11 @@
-"""service_layer, signal_handlers, task_queue 模块的单元测试。
+"""service_layer 与 signal_handlers 模块的单元测试。
 
 覆盖 P1-3: 关键模块 0% 覆盖率技术债，补充以下模块的测试：
 - service_layer.py: 数据类、VRAM 检查、服务单例
 - signal_handlers.py: 信号注册/注销/检查/重置
-- task_queue.py: 队列初始化/入队/取消/状态/关闭
+（task_queue.py 已于 P1-3 移除，生成走 per-engine 信号量）
 """
 
-import asyncio
-import contextlib
 import signal
 import time
 from unittest.mock import patch
@@ -263,78 +261,6 @@ class TestSignalHandlers:
             pass  # 进出上下文不抛异常
         # After context exit, flag should still be cleared (no signal was sent)
         assert graceful_shutdown_requested.is_set() is False
-
-
-# =====================================================================
-# task_queue 测试
-# =====================================================================
-
-
-class TestTaskQueue:
-    """task_queue 模块测试。"""
-
-    @pytest.fixture(autouse=True)
-    def setup_queue(self):
-        """每个测试前初始化队列，测试后关闭。"""
-        with contextlib.suppress(RuntimeError):
-            asyncio.get_running_loop()
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self._init_and_cleanup())
-        yield
-        loop.run_until_complete(self._shutdown_and_cleanup())
-        loop.close()
-
-    async def _init_and_cleanup(self):
-        from integrated_app.task_queue import init_queue
-
-        await init_queue(force=True)
-
-    async def _shutdown_and_cleanup(self):
-        from integrated_app.task_queue import shutdown_queue
-
-        await shutdown_queue()
-
-    def test_get_queue_status_initial(self):
-        """初始队列状态。"""
-        from integrated_app.task_queue import get_queue_status
-
-        status = get_queue_status()
-        assert isinstance(status, dict)
-        assert "queued_count" in status
-        assert "running_count" in status
-
-    def test_is_generation_active_false(self):
-        """不存在的生成 ID 不活跃。"""
-        from integrated_app.task_queue import is_generation_active
-
-        assert is_generation_active("nonexistent") is False
-
-    def test_cancel_nonexistent_generation(self):
-        """取消不存在的生成返回 None。"""
-        from integrated_app.task_queue import cancel_generation
-
-        result = cancel_generation("nonexistent_id")
-        assert result is None
-
-    def test_create_background_task(self):
-        """create_background_task 创建并运行后台任务。"""
-        from integrated_app.task_queue import create_background_task
-
-        async def simple_coro():
-            await asyncio.sleep(0.01)
-            return 42
-
-        # create_background_task needs a running event loop
-        loop = asyncio.get_event_loop()
-
-        async def run_and_wait():
-            task = create_background_task(simple_coro())
-            return await task
-
-        result = loop.run_until_complete(run_and_wait())
-        assert result == 42
 
 
 if __name__ == "__main__":
