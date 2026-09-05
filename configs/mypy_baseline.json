@@ -1,0 +1,8 @@
+{
+  "total_errors": 103,
+  "files_with_errors": 26,
+  "files_checked": 127,
+  "per_file_errors": {},
+  "last_updated": "2026-09-05",
+  "note": "mypy 棘轮基线。错误数增加则 CI 阻断；减少则自动更新本文件（ratchet down）。"
+}

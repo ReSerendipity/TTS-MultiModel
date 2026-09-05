@@ -23,6 +23,7 @@ import html
 import logging
 import os
 import re
+from datetime import datetime
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -121,6 +122,7 @@ async def persona_save(
     ref_text: str = Form(""),
     instruction: str = Form(""),
     overwrite: bool = Form(False),
+    has_consent: bool = Form(False),
 ) -> HTMLResponse:
     """保存音色（voice_design / voice_clone / ultimate_clone 三页共用）。
 
@@ -161,6 +163,10 @@ async def persona_save(
     effective_upload = ref_audio if (ref_audio is not None and ref_audio.filename) else ref_audio_upload
 
     if effective_upload is not None and effective_upload.filename:
+        # P0-1 声音克隆授权 v1：上传参考音频来源 = 可能涉及他人声音，
+        # 必须显式勾选「已获授权/拥有使用权」才允许固化，否则 fail-safe 拒绝。
+        if not has_consent:
+            return _persona_status_html("请先勾选「我已确认拥有该参考声音的使用权或已获得其授权」后再保存", "error")
         # 复用 routes/generate/utils.save_uploaded_audio：它已实现扩展名白名单、
         # 体积上限与安全文件名处理，落盘后返回绝对路径。
         # WHY 不把 bytes 直接喂给 fn_save_persona：其 docstring 声称支持 bytes，
@@ -191,11 +197,16 @@ async def persona_save(
         return _persona_status_html("缺少音频：请上传参考音频，或先生成一段语音再保存", "error")
 
     try:
+        # P0-1：授权声明随固化写入元数据。上传克隆来源 → granted（已在上方勾选校验）；
+        # 设计页固化生成结果 → self（自产声音，无需外部授权）。
+        consent_state = "granted" if staged_path else "self"
         message, needs_confirm = fn_save_persona(
             name,
             audio_input,
             (ref_text or instruction).strip(),
             bool(overwrite),
+            consent_state=consent_state,
+            consent_at=datetime.now().isoformat() if consent_state == "granted" else "",
         )
     except Exception as exc:  # noqa: BLE001 - 固化失败不得泄漏内部异常细节
         logger.exception("保存音色失败 (name=%s): %s", name, exc)

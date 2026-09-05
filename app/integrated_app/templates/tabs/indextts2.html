@@ -26,6 +26,10 @@
                     <div class="tts-upload-text">{{ "upload_ref"|t(lang) }}</div>
                     <div id="it2-ref-audio-name" class="tts-file-name">{{ "supported_formats"|t(lang) }}</div>
                 </div>
+                {# P0-1 声音克隆授权：上传参考音频必须显式声明拥有使用权/已获授权 #}
+                <label class="tts-checkbox-label" style="margin-top:8px">
+                    <input type="checkbox" name="has_consent" id="it2-has-consent" value="true"> {{ "consent_declare"|t(lang) }}
+                </label>
 
                 {# 前后端一致性整改（报告 B9）：参考文本输入已删除——indextts2 端点虽声明 ref_text
                    字段但从不消费（引擎 infer 无此参数），docstring 宣称的音质收益与实现不符。 #}

@@ -27,6 +27,11 @@
                                 <p style="font-size:10px;margin-top:2px">{{ "supported_formats"|t(lang) }} (5-30s)</p>
                             </div>
                         </div>
+                        {# P0-1 声音克隆授权：上传参考音频必须显式声明拥有使用权/已获授权 #}
+                        <div class="fg" style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
+                            <input type="checkbox" name="has_consent" id="it2c-has-consent" value="true" style="margin-top:2px" required>
+                            <label for="it2c-has-consent" class="fl" style="font-size:12px;margin:0;line-height:1.5">{{ "consent_declare"|t(lang) }}</label>
+                        </div>
 
                         <div class="fg" id="it2c-audio-preview" style="display:none">
                             <label class="fl">{{ "audio_preview"|t(lang) }}</label>

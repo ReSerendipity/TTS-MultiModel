@@ -875,5 +875,7 @@
   "weight": "Weight",
   "welcome": "Welcome!",
   "will_split": "Will split into ",
-  "youth_voice": "Youthful Energetic"
+  "youth_voice": "Youthful Energetic",
+  "consent_declare": "I confirm I own the rights to this reference voice or have obtained authorization",
+  "consent_required": "Please check \"I confirm I own the rights to this reference voice or have obtained authorization\" before using this reference audio"
 }

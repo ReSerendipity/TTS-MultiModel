@@ -1,0 +1,66 @@
+# 覆盖率预算配置（Coverage Budget）
+#
+# 每个核心模块设定最低行覆盖率预算（防回归底线）。CI 运行 check_coverage_budget.py
+# 校验，低于预算则失败（硬门禁）。预算应随测试补充逐步上调。
+#
+# 目标（Target）：核心路径 ≥60%；当前预算为防回归底线，不等于目标。
+# 上调规则：每次新增测试提升覆盖率后，将对应模块预算上调至 (当前覆盖率 - 5%)。
+#
+# 格式: path_pattern = min_coverage_percent
+# path_pattern 匹配 coverage.xml 中的 filename（相对路径）。
+# 多个 pattern 匹配同一文件时取最严格（最大）的预算。
+
+[budgets]
+# 引擎层（目标 ≥60%，当前 8-32%）
+"engine_interface.py" = 55
+"engines/indextts2_engine.py" = 25
+"engines/voxcpm2/_base.py" = 20
+"engines/voxcpm2/engine.py" = 15
+"engines/voxcpm2/ultimate.py" = 15
+"engines/voxcpm2/clone.py" = 5
+"engines/voxcpm2/design.py" = 5
+"engines/voxcpm2/lora.py" = 5
+"engines/voxcpm2/prompt.py" = 5
+"engines/voxcpm2/script.py" = 5
+"engines/voxcpm2/streaming.py" = 5
+
+# 生成路由层（目标 ≥60%，当前 16-30%）
+"routes/generate/utils.py" = 25
+"routes/generate/indextts2/synthesize.py" = 10
+"routes/generate/voxcpm2/clone.py" = 12
+"routes/generate/voxcpm2/design.py" = 15
+"routes/generate/voxcpm2/script.py" = 15
+"routes/generate/voxcpm2/streaming.py" = 15
+"routes/generate/generic/clone.py" = 25
+"routes/generate/" = 10
+
+# SSE 事件流（目标 ≥60%，当前 70%）
+"routes/sse.py" = 60
+
+# 模型管理层（目标 ≥60%，当前 9-26%）
+"model_manager_core/state.py" = 80
+"model_manager_core/switch.py" = 20
+"model_manager_core/load.py" = 5
+"model_manager_core/unload.py" = 5
+"model_manager.py" = 20
+
+# 训练层（目标 ≥50%，当前 25-87%）
+"training/data.py" = 45
+"training/packers.py" = 80
+"training/state.py" = 15
+
+# 音频处理层（目标 ≥60%，当前 39-44%）
+"audio_processing.py" = 40
+"routes/audio.py" = 35
+
+# 音色管理层（目标 ≥50%，当前 34-55%）
+"routes/persona.py" = 50
+"persona_manager.py" = 30
+
+[settings]
+# 未在 budgets 中明确配置的模块不做强制要求（只报告）
+strict_mode = false
+# 覆盖率低于预算时的退出码
+fail_exit_code = 1
+# 允许的浮点误差（百分比），避免覆盖率波动导致误报
+tolerance = 1.0

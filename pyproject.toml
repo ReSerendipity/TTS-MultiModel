@@ -107,8 +107,9 @@ watermark = []  # No extra deps needed, uses numpy/scipy only
 # （克隆 / 8 维向量情感模式均可用），仅该模式会被明确拒绝。
 emotion = ["accelerate>=0.30.0"]
 # LoRA 训练管线（app/integrated_app/training/）。API 服务启动路径绝不 import 它
-# （AGENTS.md 硬约束 #3），因此不进主依赖；但缺 datasets 时 training.data 一
-# 导入就 ModuleNotFoundError，故在此显式登记。
+# （AGENTS.md 硬约束 #3），因此不进主依赖。datasets/argbind 已改为 training.data
+# 内的可选懒加载（缺包时模块仍可 import，仅 legacy HF 路径函数抛 ImportError），
+# 使单元测试在无 datasets 环境也能真实执行（不再全 skip）。
 training = ["datasets>=2.14.0", "einops>=0.7.0", "argbind>=0.3.7"]
 
 [project.scripts]
@@ -218,6 +219,12 @@ exclude = [
 module = ["integrated_app.vendor.*"]
 ignore_errors = true
 
+# training/ 模块为「能力声明未验证」实验模块（综合评估主线：lora/ 无产物），
+# 类型标注欠债整体豁免、待训练能力真正跑通后随产物一并补齐（P1-2 追踪项）。
+[[tool.mypy.overrides]]
+module = ["integrated_app.training.*"]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
@@ -242,8 +249,8 @@ omit = ["*/tests/*", "*/templates/*", "*/static/*", "*/vendor/*"]
 
 [tool.coverage.report]
 # 覆盖率门槛：分阶段提升计划（随测试补充逐步调高）
-#   v1: 20% -> v2: 30% -> v3: 40%（当前实际 40.11%）-> v4: 50% -> v5: 60%
-fail_under = 40
+#   v1: 20% -> v2: 30% -> v3: 40% -> v4: 45%（当前实际 47.55%）-> v5: 50% -> v6: 60%
+fail_under = 45
 show_missing = true
 exclude_lines = [
     "pragma: no cover",

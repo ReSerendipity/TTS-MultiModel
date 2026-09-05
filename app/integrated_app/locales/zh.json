@@ -875,5 +875,7 @@
   "weight": "权重",
   "welcome": "欢迎使用！",
   "will_split": "将分为 ",
-  "youth_voice": "活力少年"
+  "youth_voice": "活力少年",
+  "consent_declare": "我已确认拥有该参考声音的使用权或已获得其授权",
+  "consent_required": "请先勾选「我已确认拥有该参考声音的使用权或已获得其授权」后再使用该参考音频"
 }

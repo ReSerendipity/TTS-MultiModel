@@ -139,6 +139,18 @@ async def _load_streaming_persona(
         (actual_ref_path, error_html) — error_html 为 None 表示成功。
     """
     if persona_name:
+        # P0-1 声音克隆授权 v1：流式路径仅支持 persona 来源，引用时审计其授权声明状态。
+        from ....persona_manager import get_persona_consent_state
+        from ....security.audit import log_audit
+
+        state = get_persona_consent_state(persona_name)
+        log_audit(
+            "voice_clone",
+            detail=f"persona={os.path.basename(persona_name)} consent_state={state} mode=streaming",
+            severity="warning" if state == "unverified" else "info",
+            outcome="success",
+            request_id=getattr(request.state, "request_id", None),
+        )
         ref_path, error = await resolve_persona_ref(request, persona_name)
         if error is None:
             safe_name: str = os.path.basename(persona_name)

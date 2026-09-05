@@ -30,6 +30,11 @@
                                 <button type="button" class="mode-pill" :class="{ 'active': it2eMode === 'text' }" @click="it2eMode='text'; document.getElementById('it2e-emotion-mode').value='text'">{{ "emotion_text_desc"|t(lang) }}</button>
                             </div>
                         </div>
+                        {# P0-1 声音克隆授权：上传参考/音色音频必须显式声明拥有使用权/已获授权 #}
+                        <div class="fg" style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
+                            <input type="checkbox" name="has_consent" id="it2e-has-consent" value="true" style="margin-top:2px" required>
+                            <label for="it2e-has-consent" class="fl" style="font-size:12px;margin:0;line-height:1.5">{{ "consent_declare"|t(lang) }}</label>
+                        </div>
 
                         <!-- Same Prompt Mode -->
                         <div id="it2e-same-panel" x-show="it2eMode === 'same'" x-transition>

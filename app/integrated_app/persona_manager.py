@@ -49,6 +49,7 @@ from .model_manager import _model_lock, _persona_embedding_cache
 from .model_registry import registry
 from .persona_metadata import (
     PersonaMetadata,
+    load_persona_metadata,
     save_persona_metadata,
 )
 
@@ -132,7 +133,14 @@ def _verify_persona_sync(name: str, wav_path: str, ref_text: str) -> None:
         logger.error(f"[音色固化] 音色 [{name}] 后台验证失败: {e}")
 
 
-def fn_save_persona(name: str, audio_input: Any, ref_text: str, overwrite: bool = False) -> tuple[str, bool]:
+def fn_save_persona(
+    name: str,
+    audio_input: Any,
+    ref_text: str,
+    overwrite: bool = False,
+    consent_state: str = "self",
+    consent_at: str = "",
+) -> tuple[str, bool]:
     """保存音色到音色库（固化）- 使用官方 VoxCPM2 API。
 
     Args:
@@ -146,6 +154,9 @@ def fn_save_persona(name: str, audio_input: Any, ref_text: str, overwrite: bool 
         ref_text: 音色参考文本描述，保存到同名 .txt 供后续生成时复用。
         overwrite: 是否覆盖已存在的同名音色。当同名音色已存在且 overwrite=False
             时将返回 needs_confirm=True 提示前端弹二次确认。
+        consent_state: 声音使用授权声明状态（"granted" / "self" / "unverified"），
+            由路由层依据音频来源（上传克隆 vs 自产设计页）写入元数据，默认 "self"。
+        consent_at: 授权声明时间（ISO 8601），由路由层传入。
 
     Returns:
         Tuple[str, bool]: 二元组 ``(message, needs_confirm)``。
@@ -202,6 +213,8 @@ def fn_save_persona(name: str, audio_input: Any, ref_text: str, overwrite: bool 
             voice_type="",
             traits="",
             created_at=datetime.now().isoformat(),
+            consent_state=consent_state,
+            consent_at=consent_at,
         )
         save_persona_metadata(PERSONA_DIR, name, meta)
 
@@ -355,6 +368,26 @@ def get_persona_detail_table(search_keyword: str = "") -> list[list[str]]:
     if not table:
         table = [["暂无音色", "-", "-", "-", "-"]]
     return table
+
+
+def get_persona_consent_state(name: str) -> str:
+    """读取音色的声音使用授权声明状态（P0-1 声音克隆授权 v1）。
+
+    由克隆类路由在引用 persona 前调用：状态为 ``unverified``（存量/缺失声明）
+    时放行但要求审计打 WARN；``granted`` / ``self`` 正常放行。
+
+    Args:
+        name: 音色名称（去扩展名）。
+
+    Returns:
+        str: "granted" / "self" / "unverified" 之一；元数据缺失或解析失败时
+        一律返回 "unverified"（fail-safe，不阻断存量音色但标记待声明）。
+    """
+    try:
+        return load_persona_metadata(PERSONA_DIR, name).consent_state
+    except Exception:  # noqa: BLE001 - 读取失败按"未声明"处理，不抛错
+        logger.warning(f"[授权声明] 读取音色 [{name}] 元数据失败，按 unverified 处理")
+        return "unverified"
 
 
 def get_persona_desc(name: str) -> str:

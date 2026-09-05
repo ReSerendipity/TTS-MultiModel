@@ -153,6 +153,7 @@ async def generate_indextts2(
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
     target_lufs: float = Form(-16.0),
+    has_consent: bool = Form(False),
 ) -> HTMLResponse:
     """IndexTTS2 情感控制语音合成路由。
 
@@ -202,6 +203,17 @@ async def generate_indextts2(
         EngineNotLoadedError: 503，IndexTTS2 引擎未加载（引导用户去 Settings 加载）。
         InsufficientVRAMError: 503，CUDA OOM（由 _run_with_oom_retry 捕获降级）。
     """
+    # ------------------------------------------------------------------
+    # 0. P0-1 声音克隆授权 v1：上传参考音频克隆他人声音，必须显式勾选授权。
+    # Why 先于 pre_validate（同 voxcpm_clone）：授权是安全门禁，引擎未就绪时
+    # 也应拦截，避免 gate 被 EngineNotReady 短路而形同虚设。
+    # ------------------------------------------------------------------
+    if ref_audio is not None and ref_audio.filename and not has_consent:
+        return _error_html(
+            request,
+            "请先勾选「我已确认拥有该参考声音的使用权或已获得其授权」再生成",
+        )
+
     # ------------------------------------------------------------------
     # 1. 引擎就绪 + 文本长度统一校验（pre_validate 内部也会判断 current_engine）
     # ------------------------------------------------------------------

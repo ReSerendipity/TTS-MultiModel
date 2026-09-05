@@ -40,6 +40,18 @@ logger = logging.getLogger("tts_multimodel")
 PERSONA_METADATA_VERSION = 1
 """音色元数据格式版本号，用于未来格式升级时的兼容性判断。"""
 
+# 声音使用授权声明状态（P0-1 声音克隆授权 v1）。
+# 三态语义（默认 unverified = fail-safe）：
+#   - granted   ：用户在上传克隆来源上显式勾选「已获授权/拥有使用权」（新上传数据）
+#   - self      ：音色来自语音设计页固化自身生成结果（非他人声音，无需外部授权）
+#   - unverified：存量音色或缺失声明（旧格式未升级）；克隆时可放行但审计打 WARN
+CONSENT_STATES: tuple[str, str, str] = ("granted", "self", "unverified")
+
+
+def _validate_consent_state(state: str) -> str:
+    """校验授权声明状态，非法值回退到 ``unverified``（fail-safe）。"""
+    return state if state in CONSENT_STATES else "unverified"
+
 
 class PersonaMetadata:
     """音色/语音克隆的扩展元数据模型。
@@ -60,6 +72,8 @@ class PersonaMetadata:
         rating (float): 用户评分，范围 0.0~5.0，自动 clamp 到合法区间。
         source_audio (str): 源音频文件路径或来源说明。
         language (str): 主要语言，默认 "zh"（中文）。
+        consent_state (str): 声音使用授权声明状态，取值见 CONSENT_STATES。
+        consent_at (str): 授权声明时间（ISO 8601），未声明为空串。
     """
 
     def __init__(
@@ -76,6 +90,8 @@ class PersonaMetadata:
         rating: float = 0.0,
         source_audio: str = "",
         language: str = "zh",
+        consent_state: str = "unverified",
+        consent_at: str = "",
     ):
         """初始化音色元数据实例。
 
@@ -92,6 +108,8 @@ class PersonaMetadata:
             rating: 初始评分（0.0~5.0），自动限制到合法区间，默认为 0.0。
             source_audio: 源音频信息，默认为空字符串。
             language: 主要语言代码，默认为 "zh"。
+            consent_state: 声音使用授权声明状态，默认 "unverified"（fail-safe）。
+            consent_at: 授权声明时间（ISO 8601），默认空串。
         """
         self.name = name
         self.description = description
@@ -105,6 +123,8 @@ class PersonaMetadata:
         self.rating = min(5.0, max(0.0, rating))
         self.source_audio = source_audio
         self.language = language
+        self.consent_state = _validate_consent_state(consent_state)
+        self.consent_at = consent_at or ""
 
     def to_dict(self) -> dict[str, Any]:
         """将元数据序列化为字典，用于 JSON 持久化。
@@ -126,6 +146,8 @@ class PersonaMetadata:
             "rating": self.rating,
             "source_audio": self.source_audio,
             "language": self.language,
+            "consent_state": self.consent_state,
+            "consent_at": self.consent_at,
         }
 
     @classmethod
@@ -153,6 +175,8 @@ class PersonaMetadata:
             rating=data.get("rating", 0.0),
             source_audio=data.get("source_audio", ""),
             language=data.get("language", "zh"),
+            consent_state=data.get("consent_state", "unverified"),
+            consent_at=data.get("consent_at", ""),
         )
 
     @classmethod

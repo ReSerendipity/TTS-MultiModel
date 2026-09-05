@@ -65,6 +65,7 @@ from fastapi.responses import HTMLResponse
 from ....config import MAX_TEXT_LENGTH
 from ....model_registry import registry
 from ....monitor import get_health_monitor
+from ....persona_manager import get_persona_consent_state
 from ..utils import (
     _apply_post_processing_to_file,
     _error_html,
@@ -108,6 +109,49 @@ _DEFAULT_DENOISE_ENABLED: bool = False
 _MAX_REFERENCE_AUDIO_SIZE_MB: int = 50
 
 
+def _check_clone_consent(
+    request: Request,
+    persona_name: str,
+    has_consent: bool,
+) -> HTMLResponse | None:
+    """P0-1 声音克隆授权 v1：克隆前的授权声明门禁。
+
+    两条来源路径分治：
+    - 上传来源（persona_name 为空）：必须显式勾选「已获授权/拥有使用权」，
+      否则 fail-safe 拒绝（返回 400 错误片段）。
+    - persona 来源：读取该音色的元数据授权声明，仅做审计记录——
+      ``granted``/``self`` 记 info；``unverified``（存量/缺失声明）记 warning
+      后放行，避免存量音色一次性全部不可用。
+
+    Args:
+        request: FastAPI Request（取 request_id 关联审计）。
+        persona_name: 表单中的音色名称；为空表示本次为上传来源。
+        has_consent: 用户是否勾选授权声明（checkbox 值）。
+
+    Returns:
+        HTMLResponse | None: 未授权时返回 400 错误片段；通过返回 None。
+    """
+    from ....security.audit import log_audit
+
+    if not persona_name:
+        if not has_consent:
+            return _error_html(
+                request,
+                "请先勾选「我已确认拥有该参考声音的使用权或已获得其授权」再生成",
+            )
+        return None
+
+    state = get_persona_consent_state(persona_name)
+    log_audit(
+        "voice_clone",
+        detail=f"persona={os.path.basename(persona_name)} consent_state={state}",
+        severity="warning" if state == "unverified" else "info",
+        outcome="success",
+        request_id=getattr(request.state, "request_id", None),
+    )
+    return None
+
+
 @router.post(
     "/voxcpm_clone",
     summary="可控克隆",
@@ -128,6 +172,7 @@ async def generate_voxcpm_clone(
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
     target_lufs: float = Form(-16.0),
+    has_consent: bool = Form(False),
 ) -> HTMLResponse:
     """VoxCPM2 可控语音克隆路由。
 
@@ -160,12 +205,19 @@ async def generate_voxcpm_clone(
         ValidationError: 400，文本为空 / 参考音频文件过大 / 格式不支持。
         InsufficientVRAMError: 503，推理时显存耗尽（由 OOM retry 捕获）。
     """
-    # 1. 引擎就绪 + 文本非空/长度统一校验
-    err: HTMLResponse | None = pre_validate(request, "voxcpm2", text, MAX_TEXT_LENGTH)
+    # 1. P0-1 声音克隆授权门禁：上传来源必须勾选授权，persona 来源审计。
+    # Why 先于 pre_validate：授权是安全语义门禁，必须引擎未就绪也能拦截
+    # （否则未加载模型时 gate 被 engine_not_ready 短路，授权检查形同虚设）。
+    err: HTMLResponse | None = _check_clone_consent(request, persona_name, has_consent)
     if err is not None:
         return err
 
-    # 2. 预处理：方言合并
+    # 2. 引擎就绪 + 文本非空/长度统一校验
+    err = pre_validate(request, "voxcpm2", text, MAX_TEXT_LENGTH)
+    if err is not None:
+        return err
+
+    # 3. 预处理：方言合并
     instruction = _merge_dialect(instruction, lang)
 
     # 3. 解析 actual_ref_path（三级回退优先级链）
@@ -258,6 +310,7 @@ async def generate_voxcpm_ultimate(
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
     target_lufs: float = Form(-16.0),
+    has_consent: bool = Form(False),
 ) -> HTMLResponse:
     """VoxCPM2 极致克隆路由。
 
@@ -286,7 +339,13 @@ async def generate_voxcpm_ultimate(
     Returns:
         HTMLResponse: HTMX 格式 HTML 片段。
     """
-    err: HTMLResponse | None = pre_validate(request, "voxcpm2", text, MAX_TEXT_LENGTH)
+    # 1. P0-1 声音克隆授权门禁（先于 pre_validate，理由见 voxcpm_clone）
+    err: HTMLResponse | None = _check_clone_consent(request, persona_name, has_consent)
+    if err is not None:
+        return err
+
+    # 2. 引擎就绪 + 文本非空/长度统一校验
+    err = pre_validate(request, "voxcpm2", text, MAX_TEXT_LENGTH)
     if err is not None:
         return err
 

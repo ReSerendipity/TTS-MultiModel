@@ -107,9 +107,10 @@ repos:
         stages: [pre-commit, pre-push]
       # P1-2 测试体系改进：OpenAPI 契约快照测试（防止路由/响应结构非预期变更）
       # 仅在路由/应用入口/引擎接口相关文件变更时触发，避免每次提交都跑全量测试。
+      # 必须用项目 venv 的 python（含 pytest + 项目依赖），系统 python 无 pytest。
       - id: openapi-contract-snapshot
         name: OpenAPI Contract Snapshot Test
-        entry: python -m pytest tests/test_openapi_snapshot.py -q --tb=short
+        entry: .venv/Scripts/python.exe -m pytest tests/test_openapi_snapshot.py -q --tb=short
         language: system
         pass_filenames: false
         files: ^(app/integrated_app/(routes|app_server|engine_interface)|tests/test_openapi_snapshot|tests/snapshots/openapi_contract)/

@@ -86,6 +86,11 @@
                                     <p style="font-size:10px;margin-top:2px">{{ "supported_formats"|t(lang) }}</p>
                                 </div>
                             </div>
+                            {# P0-1 声音克隆授权：上传参考音频必须显式声明拥有使用权/已获授权 #}
+                            <div class="fg" style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
+                                <input type="checkbox" name="has_consent" id="vc-has-consent" value="true" style="margin-top:2px" required>
+                                <label for="vc-has-consent" class="fl" style="font-size:12px;margin:0;line-height:1.5">{{ "consent_declare"|t(lang) }}</label>
+                            </div>
                             <div class="fg">
                                 <label class="fl" for="vc-ref-text">{{ "ref_text"|t(lang) }}</label>
                                 <textarea name="ref_text" id="vc-ref-text" class="ft" rows="2" placeholder="{{ 'ref_text_placeholder'|t(lang) }}"></textarea>
