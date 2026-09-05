@@ -187,6 +187,59 @@ def _is_training_running() -> bool:
     return _training_process is not None and _training_process.returncode is None
 
 
+async def _ensure_vram_for_training(auto_unload: bool = True) -> tuple[bool, str]:
+    """训练启动前显存仲裁：检查推理引擎是否占用 GPU，必要时自动卸载。
+
+    27G 权重常驻 + 训练同 GPU 必然 OOM（12GB 显存如 RTX 5070 Ti Laptop 尤其如此）。
+    本函数在启动训练子进程前检查已加载的推理引擎：若 auto_unload=True 则自动卸载
+    并等待显存释放；否则返回失败提示用户先手动卸载。
+
+    Returns:
+        (success: bool, message: str)
+    """
+    try:
+        from ..model_registry import registry
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"无法导入模型注册表，跳过显存仲裁: {exc}")
+        return True, "registry unavailable, skipped VRAM check"
+
+    try:
+        loaded = bool(registry.model_loaded)
+    except Exception:  # noqa: BLE001
+        loaded = False
+
+    if not loaded:
+        return True, "no inference engine loaded"
+
+    loaded_names: list[str] = []
+    try:
+        from ..model_registry import multi_engine_registry
+
+        loaded_names = list(multi_engine_registry.get_loaded_engine_names())
+    except Exception:  # noqa: BLE001
+        pass
+
+    names_display = ", ".join(loaded_names) if loaded_names else "unknown"
+
+    if not auto_unload:
+        return False, (
+            f"推理引擎已加载 ({names_display})，显存不足将导致训练 OOM。"
+            f"请先调用 /api/model/unload 卸载推理引擎，或设置 auto_unload_inference=true。"
+        )
+
+    logger.warning(f"[VRAM仲裁] 训练启动前自动卸载推理引擎: {names_display}")
+    try:
+        from ..model_manager_core.unload import unload_all_models
+
+        unload_all_models()
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"[VRAM仲裁] 自动卸载推理引擎失败: {exc}")
+        return False, f"自动卸载推理引擎失败: {exc}"
+
+    await asyncio.sleep(2.0)
+    return True, f"已自动卸载推理引擎 ({names_display})，显存已释放"
+
+
 # --------------------------------------------------------------------------- #
 # P2-5 训练任务持久化 + liveness 心跳
 # --------------------------------------------------------------------------- #
@@ -432,6 +485,16 @@ async def start_training(request: Request) -> JSONResponse:
         async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
             await f.write(json.dumps(config, indent=2, ensure_ascii=False))
         logger.warning("未安装 PyYAML，已改为保存 JSON 格式配置")
+
+    auto_unload_inference: bool = bool(body.get("auto_unload_inference", True))
+    vram_ok, vram_msg = await _ensure_vram_for_training(auto_unload=auto_unload_inference)
+    if not vram_ok:
+        logger.warning(f"[VRAM仲裁] 训练启动被拒绝: {vram_msg}")
+        return JSONResponse(
+            {"status": "error", "message": vram_msg, "code": "INSUFFICIENT_VRAM"},
+            status_code=409,
+        )
+    logger.info(f"[VRAM仲裁] {vram_msg}")
 
     cmd: list[str] = [sys.executable, train_script, "--config_path", config_path]
 
