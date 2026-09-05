@@ -40,6 +40,9 @@ services:
       - ./lora:/app/lora
       # 音色库（只读）
       - ./personas:/app/personas:ro
+    # 存活探针（liveness）：仅判断进程是否响应。
+    # readiness 闸门仅在 k8s 通过 /readyz 实现（模型未加载→503）；
+    # docker-compose 无独立 readiness 概念，此处保持 ping 即可。
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7869/api/health/ping')"]
       interval: 30s
