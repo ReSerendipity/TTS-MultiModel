@@ -1,0 +1,653 @@
+{
+  "/": {
+    "GET": {
+      "operationId": "index__get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/audio/{filename}": {
+    "GET": {
+      "operationId": "get_generated_audio_api_audio__filename__get",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/batch_delete_history": {
+    "POST": {
+      "operationId": "batch_delete_history_api_batch_delete_history_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/batch_export_history": {
+    "POST": {
+      "operationId": "batch_export_history_api_batch_export_history_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/generate/cancel": {
+    "POST": {
+      "operationId": "cancel_generation_api_generate_cancel_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/generate/generic/clone": {
+    "POST": {
+      "operationId": "generic_clone_endpoint_api_generate_generic_clone_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/indextts2": {
+    "POST": {
+      "operationId": "generate_indextts2_api_generate_indextts2_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/post-process": {
+    "POST": {
+      "operationId": "post_process_audio_api_generate_post_process_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/streaming": {
+    "POST": {
+      "operationId": "streaming_generation_api_generate_streaming_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/streaming_audio": {
+    "POST": {
+      "operationId": "streaming_audio_generation_api_generate_streaming_audio_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/streaming_sse": {
+    "POST": {
+      "operationId": "streaming_sse_generation_api_generate_streaming_sse_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/voxcpm_clone": {
+    "POST": {
+      "operationId": "generate_voxcpm_clone_api_generate_voxcpm_clone_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/voxcpm_design": {
+    "POST": {
+      "operationId": "generate_voxcpm_design_api_generate_voxcpm_design_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/voxcpm_prompt_continue": {
+    "POST": {
+      "operationId": "generate_voxcpm_prompt_continue_api_generate_voxcpm_prompt_continue_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/voxcpm_script": {
+    "POST": {
+      "operationId": "generate_voxcpm_script_api_generate_voxcpm_script_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/voxcpm_ultimate": {
+    "POST": {
+      "operationId": "generate_voxcpm_ultimate_api_generate_voxcpm_ultimate_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/health/ping": {
+    "GET": {
+      "operationId": "health_ping_api_health_ping_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/health/ready": {
+    "GET": {
+      "operationId": "health_ready_api_health_ready_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/history/clear_all": {
+    "POST": {
+      "operationId": "clear_all_history_api_history_clear_all_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/history/hide": {
+    "POST": {
+      "operationId": "hide_history_records_api_history_hide_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/history/show": {
+    "POST": {
+      "operationId": "show_history_records_api_history_show_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/history/show_all": {
+    "POST": {
+      "operationId": "show_all_history_api_history_show_all_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/history/sync": {
+    "POST": {
+      "operationId": "sync_history_api_history_sync_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/history/table": {
+    "GET": {
+      "operationId": "history_table_api_history_table_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/download_hints": {
+    "GET": {
+      "operationId": "model_download_hints_api_model_download_hints_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/load": {
+    "POST": {
+      "operationId": "load_model_endpoint_api_model_load_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/model/lora/list": {
+    "GET": {
+      "operationId": "lora_list_endpoint_api_model_lora_list_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/lora/load": {
+    "POST": {
+      "operationId": "lora_load_endpoint_api_model_lora_load_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/lora/state": {
+    "GET": {
+      "operationId": "lora_state_endpoint_api_model_lora_state_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/lora/toggle": {
+    "POST": {
+      "operationId": "lora_toggle_endpoint_api_model_lora_toggle_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/lora/unload": {
+    "POST": {
+      "operationId": "lora_unload_endpoint_api_model_lora_unload_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/preload": {
+    "POST": {
+      "operationId": "preload_model_endpoint_api_model_preload_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/preload/status": {
+    "GET": {
+      "operationId": "preload_status_endpoint_api_model_preload_status_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/status": {
+    "GET": {
+      "operationId": "model_status_api_model_status_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/model/switch": {
+    "POST": {
+      "operationId": "switch_engine_endpoint_api_model_switch_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/model/unload": {
+    "POST": {
+      "operationId": "unload_model_endpoint_api_model_unload_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/persona/audio/{name}": {
+    "GET": {
+      "operationId": "get_persona_audio_api_persona_audio__name__get",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/persona/list": {
+    "GET": {
+      "operationId": "persona_list_options_api_persona_list_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/persona/save": {
+    "POST": {
+      "operationId": "persona_save_api_persona_save_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/persona/table": {
+    "GET": {
+      "operationId": "persona_table_api_persona_table_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/persona/{name}": {
+    "DELETE": {
+      "operationId": "persona_delete_api_persona__name__delete",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/speaker/sample/{key}": {
+    "GET": {
+      "operationId": "get_speaker_sample_api_speaker_sample__key__get",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/sse/events": {
+    "GET": {
+      "operationId": "sse_events_api_sse_events_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/advanced_params": {
+    "GET": {
+      "operationId": "get_advanced_params_api_system_advanced_params_get",
+      "status_codes": [
+        "200"
+      ]
+    },
+    "POST": {
+      "operationId": "save_advanced_params_api_system_advanced_params_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/audit": {
+    "GET": {
+      "operationId": "get_audit_api_system_audit_get",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/system/capacity": {
+    "GET": {
+      "operationId": "capacity_endpoint_api_system_capacity_get",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/system/general_settings": {
+    "POST": {
+      "operationId": "save_general_settings_api_system_general_settings_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/generation_defaults": {
+    "GET": {
+      "operationId": "get_generation_defaults_api_system_generation_defaults_get",
+      "status_codes": [
+        "200"
+      ]
+    },
+    "POST": {
+      "operationId": "save_generation_defaults_api_system_generation_defaults_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/gpu/cleanup": {
+    "POST": {
+      "operationId": "gpu_cleanup_api_system_gpu_cleanup_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/gpu/history": {
+    "GET": {
+      "operationId": "gpu_history_api_system_gpu_history_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/gpu/status": {
+    "GET": {
+      "operationId": "gpu_status_api_system_gpu_status_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/health": {
+    "GET": {
+      "operationId": "get_health_api_system_health_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/health/gpu-leak": {
+    "GET": {
+      "operationId": "gpu_leak_api_system_health_gpu_leak_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/health/ping": {
+    "GET": {
+      "operationId": "ping_api_system_health_ping_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/health/ready": {
+    "GET": {
+      "operationId": "ready_api_system_health_ready_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/logs": {
+    "GET": {
+      "operationId": "get_logs_api_system_logs_get",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/system/logs/clean": {
+    "DELETE": {
+      "operationId": "clean_logs_api_system_logs_clean_delete",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/metrics": {
+    "GET": {
+      "operationId": "metrics_api_system_metrics_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/queue": {
+    "GET": {
+      "operationId": "get_queue_status_api_system_queue_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/settings": {
+    "GET": {
+      "operationId": "get_settings_api_system_settings_get",
+      "status_codes": [
+        "200"
+      ]
+    },
+    "PUT": {
+      "operationId": "update_settings_api_system_settings_put",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/settings/reset": {
+    "POST": {
+      "operationId": "reset_settings_api_system_settings_reset_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/shutdown": {
+    "POST": {
+      "operationId": "shutdown_server_api_system_shutdown_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/slo": {
+    "GET": {
+      "operationId": "slo_endpoint_api_system_slo_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/system/stats": {
+    "GET": {
+      "operationId": "get_stats_api_system_stats_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/training/log": {
+    "GET": {
+      "operationId": "get_lora_training_log",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/training/start": {
+    "POST": {
+      "operationId": "start_lora_training",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/training/stop": {
+    "POST": {
+      "operationId": "stop_lora_training",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/upload/audio": {
+    "POST": {
+      "operationId": "upload_audio_api_upload_audio_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/metrics": {
+    "GET": {
+      "operationId": "prometheus_metrics_metrics_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/readyz": {
+    "GET": {
+      "operationId": "readyz_readyz_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/tab/{tab_name}": {
+    "GET": {
+      "operationId": "load_tab_tab__tab_name__get",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/v1/audio/speech": {
+    "POST": {
+      "operationId": "create_speech_v1_audio_speech_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/v1/audio/speech/batch": {
+    "POST": {
+      "operationId": "create_speech_batch_v1_audio_speech_batch_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/v1/audio/speech/batch/{batch_id}": {
+    "DELETE": {
+      "operationId": "cancel_batch_v1_audio_speech_batch__batch_id__delete",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    },
+    "GET": {
+      "operationId": "get_batch_status_v1_audio_speech_batch__batch_id__get",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/v1/models": {
+    "GET": {
+      "operationId": "list_models_v1_models_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  }
+}

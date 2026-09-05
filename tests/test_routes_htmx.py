@@ -125,6 +125,18 @@ def test_persona_save_requires_audio_source(client):
     assert "缺少音频" in resp.text
 
 
+def test_persona_save_rejects_upload_without_consent(client):
+    """上传参考音频但未勾选授权同意时必须 fail-safe 拒绝（P0-1 声音克隆授权 v1）。"""
+    resp = client.post(
+        "/api/persona/save",
+        data={"save_name": "测试音色"},
+        files={"ref_audio": ("a.wav", _WAV_BYTES, "audio/wav")},
+        headers=_csrf_headers(client),
+    )
+    assert resp.status_code == 200
+    assert "授权" in resp.text or "使用权" in resp.text
+
+
 def test_persona_save_rejects_path_traversal_in_result_audio(client):
     """result_audio 来自客户端，绝不能成为任意文件读取的入口。"""
     resp = client.post(
@@ -145,7 +157,7 @@ def test_persona_save_rejects_unsupported_extension(client):
     """
     resp = client.post(
         "/api/persona/save",
-        data={"save_name": "测试音色"},
+        data={"save_name": "测试音色", "has_consent": "true"},
         files={"ref_audio": ("evil.exe", b"MZ\x90\x00", "application/octet-stream")},
         headers=_csrf_headers(client),
     )
@@ -164,7 +176,7 @@ def test_persona_save_rejects_disguised_file(client):
     """扩展名与魔术字节不符时必须拒绝（继承 save_uploaded_audio 的 fail-closed 校验）。"""
     resp = client.post(
         "/api/persona/save",
-        data={"save_name": "伪装", "ref_text": "x"},
+        data={"save_name": "伪装", "ref_text": "x", "has_consent": "true"},
         files={"ref_audio": ("payload.wav", b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff", "audio/wav")},
         headers=_csrf_headers(client),
     )
@@ -181,7 +193,7 @@ def test_persona_save_passes_upload_and_overwrite_to_manager(client, monkeypatch
     """
     captured: dict[str, object] = {}
 
-    def fake_save(name, audio_input, ref_text, overwrite=False):
+    def fake_save(name, audio_input, ref_text, overwrite=False, consent_state="self", consent_at=""):
         captured["name"] = name
         captured["audio_input"] = audio_input
         captured["existed_at_call"] = bool(audio_input) and __import__("os").path.isfile(str(audio_input))
@@ -193,7 +205,7 @@ def test_persona_save_passes_upload_and_overwrite_to_manager(client, monkeypatch
 
     resp = client.post(
         "/api/persona/save",
-        data={"save_name": "  我的音色  ", "ref_text": "温柔女声", "overwrite": "true"},
+        data={"save_name": "  我的音色  ", "ref_text": "温柔女声", "overwrite": "true", "has_consent": "true"},
         files={"ref_audio": ("a.wav", _WAV_BYTES, "audio/wav")},
         headers=_csrf_headers(client),
     )
@@ -210,11 +222,14 @@ def test_persona_save_emits_confirm_header_on_duplicate(client, monkeypatch):
     """重名且未确认覆盖时，必须回 X-Persona-Confirm 头驱动前端翻隐藏字段。"""
     monkeypatch.setattr(
         "integrated_app.routes.persona.fn_save_persona",
-        lambda name, audio_input, ref_text, overwrite=False: ("⚠️ 音色已存在", True),
+        lambda name, audio_input, ref_text, overwrite=False, consent_state="self", consent_at="": (
+            "⚠️ 音色已存在",
+            True,
+        ),
     )
     resp = client.post(
         "/api/persona/save",
-        data={"save_name": "dup", "ref_text": "x"},
+        data={"save_name": "dup", "ref_text": "x", "has_consent": "true"},
         files={"ref_audio": ("a.wav", _WAV_BYTES, "audio/wav")},
         headers=_csrf_headers(client),
     )
@@ -225,13 +240,13 @@ def test_persona_save_emits_confirm_header_on_duplicate(client, monkeypatch):
 def test_persona_save_does_not_leak_internal_exception(client, monkeypatch):
     """固化失败不得把内部异常文本回显给用户。"""
 
-    def boom(name, audio_input, ref_text, overwrite=False):
+    def boom(name, audio_input, ref_text, overwrite=False, consent_state="self", consent_at=""):
         raise RuntimeError("secret absolute path /home/x/personas/boom.wav")
 
     monkeypatch.setattr("integrated_app.routes.persona.fn_save_persona", boom)
     resp = client.post(
         "/api/persona/save",
-        data={"save_name": "x", "ref_text": "y"},
+        data={"save_name": "x", "ref_text": "y", "has_consent": "true"},
         files={"ref_audio": ("a.wav", _WAV_BYTES, "audio/wav")},
         headers=_csrf_headers(client),
     )
