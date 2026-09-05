@@ -131,88 +131,85 @@ def measure_cold_start(
     # 失败时还能把日志尾部打印出来辅助定位。
     _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     launch_log = _RESULTS_DIR / "cold-start_launch.log"
-    log_fh = open(launch_log, "w", encoding="utf-8", errors="replace")
 
     print(f"[cold-start] 启动服务器: {python_exe} {_LAUNCH_SCRIPT}（日志 → {launch_log}）")
-    proc = subprocess.Popen(
-        [python_exe, str(_LAUNCH_SCRIPT)],
-        cwd=str(_PROJECT_ROOT),
-        env=env,
-        stdout=log_fh,
-        stderr=subprocess.STDOUT,
-    )
+    with open(launch_log, "w", encoding="utf-8", errors="replace") as log_fh:
+        proc = subprocess.Popen(
+            [python_exe, str(_LAUNCH_SCRIPT)],
+            cwd=str(_PROJECT_ROOT),
+            env=env,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+        )
 
-    try:
-        with httpx.Client(base_url=base_url) as client:
-            # 1. 等待 ping 可用
-            print("[cold-start] 等待 /api/system/health/ping 响应...")
-            ping_ms, ping_status = _wait_for_endpoint(client, "/api/system/health/ping", _PING_TIMEOUT)
-            results["process_to_ping_ms"] = round(ping_ms, 1)
-            results["ping_status"] = ping_status
-
-            if ping_status != 200:
-                results["error"] = f"ping 未在 {_PING_TIMEOUT}s 内返回 200 (last={ping_status})"
-                print(f"[cold-start] ⚠ {results['error']}")
-                return results
-
-            print(f"[cold-start] ✓ ping 可用: {ping_ms:.0f}ms")
-
-            # 2. 等待 ready
-            ready_ms, ready_status = _wait_for_endpoint(client, "/api/system/health/ready", 60.0)
-            results["ping_to_ready_ms"] = round(ready_ms, 1)
-            results["ready_status"] = ready_status
-            print(f"[cold-start] ✓ ready 就绪: {ready_ms:.0f}ms")
-
-            # 3. 可选：引擎加载 —— 轮询 /readyz 直到返回 200
-            #    /readyz 在引擎未就绪时返回 503，就绪后返回 200，
-            #    因此「ping 就绪 → /readyz 200」的间隔 = 模型加载到可用的真实耗时，
-            #    也正是 K8s readinessProbe 的判定端点（运维稳定性评估 P0 修复后一致）。
-            #    Why 不用 POST /api/model/load：该端点受 CSRF 保护，脚本无 token 会 403。
-            engine_load_ms = 0.0
-            if engine:
-                print(f"[cold-start] 等待引擎 {engine} 就绪（轮询 /readyz，需启动时设 TTS_AUTO_LOAD_MODEL=1）...")
-                engine_load_ms, readyz_status = _wait_for_endpoint(client, "/readyz", _ENGINE_READY_TIMEOUT)
-                results["readyz_status"] = readyz_status
-                results["engine_load_ms"] = round(engine_load_ms, 1)
-                if readyz_status == 200:
-                    print(f"[cold-start] ✓ 引擎就绪（/readyz 200）: {engine_load_ms:.0f}ms")
-                else:
-                    results["engine_load_error"] = (
-                        f"/readyz 未在 {_ENGINE_READY_TIMEOUT}s 内变 200 (last={readyz_status})"
-                    )
-                    print(f"[cold-start] ⚠ {results['engine_load_error']}")
-
-        total = ping_ms + ready_ms + engine_load_ms
-        results["total_cold_start_ms"] = round(total, 1)
-        print("\n[cold-start] ═══ 冷启动摘要 ═══")
-        print(f"  进程→ping:     {ping_ms:>8.0f} ms")
-        print(f"  ping→ready:    {ready_ms:>8.0f} ms")
-        if engine:
-            print(f"  ready→/readyz: {engine_load_ms:>8.0f} ms（模型加载到可用 = MTTR 核心）")
-        print("  ─────────────────────────")
-        print(f"  总冷启动:       {total:>8.0f} ms ({total / 1000:.2f}s)")
-
-    finally:
-        # 优雅关闭子进程
         try:
-            proc.send_signal(signal.SIGTERM)
-            proc.wait(timeout=10)
-        except Exception:
-            proc.kill()
-            proc.wait()
+            with httpx.Client(base_url=base_url) as client:
+                # 1. 等待 ping 可用
+                print("[cold-start] 等待 /api/system/health/ping 响应...")
+                ping_ms, ping_status = _wait_for_endpoint(client, "/api/system/health/ping", _PING_TIMEOUT)
+                results["process_to_ping_ms"] = round(ping_ms, 1)
+                results["ping_status"] = ping_status
+
+                if ping_status != 200:
+                    results["error"] = f"ping 未在 {_PING_TIMEOUT}s 内返回 200 (last={ping_status})"
+                    print(f"[cold-start] ⚠ {results['error']}")
+                else:
+                    print(f"[cold-start] ✓ ping 可用: {ping_ms:.0f}ms")
+
+                    # 2. 等待 ready
+                    ready_ms, ready_status = _wait_for_endpoint(client, "/api/system/health/ready", 60.0)
+                    results["ping_to_ready_ms"] = round(ready_ms, 1)
+                    results["ready_status"] = ready_status
+                    print(f"[cold-start] ✓ ready 就绪: {ready_ms:.0f}ms")
+
+                    # 3. 可选：引擎加载 —— 轮询 /readyz 直到返回 200
+                    #    /readyz 在引擎未就绪时返回 503，就绪后返回 200，
+                    #    因此「ping 就绪 → /readyz 200」的间隔 = 模型加载到可用的真实耗时，
+                    #    也正是 K8s readinessProbe 的判定端点（运维稳定性评估 P0 修复后一致）。
+                    #    Why 不用 POST /api/model/load：该端点受 CSRF 保护，脚本无 token 会 403。
+                    engine_load_ms = 0.0
+                    if engine:
+                        print(
+                            f"[cold-start] 等待引擎 {engine} 就绪（轮询 /readyz，需启动时设 TTS_AUTO_LOAD_MODEL=1）..."
+                        )
+                        engine_load_ms, readyz_status = _wait_for_endpoint(client, "/readyz", _ENGINE_READY_TIMEOUT)
+                        results["readyz_status"] = readyz_status
+                        results["engine_load_ms"] = round(engine_load_ms, 1)
+                        if readyz_status == 200:
+                            print(f"[cold-start] ✓ 引擎就绪（/readyz 200）: {engine_load_ms:.0f}ms")
+                        else:
+                            results["engine_load_error"] = (
+                                f"/readyz 未在 {_ENGINE_READY_TIMEOUT}s 内变 200 (last={readyz_status})"
+                            )
+                            print(f"[cold-start] ⚠ {results['engine_load_error']}")
+
+                    total = ping_ms + ready_ms + engine_load_ms
+                    results["total_cold_start_ms"] = round(total, 1)
+                    print("\n[cold-start] ═══ 冷启动摘要 ═══")
+                    print(f"  进程→ping:     {ping_ms:>8.0f} ms")
+                    print(f"  ping→ready:    {ready_ms:>8.0f} ms")
+                    if engine:
+                        print(f"  ready→/readyz: {engine_load_ms:>8.0f} ms（模型加载到可用 = MTTR 核心）")
+                    print("  ─────────────────────────")
+                    print(f"  总冷启动:       {total:>8.0f} ms ({total / 1000:.2f}s)")
+
         finally:
+            # 优雅关闭子进程（with 块外再读取日志尾部时句柄已关闭）
             try:
-                log_fh.close()
-            except Exception:  # noqa: BLE001
-                pass
-        # ping 未通时，打印启动日志尾部辅助定位（此前完全看不到子进程输出）
-        if results.get("ping_status") != 200:
-            try:
-                tail = launch_log.read_text(encoding="utf-8", errors="replace").splitlines()[-15:]
-                print("[cold-start] ── 启动日志尾部（诊断用）──")
-                print("\n".join(tail))
-            except Exception:  # noqa: BLE001
-                pass
+                proc.send_signal(signal.SIGTERM)
+                proc.wait(timeout=10)
+            except Exception:
+                proc.kill()
+                proc.wait()
+
+    # ping 未通时，打印启动日志尾部辅助定位（此前完全看不到子进程输出）
+    if results.get("ping_status") != 200:
+        try:
+            tail = launch_log.read_text(encoding="utf-8", errors="replace").splitlines()[-15:]
+            print("[cold-start] ── 启动日志尾部（诊断用）──")
+            print("\n".join(tail))
+        except OSError:
+            pass
 
     return results
 

@@ -1,0 +1,20 @@
+{
+  "_comment": "GPU 容量/MTTR 基线（运维稳定性评估 P0-2/P0-3）。供 .github/workflows/stress.yml gpu-baseline-gate 作业比对。",
+  "_hardware": {
+    "gpu": "NVIDIA GeForce RTX 4070 SUPER (12226 MB)",
+    "engine": "voxcpm2",
+    "note": "本文件数值来自 2026-09-05 本机实测（perf/results/cold-start_20260905_1742*.json / 1743*.json / 1744*.json 共 3 轮）。换设备/权重更新后必须重新测量并更新本基线，勿直接沿用。"
+  },
+  "_methodology": "python perf/cold-start.py --engine voxcpm2（TTS_AUTO_LOAD_MODEL=1）；engine_load_ms = ping 就绪到 /readyz=200 的间隔（= 模型加载到可用 = MTTR 核心）",
+  "_samples": {
+    "engine_load_ms": [40251.9, 61616.4, 33113.3],
+    "total_cold_start_ms": [50416.1, 71481.6, 44789.6],
+    "process_to_ping_ms": [10162.0, 9861.2, 11672.5]
+  },
+  "_baseline_choice": "取三轮实测的【最差值】作为基线（非中位数）：引擎加载受磁盘缓存/显存竞争影响，抖动达 33-62s；用最差值×容差才不会把正常轮次误判为回归。",
+  "process_to_ping_ms": 11672.5,
+  "engine_load_ms": 61616.4,
+  "total_cold_start_ms": 71481.6,
+  "tolerance_ratio": 1.5,
+  "updated": "2026-09-05"
+}

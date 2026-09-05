@@ -5,6 +5,11 @@ on:
     # Run daily at 03:00 UTC（避开 benchmark 周更窗口，错峰）
     - cron: '0 3 * * *'
   workflow_dispatch:
+    inputs:
+      gpu_gate:
+        description: '在 GPU self-hosted runner 上运行冷启动/显存基线门控（需注册 [self-hosted, gpu, linux] 标签的 runner）'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -47,3 +52,42 @@ jobs:
           pytest tests/benchmarks/test_load_stress.py -v --tb=short \
             -m "stress" \
             --timeout=300
+
+  # 运维稳定性评估 P0-3（2026-09-05）：GPU 容量基线阈值门控。
+  # 背景：本仓库真实运行形态是单卡 GPU，但既有 CI 全部跑在 ubuntu-latest CPU
+  # runner 上（stress.yml 甚至强制 CUDA_VISIBLE_DEVICES=""），GPU 冷启动 /
+  # 模型加载 MTTR / 显存基线在 CI 中零覆盖——评估报告列为 P0（无基线数据）。
+  # 设计：GitHub 无 GPU 公共 runner，故门控 job 仅在 workflow_dispatch 显式
+  # 勾选 gpu_gate、且维护者注册了 [self-hosted, gpu, linux] runner 时运行；
+  # scheduled 运行永远跳过（不会因缺 runner 而挂起排队）。
+  # 门禁口径：perf/cold-start.py 实测值 vs baselines/gpu-mttr-baseline.json，
+  # 引擎加载耗时超出基线 50% 即 fail（回归阻断信号）；vram-usage.py 采集
+  # 峰值显存一并存档到 artifact。
+  gpu-baseline-gate:
+    name: GPU MTTR/VRAM Baseline Gate
+    if: github.event.inputs.gpu_gate == 'true'
+    runs-on: [self-hosted, gpu, linux]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Measure cold start (MTTR) with engine load
+        run: |
+          # 用仓库自带虚拟环境或 runner 预装环境；脚本会自启自停服务
+          PY=${PYTHON_WARMED:-python3}
+          TTS_AUTO_LOAD_MODEL=1 $PY perf/cold-start.py --engine voxcpm2 | tee /tmp/cold-start.out
+
+      - name: Gate against committed baseline
+        run: |
+          # 门禁判定由 scripts/gpu_baseline_gate.py 执行（可本地复现、可单测）
+          PY=${PYTHON_WARMED:-python3}
+          LATEST=$(ls -t perf/results/cold-start_*.json | head -1)
+          $PY scripts/gpu_baseline_gate.py "$LATEST" --baseline baselines/gpu-mttr-baseline.json
+
+      - name: Upload GPU baseline run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-baseline-${{ github.sha }}
+          path: perf/results/
+          retention-days: 60
