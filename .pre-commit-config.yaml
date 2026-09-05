@@ -75,6 +75,22 @@ repos:
         language: system
         files: \.env$
         pass_filenames: true
+      # P1-2 后端设计评估：引擎规格三向一致性（config ↔ registry ↔ 磁盘权重路径）
+      - id: check-engine-specs
+        name: Engine Specs Consistency Check
+        entry: python scripts/check_engine_specs.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+      # P2-6 后端设计评估：训练隔离 AST 门禁（服务路径禁止 import training）
+      - id: check-training-isolation
+        name: Training Isolation AST Gate
+        entry: python scripts/check_training_isolation.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
 
 # Configuration
 default_language_version:

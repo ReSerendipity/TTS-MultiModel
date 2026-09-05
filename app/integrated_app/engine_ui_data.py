@@ -228,7 +228,7 @@ VOXCPM2_UI_DATA = EngineUIData(
     tab_order=10,
     icon="sparkles",
     color="#8b5cf6",
-    sample_rate=24000,
+    sample_rate=48000,
     params=[
         ParamDefinition(
             key="text",

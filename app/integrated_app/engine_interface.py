@@ -709,7 +709,7 @@ def _register_builtin_engines() -> None:
                 "prompt",
                 "lora",
             ],
-            sample_rate=24000,
+            sample_rate=48000,
             requires_gpu=True,
             quality="high",
         )
@@ -729,7 +729,7 @@ def _register_builtin_engines() -> None:
                 "prompt",
                 "lora",
             ],
-            sample_rate=24000,
+            sample_rate=48000,
             requires_gpu=True,
             quality="high",
         )
@@ -741,7 +741,7 @@ def _register_builtin_engines() -> None:
         display_name="IndexTTS 2.5",
         vram_requirement=6.0,
         languages=["zh", "en", "ja", "es", "ar"],
-        supported_features=["clone", "emotion_control"],
+        supported_features=["clone", "emotion_control", "duration_control"],
         sample_rate=22050,
         requires_gpu=False,
         quality="high",

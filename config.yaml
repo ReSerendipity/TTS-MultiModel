@@ -38,7 +38,7 @@ models:
       languages: ["zh", "en", "ja", "ko", "ar", "de", "es", "fr", "hi", "it", "nl", "pl", "pt", "ru", "sv", "tr", "vi", "bn", "fa", "sw", "tl", "ur", "my", "ta", "th", "cs", "el", "hu", "ro", "uk"]
       quality: "high"
       license: "Apache-2.0"
-      supported_features: ["voice_design", "clone", "ultimate", "script", "streaming", "lora"]
+      supported_features: ["voice_design", "clone", "ultimate", "script", "streaming", "prompt", "lora"]
       sample_rate: 48000
       requires_gpu: true
     indextts2:
@@ -51,7 +51,7 @@ models:
       quality: "high"
       license: "bilibili Model Use License（商用需向 bilibili 登记书面授权）"
       supported_features: ["clone", "emotion_control", "duration_control"]
-      sample_rate: 48000
+      sample_rate: 22050
       requires_gpu: true
     indextts20:
       name: "indextts20"
@@ -63,7 +63,7 @@ models:
       quality: "high"
       license: "bilibili Model Use License（商用需向 bilibili 登记书面授权）"
       supported_features: ["clone", "emotion_control"]
-      sample_rate: 48000
+      sample_rate: 22050
       requires_gpu: true
 ui:
   theme: dark
@@ -146,9 +146,12 @@ security:
 
 # ── 生成流程参数（配置外置：超时 / 并发 / 信号量排队） ──
 generation:
-  timeout_s: 600                        # 单次生成硬超时（秒）
+  timeout_s: 600                        # 单次生成硬超时（秒），超时返回 503
   max_concurrent: 1                     # 每引擎最大并发生成数
-  semaphore_acquire_timeout_s: 120      # 获取生成信号量排队等待上限（秒）
+  semaphore_acquire_timeout_s: 120      # 获取生成信号量排队等待上限（秒），超时返回 429
+  # 运维稳定性评估 P1-4：OOM 后受控自动重载（无 on-call 场景的自愈路径）
+  oom_auto_reload: true                 # OOM 重试耗尽后后台自动重载当前引擎；失败标记不健康交由容器重启
+  oom_auto_reload_cooldown_s: 300       # 两次自动重载最小间隔（秒），防损坏状态下重载风暴
   # 生成结果缓存（BACKEND_DESIGN_ASSESSMENT 长期项）：相同请求短 TTL 命中，降低重复 GPU 推理成本。
   # 默认关闭（零风险）；开启后命中时复用既有音频文件、跳过推理，但仍计入历史与监控统计。
   cache_enabled: false
@@ -163,6 +166,7 @@ observability:
     availability: 99.5            # 目标可用性 %
     min_success_rate: 99.0        # 目标生成成功率 %
     max_avg_latency_ms: 30000.0   # 目标平均生成耗时上限 ms
+    max_p95_latency_ms: 90000.0   # 目标 p95 尾部延迟上限 ms（运维实施 P1；须按设备/文本长度分布校准，样本<10 按达标）
   # 告警规则阈值（P0-2）：指标越过阈值即触发对应告警通道
   alerting:
     enabled: true

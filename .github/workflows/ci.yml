@@ -50,6 +50,14 @@ jobs:
           pip install pyyaml
           python scripts/check_config_refs.py
 
+      - name: Engine specs three-way consistency gate (P1-2)
+        # 后端设计评估 P1-2：config.yaml engines ↔ engine_registry ↔ 磁盘权重路径
+        # 三向一致；sample_rate / supported_features / 引擎集合 / model_dir 任一
+        # 不一致即 FAIL（languages 差异为 WARN 不阻断，产品级声明 vs text_frontend）。
+        run: |
+          pip install pyyaml
+          python scripts/check_engine_specs.py
+
   # 类型门禁（mypy ratchet，家族底线；2026-09-03 接入组织级 reusable workflow）
   # 门禁逻辑统一维护在 ReSerendipity/.github 的 python-quality-baseline.yml，
   # 本仓只传参数。模板口径与历史内联实现完全一致（mypy==2.3.1、
