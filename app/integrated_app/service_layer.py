@@ -226,6 +226,16 @@ class TTSGenerationService:
     - 结果保存与版本记录
     - 异常转换与日志记录
 
+    .. NOTE::
+        **P2-4 HTTP 迁移阻塞说明（2026-09-05 后端设计评估）**：
+        当前仅 ``mcp_server.py`` 使用本服务；HTTP 生成路由仍走
+        ``routes/generate/utils.py`` 的 ``_execute_generation`` 管线。
+        全量迁移需先让本服务吸收以下横切关注点，否则会丢失功能：
+        per-engine 信号量并发控制、OOM 降级重试（degraded_fn）、
+        后处理（tempo/voice_enhancement/LUFS）、幂等键去重、生成结果缓存、
+        历史库写入、内容安全检测、HTML 片段渲染。这是多日重构，
+        建议分阶段：①本服务吸收信号量+OOM重试 → ②单端点试点迁移 → ③全量推广。
+
     Usage::
 
         svc = TTSGenerationService()
