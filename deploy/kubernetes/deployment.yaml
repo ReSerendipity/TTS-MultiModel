@@ -7,6 +7,10 @@
 #   - securityContext：非 root、只读根文件系统、丢弃全部 capabilities（与 docker-compose 对齐）。
 #   - GPU 通过 nvidia.com/gpu 资源请求独占（单卡 SPOF，与单机一致）。
 #   - 优雅停机：terminationGracePeriodSeconds 与 uvicorn timeout_graceful_shutdown=60 对齐。
+#   - P0-1 修复（云原生评估 2026-09-05）：readOnlyRootFilesystem=true 下，27G 权重卷
+#     /app/model 与运行时可写目录 /app/{data,outputs,logs,cache,lora} 必须显式挂载，
+#     否则 Pod 因找不到权重 / EROFS 写入失败陷入重启循环（与 docker-compose.yml 挂载面对齐）。
+#     subPath 所指 PVC 子目录由 initContainer 预建（subPath 目录缺失会导致挂载失败）。
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,6 +33,29 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      initContainers:
+        # P0-1：subPath 挂载要求 PVC 内子目录预先存在（kubelet 不会自动创建）。
+        # 用主镜像（离线可用、自带 python）在可写的 data 卷上预建全部运行时目录。
+        - name: init-dirs
+          image: ghcr.io/reserendipity/tts-multimodel:2.2.1
+          imagePullPolicy: IfNotPresent
+          command: ["python3.12", "-c",
+            "import os; [os.makedirs(f'/mnt/data/{d}', exist_ok=True) for d in ['data','outputs','logs','cache','lora','personas']]; print('init-dirs ok')"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /mnt/data
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
       containers:
         - name: tts
           image: ghcr.io/reserendipity/tts-multimodel:2.2.1
@@ -63,6 +90,31 @@ spec:
             - name: config
               mountPath: /app/config.yaml
               subPath: config.yaml
+              readOnly: true
+            # P0-1：27G 权重（独立 PVC，只读——推理不写权重目录）
+            - name: model
+              mountPath: /app/model
+              readOnly: true
+            # P0-1：运行时可写目录（与 docker-compose.yml 挂载面对齐，同一 tts-data PVC 分子目录）
+            - name: data
+              mountPath: /app/data
+              subPath: data
+            - name: data
+              mountPath: /app/outputs
+              subPath: outputs
+            - name: data
+              mountPath: /app/logs
+              subPath: logs
+            - name: data
+              mountPath: /app/cache
+              subPath: cache
+            - name: data
+              mountPath: /app/lora
+              subPath: lora
+            # 音色库：只读（与 compose 的 ./personas:/app/personas:ro 一致）
+            - name: data
+              mountPath: /app/personas
+              subPath: personas
               readOnly: true
             - name: data
               mountPath: /data
@@ -111,6 +163,10 @@ spec:
         - name: config
           configMap:
             name: tts-config
+        # P0-1：模型权重独立卷（由管理员以 rsync/object store 预填充，见 README）
+        - name: model
+          persistentVolumeClaim:
+            claimName: tts-models
         - name: data
           persistentVolumeClaim:
             claimName: tts-data

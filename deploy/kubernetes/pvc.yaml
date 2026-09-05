@@ -1,4 +1,8 @@
-# TTS_MultiModel —— 持久卷声明（历史库 / 缓存等可写数据）
+# TTS_MultiModel —— 持久卷声明（可写运行态 + 模型权重）
+# P0-1 修复（云原生评估 2026-09-05）：拆为两个 Claim——
+#   tts-data   历史库/输出/日志/缓存/lora/personas（可写运行态，subPath 分子目录）
+#   tts-models 模型权重（约 27G 磁盘占用，只读挂载；镜像不含权重，需管理员预填充）
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -11,6 +15,24 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
+      # 原 20Gi 未计入音频产物增长；按运行态数据（不含权重）扩至 30Gi
+      storage: 30Gi
   # storageClassName 按集群实际提供方调整（如 rook-cephfs / local-storage / ebs-sc）
+  # storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tts-models
+  namespace: tts
+  labels:
+    app: tts-multimodel
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # 权重约 27G + 版本余量；容量规划建议 ≥ 权重体积 × 1.5
+      storage: 60Gi
+  # storageClassName 按集群实际提供方调整
   # storageClassName: standard

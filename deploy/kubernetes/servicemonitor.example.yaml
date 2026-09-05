@@ -1,0 +1,31 @@
+# TTS_MultiModel —— ServiceMonitor 样例（P2-6 可观测接线）
+# ⚠ 依赖提示：本资源属于 prometheus-operator 的 CRD（monitoring.coreos.com/v1）。
+#   集群未安装 Prometheus Operator 时 `kubectl apply` 会报
+#   "no matches for kind ServiceMonitor"——这不是清单错误，需先装 operator 或
+#   改用原生 Prometheus 的 scrape_config（job 指向 svc tts-multimodel:7869 的 /metrics）。
+#
+# 抓取端点事实依据（2026-09-05 实测）：
+#   - 路径 /metrics：app/integrated_app/app_server.py 注册的根级标准 Prometheus 端点；
+#   - 鉴权豁免：auth.py 的 _PUBLIC_PREFIXES 不含 /metrics，且中间件只拦 /api/ 与 /v1/，
+#     故 /metrics 无需 Bearer 即可被抓取。
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tts-multimodel
+  namespace: tts
+  labels:
+    app: tts-multimodel
+    # 按集群 Prometheus 的 serviceMonitorSelector.matchLabels 调整，否则不被发现
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: tts-multimodel
+  namespaceSelector:
+    matchNames:
+      - tts
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
