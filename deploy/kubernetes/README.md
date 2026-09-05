@@ -47,6 +47,20 @@ kubectl -n tts get pods -l app=tts-multimodel
 - 告警：配置 `observability.alerting.webhook_url` 指向 Alertmanager / 企业微信 / 飞书。
 - 日志：`TTS_LOG_FORMAT=json` 输出结构化日志，配合集群日志采集（Loki/ELK）。
 
+## 冷启动 MTTR 与探针参数（运维稳定性评估 P0-2 实测留档，2026-09-05）
+
+在 RTX 4070 SUPER（12G 显存）+ voxcpm2 上 3 轮实测（`TTS_AUTO_LOAD_MODEL=1 python perf/cold-start.py --engine voxcpm2`）：
+
+| 段 | 实测 | 对应探针 |
+|---|---|---|
+| 进程→ping | 9.9–11.7s | `startupProbe`（initialDelay 10s 起步即覆盖） |
+| ready→/readyz=200（模型加载到可用 = **MTTR 核心**） | **33.1–61.6s** | readiness 接 `/readyz` 后自动兜住 |
+| 总冷启动 | 44.8–71.5s | `startupProbe` 上限 10+18×10=190s，余量约 2.7× 最差值 |
+
+- 基线门禁：`baselines/gpu-mttr-baseline.json` + `scripts/gpu_baseline_gate.py`（CI `stress.yml` 的 `gpu-baseline-gate` 作业，需 GPU self-hosted runner 手动触发）。
+- **换更大权重/设备时必须重测**：保持 `startupProbe failureThreshold×periodSeconds ≥ 1.5×最差 MTTR`。
+- 文档中的 "27G" 是**权重磁盘占用**（非显存常驻量）；引擎声明显存 5.5–6.5G，见 `config.yaml models.*.vram_gb`。
+
 ## 回滚
 
 镜像按 semver + git sha 双 tag 推送；回滚执行：
