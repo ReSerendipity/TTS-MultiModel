@@ -145,6 +145,36 @@ def test_range_and_file_controls_have_name(client):
 
 
 # ---------------------------------------------------------------------------
+# 守卫 4：OpenAI 兼容端点（/v1/audio/speech）模型→引擎映射 ⊆ 声明引擎
+# ---------------------------------------------------------------------------
+
+_OPENAI_ENGINE_MAP_RE = re.compile(r"_MODEL_ENGINE_MAP\s*(?:\([^)]*\))?[^=]*=\s*\{(.*?)\}", re.S)
+
+
+def test_openai_model_map_subset_of_declared_engines():
+    """P2-6：/v1/audio/speech 的模型→引擎映射必须 ⊆ config.yaml 声明引擎集。
+
+    静态分析 openai_api.py 的 ``_MODEL_ENGINE_MAP`` 字面量，与 config.yaml
+    ``models.engines`` 声明集比对。WHY 不使用 engine_registry（会触发懒导入
+    torch 链）：配置层声明是引擎的单一事实来源，映射引用了未声明的引擎
+    （如未来新增 ``tts-2 -> voicebox`` 而 voicebox 不在 config 声明）即视为
+    失配——与 check_engine_specs.py 的「config ↔ registry」三向一致性互为补充。
+    """
+    import yaml
+
+    root = _APP.parent.parent
+    cfg = yaml.safe_load((root / "config.yaml").read_text(encoding="utf-8"))
+    declared = set((cfg.get("models") or {}).get("engines") or {})
+    src = (_APP / "openai_api.py").read_text(encoding="utf-8")
+    block = _OPENAI_ENGINE_MAP_RE.search(src)
+    assert block is not None, "openai_api.py 中未找到 _MODEL_ENGINE_MAP 定义，断言可能已失效"
+    mapped = set(re.findall(r':\s*"([^"]+)"', block.group(1)))
+    assert mapped, "未解析到任何引擎映射值，断言可能已失效（请检查映射书写格式）"
+    unknown = sorted(mapped - declared)
+    assert not unknown, f"OpenAI 模型映射引用了 config.yaml 未声明的引擎: {unknown}"
+
+
+# ---------------------------------------------------------------------------
 # 欠债清单防膨胀
 # ---------------------------------------------------------------------------
 
