@@ -117,6 +117,25 @@ jobs:
           path: output/benchmarks/
           retention-days: 30
 
+      # L2 永久存储：tag push（release）时导出基线并上传为 Release Asset
+      - name: Export baseline for release
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          pip install pytest-benchmark 2>/dev/null || true
+          python scripts/export_benchmark_baseline.py \
+            output/benchmarks \
+            benchmark-baseline-${{ github.ref_name }}.json \
+            --name ${{ github.ref_name }}
+
+      - name: Upload baseline to release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            benchmark-baseline-${{ github.ref_name }}.json \
+            --clobber 2>/dev/null || echo "Release not found or upload failed, baseline preserved as artifact"
+
       - name: Upload GPU benchmark results
         if: always()
         uses: actions/upload-artifact@v4
