@@ -103,6 +103,80 @@ from voxcpm.training import (
     load_audio_text_datasets,
 )
 
+# 数据治理评估（v2.2.1）：训练血缘信息全局缓存
+# 原实现 TrainingState 有 dataset_fingerprint/git_commit/config_snapshot_hash 字段但从未赋值，
+# 训练脚本走 vendor voxcpm.training 不经过 app/integrated_app/training/，导致血缘完全缺失。
+# 现在 train() 入口收集血缘，save_checkpoint 时写入 run_manifest.json。
+_LINEAGE_INFO: dict | None = None
+
+
+def _collect_lineage_info(**hyperparams) -> dict:
+    """收集训练血缘信息（git commit / 数据集指纹 / 配置快照 / 超参）。
+
+    Returns:
+        包含血缘字段的字典，供 save_checkpoint 写入 run_manifest.json。
+    """
+    import hashlib
+    import subprocess
+    import time
+
+    info: dict = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "git_commit": "",
+        "dataset_fingerprint": "",
+        "config_snapshot_hash": "",
+        "hyperparams": {},
+    }
+
+    # git commit
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
+        if result.returncode == 0:
+            info["git_commit"] = result.stdout.strip()
+    except Exception:
+        pass
+
+    # 数据集指纹：对 train_manifest 文件内容做 sha256
+    train_manifest = hyperparams.get("train_manifest", "")
+    if train_manifest and os.path.exists(train_manifest):
+        try:
+            with open(train_manifest, "rb") as f:
+                info["dataset_fingerprint"] = hashlib.sha256(f.read()).hexdigest()[:16]
+            info["train_manifest"] = train_manifest
+        except Exception:
+            pass
+    val_manifest = hyperparams.get("val_manifest", "")
+    if val_manifest:
+        info["val_manifest"] = val_manifest
+
+    # 配置快照哈希：对关键超参做 sha256
+    hp_keys = [
+        "pretrained_path",
+        "sample_rate",
+        "batch_size",
+        "grad_accum_steps",
+        "num_iters",
+        "learning_rate",
+        "weight_decay",
+        "warmup_steps",
+        "max_steps",
+        "max_grad_norm",
+        "lora",
+    ]
+    hp_snapshot = {k: hyperparams.get(k) for k in hp_keys if k in hyperparams}
+    info["hyperparams"] = hp_snapshot
+    info["config_snapshot_hash"] = hashlib.sha256(
+        json.dumps(hp_snapshot, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()[:16]
+
+    return info
+
 
 @argbind.bind(without_prefix=True)
 def train(
@@ -199,6 +273,28 @@ def train(
         - 使用 Ctrl+C 可安全中断训练，自动保存当前进度
         - 训练日志可通过 TensorBoard 查看: tensorboard --logdir=checkpoints/logs
     """
+    # 数据治理评估（v2.2.1）：收集训练血缘信息（git commit / 数据集指纹 / 配置快照）
+    # 供 save_checkpoint 写入 run_manifest.json，使 checkpoint 可回溯到具体数据/代码/超参。
+    global _LINEAGE_INFO
+    _LINEAGE_INFO = _collect_lineage_info(
+        pretrained_path=pretrained_path,
+        train_manifest=train_manifest,
+        val_manifest=val_manifest,
+        sample_rate=sample_rate,
+        batch_size=batch_size,
+        grad_accum_steps=grad_accum_steps,
+        num_iters=num_iters,
+        learning_rate=learning_rate,
+        weight_decay=weight_decay,
+        warmup_steps=warmup_steps,
+        max_steps=max_steps,
+        max_grad_norm=max_grad_norm,
+        lora=lora,
+    )
+    print(
+        f"[lineage] git={_LINEAGE_INFO['git_commit'][:8]} dataset={_LINEAGE_INFO['dataset_fingerprint']} config={_LINEAGE_INFO['config_snapshot_hash']}"
+    )
+
     if lambdas is None:
         lambdas = {"loss/diff": 1.0, "loss/stop": 1.0}
     _ = config_path
@@ -1166,6 +1262,15 @@ def save_checkpoint(
     torch.save(scheduler.state_dict(), folder / "scheduler.pth")
     with open(folder / "training_state.json", "w", encoding="utf-8") as f:
         json.dump({"step": int(step)}, f)
+
+    # 数据治理评估（v2.2.1）：写入训练血缘清单 run_manifest.json
+    # 使 checkpoint 可回溯到具体 git commit / 数据集指纹 / 配置快照 / 超参。
+    if _LINEAGE_INFO is not None:
+        manifest = dict(_LINEAGE_INFO)
+        manifest["step"] = int(step)
+        manifest["checkpoint_dir"] = str(folder)
+        with open(folder / "run_manifest.json", "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2, ensure_ascii=False)
 
     # Update (or create) a `latest` folder by copying the most recent checkpoint
     latest_link = save_dir / "latest"

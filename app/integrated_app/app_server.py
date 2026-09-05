@@ -371,17 +371,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.debug(f"模型权重哈希校验跳过: {e}")
 
-    # H3 整改：PII 留存清理（启动时执行一次；默认保留 90 天）
-    try:
-        from .history_db import get_history_db
-
-        retention = get_config().pydantic_config.security.pii_retention_days
-        if retention > 0:
-            deleted = get_history_db().purge_expired(retention)
-            if deleted:
-                logger.info("[lifespan] PII 留存清理删除 %d 条过期记录", deleted)
-    except Exception as e:
-        logger.debug(f"PII 留存清理跳过: {e}")
+    # 数据治理评估（v2.2.1）修正：PII 留存清理已统一到 get_history_db() 单例创建时
+    # 执行（purge_expired，删 DB+音频），此处不再重复调用，避免双清理路径冲突。
+    # 留存口径：security.pii_retention_days 优先，回退 history.keep_days，0=永久保留。
 
     try:
         from .history_db import get_history_db
@@ -389,6 +381,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         history_manager = get_history_db()
         await run_in_threadpool(history_manager.sync_from_filesystem)
         logger.info("[lifespan] 历史记录全量同步完成")
+        # 数据治理评估（v2.2.1）：同步后扫描孤立记录，标记 file_missing=1
+        # 原实现 cleanup_orphan_records 零调用 → file_missing 从未置位，100/117 路径失效不可见。
+        orphan_count = await run_in_threadpool(history_manager.cleanup_orphan_records)
+        if orphan_count:
+            logger.warning("[lifespan] 检测到 %d 条孤立记录（音频文件缺失），已标记 file_missing=1", orphan_count)
     except Exception as e:
         logger.exception(f"[lifespan] 历史记录全量同步失败: {e}")
 
@@ -1093,7 +1090,7 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
 
     # H2 整改：SSL 接线 —— 与 Image_MultiModel 约定对齐：仅当 ssl.enabled=true
     # 且证书文件存在时启用 HTTPS（uvicorn ssl 上下文），否则回退 HTTP
-    ssl_kwargs: dict[str, str] = {}
+    ssl_kwargs: dict[str, str | None] = {}
     _ssl = get_config().pydantic_config.server.ssl
     if not _ssl.enabled:
         logger.info(

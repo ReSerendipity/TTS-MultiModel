@@ -251,11 +251,15 @@ def get_history_db_path() -> str:
 
 
 def get_history_keep_days() -> int:
-    """返回历史记录保留天数（消除 config.yaml 死配置）。
+    """返回历史记录保留天数（向后兼容别名，已被 pii_retention_days 取代）。
 
     ``config.yaml -> history.keep_days``：
     - ``0`` 或不配置 → 永久保留（默认，向后兼容）；
-    - ``>0`` → 启动与定期任务将裁剪超过该天数的记录。
+    - ``>0`` → 仅当 pii_retention_days <= 0 时作为回退留存天数。
+
+    .. deprecated::
+        留存策略已统一到 ``security.pii_retention_days``（删 DB+音频）。
+        本函数保留仅为向后兼容，新代码请使用 :func:`get_effective_retention_days`。
 
     Returns:
         int: 保留天数（>=0）。
@@ -263,6 +267,32 @@ def get_history_keep_days() -> int:
     try:
         cfg = _load_yaml_config()
         return int((cfg.get("history") or {}).get("keep_days", 0) or 0)
+    except Exception:
+        return 0
+
+
+def get_effective_retention_days() -> int:
+    """返回统一的历史记录留存天数（消除 keep_days 与 pii_retention_days 冲突）。
+
+    优先级：
+    1. ``security.pii_retention_days``（>0 时优先，删 DB+音频）；
+    2. 回退 ``history.keep_days``（>0 时）；
+    3. 0 = 永久保留（不清理）。
+
+    数据治理评估（v2.2.1）发现两条清理路径语义相反且同时生效：
+    ``prune_old_records(keep_days=0)`` 不裁剪 vs ``purge_expired(90)`` 启动即删。
+    本函数作为唯一留存口径，由 ``get_history_db()`` 单例创建时调用一次。
+
+    Returns:
+        int: 生效的留存天数（>=0，0=永久保留）。
+    """
+    try:
+        cfg = _load_yaml_config()
+        pii_retention = int((cfg.get("security") or {}).get("pii_retention_days", 0) or 0)
+        if pii_retention > 0:
+            return pii_retention
+        keep_days = int((cfg.get("history") or {}).get("keep_days", 0) or 0)
+        return keep_days if keep_days > 0 else 0
     except Exception:
         return 0
 

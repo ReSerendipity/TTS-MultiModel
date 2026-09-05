@@ -293,11 +293,8 @@ class HistoryDatabase:
         # H-R6: FTS5 可用性在 _ensure_fts() 中探测并缓存；False 时搜索回退 LIKE。
         self._fts_enabled = False
         self._ensure_table()
-        self._migrate_add_hidden_column()
-        self._migrate_add_created_timestamp_column()
-        self._migrate_add_file_missing_column()
-        self._migrate_add_hmac_columns()
-        self._migrate_add_column("rtf", "REAL")  # P2-7: 实时率指标列，支持质量趋势监控
+        # P2-8：版本化迁移替代运行时探测式迁移
+        self._run_versioned_migrations()
         self._optimize_pragmas()
         self._ensure_indexes()
         self._ensure_fts()
@@ -682,6 +679,63 @@ class HistoryDatabase:
         self._migrate_add_column("prev_hash", "TEXT DEFAULT ''")
         self._migrate_add_column("record_hmac", "TEXT DEFAULT ''")
 
+    # ------------------------------------------------------------------
+    # 版本化迁移机制（P2-8：替代运行时探测式迁移）
+    # ------------------------------------------------------------------
+
+    # 迁移注册表：(version, description, callable)
+    # version 格式 vNNN_描述，按字典序执行；已执行的迁移记录在 _schema_migrations 表。
+    _VERSIONED_MIGRATIONS: list[tuple[str, str, str]] = [
+        ("v001_hidden", "添加 hidden 列（隐藏/显示功能）", "_migrate_add_hidden_column"),
+        ("v002_created_timestamp", "添加 created_timestamp 列（Unix 时间戳）", "_migrate_add_created_timestamp_column"),
+        ("v003_file_missing", "添加 file_missing 列（磁盘文件缺失标记）", "_migrate_add_file_missing_column"),
+        ("v004_hmac_chain", "添加 HMAC 链列（prev_hash + record_hmac）", "_migrate_add_hmac_columns"),
+        ("v005_rtf", "添加 rtf 列（实时率质量指标）", "_migrate_add_rtf_column"),
+    ]
+
+    def _ensure_migrations_table(self) -> None:
+        """创建 _schema_migrations 版本追踪表（幂等）。"""
+        self._execute("""
+            CREATE TABLE IF NOT EXISTS _schema_migrations (
+                version TEXT PRIMARY KEY,
+                description TEXT NOT NULL,
+                applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+
+    def _migrate_add_rtf_column(self) -> None:
+        """P2-7：添加 rtf 列（实时率指标，支持质量趋势监控）。"""
+        self._migrate_add_column("rtf", "REAL")
+
+    def _run_versioned_migrations(self) -> None:
+        """按版本顺序执行未执行的迁移，并记录到 _schema_migrations 表。
+
+        替代原 __init__ 中直接调用各 _migrate_add_* 方法的运行时探测模式。
+        每个迁移执行前检查版本表，已执行则跳过；执行成功后记录版本号。
+        现有 _migrate_add_column 仍为幂等探测，重复执行安全。
+        """
+        self._ensure_migrations_table()
+        applied = {row[0] for row in self._execute("SELECT version FROM _schema_migrations").fetchall()}
+
+        for version, description, method_name in self._VERSIONED_MIGRATIONS:
+            if version in applied:
+                continue
+            method = getattr(self, method_name, None)
+            if method is None:
+                logger.warning("版本化迁移 %s 对应方法 %s 不存在，跳过", version, method_name)
+                continue
+            try:
+                method()
+                with self._transaction() as conn:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO _schema_migrations (version, description) VALUES (?, ?)",
+                        (version, description),
+                    )
+                logger.info("版本化迁移已执行: %s (%s)", version, description)
+            except Exception as e:
+                logger.error("版本化迁移 %s 失败: %s", version, e)
+                raise
+
     def _ensure_indexes(self) -> None:
         """创建常用查询模式所需的索引（如果不存在）。
 
@@ -811,10 +865,31 @@ class HistoryDatabase:
         """
         if timestamp is None:
             timestamp = record.get("created_timestamp", time.time())
+        # 数据治理评估（v2.2.1）：统一 created_at 与 created_timestamp 口径
+        # 原实现 created_at 直接透传调用方值（可能是 ISO 格式或空格格式），
+        # created_timestamp 另取 time.time()，导致 105 条记录两者不一致。
+        # 现以 created_timestamp 为权威时间源，created_at 统一格式派生。
+        from datetime import datetime
+
+        created_at = record.get("created_at", "")
+        if not created_at and timestamp:
+            try:
+                created_at = datetime.fromtimestamp(float(timestamp)).strftime("%Y-%m-%d %H:%M:%S")
+            except (ValueError, OSError):
+                created_at = ""
+        elif created_at:
+            # 统一格式：兼容 ISO(2026-05-04T19:05:01.065337) 和空格格式
+            for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+                try:
+                    parsed = datetime.strptime(created_at, fmt)
+                    created_at = parsed.strftime("%Y-%m-%d %H:%M:%S")
+                    break
+                except ValueError:
+                    continue
         return (
             record.get("filename", ""),
             record.get("filepath", ""),
-            record.get("created_at", ""),
+            created_at,
             record.get("file_size_bytes", 0),
             record.get("duration_seconds"),
             _encrypt_pii(record.get("text_preview", "")),
@@ -945,26 +1020,63 @@ class HistoryDatabase:
     def _get_hmac_secret() -> bytes:
         """P2: 获取或生成历史记录 HMAC 密钥。
 
-        密钥持久化在 ``data/.history_hmac_key`` 文件中，首次调用时自动生成。
+        数据治理评估（v2.2.1）修正：密钥原存储在 ``data/.history_hmac_key``，
+        与数据库同目录，攻击者拿到 data/ 即同时拿到密钥，链防护归零。
+        现迁移到用户配置目录（与 DB 隔离）：
+        - Windows: ``%APPDATA%/tts-multimodel/.history_hmac_key``
+        - Linux/macOS: ``~/.config/tts-multimodel/.history_hmac_key``
+        - 环境变量 ``TTS_HISTORY_HMAC_KEY`` 优先级最高
+        - 旧路径 ``data/.history_hmac_key`` 存在时自动迁移到新路径
 
         Returns:
             HMAC 密钥字节串。
         """
         import hashlib
+        import platform
 
-        key_path = os.path.join(
+        # 环境变量优先
+        env_key = os.environ.get("TTS_HISTORY_HMAC_KEY", "")
+        if env_key:
+            return env_key.strip().encode("utf-8")
+
+        # 新密钥路径（用户配置目录，与 DB 隔离）
+        if platform.system() == "Windows":
+            config_base = os.environ.get("APPDATA", os.path.expanduser("~"))
+        else:
+            config_base = os.path.join(os.path.expanduser("~"), ".config")
+        key_dir = os.path.join(config_base, "tts-multimodel")
+        key_path = os.path.join(key_dir, ".history_hmac_key")
+
+        # 旧路径（向后兼容：存在时迁移到新路径）
+        old_key_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", ".history_hmac_key"
         )
+
         try:
-            os.makedirs(os.path.dirname(key_path), exist_ok=True)
+            os.makedirs(key_dir, exist_ok=True)
+            # 迁移：旧密钥存在且新密钥不存在 → 复制到新路径
+            if not os.path.exists(key_path) and os.path.exists(old_key_path):
+                with open(old_key_path, encoding="utf-8") as f:
+                    old_key = f.read().strip()
+                if old_key:
+                    with open(key_path, "w", encoding="utf-8") as f:
+                        f.write(old_key)
+                    with contextlib.suppress(OSError):
+                        os.chmod(key_path, 0o600)
+                    logger.info("[history_db] HMAC 密钥已从 data/ 迁移到用户配置目录")
+
             if os.path.exists(key_path):
                 with open(key_path, encoding="utf-8") as f:
                     return f.read().strip().encode("utf-8")
+
+            # 首次生成
             import secrets
 
             new_key = secrets.token_urlsafe(48)
             with open(key_path, "w", encoding="utf-8") as f:
                 f.write(new_key)
+            with contextlib.suppress(OSError):
+                os.chmod(key_path, 0o600)
             return new_key.encode("utf-8")
         except OSError:
             # 回退到固定密钥（仅在文件系统不可用时）
@@ -1011,6 +1123,61 @@ class HistoryDatabase:
         except Exception as exc:
             logger.warning("[history_db] HMAC 链计算失败（已忽略）: %s", exc)
 
+    def _recompute_chain_from(self, start_id: int) -> int:
+        """数据治理评估（v2.2.1）：从指定 id 开始重算 HMAC 链。
+
+        删除记录后，后继节点的 prev_hash 会指向已删除的记录，导致链断裂。
+        本方法从 start_id（含）开始逐条重新计算 prev_hash 和 record_hmac，
+        维护链连续性。
+
+        Args:
+            start_id: 起始记录 id（含）。
+
+        Returns:
+            重算的记录数。
+        """
+        import hashlib
+        import hmac as _hmac
+
+        try:
+            secret = self._get_hmac_secret()
+        except Exception as exc:
+            logger.warning("[history_db] HMAC 密钥获取失败，跳过重算: %s", exc)
+            return 0
+
+        try:
+            with self._transaction() as conn:
+                # 获取 start_id 之前最后一条记录的 HMAC 作为链头
+                prev_row = conn.execute(
+                    "SELECT record_hmac FROM generation_history WHERE id < ? ORDER BY id DESC LIMIT 1",
+                    (start_id,),
+                ).fetchone()
+                prev_hash = prev_row[0] if prev_row and prev_row[0] else ""
+
+                rows = conn.execute(
+                    "SELECT id, filename, filepath, created_at, engine, text_preview "
+                    "FROM generation_history WHERE id >= ? ORDER BY id ASC",
+                    (start_id,),
+                ).fetchall()
+                count = 0
+                for row in rows:
+                    rowid, filename, filepath, created_at, engine, text_preview = row
+                    record_str = f"{filename}|{filepath}|{created_at}|{engine}|{text_preview}"
+                    record_hash = hashlib.sha256(record_str.encode("utf-8")).hexdigest()
+                    hmac_value = _hmac.new(secret, f"{prev_hash}{record_hash}".encode(), hashlib.sha256).hexdigest()
+                    conn.execute(
+                        "UPDATE generation_history SET prev_hash = ?, record_hmac = ? WHERE id = ?",
+                        (prev_hash, hmac_value, rowid),
+                    )
+                    prev_hash = hmac_value
+                    count += 1
+                if count:
+                    logger.debug("[history_db] 已从 id=%s 重算 HMAC 链 %d 条", start_id, count)
+                return count
+        except Exception as exc:
+            logger.warning("[history_db] HMAC 链重算失败（已忽略）: %s", exc)
+            return 0
+
     def purge_expired(self, retention_days: int) -> int:
         """H3：按留存期限清理过期历史记录及其音频文件。
 
@@ -1033,12 +1200,15 @@ class HistoryDatabase:
             logger.warning("[history_db] 留存清理查询失败: %s", exc)
             return 0
         deleted = 0
+        min_deleted_id: int | None = None
         for row in rows:
             _id, filepath = row["id"], row["filepath"]
             try:
                 with self._transaction() as conn:
                     conn.execute("DELETE FROM generation_history WHERE id = ?", (_id,))
                 deleted += 1
+                if min_deleted_id is None or _id < min_deleted_id:
+                    min_deleted_id = _id
             except Exception as exc:  # noqa: BLE001
                 logger.warning("[history_db] 留存清理删除记录 %s 失败: %s", _id, exc)
                 continue
@@ -1049,6 +1219,9 @@ class HistoryDatabase:
                     logger.debug("[history_db] 留存清理删除文件 %s 失败: %s", filepath, exc)
         if deleted:
             logger.info("[history_db] 留存清理已删除 %d 条超过 %d 天的记录", deleted, retention_days)
+            # 数据治理评估（v2.2.1）：删除后重算 HMAC 链，避免后继节点断链
+            if min_deleted_id is not None:
+                self._recompute_chain_from(min_deleted_id)
         return deleted
 
     # ---------------------------------------------------------------------------
@@ -1190,6 +1363,15 @@ class HistoryDatabase:
             params_list: list[tuple[Any, ...]] = [self._build_record_tuple(r, timestamp=now) for r in chunk]
             with self._transaction() as conn:
                 conn.executemany(_INSERT_SQL, params_list)
+                # 数据治理评估（v2.2.1）：批量插入后补算 HMAC 链
+                # 原实现仅单条 insert() 计算 HMAC，sync 批量路径不计算 → 仅 19/137 有链。
+                # 现通过 filepath（UNIQUE 键）回查 rowid，逐条补算。
+                for r in chunk:
+                    fp = r.get("filepath")
+                    if fp:
+                        row = conn.execute("SELECT id FROM generation_history WHERE filepath = ?", (fp,)).fetchone()
+                        if row:
+                            self._compute_and_store_hmac(conn, row[0], r)
                 total_inserted += len(chunk)
         return total_inserted
 
@@ -1642,6 +1824,8 @@ class HistoryDatabase:
             else:
                 # 文件不存在（可能被用户手动清理），不视为失败
                 logger.info(f"[history_db] 文件已不存在，跳过删除: {filepath_to_delete}")
+        # 数据治理评估（v2.2.1）：删除后重算 HMAC 链，避免后继节点 prev_hash 断链
+        self._recompute_chain_from(record_id)
         return (True, "")
 
     def delete_multiple_records_by_ids(
@@ -1710,6 +1894,9 @@ class HistoryDatabase:
                 else:
                     # 文件已被用户手动清理，不视为失败
                     logger.info(f"[history_db] 文件已不存在，跳过删除: {filepath}")
+        # 数据治理评估（v2.2.1）：批量删除后重算 HMAC 链
+        if deleted_count > 0 and unique_ids:
+            self._recompute_chain_from(min(unique_ids))
         return (deleted_count, failed_files)
 
     def delete_multiple_records(
@@ -1737,12 +1924,20 @@ class HistoryDatabase:
         filenames = list(dict.fromkeys(filenames))
         filepaths_to_delete: list[str] = []
         count = 0
+        min_deleted_id: int | None = None
 
         # H-R4: 事务内只做 DB 操作，收集待删文件路径
         for chunk_start in range(0, len(filenames), _CHUNK_SIZE):
             chunk = filenames[chunk_start : chunk_start + _CHUNK_SIZE]
             placeholders = ",".join("?" * len(chunk))
             with self._transaction() as conn:
+                # 数据治理评估（v2.2.1）：删除前记录最小 id，用于删除后重算 HMAC 链
+                min_row = conn.execute(
+                    f"SELECT MIN(id) FROM generation_history WHERE filename IN ({placeholders})",
+                    chunk,
+                ).fetchone()
+                if min_row and min_row[0] is not None and (min_deleted_id is None or min_row[0] < min_deleted_id):
+                    min_deleted_id = min_row[0]
                 if delete_files:
                     cursor = conn.execute(
                         f"SELECT filepath FROM generation_history WHERE filename IN ({placeholders})",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
@@ -1768,6 +1963,9 @@ class HistoryDatabase:
                         logger.error(f"删除文件失败 {filepath}: {e}")
                 else:
                     logger.info(f"[history_db] 文件已不存在，跳过删除: {filepath}")
+        # 数据治理评估（v2.2.1）：删除后重算 HMAC 链
+        if count > 0 and min_deleted_id is not None:
+            self._recompute_chain_from(min_deleted_id)
         return count
 
     def hide_multiple_records(self, filenames: list[str]) -> int:
@@ -1986,6 +2184,9 @@ class HistoryDatabase:
                     )
                     deleted_count += cursor.rowcount
             logger.info(f"[history_db] 清理文件缺失记录: 候选 {candidate_count} 条，实际删除 {deleted_count} 条")
+            # 数据治理评估（v2.2.1）：删除后重算 HMAC 链
+            if deleted_count > 0 and to_delete_ids:
+                self._recompute_chain_from(min(to_delete_ids))
         return (candidate_count, deleted_count)
 
     # ------------------------------------------------------------------
@@ -2140,6 +2341,12 @@ class HistoryDatabase:
 
         cutoff = time.time() - keep_days * 86400.0
         with self._transaction() as conn:
+            # 数据治理评估（v2.2.1）：删除前记录最小 id，用于删除后重算 HMAC 链
+            min_row = conn.execute(
+                "SELECT MIN(id) FROM generation_history WHERE created_timestamp > 0 AND created_timestamp < ?",
+                (cutoff,),
+            ).fetchone()
+            min_deleted_id = min_row[0] if min_row and min_row[0] is not None else None
             cursor = conn.execute(
                 "DELETE FROM generation_history WHERE created_timestamp > 0 AND created_timestamp < ?",
                 (cutoff,),
@@ -2147,6 +2354,9 @@ class HistoryDatabase:
             deleted = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
         if deleted:
             logger.info(f"已按 keep_days={keep_days} 裁剪 {deleted} 条过期历史记录")
+            # 数据治理评估（v2.2.1）：删除后重算 HMAC 链
+            if min_deleted_id is not None:
+                self._recompute_chain_from(min_deleted_id)
         return deleted
 
     def validate_integrity(self) -> tuple[bool, str]:
@@ -2265,7 +2475,13 @@ def get_history_db() -> HistoryDatabase:
 
     单例模式确保全应用共享同一个数据库连接池和索引，避免多线程各自实例化
     导致连接泄漏和数据不一致。首次调用时自动创建数据目录、运行 JSON 迁移，
-    并按 ``config.yaml -> history.keep_days`` 执行一次历史裁剪。
+    并按统一留存口径 ``get_effective_retention_days()`` 执行一次留存清理
+    （删 DB 记录 + 关联音频文件，0=永久保留不清理）。
+
+    数据治理评估（v2.2.1）修正：原实现同时调用 ``prune_old_records(keep_days)``
+    （只删 DB）与 lifespan 中的 ``purge_expired(pii_retention_days)``（删 DB+音频），
+    两条路径语义相反且冲突。现统一为单例创建时调用一次 ``purge_expired``，
+    lifespan 中不再重复调用。
 
     Returns:
         HistoryDatabase: 全局共享的历史记录数据库实例。
@@ -2275,7 +2491,7 @@ def get_history_db() -> HistoryDatabase:
         with _singleton_lock:
             # 双重检查，避免锁内重复创建
             if _history_db is None:
-                from .config import get_history_db_path, get_history_keep_days
+                from .config import get_effective_retention_days, get_history_db_path
 
                 # 路径优先级：TTS_HISTORY_DB_PATH 环境变量 > config.yaml history.db_path
                 # > data/history.db 默认值。环境变量用于容器持久化卷挂载场景；
@@ -2286,13 +2502,50 @@ def get_history_db() -> HistoryDatabase:
                 # Run JSON migration on first initialization
                 _history_db._migrate_from_json()
 
-                # 按 keep_days 自动裁剪历史记录（0 = 永久保留，默认行为不变）
+                # 统一留存清理：pii_retention_days 优先，回退 keep_days，0=不清理
+                # purge_expired 同时删除 DB 记录与关联音频文件（避免孤儿文件）
                 try:
-                    pruned = _history_db.prune_old_records(get_history_keep_days())
-                    if pruned:
-                        logger.info(f"[history_db] 启动裁剪：已删除 {pruned} 条过期历史记录")
-                except Exception as e:  # nosec B110 - 裁剪失败不应阻断启动
-                    logger.warning(f"[history_db] 启动裁剪历史记录失败（已忽略）: {e}")
+                    retention = get_effective_retention_days()
+                    if retention > 0:
+                        purged = _history_db.purge_expired(retention)
+                        if purged:
+                            logger.info(f"[history_db] 启动留存清理：已删除 {purged} 条超过 {retention} 天的记录及音频")
+                except Exception as e:  # nosec B110 - 清理失败不应阻断启动
+                    logger.warning(f"[history_db] 启动留存清理失败（已忽略）: {e}")
+
+                # 数据治理评估（v2.2.1）：启动时校验 HMAC 链完整性
+                # 原实现 verify_chain_integrity 零调用（只写不验），链断裂无人发现。
+                # 现启动时自动校验，发现篡改记录 WARNING 日志（不阻断启动）。
+                try:
+                    chain_result = _history_db.verify_chain_integrity()
+                    if not chain_result.get("verified", True):
+                        logger.warning(
+                            "[history_db] HMAC 链校验未通过：total=%s tampered=%s first_tampered_id=%s",
+                            chain_result.get("total"),
+                            chain_result.get("tampered_count"),
+                            chain_result.get("first_tampered_id"),
+                        )
+                    else:
+                        logger.debug("[history_db] HMAC 链校验通过：%s 条记录", chain_result.get("total"))
+                except Exception as e:  # nosec B110 - 链校验失败不应阻断启动
+                    logger.warning(f"[history_db] HMAC 链校验异常（已忽略）: {e}")
+
+                # 数据治理评估（v2.2.1）：一次性 HMAC 链回填
+                # 历史数据仅 19/137 条有 HMAC 且链已断裂（批量插入路径原不计算 HMAC）。
+                # 检测到空 HMAC 记录时全量重算链，并用 meta_kv 标记避免重复执行。
+                try:
+                    backfill_done = _history_db.load_kv("hmac_backfill_done")
+                    if not backfill_done:
+                        empty_hmac = _history_db._execute(
+                            "SELECT COUNT(*) FROM generation_history WHERE record_hmac IS NULL OR record_hmac = ''"
+                        ).fetchone()[0]
+                        if empty_hmac > 0:
+                            logger.info("[history_db] 检测到 %d 条无 HMAC 记录，执行全量链回填", empty_hmac)
+                            recomputed = _history_db._recompute_chain_from(0)
+                            _history_db.save_kv("hmac_backfill_done", "1")
+                            logger.info("[history_db] HMAC 链回填完成：重算 %d 条记录", recomputed)
+                except Exception as e:  # nosec B110 - 回填失败不应阻断启动
+                    logger.warning(f"[history_db] HMAC 链回填异常（已忽略）: {e}")
     return _history_db
 
 
