@@ -196,10 +196,21 @@ def setup_logging() -> None:
     root_logger.addHandler(stream_handler)
 
     # 文件输出（按大小轮转）
+    # 运维稳定性评估 P2：轮转参数改为消费 config.yaml（此前硬编码 10MB/3，
+    # 改配置无效——配置漂移）。读取失败时回退内置默认值，保证启动不依赖配置可用性。
+    _rot_size_mb, _rot_count = 10, 3
+    try:
+        from .config import _load_yaml_config
+
+        _log_cfg = (_load_yaml_config() or {}).get("logging") or {}
+        _rot_size_mb = int(_log_cfg.get("file_size_mb") or 10)
+        _rot_count = int(_log_cfg.get("file_count") or 3)
+    except Exception:  # noqa: BLE001
+        pass
     file_handler = RotatingFileHandler(
         log_path,
-        maxBytes=10 * 1024 * 1024,
-        backupCount=3,
+        maxBytes=_rot_size_mb * 1024 * 1024,
+        backupCount=_rot_count,
         encoding="utf-8",
     )
     file_handler.setFormatter(formatter)
@@ -249,41 +260,6 @@ def _discover_routes(package_name: str = ".routes") -> list[str]:
             continue
 
     return discovered
-
-
-def _auto_discover_routers(routes_package: Any, prefix: str = "") -> list[Any]:
-    """Recursively discover and collect routers from routes package.
-
-    Handles both top-level modules (e.g., pages.py) and sub-packages
-    (e.g., system/health.py, generate/voxcpm2/design.py).
-
-    Args:
-        routes_package: The routes package to scan (must have __path__ attribute).
-        prefix: Current import prefix for nested packages.
-
-    Returns:
-        List of FastAPI APIRouter instances.
-    """
-    routers: list[Any] = []
-    if not hasattr(routes_package, "__path__"):
-        return routers
-    for _importer, modname, ispkg in pkgutil.iter_modules(routes_package.__path__):
-        full_name = f"{prefix}{modname}" if prefix else modname
-        try:
-            mod = importlib.import_module(f".routes.{full_name}", package="integrated_app")
-            if hasattr(mod, "router"):
-                routers.append(mod.router)
-        except Exception as e:
-            logger.warning(f"[路由发现] 导入 {full_name} 失败: {e}")
-
-        if ispkg:
-            try:
-                subpkg = importlib.import_module(f".routes.{full_name}", package="integrated_app")
-                routers.extend(_auto_discover_routers(subpkg, f"{full_name}."))
-            except Exception as e:
-                logger.warning(f"[路由发现] 递归扫描 {full_name} 失败: {e}")
-
-    return routers
 
 
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -457,9 +433,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     from . import metrics as _m
 
                     if _m.ENABLED:
-                        from .task_queue import get_queue_status as _qs
-
-                        _m.set_queue_depth(int(_qs().get("queue_size", 0) or 0))
                         from .model_registry import registry
 
                         _m.set_models_ok(bool(registry.is_engine_ready()))
@@ -477,15 +450,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.debug(f"[lifespan] 告警规则评估任务启动跳过: {e}")
         _alert_task = None
-
-    # 初始化异步生成任务队列（参考 VoiceBox 串行队列设计）
-    try:
-        from .task_queue import init_queue
-
-        await init_queue()
-        logger.info("[lifespan] 异步生成任务队列已初始化")
-    except Exception as e:
-        logger.debug(f"[lifespan] 任务队列初始化失败（将使用信号量机制）: {e}")
 
     # P1-2: 断点续跑 — 启动时扫描未完成的 checkpoint 并尝试恢复（来源：Image_MultiModel）
     # 设计：
@@ -720,15 +684,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.debug(f"[lifespan] 超期上传文件清理跳过: {e}")
 
-    # 关闭异步生成任务队列
-    try:
-        from .task_queue import shutdown_queue
-
-        await shutdown_queue()
-        logger.info("[lifespan] 异步生成任务队列已关闭")
-    except Exception:
-        logger.debug("[lifespan] 任务队列关闭异常")
-
     _set_event_loop(None)
     logger.info("[lifespan] Shutdown 阶段完成")
 
@@ -749,7 +704,7 @@ def create_app() -> FastAPI:
     路由挂载：
         - ``/static``：CachedStaticFiles 静态资源（带 Cache-Control）
         - ``/api/persona``、``/api/model``、``/api/generate/*`` 等：
-          通过 ``_auto_discover_routers`` 自动发现并 include_router
+          通过 ``_discover_routes`` 递归发现并 include_router
 
     Raises:
         无：模板目录不存在时会回退到最小模板，不会抛出异常。
@@ -963,28 +918,31 @@ def create_app() -> FastAPI:
         return Response(content=build_metrics_text(), media_type="text/plain; version=0.0.4")
 
     # --- 自动发现并挂载路由，单个模块失败不影响其他路由 ---
-    from . import routes
-
     route_modules = _discover_routes(".routes")
+    # P2-1：两阶段挂载。
+    # 阶段 1：全量导入所有路由模块。routes/generate 采用"共享 router"模式——
+    # utils.py 定义主 router，子模块（clone/design/streaming 等）导入同一对象
+    # 并在其上注册端点。必须先导入全部模块（触发所有注册），否则若先发现
+    # utils.py 并立即 include，此时 router 尚为空，后续子模块注册的端点不会
+    # 出现在 app 中。
+    # 阶段 2：按 router 对象去重后 include。同一共享 router 被多个模块 re-export，
+    # 逐个 include 会导致每条路由重复 N 次（此前 281 条 Duplicate Operation ID）。
+    _seen_router_ids: set[int] = set()
+    _unique_routers: list[Any] = []
     for mod_name in route_modules:
         try:
             mod = importlib.import_module(mod_name)
             if hasattr(mod, "router"):
-                app.include_router(mod.router)
+                r = mod.router
+                rid = id(r)
+                if rid not in _seen_router_ids:
+                    _seen_router_ids.add(rid)
+                    _unique_routers.append(r)
         except Exception as e:
             logger.warning(f"[create_app] 路由模块 {mod_name} 导入失败: {e}")
             continue
-
-    # 兼容旧的 _auto_discover_routers 逻辑（兜底）
-    legacy_routers = _auto_discover_routers(routes)
-    for r in legacy_routers:
-        already_mounted = False
-        for existing in app.routes:
-            if getattr(existing, "path_prefix", None) == getattr(r, "prefix", None):
-                already_mounted = True
-                break
-        if not already_mounted:
-            app.include_router(r)
+    for r in _unique_routers:
+        app.include_router(r)
 
     # OpenAI 兼容 API 路由挂载（/v1/* 端点）
     try:

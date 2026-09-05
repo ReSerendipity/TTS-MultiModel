@@ -16,7 +16,7 @@ Settings 面板、k8s 健康探针、运维监控使用。
 
 设计说明：
     各子路由（health / gpu / logs / settings）各自带 ``prefix="/api/system"``，
-    由上层 ``app_server._auto_discover_routers`` 递归遍历本包并**逐个**挂载，
+    由上层 ``app_server._discover_routes`` 递归遍历本包并**逐个**挂载，
     因此本文件的聚合 ``router`` 不再 ``include_router`` 子路由（否则会产生
     ``/api/system/api/system/*`` 双前缀重复路由），仅作为兼容显式导入的空命名空间。
 """
@@ -33,7 +33,7 @@ from .logs import router as logs_router
 from .settings import router as settings_router
 
 # 说明：本包的 router 故意保持为空，不再 include 子路由。
-# 原因：app_server._auto_discover_routers 会递归遍历本包并逐个挂载
+# 原因：app_server._discover_routes 会递归遍历本包并逐个挂载
 # health / gpu / logs / settings 各自的 router（它们已带 prefix="/api/system"）。
 # 若这里再 include 一次，就会叠加出 /api/system/api/system/* 的双前缀重复路由。
 # 保留 router 属性仅为兼容显式导入；实际注册以自动发现挂载的子路由为准。
