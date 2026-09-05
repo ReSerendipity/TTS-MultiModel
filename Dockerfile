@@ -8,14 +8,23 @@
 
 # 基础镜像版本钉死（非 latest），保证构建可复现。
 # 如需进一步锁定，可改为 nvidia/cuda:12.1.0-runtime-ubuntu22.04@sha256:<digest>
+# （注意：锁定 digest 后 apt-get upgrade 的补丁集也被冻结，需随 CVE 公告定期 bump digest）
 FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y \
-    python3.10 python3-pip python3.10-venv git git-lfs ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+# P1-1（云原生评估 2026-09-05）：Python 3.10 → 3.12，与 CI（ci.yml 3.12）及
+# README 推荐版本统一，消除"测的是 3.12、发的是 3.10"漂移。
+# Ubuntu 22.04 官方源无 3.12，经 deadsnakes PPA 提供（torch/funasr 等全量依赖均有 cp312 wheel）。
+# --no-install-recommends：不拉 idle/lib2to3 等推荐包，减小体积与 CVE 面。
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common git git-lfs ffmpeg ca-certificates \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 python3.12-venv \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3.12 -m ensurepip --upgrade
 
 RUN git lfs install
 
@@ -25,9 +34,10 @@ COPY pyproject.toml requirements.txt ./
 COPY app ./app
 
 # Install build tooling and project dependencies, then build the wheel.
-RUN pip3 install --no-cache-dir --user -r requirements.txt \
-    && pip3 install --no-cache-dir --user build setuptools>=68.0 \
-    && python3 -m build --wheel
+# 显式 python3.12 -m pip：Ubuntu 22.04 的裸 pip3/python3 仍指向系统 3.10。
+RUN python3.12 -m pip install --no-cache-dir --user -r requirements.txt \
+    && python3.12 -m pip install --no-cache-dir --user build "setuptools>=68.0" \
+    && python3.12 -m build --wheel
 
 # ------------------------------------------------------------------------------
 
@@ -40,9 +50,14 @@ ENV PYTHONUNBUFFERED=1
 # （openssl CVE-2026-45447、gnupg/dirmngr CVE-2025-68973 等；修复版本均已在 22.04 安全仓库发布）。
 # 基础镜像 nvidia/cuda:12.1.0-runtime-ubuntu22.04 自带未打补丁的 openssl/libssl3/dirmngr 等，
 # 不显式升级则 Trivy 安全门禁会因未修复的高危漏洞持续报红。DEBIAN_FRONTEND=noninteractive 已设，无交互阻塞。
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-    python3.10 python3-pip ffmpeg \
+# ⚠ 可复现性提示（P2-2）：upgrade 的补丁集随构建日期漂移，如需可复现构建请锁定基础镜像 digest 并定期 bump。
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common ca-certificates ffmpeg \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends python3.12 \
     && rm -rf /var/lib/apt/lists/* \
+    && python3.12 -m ensurepip --upgrade \
     && groupadd -r ttsuser \
     && useradd -r -g ttsuser -d /app -s /sbin/nologin ttsuser
 
@@ -53,7 +68,7 @@ COPY --from=builder /root/.local /home/ttsuser/.local
 
 # Copy the built wheel and install it so package metadata is available.
 COPY --from=builder /build/dist/*.whl /tmp/
-RUN pip3 install --no-cache-dir --user /tmp/*.whl \
+RUN python3.12 -m pip install --no-cache-dir --user /tmp/*.whl \
     && rm -f /tmp/*.whl
 
 # Copy application source for templates/static and editable-style imports.
@@ -84,11 +99,16 @@ ENV TTS_AUTO_LOAD_ENGINE=voxcpm2
 # 结构化日志：设为 json 可输出 JSON 格式便于 Loki/ELK 采集
 ENV TTS_LOG_FORMAT=text
 
+# 存活探针（liveness）：ping 仅证明进程响应，**不等于模型就绪**（12-Factor IX 的
+# 深度就绪检查由 k8s readinessProbe→/readyz 承担；docker 路线无独立 readiness 概念，
+# 客户端应自行轮询 /api/health/ready 确认模型加载完成后再发合成请求，见 docker-compose.yml 注释）。
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:7869/api/health/ping')" || exit 1
+  CMD python3.12 -c "import urllib.request; urllib.request.urlopen('http://localhost:7869/api/health/ping')" || exit 1
 
-# 优雅停机：容器收到 SIGTERM 后由 uvicorn 默认 30s 宽限期排空在途请求。
+# 优雅停机：收到 SIGTERM 后由 uvicorn timeout_graceful_shutdown 排空在途请求。
+# 应用层默认 60s（app_server.py: TTS_GRACEFUL_SHUTDOWN_S 默认值，可 ENV 覆盖）；
+# k8s terminationGracePeriodSeconds=90 已留出 60s 排水 + 30s 余量（P2-4 三处对齐）。
 STOPSIGNAL SIGTERM
 
 # 0.0.0.0 仅在 TTS_API_AUTH_ENABLED=1 且 token 就绪时安全网放行（否则容器拒绝启动）
-CMD ["python3", "-c", "import os; from integrated_app.app_server import run_server; run_server(os.environ.get('TTS_BIND_HOST','0.0.0.0'), int(os.environ.get('TTS_BIND_PORT','7869')))"]
+CMD ["python3.12", "-c", "import os; from integrated_app.app_server import run_server; run_server(os.environ.get('TTS_BIND_HOST','0.0.0.0'), int(os.environ.get('TTS_BIND_PORT','7869')))"]
