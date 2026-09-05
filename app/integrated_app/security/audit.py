@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -25,12 +26,41 @@ _AUDIT_MAX_MEM = 500
 _audit_ring: deque[dict[str, Any]] = deque(maxlen=_AUDIT_MAX_MEM)
 _audit_lock = threading.Lock()
 
+# P1 安全整改：默认开启审计后需防止日志无限增长，按大小轮转
+_AUDIT_MAX_BYTES = 10 * 1024 * 1024  # 10MB
+_AUDIT_MAX_BACKUPS = 3
+
 
 def _resolve_audit_path() -> str:
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     data_dir = os.path.join(root, "data")
     os.makedirs(data_dir, exist_ok=True)
     return os.path.join(data_dir, "audit.log")
+
+
+def _rotate_audit_log_if_needed(path: str) -> None:
+    """按大小轮转审计日志（P1 安全整改：默认开启后防止无限增长）。
+
+    超过 _AUDIT_MAX_BYTES 时执行轮转：删除最旧备份 .{MAX_BACKUPS}，
+    其余备份依次后移，当前日志重命名为 .1。
+    """
+    try:
+        if not os.path.isfile(path) or os.path.getsize(path) < _AUDIT_MAX_BYTES:
+            return
+    except OSError:
+        return
+    oldest = f"{path}.{_AUDIT_MAX_BACKUPS}"
+    if os.path.isfile(oldest):
+        with contextlib.suppress(OSError):
+            os.remove(oldest)
+    for i in range(_AUDIT_MAX_BACKUPS - 1, 0, -1):
+        src = f"{path}.{i}"
+        dst = f"{path}.{i + 1}"
+        if os.path.isfile(src):
+            with contextlib.suppress(OSError):
+                os.rename(src, dst)
+    with contextlib.suppress(OSError):
+        os.rename(path, f"{path}.1")
 
 
 def _audit_enabled() -> bool:
@@ -76,7 +106,9 @@ def log_audit(
         _audit_ring.append(entry)
         if _audit_enabled():
             try:
-                with open(_resolve_audit_path(), "a", encoding="utf-8") as f:
+                audit_path = _resolve_audit_path()
+                _rotate_audit_log_if_needed(audit_path)
+                with open(audit_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(entry, ensure_ascii=False) + "\n")
             except OSError as exc:
                 logger.warning("[AUDIT] 写入审计日志失败: %s", exc)

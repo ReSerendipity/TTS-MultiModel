@@ -12,6 +12,12 @@ if _APP_DIR not in sys.path:
 os.environ.setdefault("TTS_SKIP_MODEL_LOAD", "1")
 
 
+@pytest.fixture(autouse=True)
+def _disable_pii_encryption_for_history_tests(monkeypatch):
+    """历史库 CRUD/FTS 测试基于明文假设；PII 加密行为由 test_pii_encryption.py 单独覆盖。"""
+    monkeypatch.setattr("integrated_app.history_db._get_pii_cipher", lambda: None)
+
+
 class TestHistoryDatabase:
     """Test HistoryDatabase CRUD operations."""
 

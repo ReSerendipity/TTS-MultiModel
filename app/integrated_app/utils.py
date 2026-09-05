@@ -120,6 +120,50 @@ def cleanup_temp_files(files: Iterable[str] | None = None) -> int:
     return removed_count
 
 
+def cleanup_expired_uploads(ttl_days: int = 30) -> int:
+    """递归清理 outputs/uploads/ 中超期的上传参考音频。
+
+    P1 安全整改：上传的参考音频可能含说话人语音生物特征，需设留存 TTL。
+    使用 os.walk 递归扫描子目录（现有 cleanup_temp_files 的单层 glob 不覆盖
+    outputs/uploads/ 下的子目录结构）。
+
+    Args:
+        ttl_days: 留存天数，超过此天数未修改的文件将被删除。0 表示不清理。
+
+    Returns:
+        实际删除的文件数量。
+    """
+    if ttl_days <= 0:
+        return 0
+
+    upload_dir = os.path.join(SAVE_DIR, "uploads")
+    if not os.path.isdir(upload_dir):
+        return 0
+
+    now = time.time()
+    cutoff = now - ttl_days * 86400
+    removed_count = 0
+
+    try:
+        for root, _dirs, files in os.walk(upload_dir):
+            for fname in files:
+                fpath = os.path.join(root, fname)
+                try:
+                    mtime = os.path.getmtime(fpath)
+                    if mtime < cutoff:
+                        with contextlib.suppress(OSError):
+                            os.remove(fpath)
+                            removed_count += 1
+                except OSError:
+                    pass
+    except OSError as e:
+        logger.debug(f"清理过期上传文件失败（忽略）: {type(e).__name__}: {e}")
+
+    if removed_count > 0:
+        logger.info(f"[cleanup_expired_uploads] 已清理 {removed_count} 个超期上传文件（TTL={ttl_days}天）")
+    return removed_count
+
+
 def get_role_color(role_name: str) -> tuple[str, str]:
     """获取角色对应的颜色标识。
 

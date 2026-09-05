@@ -93,10 +93,11 @@ def _get_pii_cipher() -> "Fernet | None":
             with open(key_path, encoding="utf-8") as f:
                 raw = f.read().strip()
             if raw:
-                return Fernet(raw.encode("utf-8"))
-        import secrets as _secrets
-
-        new_key = _secrets.token_urlsafe(44)
+                try:
+                    return Fernet(raw.encode("utf-8"))
+                except Exception:  # noqa: BLE001 — 旧版 bug 生成的无效密钥（59 字符），重新生成
+                    logger.warning("[history_db] 现有 PII 密钥无效，重新生成")
+        new_key = Fernet.generate_key().decode("utf-8")
         with open(key_path, "w", encoding="utf-8") as f:
             f.write(new_key)
         os.chmod(key_path, 0o600)
@@ -559,16 +560,23 @@ class HistoryDatabase:
         if search_text:
             # [H-R6] 优先 FTS5 子查询（O(log n)），不可用时回退 LIKE 全表扫描。
             # 两者对 ≥3 字符关键词语义一致（大小写不敏感子串匹配）。
+            # P1：PII 加密开启时 text_preview 为密文，仅按 filename 搜索（文本搜索不可用）。
+            pii_encrypted = _get_pii_cipher() is not None
             if self._can_use_fts(search_text):
                 fts_query = self._build_fts_query(search_text)
-                if not search_filename:
+                if pii_encrypted:
+                    fts_query = f"filename : {fts_query}"
+                elif not search_filename:
                     # 仅匹配 text_preview 列：使用 FTS5 列过滤语法 ``col : phrase``
                     fts_query = f"text_preview : {fts_query}"
                 conditions.append(f"id IN (SELECT rowid FROM {_FTS_TABLE} WHERE {_FTS_TABLE} MATCH ?)")  # nosec B608: 表名为模块常量 _FTS_TABLE，用户值经 ? 参数绑定
                 params.append(fts_query)
             else:
                 escaped = self._escape_like(search_text).lower()
-                if search_filename:
+                if pii_encrypted:
+                    conditions.append("LOWER(filename) LIKE ? ESCAPE '\\'")
+                    params.append(f"%{escaped}%")
+                elif search_filename:
                     conditions.append("(LOWER(filename) LIKE ? ESCAPE '\\' OR LOWER(text_preview) LIKE ? ESCAPE '\\')")
                     params.extend([f"%{escaped}%", f"%{escaped}%"])
                 else:
@@ -1209,7 +1217,7 @@ class HistoryDatabase:
         placeholders = ",".join("?" * len(ids))
         sql = f"SELECT id, filename, filepath FROM generation_history WHERE id IN ({placeholders})"  # nosec B608: 占位符仅生成 ?，ids 全部参数绑定
         try:
-            cursor = self._execute(sql, list(ids))
+            cursor = self._execute(sql, tuple(ids))
             return [_decrypt_record(dict(row)) for row in cursor.fetchall()]
         except Exception as e:
             logger.error(f"[history_db] 按 id 查询历史记录失败: {e}", exc_info=True)
@@ -1260,13 +1268,22 @@ class HistoryDatabase:
 
         if search_keyword:
             # [H-R6] 与 _build_filter_conditions 一致：优先 FTS5，不可用时回退 LIKE。
+            # P1：PII 加密开启时 text_preview 为密文，仅按 filename 搜索。
+            pii_encrypted = _get_pii_cipher() is not None
             if self._can_use_fts(search_keyword):
-                conditions.append(f"id IN (SELECT rowid FROM {_FTS_TABLE} WHERE {_FTS_TABLE} MATCH ?)")  # nosec B608: 表名为模块常量，用户值经 ? 参数绑定
-                params.append(self._build_fts_query(search_keyword))
+                fts_q = self._build_fts_query(search_keyword)
+                if pii_encrypted:
+                    fts_q = f"filename : {fts_q}"
+                conditions.append(f"id IN (SELECT rowid FROM {_FTS_TABLE} WHERE {_FTS_TABLE} MATCH ?)")  # nosec B608
+                params.append(fts_q)
             else:
                 kw_lower = self._escape_like(search_keyword).lower()
-                conditions.append("(LOWER(filename) LIKE ? ESCAPE '\\' OR LOWER(text_preview) LIKE ? ESCAPE '\\')")
-                params.extend([f"%{kw_lower}%", f"%{kw_lower}%"])
+                if pii_encrypted:
+                    conditions.append("LOWER(filename) LIKE ? ESCAPE '\\'")
+                    params.append(f"%{kw_lower}%")
+                else:
+                    conditions.append("(LOWER(filename) LIKE ? ESCAPE '\\' OR LOWER(text_preview) LIKE ? ESCAPE '\\')")
+                    params.extend([f"%{kw_lower}%", f"%{kw_lower}%"])
 
         # Time filter based on created_timestamp
         now = time.time()
@@ -1291,7 +1308,7 @@ class HistoryDatabase:
         where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
 
         # Get total count
-        cursor = self._execute(f"SELECT COUNT(*) as count FROM generation_history {where_clause}", params)  # nosec B608: where 子句由硬编码字面量拼接，值全部参数绑定
+        cursor = self._execute(f"SELECT COUNT(*) as count FROM generation_history {where_clause}", tuple(params))  # nosec B608: where 子句由硬编码字面量拼接，值全部参数绑定
         total = cursor.fetchone()["count"]
 
         # Get paginated records
@@ -1494,7 +1511,7 @@ class HistoryDatabase:
 
         cursor = self._execute(
             f"SELECT COUNT(*) as count FROM generation_history {where_clause}",  # nosec B608: where 子句由硬编码字面量拼接，值全部参数绑定
-            params,
+            tuple(params),
         )
         return cursor.fetchone()["count"]
 
