@@ -509,3 +509,22 @@ class TestSSRFHTTPBehavior:
                 assert resp.status_code == 404, (
                     f"Unexpected {resp.status_code} for nonexistent endpoint with {param_name}={target}"
                 )
+
+
+class TestAIGeneratedHeaders:
+    """P1-4b：显式 AI 生成标识响应头。"""
+
+    def test_ai_generated_header_present_on_health(self, client):
+        """健康检查响应携带 X-AI-Generated 头。"""
+        resp = client.get("/api/health")
+        assert resp.headers.get("X-AI-Generated") == "true"
+
+    def test_ai_service_header_present(self, client):
+        """响应携带 X-AI-Service 标识头。"""
+        resp = client.get("/api/health")
+        assert "X-AI-Service" in resp.headers
+
+    def test_ai_header_on_404(self, client):
+        """404 响应也携带 AI 标识头（中间件覆盖所有响应）。"""
+        resp = client.get("/api/nonexistent-endpoint-xyz")
+        assert resp.headers.get("X-AI-Generated") == "true"

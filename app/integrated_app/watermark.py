@@ -20,8 +20,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import hmac
 import logging
+import os
+import secrets
 import struct
 import time
 from dataclasses import dataclass
@@ -45,12 +49,62 @@ _SOURCE_CODE_UNKNOWN = 255
 # 水印参数
 _WATERMARK_VERSION = 1
 _WATERMARK_VERSION_V2 = 2  # 紧凑 8 字节载荷版本（64 bit 容量完全利用）
+_WATERMARK_VERSION_V3 = 3  # P1-4a：HMAC 秘密密钥版（载荷同 v2，载波相位由密钥派生）
 _WATERMARK_BITS = 64  # 水印载荷的比特数
 _WATERMARK_STRENGTH = 0.062  # 嵌入强度（水印信号幅度）
 _WATERMARK_FREQ_LOW = 16000  # 嵌入频率下限（Hz）
 _WATERMARK_FREQ_HIGH = 20000  # 嵌入频率上限（Hz）
 _WATERMARK_FRAME_SIZE = 2048  # FFT 帧大小
 _WATERMARK_REPEAT = 4  # 水印重复次数以增强鲁棒性
+
+#: 水印秘密密钥路径（P1-4a）。32 字节随机密钥，0600 权限，首次运行自动生成。
+#: 用于 HMAC 派生 v3 载波相位，防止无密钥者伪造或检测水印。
+_WATERMARK_KEY_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", ".watermark_key"
+)
+_WATERMARK_KEY_MSG = b"tts-multimodel-watermark-v3-carrier"
+
+# 模块级缓存：避免每次嵌入/检测都重读密钥文件
+_watermark_secret_cache: bytes | None = None
+
+
+def _get_watermark_secret() -> bytes | None:
+    """加载或自动生成水印秘密密钥（P1-4a）。
+
+    密钥存于 data/.watermark_key，32 字节，0600 权限。
+    首次调用时若文件不存在则自动生成。读取失败返回 None（回退 v2 无密钥版）。
+
+    Returns:
+        32 字节密钥；密钥文件不可读/不可写时返回 None。
+    """
+    global _watermark_secret_cache
+    if _watermark_secret_cache is not None:
+        return _watermark_secret_cache
+
+    try:
+        key_dir = os.path.dirname(_WATERMARK_KEY_PATH)
+        os.makedirs(key_dir, exist_ok=True)
+
+        if os.path.exists(_WATERMARK_KEY_PATH):
+            with open(_WATERMARK_KEY_PATH, "rb") as f:
+                key = f.read().strip()
+            if len(key) != 32:
+                logger.warning(f"水印密钥长度异常 ({len(key)}B)，重新生成")
+                key = secrets.token_bytes(32)
+                with open(_WATERMARK_KEY_PATH, "wb") as f:
+                    f.write(key)
+        else:
+            key = secrets.token_bytes(32)
+            with open(_WATERMARK_KEY_PATH, "wb") as f:
+                f.write(key)
+            with contextlib.suppress(OSError):
+                os.chmod(_WATERMARK_KEY_PATH, 0o600)
+
+        _watermark_secret_cache = key
+        return key
+    except OSError as e:
+        logger.debug(f"水印密钥加载失败，回退无密钥版: {e}")
+        return None
 
 
 #: v2 载波相位表（对齐零相位，crest 因子最低）与 v1 兼容表（旧 RandomState(42) 均匀相位）。
@@ -61,6 +115,27 @@ def _carrier_phases_v2(n_bins):
 
 def _carrier_phases_v1(n_bins):
     return np.random.RandomState(42).uniform(0, 2 * np.pi, size=n_bins)
+
+
+def _carrier_phases_v3(n_bins: int) -> np.ndarray | None:
+    """v3 密钥版载波相位（P1-4a）：由 HMAC-SHA256(secret, fixed_msg) 派生。
+
+    固定消息使检测端无需知道嵌入时间戳即可重建相位（单遍检测）。
+    密钥缺失时回退 v2 零相位。相位均匀分布 [0, 2π)，与 v1 兼容表同分布
+    但种子由秘密密钥控制——无密钥者无法重建载波，因而无法检测或伪造水印。
+
+    Args:
+        n_bins: 相位数量（等于有效水印比特数）。
+
+    Returns:
+        相位数组；密钥不可用时返回 None（调用方应回退 v2）。
+    """
+    secret = _get_watermark_secret()
+    if secret is None:
+        return None
+    digest = hmac.new(secret, _WATERMARK_KEY_MSG, hashlib.sha256).digest()
+    seed = int.from_bytes(digest[:8], "big") % (2**32)
+    return np.random.RandomState(seed).uniform(0, 2 * np.pi, size=n_bins)
 
 
 @dataclass
@@ -148,11 +223,13 @@ def _bits_to_payload_bytes(source_id: str, timestamp: float, content_hash: str) 
     )
 
 
-def _build_payload_v2(source_id: str, timestamp: float, content_hash: str) -> bytes:
-    """构建 v2 紧凑载荷（8 字节 = 64 bit，完全利用嵌入容量）。
+def _build_payload_v2(
+    source_id: str, timestamp: float, content_hash: str, version: int = _WATERMARK_VERSION_V2
+) -> bytes:
+    """构建 v2/v3 紧凑载荷（8 字节 = 64 bit，完全利用嵌入容量）。
 
     格式：
-      byte0:    version = 2
+      byte0:    version（2=公开零相位版，3=HMAC 密钥版）
       byte1:    source_id 枚举码（1-255，见 _SOURCE_ID_TO_CODE；未知 source 用 255）
       byte2-5:  timestamp 秒级 uint32（大端，覆盖至 2106 年）
       byte6-7:  content_hash 前 2 字节（sha256 前 16 bit hex）
@@ -161,6 +238,7 @@ def _build_payload_v2(source_id: str, timestamp: float, content_hash: str) -> by
         source_id: 来源标识符。
         timestamp: Unix 时间戳。
         content_hash: 内容哈希（16 位 hex 字符串，取前 4 字符）。
+        version: 载荷版本号（默认 v2；v3 表示 HMAC 密钥版）。
 
     Returns:
         8 字节紧凑载荷。
@@ -174,7 +252,7 @@ def _build_payload_v2(source_id: str, timestamp: float, content_hash: str) -> by
     if len(hash_hex) < 4:
         hash_hex = (hash_hex + "0000")[:4]
     hash_bytes = bytes.fromhex(hash_hex)
-    return struct.pack(">BBI2s", _WATERMARK_VERSION_V2, code, ts_sec, hash_bytes)
+    return struct.pack(">BBI2s", version, code, ts_sec, hash_bytes)
 
 
 def _payload_bytes_to_bits(payload_bytes: bytes) -> np.ndarray:
@@ -265,8 +343,11 @@ def embed_watermark(
 
     content_hash = _compute_content_hash(audio_mono, sample_rate)
 
-    # v2 紧凑载荷：8 字节完整进入 64 bit 信号（version/source/timestamp/hash 全部可恢复）
-    payload_bytes = _build_payload_v2(source_id, timestamp, content_hash)
+    # v2/v3 紧凑载荷：8 字节完整进入 64 bit 信号（version/source/timestamp/hash 全部可恢复）
+    # P1-4a：密钥可用时嵌入 v3（HMAC 密钥版载波相位），否则回退 v2（公开零相位）。
+    use_v3 = _get_watermark_secret() is not None
+    payload_version = _WATERMARK_VERSION_V3 if use_v3 else _WATERMARK_VERSION_V2
+    payload_bytes = _build_payload_v2(source_id, timestamp, content_hash, version=payload_version)
     payload_bits = _payload_bytes_to_bits(payload_bytes)
 
     n_samples = len(audio_mono)
@@ -292,7 +373,10 @@ def embed_watermark(
     hop_size = frame_size // 2
     n_frames = max(1, (n_samples - frame_size) // hop_size + 1)
 
-    carrier_phases = _carrier_phases_v2(effective_bits)
+    # P1-4a：v3 密钥版优先（HMAC 派生相位），不可用时回退 v2 零相位（crest 最低）
+    carrier_phases = _carrier_phases_v3(effective_bits)
+    if carrier_phases is None:
+        carrier_phases = _carrier_phases_v2(effective_bits)
 
     for _rep in range(_WATERMARK_REPEAT):
         for frame_idx in range(n_frames):
@@ -345,7 +429,7 @@ def embed_watermark(
         watermarked = np.stack([watermarked] * audio.shape[-1], axis=-1)
 
     payload = WatermarkPayload(
-        version=_WATERMARK_VERSION_V2,
+        version=payload_version,
         source_id=source_id,
         timestamp=timestamp,
         content_hash=content_hash,
@@ -374,8 +458,8 @@ def _parse_payload_v2(bit_bytes: bytes) -> WatermarkPayload:
     if len(bit_bytes) < 8:
         raise ValueError(f"v2 载荷字节不足: {len(bit_bytes)}")
     version = bit_bytes[0]
-    if version != _WATERMARK_VERSION_V2:
-        raise ValueError(f"v2 版本不合法: {version}")
+    if version not in (_WATERMARK_VERSION_V2, _WATERMARK_VERSION_V3):
+        raise ValueError(f"v2/v3 版本不合法: {version}")
     code = bit_bytes[1]
     if not 1 <= code <= 255:
         raise ValueError(f"source 枚举码不合法: {code}")
@@ -488,10 +572,15 @@ def detect_watermark(
     bit_bins = freq_low_bin + np.arange(effective_bits)
     odd_bin_mask = bit_bins % 2 == 1
 
-    # 多假设检测（2026-08-16）：v2 嵌入使用对齐零相位表（crest 最低、能量最高），
-    # 旧版（v1/早期 v2）样本使用 RandomState(42) 均匀相位表。两表同时尝试、
-    # 取 presence 分最高者，保证旧格式样本仍可检出（向后兼容）。
-    phase_tables = (_carrier_phases_v2(effective_bits), _carrier_phases_v1(effective_bits))
+    # 多假设检测（2026-08-16 + P1-4a）：
+    # v3=HMAC 密钥版（优先，仅密钥持有者可检测）；v2=对齐零相位表（crest 最低）；
+    # v1=RandomState(42) 均匀相位表（旧格式兼容）。三表同时尝试、取 presence 分最高者。
+    phase_tables = []
+    v3_phases = _carrier_phases_v3(effective_bits)
+    if v3_phases is not None:
+        phase_tables.append(v3_phases)
+    phase_tables.append(_carrier_phases_v2(effective_bits))
+    phase_tables.append(_carrier_phases_v1(effective_bits))
     for carrier_phases in phase_tables:
         carriers = np.exp(1j * carrier_phases)
 
@@ -567,8 +656,9 @@ def detect_watermark(
         if len(bit_bytes) < 2:
             raise ValueError("载荷字节不足")
         version = bit_bytes[0]
-        if version == _WATERMARK_VERSION_V2:
-            # v2 紧凑格式：8 字节完整载荷（source 枚举 / timestamp 秒 / hash 2 字节）
+        if version in (_WATERMARK_VERSION_V2, _WATERMARK_VERSION_V3):
+            # v2/v3 紧凑格式：8 字节完整载荷（source 枚举 / timestamp 秒 / hash 2 字节）
+            # v3 与 v2 载荷格式相同，区别仅在载波相位由 HMAC 密钥派生（P1-4a）
             payload = _parse_payload_v2(bytes(bit_bytes))
         elif version == _WATERMARK_VERSION:
             # v1 旧格式：64-bit 截断语义（timestamp/content_hash 置默认值）
@@ -598,6 +688,52 @@ def detect_watermark(
 # ============================================================================
 
 
+def prepend_ai_indicator_tone(
+    audio: np.ndarray,
+    sample_rate: int,
+    duration_ms: int = 200,
+    freq: float = 880.0,
+) -> np.ndarray:
+    """在音频开头叠加短提示音，用于显式标识 AI 生成内容（P1-4b，可选）。
+
+    生成一个 880Hz 正弦波短音，带 5ms 淡入淡出避免爆音，叠加到音频开头
+    （不替换原始音频，仅在开头 N 毫秒叠加）。
+
+    Args:
+        audio: 输入音频数组（float32，单声道或立体声）。
+        sample_rate: 采样率（Hz）。
+        duration_ms: 提示音时长（毫秒），默认 200ms。
+        freq: 提示音频率（Hz），默认 880Hz（A5）。
+
+    Returns:
+        叠加了提示音的音频数组（形状与输入一致）。
+    """
+    n_tone = int(sample_rate * duration_ms / 1000)
+    if n_tone <= 0 or len(audio) == 0:
+        return audio
+
+    t = np.arange(n_tone, dtype=np.float64) / sample_rate
+    tone = 0.15 * np.sin(2 * np.pi * freq * t).astype(np.float32)
+
+    # 5ms 淡入淡出避免爆音
+    fade = int(min(5e-3 * sample_rate, n_tone // 4))
+    if fade > 0:
+        tone[:fade] *= np.linspace(0, 1, fade, dtype=np.float32)
+        tone[-fade:] *= np.linspace(1, 0, fade, dtype=np.float32)
+
+    result = audio.copy()
+    overlap = min(n_tone, len(result))
+    if result.ndim > 1:
+        for ch in range(result.shape[-1]):
+            result[:overlap, ch] += tone[:overlap]
+    else:
+        result[:overlap] += tone[:overlap]
+
+    # 防止削波
+    np.clip(result, -1.0, 1.0, out=result)
+    return result
+
+
 def watermark_audio(
     audio: np.ndarray,
     sample_rate: int,
@@ -619,7 +755,19 @@ def watermark_audio(
     if not enable:
         return audio, {"watermarked": False}
 
-    watermarked, result = embed_watermark(audio, sample_rate, source_id=source_id)
+    # P3：从 config 读取水印强度（修复死配置，原硬编码 0.062）
+    strength = _WATERMARK_STRENGTH
+    try:
+        from .config import get_config
+
+        wm_cfg = get_config().pydantic_config.watermark
+        cfg_strength = getattr(wm_cfg, "strength", None)
+        if cfg_strength is not None and isinstance(cfg_strength, (int, float)) and cfg_strength > 0:
+            strength = float(cfg_strength)
+    except Exception as e:
+        logger.debug(f"水印强度配置读取失败，使用默认 {_WATERMARK_STRENGTH}: {e}")
+
+    watermarked, result = embed_watermark(audio, sample_rate, source_id=source_id, strength=strength)
 
     metadata: dict[str, Any] = {
         "watermarked": result.success,
@@ -628,5 +776,17 @@ def watermark_audio(
     if result.payload:
         metadata["source_id"] = result.payload.source_id
         metadata["content_hash"] = result.payload.content_hash
+
+    # P1-4b：可选 AI 标识提示音（默认关闭，由 config.security.ai_audio_prefix_enabled 控制）
+    try:
+        from .config import get_config
+
+        sec_cfg = get_config().pydantic_config.security
+        if getattr(sec_cfg, "ai_audio_prefix_enabled", False):
+            prefix_ms = getattr(sec_cfg, "ai_audio_prefix_ms", 200)
+            watermarked = prepend_ai_indicator_tone(watermarked, sample_rate, duration_ms=prefix_ms)
+            metadata["ai_prefix"] = True
+    except Exception as e:
+        logger.debug(f"AI 标识提示音跳过（配置读取失败）: {e}")
 
     return watermarked, metadata

@@ -45,6 +45,9 @@ _BASE_HEADERS: dict[str, str] = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     "Cross-Origin-Opener-Policy": "same-origin",
+    # P1-4b：显式 AI 生成标识响应头（合规要求，所有响应均携带）
+    "X-AI-Generated": "true",
+    "X-AI-Service": "TTS_MultiModel",
 }
 
 
