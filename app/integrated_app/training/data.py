@@ -24,12 +24,45 @@ import statistics
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-import argbind
 import torch
-from datasets import Audio, DatasetDict, load_dataset
-from datasets import Dataset as HFDataset
+
+# 重量级训练依赖改为可选导入：datasets / argbind 在最小 CI 环境可能未安装。
+# 单元测试（HFVoxCPMDataset / BatchProcessor / packers）不依赖这些包，
+# 只有 load_audio_text_datasets / compute_sample_lengths 等 legacy HF 路径需要。
+try:
+    import argbind
+except ImportError:  # pragma: no cover
+    argbind = None
+
+try:
+    from datasets import Audio, DatasetDict, load_dataset
+    from datasets import Dataset as HFDataset
+except ImportError:  # pragma: no cover
+    Audio = None
+    DatasetDict = None
+    load_dataset = None
+    HFDataset = None  # type: ignore[assignment]
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset as TorchDataset
+
+
+def _is_hf_dataset(obj: Any) -> bool:
+    """安全判断 obj 是否为 HuggingFace Dataset（datasets 未安装时返回 False）。"""
+    return HFDataset is not None and isinstance(obj, HFDataset)
+
+
+def _argbind_bind(*args, **kwargs):
+    """argbind.bind 的无操作兜底（argbind 未安装时透传函数）。"""
+    if argbind is not None:
+        return argbind.bind(*args, **kwargs)
+    if len(args) == 1 and callable(args[0]) and not kwargs:
+        return args[0]
+
+    def _wrapper(fn):
+        return fn
+
+    return _wrapper
+
 
 try:
     from typing import Literal
@@ -46,9 +79,12 @@ except ImportError:  # pragma: no cover - torchaudio/librosa 兜底
 # integrated_app/training/ 下，`..` 解析成 integrated_app，那里没有 model/ 与
 # modules/ —— 于是 LoRA 训练数据管线一 import 就 ModuleNotFoundError。
 # 同目录的 accelerator.py 用的是 `..gpu_backend`（正确深度），可作对照。
-from ..vendor.voxcpm.model.voxcpm import VoxCPMConfig
-from ..vendor.voxcpm.modules.audiovae import AudioVAE
-from .packers import AudioFeatureProcessingPacker
+# ruff E402：sf 兜底导入与 TYPE_CHECKING 之后才能进行项目内深层相对导入。
+from ..vendor.voxcpm.model.voxcpm import VoxCPMConfig  # noqa: E402
+from ..vendor.voxcpm.modules.audiovae import AudioVAE  # noqa: E402
+
+if TYPE_CHECKING:
+    from .packers import AudioFeatureProcessingPacker
 
 DEFAULT_TEXT_COLUMN = "text"
 DEFAULT_AUDIO_COLUMN = "audio"
@@ -129,7 +165,7 @@ class HFVoxCPMDataset(TorchDataset[DatasetEntry]):
             ValueError: 数据集目录不存在或没有可用样本时抛出
         """
         # Legacy：第一个参数是 HuggingFace Dataset -> 原样保留（老代码兼容）
-        if isinstance(data_dir, HFDataset) or (
+        if _is_hf_dataset(data_dir) or (
             hasattr(data_dir, "column_names") and hasattr(data_dir, "__getitem__") and hasattr(data_dir, "__len__")
         ):
             self._legacy_dataset = data_dir
@@ -549,7 +585,9 @@ class BatchProcessor:
         if config is not None and audio_vae is not None:
             if device is not None:
                 audio_vae.to(device)
-            self._legacy_packer = AudioFeatureProcessingPacker(
+            from .packers import AudioFeatureProcessingPacker as _AFPP  # 懒加载防循环 import
+
+            self._legacy_packer = _AFPP(
                 dataset_cnt=max(dataset_cnt, 1),
                 max_len=config.max_length,
                 patch_size=config.patch_size,
@@ -881,7 +919,7 @@ def create_dataloaders(
 # ---------------------------------------------------------------------- #
 # Legacy：基于 HuggingFace manifest 的工具函数（100% 保留）
 # ---------------------------------------------------------------------- #
-@argbind.bind()
+@_argbind_bind()
 def load_audio_text_datasets(
     train_manifest: str,
     val_manifest: str = "",
@@ -908,7 +946,12 @@ def load_audio_text_datasets(
 
     Returns:
         (train_dataset, val_dataset_or_None)
+
+    Raises:
+        ImportError: datasets 包未安装时抛出
     """
+    if load_dataset is None:
+        raise ImportError("load_audio_text_datasets 需要安装 datasets 包: pip install datasets")
     data_files: dict[str, str] = {"train": train_manifest}
     if val_manifest:
         data_files["validation"] = val_manifest
@@ -953,7 +996,12 @@ def compute_sample_lengths(
 
     Returns:
         每个样本的预估总 token 长度列表
+
+    Raises:
+        ImportError: datasets 包未安装时抛出
     """
+    if HFDataset is None:
+        raise ImportError("compute_sample_lengths 需要安装 datasets 包: pip install datasets")
     text_ids_list = ds["text_ids"]
     text_lens = [len(t) for t in text_ids_list]
 

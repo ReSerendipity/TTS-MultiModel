@@ -42,6 +42,9 @@ repos:
         args: [--maxkb=500]
         exclude: ^model/|^models/|^\.ruff_cache/
       - id: detect-private-key
+        # .github/SECURITY.md 是漏洞披露文档，正文含 "PRIVATE KEY" 字样（报告指引），
+        # 非真实密钥文件，排除避免误报；其他文件仍全量扫描。
+        exclude: ^\.github/SECURITY\.md$
       - id: check-ast
         files: \.py$
         exclude: ^tests/training/
@@ -56,6 +59,9 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
+        # -S error：只拦截严重度 error 及以上。SC1091（source activate 未指定输入）
+        # 属 info 级提示，在容器/CI 环境无法解析 venv 激活脚本，属于环境性噪音而非缺陷。
+        args: ["-S", "error"]
         files: \.sh$
 
   # Engine compatibility check (local hook)
@@ -90,6 +96,23 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+        stages: [pre-commit, pre-push]
+      # 综合评估主线：能力声明→验证（训练产物/SLO 基线/版本/覆盖缓冲，WARN 不阻断）
+      - id: check-declared-capabilities
+        name: Declared Capabilities Consistency Check
+        entry: python scripts/check_declared_capabilities.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+      # P1-2 测试体系改进：OpenAPI 契约快照测试（防止路由/响应结构非预期变更）
+      # 仅在路由/应用入口/引擎接口相关文件变更时触发，避免每次提交都跑全量测试。
+      - id: openapi-contract-snapshot
+        name: OpenAPI Contract Snapshot Test
+        entry: python -m pytest tests/test_openapi_snapshot.py -q --tb=short
+        language: system
+        pass_filenames: false
+        files: ^(app/integrated_app/(routes|app_server|engine_interface)|tests/test_openapi_snapshot|tests/snapshots/openapi_contract)/
         stages: [pre-commit, pre-push]
 
 # Configuration
