@@ -24,7 +24,7 @@
 
 TTS_MultiModel 内置多层安全防护：
 
-- **鉴权**：API Token + 可选 CSRF 防护（`security/auth.py`、`security/csrf.py`）
+- **鉴权**：API Token + 可选 CSRF 防护（`app/integrated_app/auth.py`、`app/integrated_app/middleware/csrf.py`）
 - **速率限制**：滑动窗口全局限流 + 克隆专用 1h 窗口（`middleware/rate_limit.py`）
 - **内容安全**：6 类正则检测（暴力/仇恨/自残/色情/违法/骚扰）+ 同音字/拼音/外文变体（`security/content_safety.py`）
 - **水印**：DCT 频域不可感知水印 + HMAC 密钥版 v3（`watermark.py`）
