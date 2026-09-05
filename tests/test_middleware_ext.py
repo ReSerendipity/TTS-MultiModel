@@ -24,6 +24,7 @@ from integrated_app.middleware.error_handler import (
     register_error_handlers,
 )
 from integrated_app.middleware.rate_limit import (
+    _CLONE_PATH_INDICATORS,
     _RATE_LIMITED_PREFIXES,
     RateLimitMiddleware,
 )
@@ -156,6 +157,111 @@ class TestRateLimitMiddleware:
         resp = client.get("/api/generate/test")
         assert resp.status_code == 429
         assert "retry-after" in resp.headers
+
+
+class TestCloneRateLimit:
+    """克隆专用限流（P0 安全整改）单元测试。"""
+
+    @pytest.fixture
+    def clone_app(self):
+        """全局限流放宽，仅克隆限流生效（clone_max_per_hour=2）。"""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            enabled=True,
+            requests_per_minute=100,
+            burst=100,
+            clone_max_per_hour=2,
+        )
+
+        @app.post("/api/generate/voxcpm2/voxcpm_clone")
+        async def clone_endpoint():
+            return {"status": "ok"}
+
+        @app.post("/api/generate/voxcpm2/voxcpm_ultimate")
+        async def ultimate_endpoint():
+            return {"status": "ok"}
+
+        @app.post("/api/generate/voxcpm2/synthesize")
+        async def synth_endpoint():
+            return {"status": "ok"}
+
+        return app
+
+    def test_clone_path_under_limit_allowed(self, clone_app):
+        """克隆路径在限额内正常通过。"""
+        client = TestClient(clone_app)
+        for _ in range(2):
+            resp = client.post("/api/generate/voxcpm2/voxcpm_clone")
+            assert resp.status_code == 200
+
+    def test_clone_path_exceeds_limit_returns_429(self, clone_app):
+        """超过克隆限额后返回 429，消息包含克隆专用提示。"""
+        client = TestClient(clone_app)
+        for _ in range(2):
+            resp = client.post("/api/generate/voxcpm2/voxcpm_clone")
+            assert resp.status_code == 200
+        resp = client.post("/api/generate/voxcpm2/voxcpm_clone")
+        assert resp.status_code == 429
+        data = resp.json()
+        assert data["status"] == "error"
+        assert "克隆" in data["message"]
+        assert "retry_after" in data
+        assert "retry-after" in resp.headers
+
+    def test_ultimate_path_counts_as_clone(self, clone_app):
+        """ultimate 端点计入克隆限额（与 clone 共享计数池）。"""
+        client = TestClient(clone_app)
+        client.post("/api/generate/voxcpm2/voxcpm_clone")
+        client.post("/api/generate/voxcpm2/voxcpm_ultimate")
+        resp = client.post("/api/generate/voxcpm2/voxcpm_clone")
+        assert resp.status_code == 429
+
+    def test_non_clone_generate_path_not_counted(self, clone_app):
+        """普通合成端点不消耗克隆限额。"""
+        client = TestClient(clone_app)
+        for _ in range(10):
+            resp = client.post("/api/generate/voxcpm2/synthesize")
+            assert resp.status_code == 200
+        # 克隆限额仍未被消耗
+        resp = client.post("/api/generate/voxcpm2/voxcpm_clone")
+        assert resp.status_code == 200
+
+    def test_clone_limit_disabled_when_zero(self):
+        """clone_max_per_hour=0 时关闭克隆专用限流。"""
+        app = FastAPI()
+        app.add_middleware(
+            RateLimitMiddleware,
+            enabled=True,
+            requests_per_minute=100,
+            burst=100,
+            clone_max_per_hour=0,
+        )
+
+        @app.post("/api/generate/voxcpm2/voxcpm_clone")
+        async def clone_endpoint():
+            return {"status": "ok"}
+
+        client = TestClient(app)
+        for _ in range(10):
+            resp = client.post("/api/generate/voxcpm2/voxcpm_clone")
+            assert resp.status_code == 200
+
+    def test_is_clone_path_method(self):
+        """_is_clone_path 正确识别克隆类路径。"""
+        mw = RateLimitMiddleware(app=FastAPI(), enabled=True)
+        assert mw._is_clone_path("/api/generate/voxcpm2/voxcpm_clone") is True
+        assert mw._is_clone_path("/api/generate/voxcpm2/voxcpm_ultimate") is True
+        assert mw._is_clone_path("/api/generate/voxcpm2/voxcpm_prompt_continue") is True
+        assert mw._is_clone_path("/api/generate/generic/clone") is True
+        assert mw._is_clone_path("/api/generate/voxcpm2/synthesize") is False
+        assert mw._is_clone_path("/api/health/ping") is False
+
+    def test_clone_indicators_constant(self):
+        """_CLONE_PATH_INDICATORS 包含核心克隆路径关键词。"""
+        assert "clone" in _CLONE_PATH_INDICATORS
+        assert "ultimate" in _CLONE_PATH_INDICATORS
+        assert "prompt_continue" in _CLONE_PATH_INDICATORS
 
 
 # =====================================================================

@@ -93,7 +93,7 @@ runtime:
   integrity:
     block_startup_on_failure: false
     verify_binaries: false
-    expected_model_hashes: ""   # C1：模型权重期望哈希清单路径（JSON）；为空则不校验
+    expected_model_hashes: "configs/model_integrity_manifest.json"  # P2-3：模型权重 SHA256 清单路径；清单不存在时不校验，运行 scripts/generate_model_integrity_manifest.py 生成
     block_on_model_mismatch: false
 
 watermark:
@@ -102,7 +102,7 @@ watermark:
   product_id: TTSMULTI-1
   embed_timestamp: true
   embed_task_id: true
-  strength: 0.008
+  strength: 0.062                  # P3：水印嵌入强度（已接线，原硬编码 0.062；范围 0.001-0.062）
 
 # ── API 速率限制（M2 整改：覆盖 /v1 与上传端点 + 可信代理 XFF） ──
 rate_limit:
@@ -110,13 +110,19 @@ rate_limit:
   requests_per_minute: 10
   burst: 5
   trusted_proxies: []
+  clone_max_per_hour: 20                # P0：每 IP 每小时最大克隆操作次数（0 关闭克隆专用限流）
 
 # ── 安全 / PII / 内容安全 / 审计（H3 / M3 / M7 整改） ──
 security:
   content_safety_enabled: true          # M3：生成前文本安全检测网关
-  pii_encryption_enabled: false         # H3：历史记录 PII 字段列级加密落库（默认关闭，避免无密钥时无法读取旧数据）
+  pii_encryption_enabled: true          # P1：历史记录 PII 列级加密默认开启（存量明文行可运行 scripts/migrate_pii_encryption.py 迁移）
   pii_retention_days: 90                # H3：PII 留存期限（天），0 表示永久保留
-  audit_enabled: false                  # M7：结构化审计日志（独立 JSONL 持久化 data/audit.log）
+  audit_enabled: true                   # P1：结构化审计日志默认开启（JSONL 10MB 轮转，detail 不含 PII 文本）
+  upload_ttl_days: 30                   # P1：上传参考音频（outputs/uploads/）留存天数，超期自动清理；0=不清理
+  ai_audio_prefix_enabled: false         # P1-4b：生成音频开头叠加可选 AI 标识提示音（默认关闭）
+  ai_audio_prefix_ms: 200                 # P1-4b：AI 标识提示音时长（毫秒，50-2000）
+  training_data_ttl_days: 90              # P2-2：训练会话临时数据留存天数；0=不清理
+  reference_audio_min_seconds: 3.0      # P0：上传参考音频最小时长（秒），0 关闭；同时拒绝近静音
 
 # ── 生成流程参数（配置外置：超时 / 并发 / 信号量排队） ──
 generation:

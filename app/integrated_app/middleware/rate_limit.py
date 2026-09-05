@@ -32,12 +32,19 @@ _RATE_LIMITED_PREFIXES = (
     "/v1/",
     "/api/audio/upload",
     "/api/persona/save",
+    "/api/training/",  # P2-2：训练接口纳入限流（防 GPU 滥用与数据投毒）
 )
 
 #: 默认配置
 _DEFAULT_REQUESTS_PER_MINUTE = 10
 _DEFAULT_BURST = 5
 _WINDOW_SECONDS = 60.0
+
+#: 克隆操作专用限流（P0 安全整改：声音克隆滥用防护）
+#: 路径中包含以下关键词即视为克隆操作，独立于全局限流计数。
+_CLONE_PATH_INDICATORS = ("clone", "ultimate", "prompt_continue")
+_CLONE_WINDOW_SECONDS = 3600.0
+_DEFAULT_CLONE_MAX_PER_HOUR = 20
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -58,14 +65,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         requests_per_minute: int = _DEFAULT_REQUESTS_PER_MINUTE,
         burst: int = _DEFAULT_BURST,
         trusted_proxies: list[str] | None = None,
+        clone_max_per_hour: int = _DEFAULT_CLONE_MAX_PER_HOUR,
     ) -> None:
         super().__init__(app)
         self.enabled = enabled
         self.max_requests = max(requests_per_minute, 1)
         self.burst = max(burst, 1)
         self.trusted_proxies = set(trusted_proxies or [])
+        # clone_max_per_hour <= 0 表示关闭克隆专用限流
+        self.clone_max = clone_max_per_hour
         # IP -> list of timestamps
         self._requests: dict[str, list[float]] = defaultdict(list)
+        self._clone_requests: dict[str, list[float]] = defaultdict(list)
         self._last_cleanup = time.time()
 
     def _get_client_ip(self, request: Request) -> str:
@@ -99,6 +110,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         """
         return any(path.startswith(prefix) for prefix in _RATE_LIMITED_PREFIXES)
 
+    def _is_clone_path(self, path: str) -> bool:
+        """判断请求路径是否为克隆操作（克隆专用限流）。
+
+        Args:
+            path: 请求路径。
+
+        Returns:
+            True 表示是克隆操作。
+        """
+        return any(indicator in path for indicator in _CLONE_PATH_INDICATORS)
+
     def _cleanup_old_entries(self) -> None:
         """定期清理过期的请求记录，防止内存泄漏。
 
@@ -116,6 +138,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 empty_keys.append(ip)
         for key in empty_keys:
             del self._requests[key]
+        # 克隆限流记录使用更长窗口，清理阈值相应放大
+        clone_cutoff = now - _CLONE_WINDOW_SECONDS * 2
+        empty_clone_keys: list[str] = []
+        for ip, timestamps in self._clone_requests.items():
+            self._clone_requests[ip] = [t for t in timestamps if t > clone_cutoff]
+            if not self._clone_requests[ip]:
+                empty_clone_keys.append(ip)
+        for key in empty_clone_keys:
+            del self._clone_requests[key]
 
     async def dispatch(
         self,
@@ -167,4 +198,31 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # 记录本次请求
         timestamps.append(now)
+
+        # 克隆专用限流：独立于全局限流的长窗口计数，防止批量克隆滥用
+        if self.clone_max > 0 and self._is_clone_path(request.url.path):
+            clone_timestamps = self._clone_requests[client_ip]
+            clone_cutoff = now - _CLONE_WINDOW_SECONDS
+            self._clone_requests[client_ip] = [t for t in clone_timestamps if t > clone_cutoff]
+            clone_timestamps = self._clone_requests[client_ip]
+            if len(clone_timestamps) >= self.clone_max:
+                retry_after = int(_CLONE_WINDOW_SECONDS - (now - clone_timestamps[0])) + 1
+                logger.warning(
+                    "[CloneRateLimit] IP %s 克隆频率超限: %d/%d (3600s)，路径: %s",
+                    client_ip,
+                    len(clone_timestamps),
+                    self.clone_max,
+                    request.url.path,
+                )
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "status": "error",
+                        "message": f"声音克隆频率超限，每小时最多 {self.clone_max} 次克隆操作",
+                        "retry_after": retry_after,
+                    },
+                    headers={"Retry-After": str(retry_after)},
+                )
+            clone_timestamps.append(now)
+
         return await call_next(request)

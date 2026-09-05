@@ -583,8 +583,8 @@ class SecurityConfig(BaseModel):
         description="M3：是否启用文本内容安全网关（生成前对输入文本做安全检测）",
     )
     pii_encryption_enabled: bool = Field(
-        default=False,
-        description="H3：是否对历史记录中的 PII 字段（text_preview）列级加密落库",
+        default=True,
+        description="P1：是否对历史记录中的 PII 字段（text_preview）列级加密落库（默认开启；存量迁移见 scripts/migrate_pii_encryption.py）",
     )
     pii_retention_days: int = Field(
         default=90,
@@ -596,8 +596,33 @@ class SecurityConfig(BaseModel):
         description="H3：PII 加密 Fernet 密钥；为空则回退环境变量 TTS_PII_FERNET_KEY 或 data/.pii_key 自动生成",
     )
     audit_enabled: bool = Field(
+        default=True,
+        description="P1：是否启用结构化审计日志（默认开启，10MB 轮转；detail 不含 PII 文本）",
+    )
+    upload_ttl_days: int = Field(
+        default=30,
+        ge=0,
+        description="P1：上传参考音频（outputs/uploads/）留存天数，超期自动清理；0=不清理",
+    )
+    ai_audio_prefix_enabled: bool = Field(
         default=False,
-        description="M7：是否启用结构化审计日志（auth 失败/配置变更/PII 访问导出/模型加载等）",
+        description="P1-4b：是否在生成音频开头叠加可选 AI 标识提示音（默认关闭，避免干扰收听体验）",
+    )
+    ai_audio_prefix_ms: int = Field(
+        default=200,
+        ge=50,
+        le=2000,
+        description="P1-4b：AI 标识提示音时长（毫秒），默认 200ms",
+    )
+    training_data_ttl_days: int = Field(
+        default=90,
+        ge=0,
+        description="P2-2：训练会话临时数据留存天数（训练数据本体按用户路径引用，TTL 适用于会话临时产物）；0=不清理",
+    )
+    reference_audio_min_seconds: float = Field(
+        default=3.0,
+        ge=0.0,
+        description="P0：上传参考音频最小时长（秒），0 表示关闭时长校验；同时拒绝近静音音频",
     )
 
 
@@ -619,6 +644,11 @@ class RateLimitConfig(BaseModel):
     trusted_proxies: list[str] = Field(
         default_factory=list,
         description="可信反向代理 IP；仅当客户端 IP 在列表中才信任 X-Forwarded-For",
+    )
+    clone_max_per_hour: int = Field(
+        default=20,
+        ge=0,
+        description="每 IP 每小时最大克隆操作次数（0 表示关闭克隆专用限流）",
     )
 
 

@@ -629,7 +629,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     async def _periodic_temp_cleanup() -> None:
         """定期清理过期临时文件，避免长时间运行后临时目录堆积。"""
-        from .utils import cleanup_temp_files
+        from .config import get_config
+        from .utils import cleanup_expired_uploads, cleanup_temp_files
 
         while not _temp_cleanup_stop.is_set():
             with contextlib.suppress(asyncio.TimeoutError):
@@ -640,6 +641,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 removed = await run_in_threadpool(cleanup_temp_files)
                 if removed > 0:
                     logger.info(f"[periodic-cleanup] 定期清理完成，删除 {removed} 个过期临时文件")
+                # P1-3：同步清理超期上传文件
+                ttl = get_config().pydantic_config.security.upload_ttl_days
+                removed_uploads = await run_in_threadpool(cleanup_expired_uploads, ttl_days=ttl)
+                if removed_uploads > 0:
+                    logger.info(f"[periodic-cleanup] 超期上传文件清理完成，删除 {removed_uploads} 个")
             except Exception:
                 logger.debug("[periodic-cleanup] 定期清理异常（忽略）", exc_info=True)
 
@@ -704,6 +710,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info(f"[lifespan] 临时文件清理完成，删除 {removed} 个文件")
     except Exception:
         logger.exception("[lifespan] 临时文件清理异常")
+
+    # P1-3：关闭时清理超期上传参考音频（outputs/uploads/，TTL 默认 30 天）
+    try:
+        from .config import get_config
+        from .utils import cleanup_expired_uploads
+
+        ttl = get_config().pydantic_config.security.upload_ttl_days
+        removed_uploads = cleanup_expired_uploads(ttl_days=ttl)
+        if removed_uploads > 0:
+            logger.info(f"[lifespan] 超期上传文件清理完成，删除 {removed_uploads} 个文件")
+    except Exception as e:
+        logger.debug(f"[lifespan] 超期上传文件清理跳过: {e}")
 
     # 关闭异步生成任务队列
     try:
@@ -833,6 +851,7 @@ def create_app() -> FastAPI:
         requests_per_minute=rl_cfg.requests_per_minute,
         burst=rl_cfg.burst,
         trusted_proxies=rl_cfg.trusted_proxies,
+        clone_max_per_hour=rl_cfg.clone_max_per_hour,
     )
 
     # --- Prometheus 请求计数中间件（可观测性，P2-8）---

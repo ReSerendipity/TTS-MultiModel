@@ -19,6 +19,7 @@
 """
 
 import asyncio
+import contextlib
 import html
 import json
 import logging
@@ -966,6 +967,44 @@ def _error_html(
 # ===========================================================================
 
 
+def validate_reference_audio_quality(
+    filepath: str,
+    min_seconds: float = 3.0,
+    silence_rms_threshold: float = 0.001,
+) -> str | None:
+    """P0 安全整改：校验参考音频时长与语音活动。
+
+    使用 soundfile 解码后计算时长与 RMS 能量，拒绝过短或近静音文件。
+    解码失败时 fail-open（不阻断上传），因为魔数校验已保证格式合法。
+
+    Args:
+        filepath: 已保存的音频文件绝对路径。
+        min_seconds: 最小时长（秒），0 表示关闭时长校验。
+        silence_rms_threshold: RMS 能量低于此值视为近静音。
+
+    Returns:
+        None 表示通过；字符串为失败原因（供错误响应使用）。
+    """
+    if min_seconds <= 0:
+        return None
+    try:
+        import numpy as np
+        import soundfile as sf
+
+        data, sr = sf.read(filepath, always_2d=True)
+        duration = len(data) / float(sr)
+        if duration < min_seconds:
+            return f"参考音频时长过短（{duration:.1f}s < {min_seconds}s），请上传至少 {min_seconds}s 的清晰语音"
+        mono = data.mean(axis=1)
+        rms = float(np.sqrt(np.mean(mono.astype(np.float64) ** 2)))
+        if rms < silence_rms_threshold:
+            return "参考音频几乎为静音，请上传包含清晰人声的音频片段"
+        return None
+    except Exception:  # noqa: BLE001
+        logger.debug("参考音频质量校验跳过（解码失败）: %s", filepath)
+        return None
+
+
 async def save_uploaded_audio(
     request: Any,
     upload_file: UploadFile | None,
@@ -1021,6 +1060,17 @@ async def save_uploaded_audio(
 
     async with aiofiles.open(upload_path, "wb") as f:
         await f.write(content)
+
+    # P0 安全整改：参考音频时长 + 语音活动门槛（拒绝过短/近静音文件）
+    try:
+        min_sec = float(get_config().pydantic_config.security.reference_audio_min_seconds)
+    except Exception:  # noqa: BLE001
+        min_sec = 3.0
+    quality_err = validate_reference_audio_quality(upload_path, min_seconds=min_sec)
+    if quality_err:
+        with contextlib.suppress(OSError):
+            os.remove(upload_path)
+        return None, _error_html(request, quality_err, title_key=title_key)
 
     return upload_path, None
 

@@ -9,6 +9,7 @@ from integrated_app.routes.generate.utils import (
     build_generation_error_response,
     format_sse_event,
     new_task_id,
+    validate_reference_audio_quality,
 )
 
 
@@ -75,3 +76,52 @@ class TestBuildErrorResponse:
         assert data["status"] == "error"
         assert data["task_id"] == "gen-1"
         assert data["error"]["message"] == "出错了"
+
+
+class TestValidateReferenceAudioQuality:
+    """P0 安全整改：参考音频时长 + 语音活动门槛单元测试。"""
+
+    def _make_wav(self, tmp_path, duration_s: float, freq: float = 440.0, amplitude: float = 0.1):
+        """生成指定时长/音量的正弦波 WAV 文件。"""
+        import numpy as np
+        import soundfile as sf
+
+        sr = 16000
+        t = np.linspace(0, duration_s, int(sr * duration_s), endpoint=False)
+        data = (amplitude * np.sin(2 * np.pi * freq * t)).astype(np.float32)
+        path = tmp_path / "ref.wav"
+        sf.write(str(path), data, sr)
+        return str(path)
+
+    def test_valid_audio_passes(self, tmp_path):
+        """3s 以上有声音频通过校验。"""
+        path = self._make_wav(tmp_path, duration_s=5.0)
+        assert validate_reference_audio_quality(path, min_seconds=3.0) is None
+
+    def test_short_audio_rejected(self, tmp_path):
+        """时长短于阈值被拒绝。"""
+        path = self._make_wav(tmp_path, duration_s=1.0)
+        err = validate_reference_audio_quality(path, min_seconds=3.0)
+        assert err is not None
+        assert "时长过短" in err
+
+    def test_silent_audio_rejected(self, tmp_path):
+        """近静音音频被拒绝。"""
+        path = self._make_wav(tmp_path, duration_s=5.0, amplitude=0.0)
+        err = validate_reference_audio_quality(path, min_seconds=3.0)
+        assert err is not None
+        assert "静音" in err
+
+    def test_min_seconds_zero_disables_check(self, tmp_path):
+        """min_seconds=0 关闭校验，即使短音频也通过。"""
+        path = self._make_wav(tmp_path, duration_s=0.5)
+        assert validate_reference_audio_quality(path, min_seconds=0.0) is None
+
+    def test_nonexistent_file_fail_open(self):
+        """文件不存在/解码失败时 fail-open（不阻断）。"""
+        assert validate_reference_audio_quality("/nonexistent/path.wav", min_seconds=3.0) is None
+
+    def test_boundary_exact_min_duration_passes(self, tmp_path):
+        """恰好等于阈值时长通过。"""
+        path = self._make_wav(tmp_path, duration_s=3.0)
+        assert validate_reference_audio_quality(path, min_seconds=3.0) is None
