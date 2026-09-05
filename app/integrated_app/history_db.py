@@ -508,7 +508,7 @@ class HistoryDatabase:
         Returns:
             可用 FTS 加速返回 True，否则 False。
         """
-        return self._fts_enabled and bool(search_text) and len(search_text) >= _FTS_MIN_QUERY_CHARS
+        return self._fts_enabled and isinstance(search_text, str) and len(search_text) >= _FTS_MIN_QUERY_CHARS
 
     def _build_filter_conditions(
         self,
@@ -987,6 +987,8 @@ class HistoryDatabase:
                 with self._transaction() as conn:
                     cursor = conn.execute(_INSERT_SQL, self._build_record_tuple(record))
                     rowid = cursor.lastrowid
+                    if rowid is None:
+                        raise sqlite3.OperationalError("INSERT 执行后未返回 rowid，HMAC 链后续无法完成")
                     # P2: HMAC 链防篡改 — 插入后计算并存储哈希链
                     self._compute_and_store_hmac(conn, rowid, record)
                     return rowid

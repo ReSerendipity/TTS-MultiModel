@@ -760,7 +760,7 @@ def watermark_audio(
     try:
         from .config import get_config
 
-        wm_cfg = get_config().pydantic_config.watermark
+        wm_cfg = get_config().pydantic_config.watermark  # type: ignore[attr-defined]  # noqa: E501 - watermark 由代码常量+配置共管，AppConfig 未建模该字段（extra=ignore）
         cfg_strength = getattr(wm_cfg, "strength", None)
         if cfg_strength is not None and isinstance(cfg_strength, (int, float)) and cfg_strength > 0:
             strength = float(cfg_strength)

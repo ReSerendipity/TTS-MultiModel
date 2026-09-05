@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -279,7 +279,7 @@ def _resample_linear(audio: np.ndarray, source_sr: int, target_sr: int) -> np.nd
 
 
 # 后端调度表
-_BACKEND_FUNCS: dict[ResampleBackend, callable] = {
+_BACKEND_FUNCS: dict[ResampleBackend, Callable[[np.ndarray, int, int], np.ndarray]] = {
     ResampleBackend.SCIPY: _resample_scipy,
     ResampleBackend.LIBROSA: _resample_librosa,
     ResampleBackend.LINEAR: _resample_linear,
@@ -686,7 +686,7 @@ def get_default_pipeline() -> ResamplingPipeline:
         from .config import get_config
 
         cfg = get_config()
-        target_sr = cfg.generation.default_sample_rate
+        target_sr = cfg.generation.default_sample_rate  # type: ignore[attr-defined]  # noqa: E501 - GenerationConfig 字段存在，mypy 对 get_config() 返回类型解析为 AppConfig 旧版
     except Exception:  # nosec B110 - 尽力而为/兜底异常处理（已有 noqa/日志审计）
         pass
 

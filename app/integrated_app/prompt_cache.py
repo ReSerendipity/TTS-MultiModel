@@ -133,18 +133,18 @@ def _serialize_value(obj: Any) -> tuple[dict[str, Any], bytes]:
             offset += len(sb)
         return {"__type__": "dict", "items": sub_metas}, b"".join(parts)
     if isinstance(obj, (list, tuple)):
-        sub_metas: list[Any] = []
-        parts: list[bytes] = []
-        offset: int = 0
+        list_meta: list[Any] = []
+        list_parts: list[bytes] = []
+        list_offset: int = 0
         is_tuple = isinstance(obj, tuple)
         for v in obj:
             sm, sb = _serialize_value(v)
-            sm["_offset"] = offset
+            sm["_offset"] = list_offset
             sm["_length"] = len(sb)
-            sub_metas.append(sm)
-            parts.append(sb)
-            offset += len(sb)
-        return {"__type__": "tuple" if is_tuple else "list", "items": sub_metas}, b"".join(parts)
+            list_meta.append(sm)
+            list_parts.append(sb)
+            list_offset += len(sb)
+        return {"__type__": "tuple" if is_tuple else "list", "items": list_meta}, b"".join(list_parts)
     try:
         json.dumps(obj)
         return {"__type__": "scalar", "value": obj}, b""
@@ -181,19 +181,19 @@ def _deserialize_value(meta: Any, binary: bytes) -> Any:
         return result
     if type_tag in ("list", "tuple"):
         items = meta.get("items", [])
-        result: list[Any] = []
+        list_result: list[Any] = []
         for sm in items:
             off = int(sm.get("_offset", 0))
             length = int(sm.get("_length", 0))
             sub_bin = binary[off : off + length] if length > 0 else b""
-            result.append(_deserialize_value(sm, sub_bin))
-        return tuple(result) if type_tag == "tuple" else result
+            list_result.append(_deserialize_value(sm, sub_bin))
+        return tuple(list_result) if type_tag == "tuple" else list_result
     if type_tag == "scalar":
         return meta.get("value")
     return {k: _deserialize_value(v, binary) for k, v in meta.items() if not k.startswith("__")}
 
 
-def _serialize_legacy(obj: Any) -> dict[str, Any]:
+def _serialize_legacy(obj: Any) -> dict[str, Any] | list[Any]:
     """旧版序列化：全部塞进 JSON（向后兼容读取）。"""
     if _HAS_TORCH and isinstance(obj, torch.Tensor):
         arr = obj.detach().cpu().numpy()
@@ -352,10 +352,10 @@ class PromptCache:
             try:
                 entry = PromptCacheEntry(
                     key=str(v.get("key", k)),
-                    created_at=float(v.get("created_at", 0)),
-                    last_access_ts=float(v.get("last_access_ts", v.get("last_accessed", 0))),
-                    access_count=int(v.get("access_count", 0)),
-                    embedding_size=int(v.get("embedding_size", v.get("file_size", 0))),
+                    created_at=float(v.get("created_at", 0) or 0),
+                    last_access_ts=float(v.get("last_access_ts", v.get("last_accessed", 0)) or 0),
+                    access_count=int(v.get("access_count", 0) or 0),
+                    embedding_size=int(v.get("embedding_size", v.get("file_size", 0)) or 0),
                     audio_hash=str(v.get("audio_hash", "")),
                 )
                 entries_list.append((k, entry))

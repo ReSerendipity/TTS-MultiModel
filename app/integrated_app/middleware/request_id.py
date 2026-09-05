@@ -166,7 +166,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
     async def __call__(
         self,
-        scope: dict[str, Any],
+        scope: dict[str, Any],  # type: ignore[override]  # noqa: E501 - 收敛 scope 具体键类型，与 ASGI 规范 dict 语义一致，mypy 判 LSP 违规因基类用 MutableMapping
         receive: Callable[[], Any],
         send: Callable[[Any], Awaitable[None]],
     ) -> None:

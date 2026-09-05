@@ -233,14 +233,14 @@ def file_lock(file_path: str | Path):
                 else:
                     import fcntl
 
-                    fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]  # noqa: E501 - fcntl 为平台条件导入，Windows stubs 无此属性
             except OSError:
                 os.close(self.fd)
                 self.fd = None
                 raise RuntimeError(f"无法获取文件锁: {self.path}") from None
             return self
 
-        def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:  # type: ignore[exit-return]  # noqa: E501 - 恒返回 False 且 mypy 要求 Literal[False] 标注，保持 bool 以兼容历史签名
             """退出上下文，释放文件锁。
 
             Args:
@@ -260,7 +260,7 @@ def file_lock(file_path: str | Path):
                     else:
                         import fcntl
 
-                        fcntl.flock(self.fd, fcntl.LOCK_UN)
+                        fcntl.flock(self.fd, fcntl.LOCK_UN)  # type: ignore[attr-defined]  # noqa: E501 - fcntl 为平台条件导入，Windows stubs 无此属性
                 finally:
                     os.close(self.fd)
                     self.fd = None
@@ -290,7 +290,7 @@ def set_process_high_priority() -> bool:
             p = psutil.Process()
             p.nice(psutil.HIGH_PRIORITY_CLASS)
         else:
-            os.nice(-10)
+            os.nice(-10)  # type: ignore[attr-defined]  # noqa: E501 - os.nice 仅 POSIX 存在，Windows stubs 无此属性
         logger.debug("[cross_platform] 已设置进程高优先级")
         return True
     except Exception as e:
@@ -353,7 +353,7 @@ def is_admin() -> bool:
 
             return ctypes.windll.shell32.IsUserAnAdmin() != 0
         else:
-            return os.geteuid() == 0
+            return os.geteuid() == 0  # type: ignore[attr-defined]  # noqa: E501 - 仅 POSIX 分支执行，Windows stubs 无此属性
     except Exception:
         return False
 

@@ -93,7 +93,7 @@ def cleanup_temp_files(files: Iterable[str] | None = None) -> int:
                             removed_count += 1
                 except OSError:
                     pass
-    except (OSError, PermissionError, glob.error) as e:
+    except OSError as e:
         logger.debug(f"清理 SAVE_DIR 临时文件失败（忽略）: {type(e).__name__}: {e}")
 
     # 模式 2 补充：清理系统临时目录中超过 1 小时的相关临时文件
@@ -112,7 +112,7 @@ def cleanup_temp_files(files: Iterable[str] | None = None) -> int:
                             removed_count += 1
                 except OSError:
                     pass
-    except (OSError, PermissionError, glob.error) as e:
+    except OSError as e:
         logger.debug(f"清理系统临时目录失败（忽略）: {type(e).__name__}: {e}")
 
     if removed_count > 0:

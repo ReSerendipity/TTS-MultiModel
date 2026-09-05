@@ -440,17 +440,23 @@ class AppConfig:
     @property
     def generation_defaults(self) -> GenerationDefaultsConfig:
         self._ensure_loaded()
-        return self._generation_defaults
+        value = self._generation_defaults
+        assert value is not None, "_ensure_loaded() 未填充 generation_defaults"
+        return value
 
     @property
     def api_auth(self) -> ApiAuthConfig:
         self._ensure_loaded()
-        return self._api_auth
+        value = self._api_auth
+        assert value is not None, "_ensure_loaded() 未填充 api_auth"
+        return value
 
     @property
     def pydantic_config(self) -> _PydanticAppConfig:
         self._ensure_loaded()
-        return self._pydantic_config
+        value = self._pydantic_config
+        assert value is not None, "_ensure_loaded() 未填充 pydantic_config"
+        return value
 
     # -- Computed properties (backward compat with old module-level vars) -----
 
@@ -458,13 +464,17 @@ class AppConfig:
     def gen_defaults_dict(self) -> dict:
         """Generation defaults as a plain dict (backward compat with GEN_DEFAULTS)."""
         self._ensure_loaded()
-        return self._generation_defaults.model_dump()
+        value = self._generation_defaults
+        assert value is not None, "_ensure_loaded() 未填充 generation_defaults"
+        return value.model_dump()
 
     @property
     def api_auth_dict(self) -> dict:
         """API auth as a plain dict (backward compat with API_AUTH)."""
         self._ensure_loaded()
-        return {"enabled": self._api_auth.enabled, "token": self._api_auth.token.get_secret_value()}
+        value = self._api_auth
+        assert value is not None, "_ensure_loaded() 未填充 api_auth"
+        return {"enabled": value.enabled, "token": value.token.get_secret_value()}
 
     @property
     def observability_dict(self) -> dict:

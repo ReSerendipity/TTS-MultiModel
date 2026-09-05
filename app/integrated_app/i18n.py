@@ -102,13 +102,13 @@ def _resolve_key(translations: dict[str, Any], key: str) -> str | None:
             parts = key.split(".")
             if not parts:
                 return None
-            result: Any = translations
+            node: Any = translations
             for part in parts:
-                if isinstance(result, dict) and part in result:
-                    result = result[part]
+                if isinstance(node, dict) and part in node:
+                    node = node[part]
                 else:
                     return None
-            return result if isinstance(result, str) else None
+            return node if isinstance(node, str) else None
         except Exception:
             return None
     return None

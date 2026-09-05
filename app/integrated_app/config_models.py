@@ -779,7 +779,7 @@ def load_config_dict(yaml_data: Any) -> AppConfig:
                     "msg": f"Expected config root to be a dict/mapping, got {type(yaml_data).__name__}. "
                     "Please check that config.yaml has a valid key-value structure at the top level.",
                     "input": yaml_data,
-                }
+                }  # type: ignore[typeddict-unknown-key]  # noqa: E501 - pydantic line_errors 接受自定义 msg 便于用户阅读，TypedDict 未建 msg 键
             ],
         )
 
