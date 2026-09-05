@@ -185,9 +185,10 @@ _INSERT_FIELDS: str = (
     "filename, filepath, created_at, file_size_bytes, duration_seconds, "
     "text_preview, engine, model_type, model_size, lang, persona_name, "
     "output_format, temperature, seed, speed, is_success, error_msg, "
-    "is_degraded, tags, hidden, created_timestamp, rtf"
+    "is_degraded, tags, hidden, created_timestamp, rtf, "
+    "engine_version, persona_version, vram_peak_mb"
 )
-_INSERT_PLACEHOLDERS: str = ", ".join(["?"] * 22)
+_INSERT_PLACEHOLDERS: str = ", ".join(["?"] * 25)
 # Why INSERT OR REPLACE 而不是 INSERT OR IGNORE：
 # 用户重新生成相同文件名的音频时（如"换个语气再来一次"），希望覆盖旧的
 # 元数据（error_msg / duration_seconds / is_success 等可能已变化）。
@@ -602,7 +603,7 @@ class HistoryDatabase:
     def _ensure_table(self) -> None:
         """创建 generation_history 表（如果不存在）。
 
-        包含 22 个字段：主键 id、文件名、文件路径（UNIQUE）、创建时间、文件大小、
+        包含 25 个字段：主键 id、文件名、文件路径（UNIQUE）、创建时间、文件大小、
         生成时长、文本预览、引擎、模型类型/大小、语言、音色名、输出格式、
         温度/种子/速度参数、成功标志、错误信息、降级标志、标签、隐藏标志、
         时间戳、文件缺失标志。
@@ -633,7 +634,10 @@ class HistoryDatabase:
                     hidden INTEGER NOT NULL DEFAULT 0,
                     created_timestamp REAL NOT NULL DEFAULT 0,
                     file_missing INTEGER NOT NULL DEFAULT 0,
-                    rtf REAL
+                    rtf REAL,
+                    engine_version TEXT DEFAULT '',
+                    persona_version TEXT DEFAULT '',
+                    vram_peak_mb REAL DEFAULT 0
                 )
             """)
 
@@ -691,6 +695,11 @@ class HistoryDatabase:
         ("v003_file_missing", "添加 file_missing 列（磁盘文件缺失标记）", "_migrate_add_file_missing_column"),
         ("v004_hmac_chain", "添加 HMAC 链列（prev_hash + record_hmac）", "_migrate_add_hmac_columns"),
         ("v005_rtf", "添加 rtf 列（实时率质量指标）", "_migrate_add_rtf_column"),
+        (
+            "v006_lineage",
+            "添加血缘扩展列（engine_version/persona_version/vram_peak_mb）",
+            "_migrate_add_lineage_columns",
+        ),
     ]
 
     def _ensure_migrations_table(self) -> None:
@@ -706,6 +715,17 @@ class HistoryDatabase:
     def _migrate_add_rtf_column(self) -> None:
         """P2-7：添加 rtf 列（实时率指标，支持质量趋势监控）。"""
         self._migrate_add_column("rtf", "REAL")
+
+    def _migrate_add_lineage_columns(self) -> None:
+        """Q3-8：添加血缘扩展列（engine_version / persona_version / vram_peak_mb）。
+
+        数据治理评估指出 generation_history 缺引擎版本、音色版本与显存峰值，
+        无法定位"某次合成用的是哪个模型版本"。三列均为可选（旧记录回填默认值），
+        不破坏现有 schema 与查询。
+        """
+        self._migrate_add_column("engine_version", "TEXT DEFAULT ''")
+        self._migrate_add_column("persona_version", "TEXT DEFAULT ''")
+        self._migrate_add_column("vram_peak_mb", "REAL DEFAULT 0")
 
     def _run_versioned_migrations(self) -> None:
         """按版本顺序执行未执行的迁移，并记录到 _schema_migrations 表。
@@ -861,7 +881,7 @@ class HistoryDatabase:
                 从 record["created_timestamp"] 取值，再否则取当前 ``time.time()``。
 
         Returns:
-            与 _INSERT_SQL 占位符一一对应的有序元组，长度恒为 22。
+            与 _INSERT_SQL 占位符一一对应的有序元组，长度恒为 25。
         """
         if timestamp is None:
             timestamp = record.get("created_timestamp", time.time())
@@ -909,6 +929,9 @@ class HistoryDatabase:
             1 if record.get("hidden", False) else 0,
             timestamp,
             record.get("rtf"),
+            record.get("engine_version", ""),
+            record.get("persona_version", ""),
+            record.get("vram_peak_mb", 0),
         )
 
     # ------------------------------------------------------------------

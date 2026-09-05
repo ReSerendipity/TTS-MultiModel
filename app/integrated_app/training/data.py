@@ -1,12 +1,19 @@
 """LoRA 训练的数据集封装、Batch 处理与 DataLoader 构建。
 
-training/ 目录对应 WebUI 中 LoRA 微调 Tab 的训练任务；scripts/train_voxcpm_finetune.py
-会在启动训练前首先调用本模块：
-  1. ``HFVoxCPMDataset`` 从 ``data_dir`` 扫描 .wav + 同名 .txt 对（或 metadata.jsonl），
-     做时长过滤与 train/eval 切分；
-  2. ``BatchProcessor`` 对 batch 执行 Mel 谱提取 → 文本 tokenize → 时长对齐 → padding；
-  3. ``create_dataloaders`` / ``build_dataloader`` 构建带 DistributedSampler 的
-     DataLoader（由 accelerator 提供）。
+⚠️ 双轨架构说明（Q4-T9 / 2026-09-05）：
+    本目录（``integrated_app/training/``）是**现代重构版**训练模块，设计完整
+    （Pydantic TrainingConfig / StateManager 原子写 / TrainingTracker SSE+TensorBoard /
+    dataset_fingerprint / _set_seed 全设），但**当前实际训练路径未接线到本模块**。
+
+    实际训练脚本 ``scripts/train_voxcpm_finetune.py`` 通过 sys.path 注入
+    ``app/integrated_app/vendor/`` 后导入的是 **vendored 版**
+    ``voxcpm.training``（``app/integrated_app/vendor/voxcpm/training/``），
+    而非本模块。两套模块文件同名（accelerator/config/data/packers/state/tracker）
+    但 vendored 版是 VoxCPM 上游的原始实现。
+
+    未来收敛方向：将训练脚本切换到本现代模块，或删除本模块避免维护双份。
+    在收敛完成前，本模块的单元测试（tests/training/）验证其内部逻辑正确性，
+    但不代表实际训练路径使用本模块。
 
 数据格式：
   - 最简：``data_dir`` 下放一对对 ``sample001.wav`` + ``sample001.txt``（txt 中是对应文本）

@@ -618,6 +618,9 @@ def _record_to_history_db(
     is_success: bool = True,
     error_msg: str | None = None,
     audio_duration: float = 0.0,
+    engine_version: str = "",
+    persona_version: str = "",
+    vram_peak_mb: float = 0.0,
 ) -> None:
     """将单次生成结果写入 history_db。
 
@@ -633,6 +636,9 @@ def _record_to_history_db(
         is_success: 本次是否生成成功。
         error_msg: 失败原因（仅 is_success=False 时使用）。
         audio_duration: 生成音频时长（秒），用于计算 RTF（实时率 = 生成耗时 / 音频时长）。
+        engine_version: 引擎模型版本标识（Q3-8 血缘扩展）。
+        persona_version: 音色版本标识（Q3-8 血缘扩展）。
+        vram_peak_mb: 本次生成期间 GPU 显存峰值（MB）（Q3-8 血缘扩展）。
     """
     # S-R4: 首次调用时执行一次性 legacy 数据库迁移（幂等）
     _migrate_legacy_history_db_if_needed()
@@ -658,6 +664,9 @@ def _record_to_history_db(
                 "is_success": is_success,
                 "error_msg": error_msg,
                 "rtf": round(duration / audio_duration, 4) if audio_duration > 0 else None,
+                "engine_version": engine_version,
+                "persona_version": persona_version,
+                "vram_peak_mb": vram_peak_mb,
             }
         )
     except Exception as e:  # noqa: BLE001
