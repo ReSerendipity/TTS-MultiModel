@@ -318,7 +318,7 @@ async def _acquire_streaming_semaphore(
         await asyncio.wait_for(semaphore.acquire(), timeout=_SEMAPHORE_ACQUIRE_TIMEOUT_S)
         return semaphore, None
     except asyncio.TimeoutError:
-        # 运维稳定性评估 P1：排队超时统一 503（与 utils._execute_generation 一致）。
+        # 运维稳定性评估 P1：排队超时统一 429 + Retry-After（与 utils._execute_generation 一致）。
         from ..utils import _record_generation_failure
 
         _record_generation_failure("timeout")
@@ -326,7 +326,8 @@ async def _acquire_streaming_semaphore(
             request,
             "系统繁忙，请稍后再试（等待超时）",
             error_type="queue_timeout",
-            status_code=503,
+            status_code=429,
+            headers={"Retry-After": "30"},
         )
 
 
@@ -649,6 +650,8 @@ async def streaming_generation(
         return _error_html(
             request,
             f"生成超时（超过 {_GENERATION_HARD_TIMEOUT_S:.0f} 秒），请尝试缩短文本",
+            status_code=503,
+            headers={"Retry-After": "60"},
         )
     except Exception as e:
         duration = time.monotonic() - start_time

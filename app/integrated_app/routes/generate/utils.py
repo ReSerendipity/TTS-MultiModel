@@ -40,7 +40,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...audio_processing import enhance_audio
 from ...config import MAX_UPLOAD_SIZE_BYTES, SAVE_DIR, get_config
-from ...exceptions import EngineSwitchError, InsufficientVRAMError, TTSError
+from ...exceptions import EngineSwitchError, InsufficientVRAMError, OOMRetryExhaustedError, TTSError
 from ...gpu_utils import free_gpu_memory, is_oom_error
 from ...history_db import get_history_db
 from ...model_manager import _time_estimator
@@ -359,7 +359,10 @@ async def write_history_and_save_audio(
     _migrate_legacy_history_db_if_needed()
 
     db = get_history_db()
-    db.insert(
+    # P2-7：db.insert 是同步 SQLite 操作，在 async 函数中直接调用会阻塞事件循环。
+    # 移至线程池执行（与 _record_to_history_db 的调用方式一致）。
+    await asyncio.to_thread(
+        db.insert,
         {
             "filename": filename,
             "filepath": save_path,
@@ -375,7 +378,7 @@ async def write_history_and_save_audio(
             "is_success": True,
             "error_msg": None,
             "rtf": None,  # gen_start_ts 调用链未透传，RTF 暂置 None（保持既有行为，避免 F821）
-        }
+        },
     )
 
     return f"/api/audio/generated/{filename}"
@@ -926,6 +929,7 @@ def _error_html(
     engine_id: str = "",
     title_key: str = "gen_failed",
     status_code: int = 400,
+    headers: dict[str, str] | None = None,
 ) -> HTMLResponse:
     """渲染 HTML 错误片段；优先使用 Jinja2 模板，模板不可用时降级返回安全字符串。
 
@@ -937,15 +941,22 @@ def _error_html(
         title_key: 标题的 i18n 键。默认 ``gen_failed``（「生成失败」一类文案）；
             非生成类端点（如音色保存）必须传更贴切的键，否则校验错误会被冠以
             「生成时遇到了一点小状况」这种与操作无关的标题。
-        status_code: HTTP 状态码，默认 400。排队超时须传 503
+        status_code: HTTP 状态码，默认 400。排队超时传 429，硬超时传 503
             （运维稳定性评估 P1：此前 200/400+HTML 让监控统计不到这类失败）。
+        headers: 额外响应头（如 ``Retry-After``），与内置 HX-Trigger 合并。
 
     Returns:
-        HTMLResponse（按 status_code），携带 HX-Trigger toast 头。
+        HTMLResponse（按 status_code），携带 HX-Trigger toast 头及自定义头。
     """
     from ...i18n import get_lang, t
 
     lang: str = get_lang(request)
+    # 合并自定义头与内置 toast 头（自定义头优先，避免覆盖 HX-Trigger）
+    merged_headers: dict[str, str] = {
+        "HX-Trigger": json.dumps({"tts-toast": {"type": "error", "message": html.escape(error_message)}}),
+    }
+    if headers:
+        merged_headers.update(headers)
     try:
         templates = request.app.state.templates
         return templates.TemplateResponse(
@@ -959,16 +970,7 @@ def _error_html(
                 "title_key": title_key,
             },
             status_code=status_code,
-            headers={
-                # ensure_ascii 必须保持 True（json.dumps 的默认值，故不显式传参）。
-                # HTTP 头只允许 latin-1 字节，而 error_message 绝大多数是中文，
-                # 此前这里显式写了 ensure_ascii=False，Starlette 编码响应头时抛
-                # UnicodeEncodeError: 'latin-1' codec can't encode characters，
-                # 被下面的 except 静默吞掉并走降级分支 —— 导致全站 HTMX toast
-                # 提示从未真正生效（只有纯 ASCII 消息才碰巧可用）。
-                # 改成 \uXXXX 转义后 JS 侧 JSON.parse 会自动还原，显示文本不受影响。
-                "HX-Trigger": json.dumps({"tts-toast": {"type": "error", "message": html.escape(error_message)}}),
-            },
+            headers=merged_headers,
         )
     except Exception:  # noqa: BLE001
         # 降级不再静默：模板路径失败会让 toast 消失，必须留下可查证据
@@ -997,6 +999,7 @@ def _error_html(
             f"{load_btn}"
             f"</div>",
             status_code=status_code,
+            headers=merged_headers,
         )
 
 
@@ -1276,9 +1279,156 @@ def _run_with_oom_retry(
                 logger.warning(f"{endpoint_name} OOM retry {retry_count}/{max_retries} failed")
                 free_gpu_memory()
 
-        raise RuntimeError(
+        # 运维稳定性评估 P1-4：抛专用异常子类而非裸 RuntimeError。
+        # Why：耗尽文案是中文，不含 is_oom_error() 英文模式，此前监控分类会被
+        # 误判为 other。专用类型让 oom 分类与自愈触发都可靠；继承 RuntimeError
+        # 保持既有 except RuntimeError 调用方兼容。
+        raise OOMRetryExhaustedError(
             "显存不足，已尝试降级重试但仍失败。请尝试缩短文本、关闭其他GPU程序，或在设置中切换到CPU模式"
         ) from None
+
+
+# ---------------------------------------------------------------------------
+# 运维稳定性评估 P1-4：OOM 后受控自动重载（无 on-call 场景的自愈路径）
+# ---------------------------------------------------------------------------
+
+# 上次自动重载的时间戳（epoch 秒）。0.0 = 从未重载过。
+_last_oom_auto_reload_ts: float = 0.0
+
+
+def _schedule_oom_auto_recovery(endpoint_name: str) -> None:
+    """OOM（含重试耗尽）后调度一次后台自动重载：卸载当前引擎 → 重新加载。
+
+    设计约束（对齐评估报告 P1-4「自动重载，失败则交由容器重启」）：
+    - 默认开启（``generation.oom_auto_reload``），设 false 退回旧的「只靠容器重启」。
+    - 冷却窗口（``oom_auto_reload_cooldown_s``）：窗口内不重复触发，防止权重损坏时
+      反复重载风暴把 GPU 拖死。
+    - 获取 per-engine 信号量（最多 120s）串行化：重载不与正在跑的推理抢显存；
+      拿不到槽位就放弃本次（下次 OOM 再试）。
+    - 重载后轮询 ``registry.is_engine_ready()``（上限 600s）判成败：成功发 INFO 告警、
+      失败发 CRITICAL 告警并标 error——此时 ``/readyz`` 仍 503，容器编排据此重启兜底。
+    - 本函数绝不抛异常：恢复调度失败不能影响正在返回给用户的 OOM 错误响应。
+
+    Args:
+        endpoint_name: 触发 OOM 的端点名（诊断用）。
+    """
+    global _last_oom_auto_reload_ts
+    try:
+        cfg = get_config().pydantic_config.generation
+        if not getattr(cfg, "oom_auto_reload", True):
+            return
+        cooldown = float(getattr(cfg, "oom_auto_reload_cooldown_s", 300.0))
+    except Exception:  # noqa: BLE001
+        cooldown = 300.0
+    now = time.time()
+    if now - _last_oom_auto_reload_ts < cooldown:
+        logger.warning(
+            "[oom-recovery] %s 距上次自动重载仅 %.0fs（冷却 %.0fs），跳过本次",
+            endpoint_name,
+            now - _last_oom_auto_reload_ts,
+            cooldown,
+        )
+        return
+    _last_oom_auto_reload_ts = now
+
+    async def _recover() -> None:
+        from ...model_registry import registry
+        from ...monitor import get_health_monitor
+        from ...observability.alerting import Alert, AlertSeverity, get_alert_manager
+
+        loop = asyncio.get_running_loop()
+        sem: asyncio.Semaphore | None = None
+        acquired = False
+        engine: str = registry.current_engine or "voxcpm2"
+        try:
+            sem = await _get_generation_semaphore(engine)
+            try:
+                await asyncio.wait_for(sem.acquire(), timeout=120.0)
+                acquired = True
+            except asyncio.TimeoutError:
+                logger.warning("[oom-recovery] 120s 内未获取到生成槽位，放弃本次自动重载（等待下次 OOM）")
+                return
+
+            logger.warning("[oom-recovery] 开始受控重载引擎 %s（卸载→重新加载）", engine)
+            get_health_monitor().set_model_status("unloading")
+
+            def _reload_worker() -> None:
+                # 同步链路线程内执行：重新加载当前引擎。load_* 生成器内部已含
+                # "卸载旧引擎 + GC + empty_cache" 阶段（见 model_manager_core.load
+                # 的 phase=init），无需再单独 unload；且必须完整消费才会真正加载
+                # （与 routes/model.py._run_load 同样的 4 元组消费方式）。
+                from ...model_manager import (
+                    load_indextts2,
+                    load_indextts20,
+                    load_voxcpm2,
+                    switch_engine,
+                )
+
+                if engine == "indextts2":
+                    _gen = load_indextts2()
+                elif engine == "indextts20":
+                    _gen = load_indextts20()
+                elif engine == "voxcpm2":
+                    _gen = load_voxcpm2()
+                else:
+                    _gen = switch_engine(engine)
+                for _evt in _gen:
+                    _status = _evt[0] if isinstance(_evt, tuple) and _evt else str(_evt)
+                    logger.debug("[oom-recovery] 重载进度: %s", _status)
+
+            try:
+                await loop.run_in_executor(None, _reload_worker)
+            except Exception as re_exc:  # noqa: BLE001
+                get_health_monitor().set_model_status("error")
+                get_alert_manager().emit(
+                    Alert(
+                        severity=AlertSeverity.CRITICAL,
+                        title=f"OOM 后自动重载失败：{re_exc}",
+                        detail=f"引擎={engine} 场景={endpoint_name}；服务保持未就绪（/readyz=503），交由容器重启兜底",
+                        source="oom_auto_recovery",
+                    )
+                )
+                return
+
+            deadline = loop.time() + 600.0
+            while loop.time() < deadline:
+                if registry.is_engine_ready():
+                    break
+                await asyncio.sleep(2.0)
+            if registry.is_engine_ready():
+                get_health_monitor().set_model_status("ready")
+                get_health_monitor().record_oom_auto_recovery()
+                get_alert_manager().emit(
+                    Alert(
+                        severity=AlertSeverity.INFO,
+                        title="OOM 后引擎已自动重载恢复",
+                        detail=f"引擎={engine}，服务重新就绪（/readyz=200）",
+                        source="oom_auto_recovery",
+                    )
+                )
+                logger.info("[oom-recovery] 引擎 %s 自动重载完成，服务恢复就绪", engine)
+            else:
+                get_health_monitor().set_model_status("error")
+                get_alert_manager().emit(
+                    Alert(
+                        severity=AlertSeverity.CRITICAL,
+                        title="OOM 后自动重载超时未就绪",
+                        detail=f"引擎={engine}；服务保持未就绪（/readyz=503），交由容器重启兜底",
+                        source="oom_auto_recovery",
+                    )
+                )
+                logger.error("[oom-recovery] 引擎 %s 重载后 600s 内未就绪", engine)
+        except Exception as outer:  # noqa: BLE001
+            logger.error("[oom-recovery] 自动重载流程异常（已忽略，交由后续请求/容器兜底）: %s", outer)
+        finally:
+            if acquired and sem is not None:
+                with contextlib.suppress(Exception):
+                    sem.release()
+
+    try:
+        asyncio.create_task(_recover())
+    except Exception as ce:  # noqa: BLE001 - 无运行循环等极端场景
+        logger.debug("[oom-recovery] 重载任务调度失败（忽略）: %s", ce)
 
 
 def _store_generation_result(filename: str, idem_key: str | None, cache_key: str | None) -> None:
@@ -1378,14 +1528,15 @@ async def _execute_generation(
             timeout=_gen_semaphore_timeout(),
         )
     except asyncio.TimeoutError:
-        # 运维稳定性评估 P1：排队超时是服务过载信号，必须以 5xx 暴露并可被监控统计。
-        # 此前返回 200/400+HTML，Prometheus 侧完全看不到这次失败。
+        # 后端设计评估 P2-2：排队超时是客户端可重试的过载信号，返回 429 + Retry-After。
+        # 此前返回 503，语义不准确（503 应保留给服务端硬超时/不可用）。
         _record_generation_failure("timeout")
         return _error_html(
             request,
             "系统繁忙，请稍后再试（等待超时）",
             error_type="queue_timeout",
-            status_code=503,
+            status_code=429,
+            headers={"Retry-After": "30"},
         )
     try:
         # E6-1 ROBUSTNESS: 为生成任务本身加硬超时，防止超长文本/死循环耗尽信号量池。
@@ -1433,6 +1584,8 @@ async def _execute_generation(
             request,
             f"生成超时（超过 {_gen_hard_timeout():.0f} 秒），请尝试缩短文本或减少并发",
             error_type="timeout",
+            status_code=503,
+            headers={"Retry-After": "60"},
         )
     finally:
         semaphore.release()
@@ -1513,6 +1666,25 @@ async def _execute_generation_impl(
             _log_generation(endpoint_name, text, engine, voice_or_persona, False, duration, error_msg=msg)
             _record_generation_failure("other", duration)
             return _error_html(request, msg)
+        # --- P2-3: bad_case_retry 质量检测接入生成管线 ---
+        # 此前 bad_case_retry 模块有完整测试但零生产调用（死代码）。
+        # 此处接入 detect_failure_type：生成成功后对音频做静音/过短/爆音/重复检测，
+        # 命中则记录 bad_case 指标 + warning 日志（不自动重试：run_fn 为参数闭包，
+        # 调参重试需重构生成函数签名，风险较高，留待后续迭代）。
+        bad_case_note: str | None = None
+        try:
+            if isinstance(result, tuple) and len(result) >= 2 and hasattr(result[0], "shape"):
+                from ...bad_case_retry import detect_failure_type
+
+                _wav = result[0]
+                _sr = int(result[1]) if len(result) >= 2 else 48000
+                _has_fail, _ftype, _reason = detect_failure_type(_wav, _sr)
+                if _has_fail:
+                    bad_case_note = f"质量检测: {_reason}"
+                    logger.warning("[bad-case] %s 引擎=%s 类型=%s", endpoint_name, engine, _ftype.value)
+                    _record_generation_failure("bad_case", duration)
+        except Exception as bce:  # noqa: BLE001
+            logger.debug("[bad-case] 质量检测异常（忽略）: %s", bce)
         is_degraded: bool = degraded_note is not None
         _log_generation(endpoint_name, text, engine, voice_or_persona, True, duration, is_degraded=is_degraded)
         _time_estimator.record(len(text), duration, engine, segment_count=1)
@@ -1541,6 +1713,8 @@ async def _execute_generation_impl(
         _store_generation_result(filename, idem_key, cache_key)
         if degraded_note:
             return _partial_success_html(filename, msg, degraded_note)
+        if bad_case_note:
+            return _partial_success_html(filename, msg, bad_case_note)
         return _success_html(filename, msg)
     except Exception as e:  # noqa: BLE001
         duration = time.monotonic() - start_time
@@ -1548,9 +1722,12 @@ async def _execute_generation_impl(
         _log_generation(endpoint_name, text, engine, voice_or_persona, False, duration, error_msg=str(e))
         error_type: str = "general"
         metric_type: str = "other"
-        if is_oom_error(e):
+        if isinstance(e, OOMRetryExhaustedError) or is_oom_error(e):
             error_type = "oom"
             metric_type = "oom"
+            # 运维稳定性评估 P1-4：OOM（含重试耗尽）后调度受控自动重载。
+            # 冷却窗口内的重复 OOM 不会反复触发；调度失败不影响错误响应。
+            _schedule_oom_auto_recovery(endpoint_name)
         elif isinstance(e, ValueError):
             error_type = "validation"
             metric_type = "param"
