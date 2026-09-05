@@ -21,7 +21,7 @@ from enum import Enum
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from .config import SAVE_DIR
@@ -116,6 +116,10 @@ class SpeechRequest(BaseModel):
         ge=0.25,
         le=4.0,
         description="语速倍率 (0.25-4.0)",
+    )
+    stream: bool = Field(
+        default=False,
+        description="是否以流式（chunked transfer）返回音频；false 时返回完整二进制带 Content-Length",
     )
 
     @field_validator("response_format")
@@ -850,15 +854,28 @@ class OpenAICompatibleRouter:
                     "aac": "audio/aac",
                 }
                 content_type = content_types.get(body.response_format, "audio/wav")
+                common_headers = {
+                    "Content-Disposition": f"attachment; filename=speech.{body.response_format}",
+                    "X-Task-ID": task_id,
+                }
 
-                # 流式返回音频
-                return StreamingResponse(
-                    _stream_file(final_path),
+                # P2-5：尊重 OpenAI 兼容的 stream 参数。
+                # stream=true → StreamingResponse（chunked transfer，边生成边播放）。
+                # stream=false（默认）→ Response 完整二进制 + Content-Length，
+                # 兼容不支持 chunked 的客户端（此前 Pydantic 静默忽略 stream=true）。
+                if body.stream:
+                    return StreamingResponse(
+                        _stream_file(final_path),
+                        media_type=content_type,
+                        headers=common_headers,
+                    )
+                with open(final_path, "rb") as f:
+                    audio_bytes = f.read()
+                common_headers["Content-Length"] = str(len(audio_bytes))
+                return Response(
+                    content=audio_bytes,
                     media_type=content_type,
-                    headers={
-                        "Content-Disposition": f"attachment; filename=speech.{body.response_format}",
-                        "X-Task-ID": task_id,
-                    },
+                    headers=common_headers,
                 )
 
             except HTTPException:
