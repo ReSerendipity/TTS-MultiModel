@@ -118,7 +118,6 @@ import threading
 import webbrowser
 import time
 import socket
-import subprocess
 
 
 def silent_exception_handler(loop, context):
@@ -143,69 +142,6 @@ def silent_exception_handler(loop, context):
         return
     loop.default_exception_handler(context)
 
-
-def _kill_port_occupant(port, ip="127.0.0.1"):
-    """
-    终止占用指定端口的进程（Windows 专用）
-
-    功能说明:
-        在启动服务前清理目标端口，防止端口冲突导致启动失败。
-        优先使用 psutil 库遍历网络连接查找占用进程，如 psutil 不可用
-        则降级使用 netstat + taskkill 命令（Windows 系统自带工具）。
-
-    Args:
-        port: 要清理的端口号（整数）
-        ip: 绑定的 IP 地址，默认 "127.0.0.1"
-
-    实现策略:
-        1. 优先方案（psutil）: 遍历 inet 连接，找到 LISTEN 状态匹配端口的进程，调用 proc.kill()
-        2. 降级方案（系统命令）: 使用 netstat -ano 查找占用 PID，通过 taskkill /F 强制终止
-        3. 跳过自身进程: 不终止当前 Python 进程自身
-        4. 异常容错: 权限不足或进程不存在时静默跳过
-
-    注意事项:
-        - 仅适用于 Windows 平台
-        - 需要相应权限才能终止其他进程
-        - 终止后等待 1 秒确保端口释放
-    """
-    # L4 整改：端口强杀前需人工确认（CI/容器无 stdin 时自动取消，不误杀）
-    if not os.environ.get("TTS_SKIP_PORT_KILL_CONFIRM"):
-        try:
-            _confirm = input(f"端口 {port} 被占用，将终止占用进程以继续启动，是否继续？(y/N): ")
-        except (EOFError, KeyboardInterrupt):
-            _confirm = "n"
-        if _confirm.strip().lower() != "y":
-            logger.info("已取消端口强杀，占用进程保留。")
-            return
-    try:
-        import psutil
-
-        for conn in psutil.net_connections(kind="inet"):
-            if conn.laddr.port == port and conn.status == "LISTEN":
-                try:
-                    proc = psutil.Process(conn.pid)
-                    if proc.pid != os.getpid():
-                        logger.info(f"端口 {port} 被进程 {conn.pid} ({proc.name()}) 占用，正在终止...")
-                        proc.kill()
-                        proc.wait(timeout=5)
-                        logger.info(f"已终止进程 {conn.pid}")
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-        time.sleep(1)
-    except ImportError:
-        # Fallback: use netstat + taskkill
-        try:
-            result = subprocess.run(["netstat", "-ano"], capture_output=True, text=True, timeout=5)
-            for line in result.stdout.splitlines():
-                if f":{port}" in line and "LISTENING" in line:
-                    parts = line.strip().split()
-                    pid = int(parts[-1])
-                    if pid != os.getpid():
-                        logger.info(f"端口 {port} 被进程 {pid} 占用，正在终止...")
-                        subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True, timeout=5)
-            time.sleep(1)
-        except Exception:
-            pass
 
 
 def auto_open_browser(ip, port, timeout=300):
@@ -351,11 +287,8 @@ def start_app():
     if os.path.isdir(ffmpeg_dir):
         os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ["PATH"]
 
-    # 端口自动转换：若默认端口被占用，向后寻找第一个可用端口（7869 → 7870 → …），
+    # 端口被占用时由下方 _find_available_port 自动向后寻找可用端口（7869 → 7870 → …），
     # 不再交互式询问是否强杀占用进程（避免启动被阻塞在 y/N 等待上）。
-
-    # Kill any leftover process on the target port before selecting
-    _kill_port_occupant(int(port), ip)
 
     # M8 整改：关键二进制 SHA256 完整性校验（默认关闭；设 TTS_VERIFY_BINARIES=1 启用）。
     # 仅当校验清单存在且哈希不匹配时拒绝启动；清单缺失则跳过（不阻断）。
