@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTS_MultiModel 数据治理评估报告 v2.2.1</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --ink: #1a1b1c; --sub: #6b7280;
+    --line: #e5e7eb; --accent: #2563eb; --p0: #dc2626; --p1: #d97706; --p2: #2563eb;
+    --good: #16a34a; --bad: #dc2626; --warn: #d97706;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.7 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+  header.hero { background: linear-gradient(135deg,#1e3a5f,#2563eb); color: #fff; border-radius: 14px; padding: 28px 32px; margin-bottom: 28px; }
+  header.hero h1 { margin: 0 0 6px; font-size: 24px; }
+  header.hero p { margin: 4px 0; opacity: .9; font-size: 13.5px; }
+  .badges span { display: inline-block; background: rgba(255,255,255,.16); border-radius: 20px; padding: 2px 12px; margin: 4px 6px 0 0; font-size: 12px; }
+  h2 { font-size: 20px; margin: 40px 0 12px; padding-left: 12px; border-left: 4px solid var(--accent); }
+  h3 { font-size: 16px; margin: 24px 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin: 14px 0; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 10px 0; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #f0f4fa; font-weight: 600; white-space: nowrap; }
+  code { background: #eef1f5; border-radius: 4px; padding: 1px 5px; font: 12.5px Consolas,Menlo,monospace; }
+  pre { background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 12px 14px; overflow-x: auto; font: 12.5px Consolas,Menlo,monospace; line-height: 1.55; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .chart { width: 100%; height: 340px; }
+  .tag { display: inline-block; border-radius: 4px; padding: 1px 8px; font-size: 12px; font-weight: 600; color: #fff; }
+  .t-p0 { background: var(--p0); } .t-p1 { background: var(--p1); } .t-p2 { background: var(--p2); }
+  .score { font-weight: 700; }
+  .s-bad { color: var(--bad); } .s-mid { color: var(--warn); } .s-good { color: var(--good); }
+  .ok { color: var(--good); font-weight: 600; } .no { color: var(--bad); font-weight: 600; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } header.hero { padding: 20px; } .chart { height: 300px; } }
+  .note { font-size: 12.5px; color: var(--sub); }
+  .callout { border-left: 4px solid var(--p0); background: #fef2f2; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+  .callout.warn { border-color: var(--p1); background: #fffbeb; }
+  .callout.good { border-color: var(--good); background: #f0fdf4; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>TTS_MultiModel · 数据治理评估报告</h1>
+  <p>评估对象：<code style="background:rgba(255,255,255,.2);color:#fff">C:/Users/Doro/TTS_MultiModel</code> ｜ 版本：<b>v2.2.1</b>（config.yaml / CHANGELOG 双向核验）</p>
+  <p>评估日期：2026-09-05 ｜ 方法：代码级证据绑定（grep / PRAGMA / SQLite 只读查询 / 文件系统实测），全部结论附源码行号或复现命令</p>
+  <div class="badges">
+    <span>核心矛盾：声明治理策略 vs 实际行为相差 64 条脏记录 + 3 行启动代码</span>
+    <span>数据源：history.db（1.25 GB）实际 137 行，其中 921 MB 为单批脏数据</span>
+  </div>
+</header>
+
+<!-- ============ 1. 数据资产实测盘点 ============ -->
+<h2>① 数据资产实测盘点（2026-09-05 实测）</h2>
+
+<div class="card">
+  <h3>1.1 数据库与文件系统规模</h3>
+  <table>
+    <tr><th>资产</th><th>实测值</th><th>核实方式</th><th>备注</th></tr>
+    <tr><td><code>data/history.db</code></td><td>1,253,924,864 B（≈1.25 GB，306,134 页 × 4 KB）</td><td><code>Get-ChildItem</code> + <code>PRAGMA page_count</code></td><td><span class="tag t-p0">P0</span> 体积主因见 1.3</td></tr>
+    <tr><td><code>history.db-wal / -shm</code></td><td>253 KB / 32 KB</td><td><code>Get-ChildItem</code></td><td>WAL 模式，<code>synchronous=NORMAL</code></td></tr>
+    <tr><td><code>outputs/</code></td><td>1.19 GB；顶层 17 个 wav + <code>uploads/</code> 14 个参考音频 + <code>generation_versions.db</code></td><td><code>du</code> / <code>os.listdir</code></td><td>含 92 行谱系库（见 1.4）</td></tr>
+    <tr><td>密钥文件</td><td><code>data/.history_hmac_key</code>、<code>data/.csrf_secret</code> 各 64 B 明文，与 DB 同目录</td><td><code>Get-ChildItem</code> + 读取</td><td><span class="tag t-p1">P1</span> 密钥与密文同目录（见 §3）</td></tr>
+    <tr><td>训练产物</td><td><code>lora/</code> 空；<code>checkpoints/</code> 仅 <code>hf_cache/models--facebook--w2v-bert-2.0</code>（HF 缓存，非训练产物）；<code>data/checkpoints</code> 为空目录</td><td>文件系统实测</td><td><span class="tag t-p1">P1</span> 训练从未产出（见 §6）</td></tr>
+    <tr><td>personas</td><td><b>7 个</b>音色（gf1/南宫婉/小林/御姐/旁白/李老师/韩立），四件套齐全，metadata schema 13 字段完全一致</td><td>脚本比对</td><td>提示词锚点"8 个"有误，实测 7 个</td></tr>
+    <tr><td>i18n</td><td>5 语言（zh/en/ja/ko/zh-tw）key 差异 = <b>0</b></td><td>递归 flat 比对</td><td class="ok">治理良好</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>1.2 表结构与记录质量（SQLite 只读实测）</h3>
+  <table>
+    <tr><th>项</th><th>实测值</th><th>判定</th></tr>
+    <tr><td>表清单</td><td><code>generation_history</code>(137 行)、<code>action_logs</code>(200 行)、<code>meta_kv</code>(0 行)、<code>generation_history_fts</code>(137 行) + FTS shadow 表</td><td>meta_kv 空表：指标跨重启持久化从未写入</td></tr>
+    <tr><td>generation_history 列数</td><td>26 列（含迁移补的 <code>prev_hash</code>/<code>record_hmac</code>）</td><td>与提示词"24+2"一致</td></tr>
+    <tr><td>sqlite_sequence</td><td>generation_history 历史最大 id = <b>405</b>，当前 137 行 → <b>曾删除 268 条</b></td><td class="no">purge 生效的直接证据（见 §2）</td></tr>
+    <tr><td>created_timestamp 范围</td><td>2026-06-10 ~ 2026-08-30，<b>全部 &lt; 90 天</b>（最老 86 天）</td><td class="no">pii_retention_days=90 已删除过超期记录</td></tr>
+    <tr><td>created_at vs created_timestamp</td><td><b>105 条不一致</b>（差异 &gt; 1 天）</td><td class="no">时间字段口径冲突（字符串 vs 时间戳）</td></tr>
+    <tr><td>text_preview</td><td>137/137 非空（100%），长度 2~100（截断上限 100），含真实用户输入原文</td><td class="no">PII 明文落库全覆盖（见 §4）</td></tr>
+    <tr><td>失败 / 降级</td><td>is_success=0：0 条；is_degraded=1：0 条</td><td>记录的是"成功生成"（失败不落库）</td></tr>
+    <tr><td>file_missing</td><td>=1 的 0 条，但 <b>117 个唯一引用路径中 100 个磁盘文件不存在</b></td><td class="no">标志位从未被置位（无扫描任务）</td></tr>
+    <tr><td>HMAC 链</td><td>record_hmac 非空仅 <b>19/137</b>；手工复算 <code>verify_chain_integrity</code> 逻辑 → 自 id=236 起全部判定 tampered</td><td class="no">链覆盖不完整且已断（见 §5）</td></tr>
+    <tr><td>output_format</td><td><b>64 条存音频 PCM 二进制</b>（id 273~336），合计 <b>1,252.1 MB</b></td><td class="no">脏数据，见 1.3</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>1.3 ★ 1.25 GB 单库体积的真相：单批脏数据（本次评估最大发现）</h3>
+  <div class="callout">
+    <b>dbstat 页级分析：</b><code>generation_history</code> 表的 <b>overflow 页 305,980 页 = 1,253.3 MB</b>，leaf 仅 41 页（0.2 MB）。
+    定位：<b>64 条记录</b>（id 273~336，voxcpm2 63 条 + qwen3tts 1 条）的 <code>output_format</code> 字段被写入了<b>音频 PCM 波形字节</b>（字段长度 33 万~1,677 万字符不等）。
+    <b>64 条 created_timestamp 完全相同（2026-07-31）</b> → 同一批次写入（疑似某次批量重放/同步的引擎侧 bug 遗留）。
+    当前 137 行的逻辑数据合计仅约 23 KB —— <b>库体积的 99.99% 是这 64 条脏数据</b>。
+  </div>
+  <div id="chart_volume" class="chart"></div>
+  <p class="note">数据口径：主库 1,253.4 MB = 脏记录 overflow 1,252.1 MB + 正常表页 ≈1.3 MB（FTS 0.1 + 各表 leaf 页）+ freelist 50 页。WAL/SHM 285 KB 未计入主库。</p>
+</div>
+
+<div class="card">
+  <h3>1.4 版本谱系表 generation_versions（"血缘"资产实测）</h3>
+  <ul>
+    <li>位置：<code>outputs/generation_versions.db</code>（SAVE_DIR 下，独立库）—— 92 行，created_at 2026-08-06 ~ 2026-09-04。</li>
+    <li><b>parent_id 全部为 NULL（0 个父子关系）</b>：谱系表"被写入但从未建立层级"。service_layer.py 的 4 处 <code>_save_version_record()</code> 调用均未传 parent_id。</li>
+    <li><b>只写不读</b>：<code>get_lineage()</code> / <code>get_version()</code> 在 app/ 内无任何消费方（无 UI / API 读取谱系）。</li>
+    <li>内容为明文 text + params（含"你好世界"等测试数据），无清理策略，随 outputs 增长。</li>
+  </ul>
+</div>
+
+<!-- ============ 2. 声明 vs 实际 ============ -->
+<h2>② 留存与 PII 策略：「声明的治理承诺」vs「代码实际行为」</h2>
+
+<div class="card">
+  <table>
+    <tr><th>配置项（config.yaml）</th><th>声明</th><th>消费方 / 实际行为</th><th>一致？</th></tr>
+    <tr>
+      <td><code>history.keep_days: 0</code>（L79）</td>
+      <td>永久保留（0 = 不裁剪）</td>
+      <td><code>get_history_db()</code> 启动时调 <code>prune_old_records(0)</code>（history_db.py:2274）→ <code>keep_days &lt;= 0</code> 直接 <code>return 0</code>（history_db.py:2121）</td>
+      <td class="ok">声明与实现一致（但见下方冲突）</td>
+    </tr>
+    <tr>
+      <td><code>security.pii_encryption_enabled: false</code>（L117）</td>
+      <td>PII 列级加密关闭（避免无密钥读不了旧数据）</td>
+      <td><code>_get_pii_cipher()</code> 返回 None（history_db.py:77）→ <code>_encrypt_pii</code> 原样返回 → <b>text_preview 明文落库</b>；加密范围仅 <code>text_preview</code> 一列（history_db.py:139）</td>
+      <td class="ok">声明一致，但范围缺陷见 §4</td>
+    </tr>
+    <tr>
+      <td><code>security.pii_retention_days: 90</code>（L118）</td>
+      <td>PII 留存 90 天</td>
+      <td><b>app_server.py:378-380 lifespan 启动时执行 <code>purge_expired(90)</code></b>：删除 created_timestamp &lt; cutoff 的<b>记录 + 音频文件</b>（history_db.py:1006-1044）；SQL 无 <code>created_timestamp &gt; 0</code> 豁免（与 prune 逻辑相反）</td>
+      <td class="no"><b>实际生效！</b>提示词预判"永不生效"不成立</td>
+    </tr>
+  </table>
+
+  <div class="callout">
+    <b>核心矛盾实证（不是"三处互相抵消"，而是"两个清理逻辑打架"）：</b><br>
+    ① <code>keep_days: 0</code> 承诺"永久保留"（prune 不裁剪）；② <code>pii_retention_days: 90</code> 承诺"90 天后删除"（purge 启动即裁剪）——<b>两条清理路径同时存在且语义相反</b>。<br>
+    实测：数据库曾被删除 268 条（max_id 405 vs 137 行），现存记录全部 &lt; 90 天 —— <b>purge 真的在跑，keep_days=0 的"永久保留"承诺已被悄悄打破</b>。<br>
+    ③ <code>pii_encryption_enabled: false</code> 使 purge 删除的是<b>90 天前的明文 PII</b>（而非加密数据）——保密性与留存策略互相抵消。
+  </div>
+
+  <h3>对外承诺（PRIVACY_POLICY.md）违约风险逐条比对</h3>
+  <table>
+    <tr><th>政策承诺</th><th>实际行为</th><th>风险</th></tr>
+    <tr>
+      <td>"历史记录存储于本地数据库，<b>可随时清空</b>"（§1）</td>
+      <td>用户"清空历史"删除 DB 记录时，<code>delete_records(delete_file=True)</code> 会同步删音频（history_db.py:1668-1695）——但 <b>prune/purge 自动裁剪只删 DB 不保证删音频的路径均一致</b>；且"清空历史"不等于清空 <code>outputs/</code> 与 <code>generation_versions.db</code></td>
+      <td class="no">"可随时清空全部数据"承诺与多存储点残留不一致</td>
+    </tr>
+    <tr>
+      <td>"本服务<b>不收集</b>任何个人信息"（§4）</td>
+      <td><b>137/137 条 text_preview 明文存储用户输入原文</b>（含角色扮演私密文本），FTS 全文索引同步暴露；audit 内存环记录 generation 事件</td>
+      <td class="no">"不收集"与"明文留存全部输入"表述冲突（自托管语境下为合规表述风险）</td>
+    </tr>
+    <tr>
+      <td>"声音克隆与 LoRA 训练会处理人声样本，属于敏感数据"（§3，承认声纹敏感）</td>
+      <td><code>outputs/uploads/</code> 14 个参考音频明文存放、无过期清理；<code>personas/*.pt</code> 声纹特征不在 <code>pii_*</code> 保护范围（加密仅 text_preview）</td>
+      <td class="no">声纹（生物识别敏感信息）未纳入任何 PII 治理范围</td>
+    </tr>
+    <tr>
+      <td>政策未承诺 90 天自动删除</td>
+      <td><code>pii_retention_days: 90</code> 自动过期删除（启动即执行）</td>
+      <td class="warn">内部承诺与对外政策不一致：政策无留存期限表述，用户不知数据 90 天后被自动删除</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ============ 3. 七维度评分 ============ -->
+<h2>③ 七维度评分（0–5 分，附证据）</h2>
+
+<div class="card">
+  <div id="chart_score" class="chart"></div>
+  <table>
+    <tr><th>维度</th><th>得分</th><th>关键证据</th></tr>
+    <tr><td>Schema 与迁移</td><td class="score s-mid">1.5</td><td>无 alembic/migrations（实测不存在）；靠 <code>CREATE TABLE IF NOT EXISTS</code> + 运行时探测 <code>_migrate_add_column()</code>（history_db.py:635）；6 处调用点参数全为字面量（无外部输入，安全）；但<b>不能改列类型/删列/回滚/重建索引</b>；schema 定义分散在 history_db.py 与 generation_versioning.py 两处</td></tr>
+    <tr><td>留存生命周期</td><td class="score s-bad">1.0</td><td>双清理逻辑打架（keep_days=0 vs pii_retention_days=90）；purge 删 DB+音频但 prune 只删 DB（路径不一致）；<b>1.25 GB 脏数据 created_timestamp 均在 90 天内 → 永不清理</b>；outputs 音频无配套生命周期任务</td></tr>
+    <tr><td>PII 与加密</td><td class="score s-bad">1.0</td><td>加密开关 false → 全量明文；保护范围仅 text_preview 一列；声纹（.pt + uploads 参考音频）不在范围；<b>开启加密无迁移路径</b>（旧明文行处理、HMAC 链断裂问题未设计）；<code>pii_export</code> 端点仅审计"attempt"不阻断</td></tr>
+    <tr><td>完整性与密钥</td><td class="score s-mid">2.0</td><td>HMAC 链设计正确（prev_hash+record_hash 链式，history_db.py:965-1002）；但<b>密钥 64B 明文与 DB 同目录</b>；<code>verify_chain_integrity</code> 定义存在（L1122）<b>全项目零调用</b>（只写不验）；链仅覆盖 19/137；批量插入（sync）不计算 HMAC；purge/delete 不重算后继链 → 实测已断</td></tr>
+    <tr><td>训练数据血缘</td><td class="score s-mid">1.5</td><td>字段设计存在（TrainingState.dataset_fingerprint/git_commit/config_snapshot_hash，state.py:86-91）且 dataset_fingerprint 有真实实现（data.py:364-385）；但 <b>build_dataloaders 在 app/ 无调用点</b>、git_commit/config_snapshot_hash <b>全项目无赋值点</b>；训练脚本 train_voxcpm_finetune.py 不 import app.integrated_app.training（走 vendor voxcpm 管线）；<b>无任何训练产物</b> → 血缘是"设计了但从未接线"的半成品</td></tr>
+    <tr><td>元数据治理</td><td class="score s-good">4.0</td><td>personas 7 音色四件套齐全、metadata schema 13 字段全一致；i18n 5 语言 key 差异 = 0（递归比对）；缺：无 metadata 校验脚本、无孤儿元数据检查（删除 .pt 漏删 .json 无告警）</td></tr>
+    <tr><td>数据质量可观测</td><td class="score s-bad">1.0</td><td><code>cleanup_orphan_records</code>（history_db.py:2056）<b>无调用点</b> → file_missing 从未置位（0 条），但 100/117 路径已失效；1.25 GB 脏数据无字段级监控；created_at 与 created_timestamp 105 条不一致；meta_kv 空（指标持久化未用）；action_logs 200 行为历史遗留（现行代码无 INSERT）</td></tr>
+  </table>
+  <p class="note">总分 12/35。亮点集中在元数据治理（i18n/personas 一致性），结构性缺口集中在生命周期、PII 与可观测。</p>
+</div>
+
+<!-- ============ 4. 缺陷清单 ============ -->
+<h2>④ 缺陷清单（P0 / P1 / P2 + 文件行号 + 复现命令）</h2>
+
+<div class="card">
+  <h3>P0 — 立即处理（数据安全 / 策略冲突 / 体积失控）</h3>
+  <table>
+    <tr><th>#</th><th>缺陷</th><th>证据（文件:行号）</th><th>复现命令</th></tr>
+    <tr>
+      <td>P0-1</td>
+      <td><b>64 条脏数据（1,252 MB）永久占用且无监控</b>：output_format 存音频字节，created_timestamp 均在 90 天内，purge 永不清理</td>
+      <td>dbstat：overflow 305,980 页；<code>id 273~336</code>；<code>created_timestamp=1785477731</code>（2026-07-31 同批）</td>
+      <td><pre><code>python -c "import sqlite3;c=sqlite3.connect('data/history.db');print(c.execute(\"SELECT COUNT(*),SUM(LENGTH(output_format)) FROM generation_history WHERE LENGTH(output_format)>1000\").fetchone())"</code></pre></td>
+    </tr>
+    <tr>
+      <td>P0-2</td>
+      <td><b>留存策略自相矛盾</b>：keep_days=0（永久保留）与 pii_retention_days=90（启动即删）同时生效；实测已删 268 条</td>
+      <td>app_server.py:378-380；history_db.py:2274、2104-2133、1006-1044</td>
+      <td><pre><code>grep -n "purge_expired\|prune_old_records" app/integrated_app/app_server.py app/integrated_app/history_db.py</code></pre></td>
+    </tr>
+    <tr>
+      <td>P0-3</td>
+      <td><b>PII 全量明文 + 声纹不在治理范围</b>：text_preview 137/137 明文；uploads 参考音频与 personas/*.pt 无任何保护</td>
+      <td>history_db.py:69-141（加密范围）；outputs/uploads/ 14 文件实测</td>
+      <td><pre><code>grep -rn "pii_encryption_enabled" app/ | head
+# 加密消费点仅 history_db.py:77</code></pre></td>
+    </tr>
+  </table>
+
+  <h3>P1 — 应尽快处理</h3>
+  <table>
+    <tr><th>#</th><th>缺陷</th><th>证据（文件:行号）</th><th>复现命令</th></tr>
+    <tr>
+      <td>P1-1</td>
+      <td><b>哈希链只写不验 + 覆盖不完整 + 已断裂</b>：verify_chain_integrity 零调用；19/137 有 HMAC；purge/delete 不重算链</td>
+      <td>history_db.py:1122（定义）、908（唯一写入点）；实测复算自 id=236 起 tampered</td>
+      <td><pre><code>grep -rn "verify_chain_integrity" app/ | grep -v "def verify"
+# 无输出 = 只写不验</code></pre></td>
+    </tr>
+    <tr>
+      <td>P1-2</td>
+      <td><b>密钥明文与 DB 同目录</b>：拿到 data/ 即同时拿到密钥，链防护归零</td>
+      <td>history_db.py:948；data/.history_hmac_key（64B 明文实测）</td>
+      <td><pre><code>ls -la data/.history_hmac_key</code></pre></td>
+    </tr>
+    <tr>
+      <td>P1-3</td>
+      <td><b>训练能力与血缘"空转"</b>：无任何训练产物；血缘字段定义但未接线</td>
+      <td>state.py:86-91；data.py:878（指纹返回无接收方）；train_voxcpm_finetune.py 无 app 导入；lora/ 空</td>
+      <td><pre><code>ls -la lora/ checkpoints/ data/checkpoints/
+grep -rn "build_dataloaders" app/ | grep -v "def build"</code></pre></td>
+    </tr>
+    <tr>
+      <td>P1-4</td>
+      <td><b>file_missing 观测失效</b>：cleanup_orphan_records 无调用点，100/117 引用路径失效但标志全 0</td>
+      <td>history_db.py:2056-2088；实测 117 唯一路径中 100 缺失</td>
+      <td><pre><code>grep -rn "cleanup_orphan_records" app/ | grep -v "def "</code></pre></td>
+    </tr>
+    <tr>
+      <td>P1-5</td>
+      <td><b>action_logs 死表</b>：200 行历史数据，现行代码无写入方（审计已迁移 audit.py 内存环）</td>
+      <td>app/ 内 grep 无 <code>INSERT INTO action_logs</code>；routes/system/logs.py 只读</td>
+      <td><pre><code>grep -rn "INSERT INTO action_logs" app/</code></pre></td>
+    </tr>
+    <tr>
+      <td>P1-6</td>
+      <td><b>时间字段不一致</b>：105 条 created_at 与 created_timestamp 偏差 &gt; 1 天（同步/迁移口径混乱）</td>
+      <td>实测 SQL；sync_from_filesystem 以文件名截断作 text_preview（history_db.py:2026）</td>
+      <td><pre><code>python -c "import sqlite3;c=sqlite3.connect('data/history.db');print(c.execute(\"SELECT COUNT(*) FROM generation_history WHERE ABS(created_timestamp-strftime('%s',created_at))>86400\").fetchone()[0])"</code></pre></td>
+    </tr>
+  </table>
+
+  <h3>P2 — 治理补全</h3>
+  <table>
+    <tr><th>#</th><th>缺陷</th><th>证据</th></tr>
+    <tr><td>P2-1</td><td>无迁移工具链（Alembic/自定义版本化迁移），schema 演进不可回滚</td><td>alembic/、migrations/ 实测不存在</td></tr>
+    <tr><td>P2-2</td><td>谱系表只写不读、无层级（parent_id 全 NULL），92 行数据无消费者</td><td>generation_versioning.py；实测 parent_id 全 None</td></tr>
+    <tr><td>P2-3</td><td>personas 无校验脚本/孤儿元数据检测</td><td>personas/ 目录实测（当前无孤儿）</td></tr>
+    <tr><td>P2-4</td><td>generation_versions.db 无留存/清理策略，随 outputs 增长</td><td>outputs/generation_versions.db 92 行</td></tr>
+    <tr><td>P2-5</td><td>sync 插入记录 engine="unknown"、text_preview=文件名（伪 PII 噪音）</td><td>history_db.py:2034-2039；26 条 unknown 记录实测</td></tr>
+    <tr><td>P2-6</td><td>qwen3tts 引擎已下线但历史数据残留（引擎生命周期无治理）</td><td>config.yaml 无 qwen3tts；history 表 1 条</td></tr>
+    <tr><td>P2-7</td><td>meta_kv 空表（HealthMonitor 持久化从未写入）</td><td>meta_kv COUNT=0</td></tr>
+  </table>
+</div>
+
+<!-- ============ 5. 三个必答问题 ============ -->
+<h2>⑤ 三个必答问题</h2>
+
+<div class="card">
+  <h3>问题一：<code>keep_days: 0</code> + <code>pii_encryption_enabled: false</code> + <code>pii_retention_days: 90</code> 如何共存？</h3>
+  <p><b>逐条差异：</b></p>
+  <ul>
+    <li><code>keep_days: 0</code> → <code>prune_old_records</code> 启动调用但直接 return（不裁剪）——"永久保留"声明与代码一致。</li>
+    <li><code>pii_encryption_enabled: false</code> → text_preview 明文落库——声明（关闭加密）与代码一致，但与"PII 治理"目标相悖。</li>
+    <li><code>pii_retention_days: 90</code> → <b>被 app_server.py:378 启动路径真实消费</b>，删除超 90 天记录+音频。实测删除过 268 条、现存记录全部 &lt;90 天 → <b>这条不是空承诺，它在执行</b>。</li>
+  </ul>
+  <p><b>真正的问题：</b>第 1 条与第 3 条语义相反（保留 vs 删除）且同时生效；第 2 条使删除动作作用于明文 PII。三者共同构成一个自相矛盾的留存矩阵。</p>
+  <p><b>对外承诺违约风险：</b>PRIVACY_POLICY.md 声明"可随时清空"与"不收集任何个人信息"——实际明文留存全部输入原文、90 天自动删除且政策未披露留存期限。构成表述性违约风险：<b>"可随时清空" ≠ "90 天自动删除"</b>，用户在政策下无法预期数据生命周期。</p>
+</div>
+
+<div class="card">
+  <h3>问题二：哈希链在"密钥与库同目录明文"前提下还剩多少防护价值？</h3>
+  <p><b>实际防护价值评估：接近零。</b></p>
+  <ul>
+    <li>攻击者拿到 <code>data/</code> 目录即同时拿到 <code>.history_hmac_key</code>（64B 明文）与 history.db → 可重新计算任意记录的 HMAC，链形同虚设。</li>
+    <li>即便密钥安全：<code>verify_chain_integrity</code> 零调用（只写不验）、链仅覆盖 19/137、purge 删除不重算后继 → 当前库运行校验会报大面积 tampered（实测自 id=236 起全断），"防篡改"能力实际未落地。</li>
+  </ul>
+  <p><b>低成本改进（按性价比排序）：</b></p>
+  <ul>
+    <li>① 密钥移出 data/（如 <code>~/.config/tts-multimodel/</code>，权限 0600，.gitignore），与库隔离 —— 一行路径改动，恢复链的基本价值。</li>
+    <li>② 启动时调用一次 <code>verify_chain_integrity()</code> 并记录告警（已有实现，缺调用点）—— 让"防篡改"从理论变为可观测。</li>
+    <li>③ purge/delete 后重算受影响后继节点的 prev_hash（或改为逻辑删除），维持链连续性。</li>
+    <li>④ insert_batch（sync 路径）补 HMAC 计算；旧记录一次性回填。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>问题三：训练血缘能否回答"这个 checkpoint 用了哪些数据/代码/超参"？</h3>
+  <p><b>答案：不能。</b>实测证据：</p>
+  <ul>
+    <li>无任何训练产物（lora/ 空、checkpoints/ 仅 HF 缓存）→ 没有"这个 checkpoint"存在。</li>
+    <li>血缘字段（dataset_fingerprint / git_commit / config_snapshot_hash）虽已在 TrainingState 定义，但 <code>git_commit</code>/<code>config_snapshot_hash</code> 全项目无赋值点、<code>build_dataloaders</code> 的指纹返回值无接收方、训练脚本走 vendor voxcpm 管线（不 import app 内 training 模块）→ 即使训练成功，血缘也不会写入。</li>
+  </ul>
+  <p><b>最小可行血缘方案（不引入 DVC）：</b></p>
+  <ul>
+    <li>① 在 <code>save_checkpoint</code> 时把 <code>{dataset_fingerprint, git_commit(动态取,非空串), config_snapshot_hash, 超参 JSON}</code> 写入 <code>state.json</code>（字段已存在，只需接线）。</li>
+    <li>② 训练入口（routes/training.py start）从 <code>build_dataloaders</code> 返回值接收 fingerprint 并注入 TrainingState（一行接线）。</li>
+    <li>③ LoRA 元数据保存时填充 git_commit/dataset_fingerprint（当前硬编码空串，lora.py:176-177）。</li>
+    <li>④ 产物目录与 config 解耦：明确 <code>checkpoint_dir</code>（现为断点续跑配置）与训练 save_path 的关系，避免路径误读。</li>
+  </ul>
+</div>
+
+<!-- ============ 6. 改进路线图 ============ -->
+<h2>⑥ 改进路线图</h2>
+
+<div class="card">
+  <table>
+    <tr><th>阶段</th><th>动作</th><th>验收标准</th></tr>
+    <tr>
+      <td><b>P0 止血（1 周内）</b></td>
+      <td>
+        ① 清理 64 条脏数据（备份后 DELETE 并 VACUUM，或按业务判定保留）→ 库从 1.25 GB 降至 ~5 MB<br>
+        ② 裁定留存策略唯一口径：要么 keep_days&gt;0 统一由 prune 管（补音频清理），要么删除 purge_expired 启动调用，二选一<br>
+        ③ 若开启加密：设计旧明文行迁移（读旧→写新→删旧）与密钥轮换，明确声纹（.pt/uploads）是否纳入范围
+      </td>
+      <td>库体积实测 &lt;10 MB；留存行为与配置单点对应；PII 范围书面化</td>
+    </tr>
+    <tr>
+      <td><b>P1 补全（1 个月内）</b></td>
+      <td>
+        ④ 哈希链：密钥移出 data/ + 启动 verify + 删除重算链 + 批量插入补 HMAC<br>
+        ⑤ 启动/定时执行 cleanup_orphan_records（已有实现）+ file_missing 置位与告警<br>
+        ⑥ 训练血缘接线（问题三方案）；删除 action_logs 死表或恢复写入方<br>
+        ⑦ 时间口径统一（created_at 字符串与 created_timestamp 单一来源）
+      </td>
+      <td>verify_chain_integrity 启动自动运行且告警可达；file_missing 反映真实状态；血缘字段非空</td>
+    </tr>
+    <tr>
+      <td><b>P2 治理（季度级）</b></td>
+      <td>
+        ⑧ 引入轻量版本化迁移（可先自研 _MIGRATIONS 列表，再评估 Alembic）<br>
+        ⑨ 谱系表接 UI/API 消费（parent_id 支持链式生成）或下线<br>
+        ⑩ personas 校验脚本 + i18n 缺失 key CI 检查（当前数据健康，防回归）<br>
+        ⑪ outputs 与 generation_versions.db 生命周期策略（孤儿音频清理）
+      </td>
+      <td>schema 变更可回滚；谱系可查询；CI 阻断元数据回归</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ============ 7. 附录 ============ -->
+<h2>⑦ 附录：证据与验证说明</h2>
+<div class="card">
+  <ul>
+    <li><b>验证方式</b>：全部为只读操作（grep / SQLite <code>mode=ro</code> / 文件系统列举），未修改任何项目数据；探查脚本位于 <code>data/gov_audit_probe*.py</code>（评估后已清理）。</li>
+    <li><b>覆盖范围</b>：config.yaml / app_server.py lifespan / history_db.py（迁移、HMAC、prune、purge、sync、cleanup）/ generation_versioning.py / training/*（state/data/tracker）/ security/audit.py / scripts/train_voxcpm_finetune.py / PRIVACY_POLICY.md / USER_AGREEMENT.md / 全部数据文件。</li>
+    <li><b>与提示词锚点的差异修正</b>：① personas 实测 7 个（提示词写 8 个）；② pii_retention_days 实测生效（提示词写"永不生效"）；③ checkpoint_dir 实为断点续跑配置而非训练产物路径；④ 新增发现 action_logs 死表与 64 条脏数据。</li>
+    <li><b>未覆盖</b>：未运行训练/推理（GPU 不可用）；未校验 FTS 检索一致性细节；未审计前端页面与全部路由的 PII 展示面。</li>
+  </ul>
+</div>
+
+</div>
+
+<script>
+(function(){
+  function mount(id, option){
+    var el = document.getElementById(id);
+    if(!el) return;
+    if(typeof echarts === 'undefined'){
+      el.innerHTML = '<div style="padding:20px;color:#6b7280;border:1px dashed #d1d5db;border-radius:8px;font-size:13px">图表组件加载失败（需联网加载 ECharts CDN），以下为数据表格：见正文 §1.3 / §3 表格。</div>';
+      return;
+    }
+    var chart = echarts.init(el);
+    chart.setOption(option);
+    window.addEventListener('resize', function(){ chart.resize(); });
+  }
+
+  // 图1：体积构成（主库 1253.4 MB）
+  mount('chart_volume', {
+    backgroundColor: 'transparent',
+    title: { text: 'history.db 主库体积构成（1,253.4 MB）', left: 'center', textStyle: { color: '#1a1b1c', fontSize: 15, fontWeight: 600 } },
+    tooltip: { trigger: 'item', triggerOn: 'click', renderMode: 'richText', confine: true, textStyle: { fontSize: 10, lineHeight: 14 }, padding: [6,8] },
+    legend: { bottom: 0, type: 'scroll', itemWidth: 14, itemHeight: 8, textStyle: { color: '#6b7280', fontSize: 11 } },
+    series: [{
+      name: '体积', type: 'pie', radius: ['42%','68%'], center: ['50%','52%'],
+      avoidLabelOverlap: true,
+      label: { formatter: '{b}: {d}%', color: '#555', fontSize: 11 },
+      data: [
+        { value: 1252.1, name: '64条脏记录 output_format 溢出页', itemStyle: { color: '#dc2626' } },
+        { value: 1.3, name: '正常数据页(表/索引/FTS)', itemStyle: { color: '#2563eb' } }
+      ]
+    }]
+  });
+
+  // 图2：七维度评分雷达
+  mount('chart_score', {
+    backgroundColor: 'transparent',
+    title: { text: '数据治理七维度评分（0–5）', left: 'center', textStyle: { color: '#1a1b1c', fontSize: 15, fontWeight: 600 } },
+    tooltip: { trigger: 'item', triggerOn: 'click', renderMode: 'richText', confine: true, textStyle: { fontSize: 10, lineHeight: 14 }, padding: [6,8] },
+    legend: { bottom: 0, itemWidth: 14, itemHeight: 8, textStyle: { color: '#6b7280', fontSize: 11 } },
+    radar: {
+      indicator: [
+        { name: 'Schema与迁移', max: 5 }, { name: '留存生命周期', max: 5 },
+        { name: 'PII与加密', max: 5 }, { name: '完整性与密钥', max: 5 },
+        { name: '训练数据血缘', max: 5 }, { name: '元数据治理', max: 5 },
+        { name: '数据质量可观测', max: 5 }
+      ],
+      radius: '62%', center: ['50%','52%'],
+      axisName: { color: '#374151', fontSize: 11 },
+      splitArea: { areaStyle: { color: ['rgba(37,99,235,0.03)','rgba(37,99,235,0.06)'] } }
+    },
+    series: [{
+      name: '评分', type: 'radar',
+      data: [{
+        value: [1.5, 1.0, 1.0, 2.0, 1.5, 4.0, 1.0],
+        name: 'v2.2.1 实测',
+        areaStyle: { color: 'rgba(37,99,235,0.25)' },
+        lineStyle: { color: '#2563eb', width: 2 },
+        itemStyle: { color: '#2563eb' }
+      }]
+    }]
+  });
+})();
+</script>
+</body>
+</html>
