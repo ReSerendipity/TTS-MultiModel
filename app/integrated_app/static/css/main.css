@@ -87,12 +87,12 @@
         border-top: none;
     }
     .sidebar-tools-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
-    .sidebar-nav-label { 
-        font-size: 10px; 
-        text-transform: uppercase; 
-        letter-spacing: 0.12em; 
-        color: var(--text-muted); 
-        padding: 12px 12px 8px; 
+    .sidebar-nav-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        padding: 12px 12px 8px;
         font-weight: 700;
         display: flex;
         align-items: center;
@@ -148,7 +148,7 @@
         background: linear-gradient(90deg, color-mix(in srgb, var(--accent-primary) 10%, var(--bg-secondary)), var(--bg-secondary));
         color: var(--accent-primary);
         font-weight: 600;
-        box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 15%, transparent), 
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 15%, transparent),
                     inset 0 1px 0 color-mix(in srgb, var(--accent-primary) 20%, transparent);
         transform: translateX(2px);
     }
@@ -4234,11 +4234,11 @@ textarea {
     .card {
         border-width: 2px;
     }
-    
+
     button, .btn {
         border-width: 2px;
     }
-    
+
     input, select, textarea {
         border-width: 2px;
     }

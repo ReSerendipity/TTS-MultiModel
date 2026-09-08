@@ -251,4 +251,3 @@ if (typeof window.showToast !== 'function') {
         console.log('[TOAST '+(type||'info').toUpperCase()+']', msg);
     };
 }
-

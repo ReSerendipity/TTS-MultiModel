@@ -4090,7 +4090,7 @@ audio::-webkit-media-controls-panel {
     min-height: 0;
 }
 /* 右侧面板内的 Audio 组件紧凑化 */
-.right-output-panel 
+.right-output-panel
 
 /* 缩小引擎选择区域的内边距 */
 #engine-selector-row > div {
@@ -4225,7 +4225,7 @@ audio::-webkit-media-controls-panel {
 
 
 /* 减少文本框内边距 */
-.card 
+.card
 /* 减少分割线间距 */
 
 /* 减少下拉框间距 */
@@ -4266,7 +4266,7 @@ audio::-webkit-media-controls-panel {
         min-width: 0;
         align-self: flex-start;
     }
-    
+
     /* output-panel responsive styles removed - elem_id not defined in Python */
 }
 
@@ -4274,11 +4274,11 @@ audio::-webkit-media-controls-panel {
     #engine-selector-row {
         flex-direction: column;
     }
-    
+
     #engine-selector-row > .column {
         width: 100%;
     }
-    
+
     .enhanced-tabs > .tab-wrap {
         padding: var(--space-4);
     }
@@ -4290,45 +4290,45 @@ audio::-webkit-media-controls-panel {
         gap: var(--space-2);
         padding: var(--space-3);
     }
-    
+
     .nav-badges {
         flex-wrap: wrap;
         justify-content: center;
     }
-    
+
     .card {
         padding: var(--space-4);
     }
-    
+
     .card-header {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--space-1);
     }
-    
+
     .voice-preset-tags {
         justify-content: center;
     }
-    
+
     .filter-bar {
         justify-content: center;
     }
 }
 
 @media (max-width: 480px) {
-    
+
     .enhanced-tabs > .tab-wrap {
         padding: var(--space-3);
     }
-    
+
     .card {
         padding: var(--space-3);
     }
-    
+
     .card-header-title {
         font-size: var(--text-base);
     }
-    
+
     .primary-btn,
     .secondary-btn {
         width: 100%;
@@ -6370,37 +6370,37 @@ html.dark .empty-state-enhanced::before {
         padding: var(--space-10) var(--space-4);
         min-height: 280px;
     }
-    
+
     .empty-state-enhanced::before {
         width: 200px;
         height: 200px;
     }
-    
+
     .empty-state-icon-wrapper {
         width: 96px;
         height: 96px;
         margin-bottom: var(--space-5);
     }
-    
+
     .empty-state-icon-wrapper::after {
         width: 72px;
         height: 72px;
     }
-    
+
     .empty-state-enhanced .empty-state-icon {
         width: 44px;
         height: 44px;
     }
-    
+
     .empty-state-enhanced .empty-state-title {
         font-size: var(--font-size-base);
     }
-    
+
     .empty-state-enhanced .empty-state-desc {
         font-size: var(--font-size-sm);
         max-width: 280px;
     }
-    
+
     .empty-state-hint-card {
         max-width: 100%;
         padding: var(--space-3) var(--space-4);

@@ -175,27 +175,27 @@ var _activeAnimations = {};
 function _animateNumber(el, startVal, endVal, duration, formatter, onComplete) {
     if (!el) return;
     var elId = el.id || ('anim_' + Math.random().toString(36).substr(2, 9));
-    
+
     if (_activeAnimations[elId]) {
         cancelAnimationFrame(_activeAnimations[elId]);
     }
-    
+
     var startTime = null;
     var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    
+
     if (prefersReducedMotion || Math.abs(endVal - startVal) < 0.5) {
         el.textContent = formatter(endVal);
         if (onComplete) onComplete();
         return;
     }
-    
+
     function step(timestamp) {
         if (!startTime) startTime = timestamp;
         var progress = Math.min((timestamp - startTime) / duration, 1);
         var eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
         var currentVal = startVal + (endVal - startVal) * eased;
         el.textContent = formatter(currentVal);
-        
+
         if (progress < 1) {
             _activeAnimations[elId] = requestAnimationFrame(step);
         } else {
@@ -203,7 +203,7 @@ function _animateNumber(el, startVal, endVal, duration, formatter, onComplete) {
             if (onComplete) onComplete();
         }
     }
-    
+
     _activeAnimations[elId] = requestAnimationFrame(step);
 }
 
@@ -212,10 +212,10 @@ function _updateValueWithSmooth(el, newText, valueKey, newVal, formatter) {
     el.style.fontVariantNumeric = 'tabular-nums';
     el.classList.remove('accent-error', 'accent-success', 'text-secondary');
     el.classList.add('updating', 'tabular');
-    
+
     var prevVal = _miniPrevValues[valueKey];
     var colorClass = _getColorClass(newVal, prevVal);
-    
+
     if (colorClass) {
         var baseClass = 'mini-monitor-value';
         if (_isSystemIdle()) baseClass += ' idle';
@@ -224,14 +224,14 @@ function _updateValueWithSmooth(el, newText, valueKey, newVal, formatter) {
         if (!el.classList.contains('mini-monitor-value')) el.classList.add('mini-monitor-value');
         if (!el.classList.contains('tabular')) el.classList.add('tabular');
     }
-    
+
     // Animate numeric values
     if (formatter && prevVal !== null && prevVal !== undefined && !isNaN(prevVal) && !isNaN(newVal)) {
         _animateNumber(el, prevVal, newVal, 400, formatter);
     } else {
         el.textContent = newText;
     }
-    
+
     _miniPrevValues[valueKey] = newVal;
     setTimeout(function() {
         el.classList.remove('updating');
@@ -282,4 +282,3 @@ window.HealthMonitor = {
     initMini: window.initMiniMonitor
 };
 })();
-

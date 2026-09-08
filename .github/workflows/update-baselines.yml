@@ -88,7 +88,7 @@ jobs:
             BRANCH="update-baselines-$(date +%Y%m%d%H%M%S)"
             git checkout -b "$BRANCH"
             git push origin HEAD:$BRANCH
-            
+
             # Create PR using GitHub CLI
             gh pr create \
               --title "chore(e2e): update visual regression baselines" \
