@@ -406,3 +406,15 @@ data/
 
 # AGENTS 瘦身重构下沉子文档（仅本地保留，随 AGENTS.md 一起不入库，2026-09-03）
 docs/agents/
+
+# --- 2026-09-06 目录整理补齐（方案 A：路径不动，仅排除）---
+pretrained_models/
+pytest_tmp/
+.workbuddy/
+.workbuddy-ai/
+
+# --- auto-tidy: 运行时产物自动补齐 (auto) ---
+logs/
+
+# --- 本地归档（草稿/抓取资源/临时工具，仅本地保留）---
+_archive/
