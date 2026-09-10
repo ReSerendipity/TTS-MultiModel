@@ -1,12 +1,12 @@
 #!/bin/sh
-# 克隆后执行一次，把 .githooks 安装到本机 .git/hooks
-DIR=$(cd "$(dirname "$0")" && pwd)
-GD=$(git rev-parse --git-dir 2>/dev/null)
-[ -z "$GD" ] && GD=".git"
-mkdir -p "$GD/hooks"
-for h in lib-depwatch.sh prepare-commit-msg commit-msg post-merge post-checkout; do
-    cp "$DIR/$h" "$GD/hooks/$h" && chmod +x "$GD/hooks/$h"
-done
-echo "已安装：prepare-commit-msg commit-msg post-merge post-checkout"
-echo "若还需轻量 pre-commit（大文件/密钥/卫生/守卫）："
-echo "  cp .githooks/pre-commit-lite .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit"
+# 启用本仓库的 .githooks（克隆后执行一次即可）
+# 之后钩子源码统一由 .githooks/ 提供，改动即时生效，无需再复制文件。
+git config core.hooksPath .githooks
+echo "已启用 .githooks：core.hooksPath=$(git config core.hooksPath)"
+echo ""
+echo "已生效钩子："
+echo "  pre-commit          框架可用则走 pre-commit，否则走轻量检查+根目录守卫"
+echo "  pre-push            执行 precheck.ps1（无则退回根目录守卫）"
+echo "  prepare-commit-msg  自动补 DCO 签名（幂等）"
+echo "  commit-msg          DCO 硬校验 + 规范软提示"
+echo "  post-merge/-checkout 依赖清单变更提醒"

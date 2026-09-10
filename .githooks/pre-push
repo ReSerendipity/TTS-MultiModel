@@ -1,0 +1,33 @@
+#!/bin/sh
+# 通用 pre-push（无机器特定路径，可随仓库分发）。
+#   1) 仓库提供 precheck.ps1 -> 执行它（家族既有门禁口径）
+#   2) 否则 -> 退回根目录守卫 structure-guard
+if [ -f ./precheck.ps1 ]; then
+    echo "[pre-push] 运行本地预检 precheck.ps1 ..."
+    if command -v powershell.exe >/dev/null 2>&1; then
+        if ! powershell.exe -NoProfile -ExecutionPolicy Bypass -File "./precheck.ps1"; then
+            echo "[pre-push] 预检未通过。绕过：git push --no-verify" >&2
+            exit 1
+        fi
+        exit 0
+    fi
+    echo "[pre-push] 未找到 powershell.exe，无法执行 precheck.ps1" >&2
+    echo "          绕过：git push --no-verify" >&2
+    exit 1
+fi
+
+PY=""
+for cand in ".venv/Scripts/python.exe" ".venv/bin/python"; do
+    [ -x "$cand" ] && PY="$cand" && break
+done
+if [ -z "$PY" ]; then
+    for c in python python3; do
+        command -v "$c" >/dev/null 2>&1 && PY="$c" && break
+    done
+fi
+if [ -z "$PY" ]; then
+    echo "[pre-push] 无 precheck.ps1 且未找到 python，跳过推送前检查" >&2
+    exit 0
+fi
+$PY .github/scripts/check_layout.py || exit 1
+exit 0

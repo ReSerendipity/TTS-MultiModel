@@ -1,0 +1,24 @@
+#!/bin/sh
+# 通用 pre-commit 分发器（无机器特定路径，可随仓库分发）。
+#   1) 仓库有 .pre-commit-config.yaml 且 pre-commit 框架可用 -> 交给框架
+#   2) 否则 -> 交给同目录的 pre-commit-lite（大文件/密钥/冲突标记 + 根目录守卫）
+if [ -f .pre-commit-config.yaml ]; then
+    PY=""
+    for cand in ".venv/Scripts/python.exe" ".venv/bin/python"; do
+        [ -x "$cand" ] && PY="$cand" && break
+    done
+    if [ -z "$PY" ]; then
+        for c in python python3; do
+            command -v "$c" >/dev/null 2>&1 && PY="$c" && break
+        done
+    fi
+    if [ -n "$PY" ] && $PY -m pre_commit --version >/dev/null 2>&1; then
+        echo "[pre-commit] 使用 pre-commit 框架（.pre-commit-config.yaml）"
+        if ! $PY -m pre_commit run --config .pre-commit-config.yaml; then
+            echo "[pre-commit] 框架检查未通过。紧急绕过：git commit --no-verify" >&2
+            exit 1
+        fi
+        exit 0
+    fi
+fi
+exec "$(dirname "$0")/pre-commit-lite"
