@@ -1,12 +1,15 @@
-# -*- coding: utf-8 -*-
 """Structure-guard v2: freeze the approved repo root layout and block stray dumps.
 
 Reads .github/layout-rules.yaml. Exit codes: 0 = OK, 1 = hard failure.
 
-v2 改进（2026-09-07）：
-  - 已被 .gitignore 忽略的根条目不再计入检查（它们不构成仓库卫生问题，
+v2 改进（2026-09-07 / 2026-09-09）：
+  - 已被 .gitignore 忽略的根条目不再计入 WARN（它们不构成仓库卫生问题，
     也不应污染 root_allowlist）。这让 WARN 真正意味着"有东西该整理了"。
-  - 命中 forbid_root_patterns -> FAIL（阻断）；其余未登记条目 -> WARN（不阻断）。
+  - 命中 forbid_root_patterns -> FAIL（阻断），且判定在 ignore 之前：即使
+    该文件被 gitignore，散落转储照样拦。
+  - artifact_root_patterns（会再生的产物，如 coverage.xml）只 WARN 不阻断。
+  - 2026-09-09：改用 f-string、去掉 coding 声明，满足 ruff UP009/UP031，
+    避免污染各仓的 lint 门禁。
 """
 import os
 import re
@@ -93,7 +96,7 @@ def main():
         if e in allow:
             continue
         if any(p.search(e) for p in forbid):
-            fails.append("FORBID pattern matched root entry: %s" % e)
+            fails.append(f"FORBID pattern matched root entry: {e}")
 
     # 再对"未被忽略"的未登记条目给出 WARN（不阻断）
     for e in checked:
@@ -102,18 +105,18 @@ def main():
         if any(p.search(e) for p in forbid):
             continue  # 上面已计为 FAIL，不重复计入 WARN
         if any(p.search(e) for p in artifact):
-            warns.append("Artifact at root (auto-tidy will relocate): %s" % e)
+            warns.append(f"Artifact at root (auto-tidy will relocate): {e}")
             continue
-        warns.append("Unrecognized root entry (review / add to allowlist): %s" % e)
+        warns.append(f"Unrecognized root entry (review / add to allowlist): {e}")
 
     for d in require:
         if not os.path.exists(os.path.join(REPO_ROOT, d)):
-            fails.append("Required directory missing: %s" % d)
+            fails.append(f"Required directory missing: {d}")
 
     for g in gignore:
         gp = os.path.join(REPO_ROOT, g)
         if os.path.exists(gp) and g not in ignored:
-            warns.append("Expected-gitignored entry is NOT ignored: %s" % g)
+            warns.append(f"Expected-gitignored entry is NOT ignored: {g}")
 
     for w in warns:
         print("WARN: " + w)
@@ -121,10 +124,11 @@ def main():
         print("FAIL: " + f)
 
     if fails:
-        print("\nstructure-guard: %d failure(s), %d warning(s)." % (len(fails), len(warns)))
+        print(f"\nstructure-guard: {len(fails)} failure(s), {len(warns)} warning(s).")
         return 1
-    print("structure-guard: OK (%d root entries, %d checked, %d ignored, %d warning(s))."
-          % (len(entries), len(checked), len(ignored), len(warns)))
+    print("structure-guard: OK "
+          f"({len(entries)} root entries, {len(checked)} checked, "
+          f"{len(ignored)} ignored, {len(warns)} warning(s)).")
     return 0
 
 
