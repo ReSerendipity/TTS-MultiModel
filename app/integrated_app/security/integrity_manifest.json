@@ -2,9 +2,9 @@
   "description": "TTS_MultiModel 核心模块完整性清单 (自动生成)",
   "algorithm": "sha256",
   "files": {
-    "app_server.py": "5e829486a4bbadde208fe41e9835de772d8db9dc59656843c7fd5e9306317d85",
+    "app_server.py": "42de202acba59b9bae8a723d26d751aaa5c33cc772a6c85ad1214568b4e7539a",
     "config.py": "f4a0e310fa5eb79b20d968192eef6e78df7bb717fba923c49e96125859cc8f72",
-    "config_models.py": "023b7738c62f1ce1f384788be9e3173ef9cb19b26c5c594e4b3c7b90b5ea27c5",
+    "config_models.py": "220103a449e2cdad14685bcfcbb61ec2e31240cb95cff02b5a5280350a291a3d",
     "engine_interface.py": "5102bf08a3c3650d05b01b63497079003a775eee0ad99c7f44b62410daf22ea5",
     "model_manager.py": "39db84c5bbb760974b2bf6047cc75c1b1bd5f656001aed0cafa403e22af8b34a",
     "model_registry.py": "17664cc62e651a3705dc0f447814d2304448d710fa6c0690b6f1055f62a97a8f",

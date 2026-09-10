@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-window-busy"
+description = "Enables the set_window_busy command without any pre-configured scope."
+commands.allow = ["set_window_busy"]
+
+[[permission]]
+identifier = "deny-set-window-busy"
+description = "Denies the set_window_busy command without any pre-configured scope."
+commands.deny = ["set_window_busy"]

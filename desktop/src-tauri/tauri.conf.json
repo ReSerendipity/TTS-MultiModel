@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TTSMultiModel",
+  "version": "2.2.1",
+  "identifier": "com.ttsmultimodel.desktop",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUcxcGJtbHphV2R1SUhCMVlteHBZeUJyWlhrNklFRkdRa1V4UlRZME1VSXlOa1UwTmtRS1VsZFNkRFZEV1dKYVFqWXJjaXMyTURCME9VaDVZMDV5VVcxWFYzVkpOV281YTJJdlNYVkJNMlEwV21rNGNXODJjVE4wWmxWb1MyUUs=",
+      "endpoints": [
+        "https://github.com/ReSerendipity/TTS_MultiModel/releases/latest/download/shell-update.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

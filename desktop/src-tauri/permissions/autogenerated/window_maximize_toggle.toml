@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-window-maximize-toggle"
+description = "Enables the window_maximize_toggle command without any pre-configured scope."
+commands.allow = ["window_maximize_toggle"]
+
+[[permission]]
+identifier = "deny-window-maximize-toggle"
+description = "Denies the window_maximize_toggle command without any pre-configured scope."
+commands.deny = ["window_maximize_toggle"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-trigger-check-update"
+description = "Enables the trigger_check_update command without any pre-configured scope."
+commands.allow = ["trigger_check_update"]
+
+[[permission]]
+identifier = "deny-trigger-check-update"
+description = "Denies the trigger_check_update command without any pre-configured scope."
+commands.deny = ["trigger_check_update"]

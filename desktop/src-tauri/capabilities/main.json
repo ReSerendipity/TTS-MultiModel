@@ -1,0 +1,39 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "TTS MultiModel 桌面壳主能力：事件、通知、窗口控制，并放行本机后端页面的 IPC（桥接脚本）",
+  "windows": ["main", "update"],
+  "permissions": [
+    "core:default",
+    "notification:default",
+    "updater:default",
+    "allow-read-dragged-file",
+    "allow-check-update",
+    "allow-get-pending-update",
+    "allow-get-update-state",
+    "allow-start-update",
+    "allow-dismiss-update",
+    "allow-open-update-dialog",
+    "allow-trigger-check-update",
+    "allow-show-notification",
+    "allow-set-window-busy",
+    "allow-get-app-config",
+    "allow-set-notification-sound",
+    "allow-set-close-to-tray",
+    "allow-retry-start",
+    "allow-restart-service",
+    "allow-show-main-window",
+    "allow-save-window-state",
+    "allow-window-minimize",
+    "allow-window-maximize-toggle",
+    "allow-window-close",
+    "allow-window-toggle-fullscreen",
+    "allow-window-is-fullscreen"
+  ],
+  "remote": {
+    "urls": [
+      "http://127.0.0.1:*",
+      "http://localhost:*"
+    ]
+  }
+}

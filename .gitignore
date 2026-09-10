@@ -418,3 +418,10 @@ logs/
 
 # --- 本地归档（草稿/抓取资源/临时工具，仅本地保留）---
 _archive/
+
+# Tauri desktop shell (P1-2) - 更新签名密钥严禁入库（私钥）
+desktop/tauri.key
+desktop/tauri.key.pub
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
