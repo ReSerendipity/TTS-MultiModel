@@ -425,3 +425,10 @@ desktop/tauri.key.pub
 desktop/node_modules/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
+
+# NSIS 安装器构建产物与装配中间物（脚本源文件入库，二进制不入库）
+scripts/installer/TTSMultiModel.exe
+scripts/installer/TTSMultiModel-Setup-*.exe
+scripts/installer/diag7z-test.exe
+scripts/installer/version.json
+scripts/installer/pyproject.toml

@@ -7,8 +7,14 @@
 
 每次修改核心模块代码后，重新运行此脚本更新清单：
     python scripts/generate_integrity_manifest.py
+
+便携分卷构建（A-6，build_portable_bundle.ps1）需要针对 staging 里的
+``app/integrated_app`` 重新生成清单（闭源注入/去注释后哈希已变），
+此时传入 ``--app-dir`` 指定应用根目录（``integrated_app`` 的上级）：
+    python scripts/generate_integrity_manifest.py --app-dir <path>
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -41,11 +47,26 @@ def compute_sha256(filepath: str) -> str:
 
 def main() -> None:
     """生成完整性清单。"""
+    parser = argparse.ArgumentParser(description="生成完整性清单")
+    parser.add_argument(
+        "--app-dir",
+        default=None,
+        help="应用根目录（integrated_app 的上级，其下须有 security/integrity_selfcheck.py 引用的核心模块），默认仓库 app/",
+    )
+    args = parser.parse_args()
+
+    app_dir = _APP_DIR
+    if args.app_dir:
+        app_dir = os.path.abspath(args.app_dir)
+        manifest_path = os.path.join(app_dir, "security", "integrity_manifest.json")
+    else:
+        manifest_path = _MANIFEST_PATH
+
     files: dict[str, str] = {}
     skipped: list[str] = []
 
     for module_rel in _CORE_MODULES:
-        module_path = os.path.join(_APP_DIR, module_rel)
+        module_path = os.path.join(app_dir, module_rel)
         if not os.path.exists(module_path):
             print(f"  [SKIP] {module_rel} (文件不存在)")
             skipped.append(module_rel)
@@ -60,11 +81,14 @@ def main() -> None:
         "files": files,
     }
 
-    os.makedirs(os.path.dirname(_MANIFEST_PATH), exist_ok=True)
-    with open(_MANIFEST_PATH, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(manifest_path), exist_ok=True)
+    with open(manifest_path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
+        # EOF 尾换行规范化（pre-commit end-of-file-fixer 会补 \n；签名依赖文件字节，
+        # 若此处不写尾换行，提交前再补一次换行会导致签名失配——见 P1-2 冒烟教训）
+        f.write("\n")
 
-    print(f"\n清单已生成: {_MANIFEST_PATH}")
+    print(f"\n清单已生成: {manifest_path}")
     print(f"  已哈希: {len(files)} 个文件")
     if skipped:
         print(f"  已跳过: {len(skipped)} 个文件 ({', '.join(skipped)})")
