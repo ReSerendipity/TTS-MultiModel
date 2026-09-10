@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+* **desktop:** Tauri 桌面壳（`desktop/src-tauri`）：完整性自检签名 + enforce、水印密钥管理、启动契约（`runtime\python.exe` + `start_portable.py`，`--port` 由壳指定）（对应《桌面分发与安全加固-20260910》P1-2）
+* **dist:** 便携分卷打包（core/torch/model 三组件、1900MB 7z 原生分卷、SHA256SUMS 全覆盖 + 回读校验）、NSIS 安装器（`scripts/installer`，kill 子进程 + 许可页）、增量更新（`make_shell_update.ps1` 生成 zip + `shell-update.json` 扁平契约）、发布门禁五步（`release_gate.ps1`）与完整性逐环节诊断（`diag_integrity.py`）（对应 P1-3/P2-1）
+
+### Security
+
+* **integrity:** 核心模块完整性自检 Ed25519 签名 + `enforce` 阻断（P0）；水印密钥从配置文件迁出为 env/`data/.watermark_key`（P0）；便携包清单重算/重签链路（`generate_integrity_manifest.py --app-dir` + EOF 尾换行规范化）、分发负向断言（无密钥/本机路径残留）、篡改模拟门禁（P1-3/P2-1）
+
+### Chore
+
+* **dist:** 便携依赖钉装（`launcher/requirements-small.txt` 93 项 + `torch==2.13.0+cu132` 系列钉版，`sync_requirements.py --check-small` 校验）（P1-1）
+
 ## [2.2.1](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.0...v2.2.1) (2026-08-22)
 
 
