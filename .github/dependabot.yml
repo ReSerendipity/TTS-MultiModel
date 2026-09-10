@@ -2,15 +2,10 @@ version: 2
 updates:
   - package-ecosystem: pip
     directory: "/"
-    schedule:
-      interval: monthly
-    open-pull-requests-limit: 5
+    schedule: { interval: monthly }
   - package-ecosystem: npm
-    directory: "/"
-    schedule:
-      interval: monthly
-    open-pull-requests-limit: 5
+    directory: "/tests"
+    schedule: { interval: monthly }
   - package-ecosystem: github-actions
     directory: "/"
-    schedule:
-      interval: monthly
+    schedule: { interval: monthly }
