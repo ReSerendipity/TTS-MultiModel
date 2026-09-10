@@ -61,6 +61,7 @@ root_allowlist:
   - .dockerignore
   - .env.example
   - .gitattributes
+  - .githooks
   - .github
   - .gitignore
   - .mailmap

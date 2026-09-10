@@ -1,0 +1,27 @@
+#!/bin/sh
+# 自动为提交信息追加 DCO 签名 Signed-off-by（幂等），让 CI 的 DCO 门禁不会失败。
+# 不阻断提交；如已存在签名或来源为 merge/squash 则跳过。
+MSG="$1"
+SRC="$2"
+[ -z "$MSG" ] && exit 0
+[ -f "$MSG" ] || exit 0
+case "$SRC" in
+    merge|squash) exit 0 ;;
+esac
+if grep -qi '^[[:space:]]*Signed-off-by: ' "$MSG"; then
+    exit 0
+fi
+NAME=$(git config user.name)
+EMAIL=$(git config user.email)
+if [ -z "$EMAIL" ]; then
+    echo "[prepare-commit-msg] 未配置 user.email，跳过自动 DCO 签名" >&2
+    exit 0
+fi
+SOB="Signed-off-by: $NAME <$EMAIL>"
+# 插到第一个注释块之前，避免被 git 当作注释丢弃
+awk -v sob="$SOB" '
+    !inserted && /^#/ { print ""; print sob; inserted=1 }
+    { print }
+    END { if (!inserted) { print ""; print sob } }
+' "$MSG" > "$MSG.dco.tmp" && mv "$MSG.dco.tmp" "$MSG"
+exit 0

@@ -1,0 +1,6 @@
+#!/bin/sh
+# 切换分支后提醒依赖漂移。$3=1 表示分支检出（0 为单文件检出，跳过）。
+[ "$3" = "1" ] || exit 0
+. "$(dirname "$0")/lib-depwatch.sh"
+depwatch "$1" "$2"
+exit 0

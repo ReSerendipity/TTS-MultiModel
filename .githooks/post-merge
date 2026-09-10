@@ -1,0 +1,5 @@
+#!/bin/sh
+# 合并/拉取后提醒依赖漂移。post-* 钩子不阻断操作，仅提示。
+. "$(dirname "$0")/lib-depwatch.sh"
+depwatch "ORIG_HEAD" "HEAD"
+exit 0

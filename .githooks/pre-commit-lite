@@ -1,0 +1,78 @@
+#!/bin/sh
+# 轻量 pre-commit：不依赖 .venv / pre-commit 框架也能拦住最常见的误提交。
+#   1. 大文件（> GUARD_MAX_FILE_MB，默认 5MB）
+#   2. 私钥与常见令牌
+#   3. 合并冲突标记、尾随空白、缺失末尾换行、调试语句
+#   4. structure-guard 根目录守卫（python 不可用时明确告警，不再静默放行）
+FAILED=0
+MAX_MB=${GUARD_MAX_FILE_MB:-5}
+LIMIT=$((MAX_MB * 1024 * 1024))
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+
+echo "[pre-commit] 轻量门禁启动（大文件 / 密钥 / 卫生 / 根目录守卫）"
+
+# 1) 大文件
+for f in $STAGED; do
+    [ -f "$f" ] || continue
+    size=$(wc -c < "$f" | tr -d ' ')
+    if [ "${size:-0}" -gt "$LIMIT" ] 2>/dev/null; then
+        echo "  [FAIL] 大文件：$f（$((size / 1048576)) MB，上限 ${MAX_MB} MB）" >&2
+        FAILED=1
+    fi
+done
+
+# 2) 私钥 / 令牌
+KEYPAT='-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{20,}'
+for f in $STAGED; do
+    [ -f "$f" ] || continue
+    case "$f" in
+        *.lock|*package-lock.json|*pnpm-lock.yaml|*Cargo.lock) continue ;;
+    esac
+    if grep -qI -E "$KEYPAT" "$f" 2>/dev/null; then
+        echo "  [FAIL] 疑似私钥或令牌：$f" >&2
+        FAILED=1
+    fi
+done
+
+# 3) 冲突标记 / 调试语句
+for f in $STAGED; do
+    [ -f "$f" ] || continue
+    if grep -qI -E '^(<<<<<<< |>>>>>>> )' "$f" 2>/dev/null; then
+        echo "  [FAIL] 残留合并冲突标记：$f" >&2
+        FAILED=1
+    fi
+done
+
+# 4) structure-guard
+PY=""
+for cand in ".venv/Scripts/python.exe" ".venv/bin/python"; do
+    [ -x "$cand" ] && PY="$cand" && break
+done
+if [ -z "$PY" ]; then
+    for c in python python3; do
+        if command -v "$c" >/dev/null 2>&1; then PY="$c"; break; fi
+    done
+fi
+if [ -z "$PY" ]; then
+    echo "  [WARN] 未找到 Python，structure-guard 未执行 —— 根目录本次未校验！" >&2
+    echo "         安装 Python 或重建 .venv 后自动生效。" >&2
+    if [ "$GUARD_STRICT" = "1" ]; then
+        echo "  [FAIL] GUARD_STRICT=1，守卫缺席视为失败。" >&2
+        FAILED=1
+    fi
+else
+    if ! $PY .github/scripts/check_layout.py; then
+        echo "" >&2
+        echo "  [FAIL] structure-guard 未通过 —— 根目录出现散落转储。" >&2
+        echo "    处理1：python \"\$HOME/.workbuddy-ai/scripts/auto_tidy.py\" --apply" >&2
+        echo "    处理2：确属有意则加入 .github/layout-rules.yaml 的 root_allowlist" >&2
+        FAILED=1
+    fi
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "[pre-commit] 未通过。紧急绕过：git commit --no-verify" >&2
+    exit 1
+fi
+echo "[pre-commit] 通过"
+exit 0

@@ -1,0 +1,23 @@
+#!/bin/sh
+# DCO 硬校验（CI 的 DCO 门禁要求每个提交带 Signed-off-by）+ 提交信息规范软提示。
+MSG="$1"
+[ -z "$MSG" ] && exit 0
+[ -f "$MSG" ] || exit 0
+SUBJECT=$(grep -v '^#' "$MSG" | grep -v '^[[:space:]]*$' | head -1)
+case "$SUBJECT" in
+    Merge*|Revert*|"fixup!"*|"squash!"*) exit 0 ;;
+esac
+if ! grep -qi '^[[:space:]]*Signed-off-by: ' "$MSG"; then
+    echo "[commit-msg] 缺少 DCO 签名，CI 的 DCO 门禁会失败。" >&2
+    echo "  修复：git commit -s        (补签上一个提交: git commit --amend -s)" >&2
+    echo "  绕过：git commit --no-verify (不推荐)" >&2
+    exit 1
+fi
+LEN=$(printf '%s' "$SUBJECT" | wc -m | tr -d ' ')
+if [ "${LEN:-0}" -gt 72 ] 2>/dev/null; then
+    echo "[commit-msg] 提示：标题 ${LEN} 字符，建议不超过 72。"
+fi
+if ! printf '%s' "$SUBJECT" | grep -qE '^[A-Za-z]+(\([^)]*\))?!?: .+'; then
+    echo "[commit-msg] 提示：标题建议用 conventional 格式，如 feat(core): 描述"
+fi
+exit 0
