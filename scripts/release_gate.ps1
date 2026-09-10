@@ -25,6 +25,7 @@ param(
     [string]$ModelDir = '',
     [string]$PythonExe = '',
     [string]$WorkDir = '',
+    [string]$WinPythonUrl = '',
     [long]$MaxPartBytes = 0
 )
 
@@ -67,10 +68,10 @@ foreach ($d in @($fx, $outBundle, $installed)) { New-Item -ItemType Directory -P
 
 # ================ ① 构建 ================
 Write-Step '① 构建（build_portable_bundle）'
-$realBuild = $RuntimeDir -and $TorchWheelDir -and $ModelDir
+$realBuild = [bool]$ModelDir
 if (-not $realBuild) {
     # fixture 模式：伪运行时 / 2 个 wheel / model 目录 + LICENSE/NOTICE（与 test_portable_bundle 同构）
-    Write-Host '  [fixture] 未提供真实 RuntimeDir/TorchWheelDir/ModelDir，构造最小夹具...' -ForegroundColor DarkGray
+    Write-Host '  [fixture] 未提供真实 ModelDir，构造最小夹具...' -ForegroundColor DarkGray
     New-Item -ItemType Directory -Path (Join-Path $fx 'WPy64-FAKE\python-3.12.10.amd64\Lib\site-packages\numpy') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $fx 'WPy64-FAKE\python-3.12.10.amd64\python.exe') -Value 'not-a-real-python' -Encoding ascii
     New-Item -ItemType Directory -Path (Join-Path $fx 'wheels') -Force | Out-Null
@@ -84,10 +85,28 @@ if (-not $realBuild) {
     $TorchWheelDir = Join-Path $fx 'wheels'
     $ModelDir = Join-Path $fx 'model'
 }
-& (Join-Path $PSScriptRoot 'build_portable_bundle.ps1') `
-    -Root $root -Version $Version -OutDir $outBundle -StagingDir (Join-Path $WorkDir 'staging') `
-    -RuntimeDir $RuntimeDir -TorchWheelDir $TorchWheelDir -ModelDir $ModelDir `
-    -MaxPartBytes $MaxPartBytes -SkipOfflineTorchCheck -SkipAutoPrepare | Out-Host
+# 真实构建：RuntimeDir/TorchWheelDir 可缺省 → build 脚本自动准备（WinPython 下载 + 依赖预装 + wheels 复用/下载）
+# 注意：命名参数必须用哈希表 splat（数组 splat 是位置传参，会把 -Param 当普通值绑定到首个位置参数）
+$buildArgs = @{
+    Root         = $root
+    Version      = $Version
+    OutDir       = $outBundle
+    StagingDir   = (Join-Path $WorkDir 'staging')
+    ModelDir     = $ModelDir
+    MaxPartBytes = $MaxPartBytes
+}
+if ($RuntimeDir) {
+    $buildArgs.RuntimeDir = $RuntimeDir
+    $buildArgs.SkipAutoPrepare = $true
+}
+if ($TorchWheelDir) { $buildArgs.TorchWheelDir = $TorchWheelDir }
+if ($WinPythonUrl) { $buildArgs.WinPythonUrl = $WinPythonUrl }
+if (-not $realBuild) {
+    # fixture 模式：跳过离线可装性验证（伪 wheels 无意义）与自动准备
+    $buildArgs.SkipOfflineTorchCheck = $true
+    $buildArgs.SkipAutoPrepare = $true
+}
+& (Join-Path $PSScriptRoot 'build_portable_bundle.ps1') @buildArgs | Out-Host
 Assert-Step ($LASTEXITCODE -eq 0) 'build' "exit=$LASTEXITCODE"
 
 $manifest = Read-TTSMultiModelJson -Path (Join-Path $outBundle 'manifest.json')
@@ -171,11 +190,18 @@ if ($tamperRejected) {
 
 # ================ ⑤ 冒烟启动 ================
 Write-Step '⑤ 冒烟启动（自检 + 验签）'
-$smokeOut = & $PythonExe (Join-Path $PSScriptRoot 'diag_integrity.py') --app-dir $payloadApp --enforce 2>&1
+# 真实便携解释器优先：解包载荷内的 WPy64 运行时 python.exe（真实启动自检）
+$payloadRootPath = Join-Path $installed 'TTSMultiModel-Portable'
+$payloadPy = @(Get-ChildItem -LiteralPath $payloadRootPath -Recurse -File -Filter 'python.exe' -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match 'WPy64' } | Select-Object -First 1).FullName
+$smokePython = if ($payloadPy) { $payloadPy } else { $PythonExe }
+$smokeOut = & $smokePython (Join-Path $PSScriptRoot 'diag_integrity.py') --app-dir $payloadApp --enforce 2>&1
 $smokeExit = $LASTEXITCODE
 $smokeOut | Select-Object -Last 2 | ForEach-Object { Write-Host "  [smoke] $_" -ForegroundColor DarkGray }
-Assert-Step ($smokeExit -eq 0 -and ($smokeOut -match 'selfcheck=True') -and ($smokeOut -match 'VERIFY=True')) 'smoke' "diag-exit=$smokeExit"
-Write-Host '  [note] ⑤ 使用便携解释器时即为真实启动自检；本地默认仓库 .venv（等价逻辑），CI 传 -PythonExe' -ForegroundColor DarkGray
+Assert-Step ($smokeExit -eq 0 -and ($smokeOut -match 'selfcheck=True') -and ($smokeOut -match 'VERIFY=True')) 'smoke' "diag-exit=$smokeExit py=$([System.IO.Path]::GetFileName([System.IO.Path]::GetDirectoryName($smokePython)))"
+if (-not $payloadPy) {
+    Write-Host '  [note] 载荷内未找到便携 python，⑤ 回退仓库 .venv（等价逻辑）；真实构建应有 WPy64 运行时' -ForegroundColor DarkGray
+}
 
 # ---------- 汇总 ----------
 Write-Host ''
