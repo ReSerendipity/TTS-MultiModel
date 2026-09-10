@@ -156,8 +156,9 @@ def _wav_to_bytes(wav: np.ndarray, sample_rate: int) -> bytes:
 
     # P0 安全修复：序列化前强制嵌入水印，用于生成内容来源追溯。
     # source_id 为代码常量，不可通过配置篡改。
+    # 桌面分发与安全加固 P0：block 档 WatermarkEmbedError 上抛（产出被阻断）。
     try:
-        from ...watermark import WATERMARK_SOURCE_ID, watermark_audio
+        from ...watermark import WATERMARK_SOURCE_ID, WatermarkEmbedError, watermark_audio
 
         wav_wm, wm_meta = watermark_audio(
             wav.astype(np.float32) if wav.dtype != np.float32 else wav,
@@ -167,7 +168,13 @@ def _wav_to_bytes(wav: np.ndarray, sample_rate: int) -> bytes:
         )
         if wm_meta.get("watermarked"):
             logger.debug("[streaming] 水印嵌入成功: snr=%.1fdB", wm_meta.get("snr_db", 0.0))
+        else:
+            logger.warning(
+                "[streaming] 水印嵌入失败（字节流无产出路径，侧车跳过）: %s", wm_meta.get("failure_reason", "")
+            )
         wav = wav_wm
+    except WatermarkEmbedError:
+        raise
     except Exception as wm_exc:
         logger.debug("[streaming] 水印嵌入异常（已忽略）: %s", wm_exc)
 

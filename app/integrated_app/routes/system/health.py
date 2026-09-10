@@ -496,6 +496,32 @@ async def get_health() -> dict[str, Any]:
         if "cache" not in health:
             health["cache"] = {"hit_rate": 0.0, "hits": 0, "misses": 0, "size": 0, "maxsize": 0}
 
+    # 桌面分发与安全加固 P0：暴露最近一次核心模块完整性自检结果（供桌面壳/运维告警）
+    try:
+        from ...security.integrity_selfcheck import get_last_selfcheck
+
+        _sc = get_last_selfcheck()
+        health["security"] = {
+            "integrity": {
+                "checked": bool(_sc),
+                "total": _sc.get("total", 0),
+                "failed": _sc.get("failed", 0),
+                "failed_files": _sc.get("failed_files", []),
+                "manifest_signed": _sc.get("manifest_signed", False),
+            }
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"完整性自检状态暴露失败: {exc}")
+        health["security"] = {
+            "integrity": {
+                "checked": False,
+                "total": 0,
+                "failed": 0,
+                "failed_files": [],
+                "manifest_signed": False,
+            }
+        }
+
     return health
 
 

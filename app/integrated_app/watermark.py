@@ -23,6 +23,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import hmac
+import json
 import logging
 import os
 import secrets
@@ -34,6 +35,17 @@ from typing import Any
 import numpy as np
 
 logger = logging.getLogger("tts_multimodel.watermark")
+
+
+#: 水印嵌入失败时抛出的受控异常（桌面分发与安全加固 P0：block 档阻断产出）。
+#: 调用点不得用裸 ``except Exception`` 吞掉——block 档语义是"产出被阻断"。
+class WatermarkEmbedError(RuntimeError):
+    """水印嵌入在 block 档失败——产出被阻断（未嵌入可溯源水印的音频不允许产出）。"""
+
+
+#: 水印密钥环境变量（桌面分发与安全加固 P0：空间隔离，企业场景注入统一密钥）。
+#: 值：64 位十六进制（32 字节），如 ``TTS_WATERMARK_KEY=<64 hex>``。
+_WATERMARK_KEY_ENV = "TTS_WATERMARK_KEY"
 
 #: 水印来源标识符常量（代码常量，不可通过配置修改，防止篡改溯源）。
 #: 所有通过 TTS_MultiModel 生成的音频均嵌入此标识，用于内容来源追溯。
@@ -73,6 +85,9 @@ def _get_watermark_secret() -> bytes | None:
 
     密钥存于 data/.watermark_key，32 字节，0600 权限。
     首次调用时若文件不存在则自动生成。读取失败返回 None（回退 v2 无密钥版）。
+    桌面分发与安全加固 P0 变更：
+      - 环境变量 ``TTS_WATERMARK_KEY`` 优先（企业空间隔离：统一密钥注入，每机无需各自生成）；
+      - 读取密钥文件时调用 ``harden_secret_file_permissions`` 自愈过宽权限（读时硬化）。
 
     Returns:
         32 字节密钥；密钥文件不可读/不可写时返回 None。
@@ -80,6 +95,19 @@ def _get_watermark_secret() -> bytes | None:
     global _watermark_secret_cache
     if _watermark_secret_cache is not None:
         return _watermark_secret_cache
+
+    # P0：环境变量注入优先（企业统一密钥；hex 64 字符 = 32 字节）
+    env_key = os.environ.get(_WATERMARK_KEY_ENV, "").strip()
+    if env_key:
+        try:
+            key = bytes.fromhex(env_key)
+            if len(key) != 32:
+                logger.warning(f"TTS_WATERMARK_KEY 长度异常（{len(key)}B，期望 32B），忽略环境变量")
+            else:
+                _watermark_secret_cache = key
+                return key
+        except ValueError:
+            logger.warning("TTS_WATERMARK_KEY 非合法 hex，忽略环境变量")
 
     try:
         key_dir = os.path.dirname(_WATERMARK_KEY_PATH)
@@ -93,12 +121,22 @@ def _get_watermark_secret() -> bytes | None:
                 key = secrets.token_bytes(32)
                 with open(_WATERMARK_KEY_PATH, "wb") as f:
                     f.write(key)
+            else:
+                # P0：读时权限自愈（历史部署可能权限过宽）
+                with contextlib.suppress(ImportError):
+                    from .security.secret_key import harden_secret_file_permissions
+
+                    harden_secret_file_permissions(_WATERMARK_KEY_PATH)
         else:
             key = secrets.token_bytes(32)
             with open(_WATERMARK_KEY_PATH, "wb") as f:
                 f.write(key)
             with contextlib.suppress(OSError):
                 os.chmod(_WATERMARK_KEY_PATH, 0o600)
+            with contextlib.suppress(ImportError):
+                from .security.secret_key import harden_secret_file_permissions
+
+                harden_secret_file_permissions(_WATERMARK_KEY_PATH)
 
         _watermark_secret_cache = key
         return key
@@ -734,23 +772,109 @@ def prepend_ai_indicator_tone(
     return result
 
 
+def _resolve_failure_mode(failure_mode: str | None) -> str:
+    """解析水印失败策略：参数 > config watermark.failure_mode > 默认 provenance。
+
+    Args:
+        failure_mode: 显式指定（"provenance" / "block"）；None 时读配置。
+
+    Returns:
+        "provenance" 或 "block"（非法值回退 provenance 并告警）。
+    """
+    if failure_mode in ("provenance", "block"):
+        return failure_mode
+    try:
+        from .config import get_config
+
+        wm_cfg = get_config().pydantic_config.watermark  # type: ignore[attr-defined]
+        mode = getattr(wm_cfg, "failure_mode", "provenance")
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"水印失败策略配置读取失败，使用默认 provenance: {e}")
+        mode = "provenance"
+    if mode not in ("provenance", "block"):
+        logger.warning(f"非法 watermark.failure_mode={mode!r}，回退 provenance")
+        mode = "provenance"
+    return mode
+
+
+def _write_provenance_sidecar(output_path: str | None, detail: dict[str, Any]) -> None:
+    """把水印失败事实写成侧车元数据文件（<输出>.provenance.json）。
+
+    侧车与产出同目录同基名，供事后溯源审计：此文件存在即表示该产出
+    未经可溯源水印嵌入（默认 provenance 档的行为）。
+
+    Args:
+        output_path: 产出音频路径；None 时跳过写盘（仅记录日志）。
+        detail: 侧车内容（source_id/version/原因/时间等）。
+    """
+    if not output_path:
+        logger.warning("[WATERMARK] 无产出路径，跳过 .provenance.json 侧车写盘")
+        return
+    sidecar = f"{output_path}.provenance.json"
+    try:
+        parent = os.path.dirname(os.path.abspath(sidecar))
+        os.makedirs(parent, exist_ok=True)
+        payload = {
+            "schema": "tts-multimodel.provenance.v1",
+            "audio_file": os.path.basename(output_path),
+            "watermark": {"embedded": False, **detail},
+            "written_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        }
+        with open(sidecar, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        logger.warning("[WATERMARK] 已写入溯源侧车（未嵌入水印）: %s", sidecar)
+    except OSError as e:
+        logger.error(f"[WATERMARK] 溯源侧车写入失败: {e}")
+
+
+def _log_watermark_failure(detail: str, severity: str, outcome: str) -> None:
+    """记录水印失败审计事件（桌面分发与安全加固 P0；模块级懒加载避免循环导入）。"""
+    try:
+        from .security.audit import log_audit
+
+        log_audit(
+            action="watermark_embed_failure",
+            actor="system",
+            detail=detail,
+            severity=severity,
+            outcome=outcome,
+        )
+    except Exception as e:  # noqa: BLE001 — 审计失败不阻断水印流程
+        logger.debug(f"[WATERMARK] 审计事件写入失败: {e}")
+
+
 def watermark_audio(
     audio: np.ndarray,
     sample_rate: int,
     enable: bool = True,
     source_id: str = "tts-multimodel",
+    output_path: str | None = None,
+    failure_mode: str | None = None,
 ) -> tuple[np.ndarray, dict]:
-    """可选地为音频添加水印的便捷函数。
+    """可选地为音频添加水印的便捷函数（桌面分发与安全加固 P0：3 级失败策略）。
+
+    失败策略（config watermark.failure_mode，默认 provenance）：
+      1. 重试 1 次：embed 失败（success=False 或抛异常）时重试一次；
+      2. provenance（默认）：重试仍失败 → 写 ``<输出>.provenance.json`` 侧车 +
+         返回原始音频（fail-open 但留痕）；
+      3. block：重试仍失败 → 抛 ``WatermarkEmbedError``，产出被阻断（fail-closed）。
+     任一失败路径均记审计事件（action=watermark_embed_failure）。
 
     Args:
         audio: 输入音频数组。
         sample_rate: 采样率（Hz）。
         enable: 是否启用水印，默认 True。
         source_id: 水印来源标识符。
+        output_path: 产出音频路径（provenance 档写侧车用；None 时跳过侧车写盘）。
+        failure_mode: 失败策略覆盖（"provenance"/"block"）；None 读 config。
 
     Returns:
         (处理后的音频, 元数据字典) 元组。元数据包含 watermarked（是否嵌入）、
-        snr_db（信噪比）、source_id、content_hash 等字段。
+        snr_db（信噪比）、source_id、content_hash 等字段；失败路径额外带
+        watermark_failed / failure_strategy / failure_reason。
+
+    Raises:
+        WatermarkEmbedError: failure_mode=block 且重试后仍失败时抛出。
     """
     if not enable:
         return audio, {"watermarked": False}
@@ -767,26 +891,65 @@ def watermark_audio(
     except Exception as e:
         logger.debug(f"水印强度配置读取失败，使用默认 {_WATERMARK_STRENGTH}: {e}")
 
-    watermarked, result = embed_watermark(audio, sample_rate, source_id=source_id, strength=strength)
+    mode = _resolve_failure_mode(failure_mode)
 
-    metadata: dict[str, Any] = {
-        "watermarked": result.success,
-        "snr_db": round(result.snr_db, 1),
+    # P0：3 级失败策略——首次嵌入 + 重试 1 次
+    last_error: str | None = None
+    result: Any = None
+    for _attempt in (1, 2):
+        try:
+            watermarked, result = embed_watermark(audio, sample_rate, source_id=source_id, strength=strength)
+            if result.success:
+                break
+            last_error = result.message
+        except Exception as e:  # noqa: BLE001 — embed 异常按失败处理（重试/降级）
+            last_error = f"{type(e).__name__}: {e}"
+            result = None
+
+    if result is not None and result.success:
+        metadata: dict[str, Any] = {
+            "watermarked": True,
+            "snr_db": round(result.snr_db, 1),
+        }
+        if result.payload:
+            metadata["source_id"] = result.payload.source_id
+            metadata["content_hash"] = result.payload.content_hash
+
+        # P1-4b：可选 AI 标识提示音（默认关闭，由 config.security.ai_audio_prefix_enabled 控制）
+        try:
+            from .config import get_config
+
+            sec_cfg = get_config().pydantic_config.security
+            if getattr(sec_cfg, "ai_audio_prefix_enabled", False):
+                prefix_ms = getattr(sec_cfg, "ai_audio_prefix_ms", 200)
+                watermarked = prepend_ai_indicator_tone(watermarked, sample_rate, duration_ms=prefix_ms)
+                metadata["ai_prefix"] = True
+        except Exception as e:
+            logger.debug(f"AI 标识提示音跳过（配置读取失败）: {e}")
+
+        return watermarked, metadata
+
+    # ---- 重试后仍失败：按策略降级/阻断 ----
+    reason = last_error or "未知水印嵌入失败"
+    detail = {
+        "source_id": source_id,
+        "sample_rate": sample_rate,
+        "reason": reason,
+        "strategy": mode,
     }
-    if result.payload:
-        metadata["source_id"] = result.payload.source_id
-        metadata["content_hash"] = result.payload.content_hash
+    if mode == "block":
+        _log_watermark_failure(
+            f"水印嵌入失败且 failure_mode=block，阻断产出: {reason}", severity="critical", outcome="blocked"
+        )
+        raise WatermarkEmbedError(f"水印嵌入失败（重试 1 次后仍失败），failure_mode=block 阻断产出: {reason}")
 
-    # P1-4b：可选 AI 标识提示音（默认关闭，由 config.security.ai_audio_prefix_enabled 控制）
-    try:
-        from .config import get_config
-
-        sec_cfg = get_config().pydantic_config.security
-        if getattr(sec_cfg, "ai_audio_prefix_enabled", False):
-            prefix_ms = getattr(sec_cfg, "ai_audio_prefix_ms", 200)
-            watermarked = prepend_ai_indicator_tone(watermarked, sample_rate, duration_ms=prefix_ms)
-            metadata["ai_prefix"] = True
-    except Exception as e:
-        logger.debug(f"AI 标识提示音跳过（配置读取失败）: {e}")
-
-    return watermarked, metadata
+    _log_watermark_failure(
+        f"水印嵌入失败，已写 .provenance.json 侧车（fail-open）: {reason}", severity="warning", outcome="failure"
+    )
+    _write_provenance_sidecar(output_path, detail)
+    return audio, {
+        "watermarked": False,
+        "watermark_failed": True,
+        "failure_strategy": "provenance",
+        "failure_reason": reason,
+    }

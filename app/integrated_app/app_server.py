@@ -298,13 +298,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # P0-3: 核心模块完整性自校验 (CWE-912 防御，来源：Seedvr2)
     # 在 HistoryDB 初始化之前、config 加载之后执行
-    # 自检失败默认只告警不阻塞启动（避免误伤）；可按 runtime.integrity.block_startup_on_failure 阻断
+    # 自检失败默认只告警不阻塞启动（避免误伤）；可按 runtime.integrity.block_startup_on_failure 阻断；
+    # 桌面分发与安全加固 P0：security.integrity_selfcheck.enforce=true 时验签/哈希失败抛 RuntimeError 拒绝启动
     from .config import get_config
 
+    _enforce = getattr(get_config().pydantic_config.security.integrity_selfcheck, "enforce", False)
     try:
         from .security.integrity_selfcheck import run_startup_selfcheck
 
-        selfcheck = run_startup_selfcheck()
+        selfcheck = run_startup_selfcheck(enforce=_enforce)
         if selfcheck["failed"] > 0:
             logger.error(
                 "=" * 60 + "\n"
@@ -312,6 +314,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 f"    失败文件: {', '.join(selfcheck['failed_files'])}\n"
                 "    请检查代码是否被篡改或重新生成清单。\n" + "=" * 60
             )
+        elif not selfcheck.get("manifest_signed", False):
+            logger.warning("[SECURITY] 完整性清单未签名（enforce 未开启时仅告警）")
+    except RuntimeError:
+        # enforce 模式：验签/哈希失败 → 拒绝启动（fail-fast），不得吞掉
+        raise
     except Exception as e:
         logger.debug(f"核心模块完整性自检跳过: {e}")
         selfcheck = {"failed": 0, "failed_files": []}

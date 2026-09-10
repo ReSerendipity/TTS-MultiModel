@@ -894,7 +894,7 @@ def _apply_post_processing_to_file(
         # 其持续失败（如底层算子异常）会触发熔断，快速跳过水印而非反复重试拖慢主路径。
         try:
             from ...circuit_breaker import CircuitBreakerOpenError, get_circuit_breaker
-            from ...watermark import WATERMARK_SOURCE_ID, watermark_audio
+            from ...watermark import WATERMARK_SOURCE_ID, WatermarkEmbedError, watermark_audio
 
             _cb = get_circuit_breaker("watermark_svc")
 
@@ -904,6 +904,7 @@ def _apply_post_processing_to_file(
                     sr,
                     enable=True,
                     source_id=WATERMARK_SOURCE_ID,
+                    output_path=new_path,
                 )
 
             processed, wm_meta = _cb.call(_embed, processed)
@@ -915,7 +916,10 @@ def _apply_post_processing_to_file(
                     wm_meta.get("content_hash", ""),
                 )
             else:
-                logger.debug("后处理水印嵌入失败，*_pp.wav 已写入但无来源标识: %s", new_path)
+                logger.warning("后处理水印嵌入失败（已写 .provenance.json 侧车），*_pp.wav 无来源标识: %s", new_path)
+        except WatermarkEmbedError:
+            # block 档：未嵌入可溯源水印的后处理产出不允许写出 → 上抛（由外层兜底中止后处理）
+            raise
         except CircuitBreakerOpenError as cboe:
             logger.warning("[后处理水印] 熔断器已打开，跳过水印嵌入（音频正常写出）: %s", cboe)
         except Exception as wm_exc:  # noqa: BLE001

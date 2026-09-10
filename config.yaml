@@ -114,6 +114,12 @@ watermark:
   embed_timestamp: true
   embed_task_id: true
   strength: 0.062                  # P3：水印嵌入强度（已接线，原硬编码 0.062；范围 0.001-0.062）
+  failure_mode: provenance         # 桌面分发与安全加固 P0：嵌入失败策略（重试 1 次后）
+                                   #   provenance（默认）：写 <输出>.provenance.json 侧车 + 返回原音频（fail-open 但留痕）
+                                   #   block：抛 WatermarkEmbedError 阻断产出（fail-closed）
+                                   # 密钥注入：默认每机首启自动生成 data/.watermark_key；
+                                   #   企业统一密钥可用环境变量 TTS_WATERMARK_KEY（64 hex）注入（空间隔离）
+  retry: 1                         # 桌面分发与安全加固 P0：嵌入失败重试次数（固定 1 次，代码常量，此处仅文档化）
 
 # ── API 速率限制（M2 整改：覆盖 /v1 与上传端点 + 可信代理 XFF） ──
 rate_limit:
@@ -138,6 +144,13 @@ security:
   ai_audio_prefix_ms: 200                 # P1-4b：AI 标识提示音时长（毫秒，50-2000）
   training_data_ttl_days: 90              # P2-2：训练会话临时数据留存天数；0=不清理
   reference_audio_min_seconds: 3.0      # P0：上传参考音频最小时长（秒），0 关闭；同时拒绝近静音
+  # 桌面分发与安全加固 P0：启动完整性自检强制模式
+  # - enforce: true 时清单验签/哈希失败 → 抛 RuntimeError 拒绝启动（fail-fast）
+  # - 需与密钥分发配套：CI Secret 注入 Ed25519 私钥（MANIFEST_SIGNING_KEY_B64）+
+  #   公钥入包（security/manifest_signing_public_key.pem）+ data/ 下 0600 密钥文件
+  # - 开发机：无私钥时回退 HMAC（data/.integrity_hmac_secret，本机签名后验签）
+  integrity_selfcheck:
+    enforce: true
   # P2-11：outputs/ 目录生命周期策略
   # - 生成音频(outputs/*.wav)：与 history.db 记录绑定，随 pii_retention_days 统一清理（删 DB+音频）
   # - 上传参考音频(outputs/uploads/)：受 upload_ttl_days 管理，超期自动清理

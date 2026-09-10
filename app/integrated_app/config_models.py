@@ -563,6 +563,22 @@ class GenerationDefaultsConfig(BaseModel):
     split_max_chars: int = Field(default=200, ge=50, le=500, description="Max chars per split")
 
 
+class IntegritySelfcheckConfig(BaseModel):
+    """启动完整性自检配置（桌面分发与安全加固 P0）。
+
+    Attributes:
+        enforce: True 时验签/哈希失败抛 RuntimeError 拒绝启动；
+            清单缺失仍跳过（避免误伤首次部署）。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    enforce: bool = Field(
+        default=False,
+        description="P0：完整性自检强制模式（验签/哈希失败拒绝启动）。需先完成密钥分发（CI Secret + 公钥入包）再开启",
+    )
+
+
 class SecurityConfig(BaseModel):
     """安全配置。
 
@@ -634,6 +650,13 @@ class SecurityConfig(BaseModel):
         default=3.0,
         ge=0.0,
         description="P0：上传参考音频最小时长（秒），0 表示关闭时长校验；同时拒绝近静音音频",
+    )
+    # 桌面分发与安全加固 P0：启动完整性自检强制模式。
+    # enforce=True 时验签/哈希失败将抛 RuntimeError 拒绝启动（fail-fast）；
+    # 需与密钥分发配套（CI Secret 注入私钥 + 公钥入包 + data/ 下 0600 密钥）。
+    integrity_selfcheck: IntegritySelfcheckConfig = Field(
+        default_factory=IntegritySelfcheckConfig,
+        description="启动完整性自检配置（清单签名 + 哈希，enforce 阻断启动）",
     )
 
 

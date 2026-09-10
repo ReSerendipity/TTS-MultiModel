@@ -906,15 +906,17 @@ def _save_wav_compatible(
 
     # P0 安全修复：写盘前强制嵌入水印，用于生成内容来源追溯。
     # source_id 为代码常量（WATERMARK_SOURCE_ID），不可通过配置篡改。
-    # 水印失败时仅记录日志不阻塞生成（保证可用性），但会在日志中留下审计痕迹。
+    # 桌面分发与安全加固 P0：失败策略 3 级（重试→.provenance.json 侧车→block 档抛错）；
+    # block 档的 WatermarkEmbedError 必须上抛（产出被阻断），不得被裸 except 吞掉。
     try:
-        from .watermark import watermark_audio
+        from .watermark import WATERMARK_SOURCE_ID, WatermarkEmbedError, watermark_audio
 
         wav_data, wm_meta = watermark_audio(
             wav_data.astype(np.float32),
             sample_rate,
             enable=True,
             source_id=WATERMARK_SOURCE_ID,
+            output_path=out_path,
         )
         if wm_meta.get("watermarked"):
             logger.debug(
@@ -924,7 +926,10 @@ def _save_wav_compatible(
                 wm_meta.get("content_hash", ""),
             )
         else:
-            logger.debug("水印嵌入失败，音频已写入但无来源标识: %s", out_path)
+            logger.warning("水印嵌入失败（已写 .provenance.json 侧车，音频仍写入）: %s", out_path)
+    except WatermarkEmbedError:
+        # block 档：未嵌入可溯源水印的产出不允许写出 → 上抛阻断任务
+        raise
     except Exception as wm_exc:
         logger.debug("水印嵌入异常（已忽略，音频正常写入）: %s", wm_exc)
 
