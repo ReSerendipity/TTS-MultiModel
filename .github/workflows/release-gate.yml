@@ -1,0 +1,50 @@
+name: release-gate
+
+# 发布门禁五步（任务书阶段四 / 报告2 §4.1）：
+#   ① 构建  ② 拆包验证（清单完整 + 公钥验签） ③ 负向断言（无密钥/私钥/残留）
+#   ④ 篡改模拟（改 1 字节 → 校验失败） ⑤ 冒烟启动（自检 + Ed25519 验签）
+# 实现：scripts/release_gate.ps1（fixture 构建，快）+ scripts/diag_integrity.py
+# CI 只调脚本路径，不内联 python -c（报告2 §七-3）。
+#
+# 触发：workflow_dispatch（手动）/ 推送 tag v*（发布前必经）。
+# 真实权重构建（WinPython + torch wheels + model/ 27GB）不在本工作流：
+# 模型资产不在仓库内、外部源未在报告范围，属「需人工决策」项（见执行对照表）。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Release gate (5 steps)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install cryptography (Ed25519 验签依赖)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cryptography
+
+      - name: '①-⑤ 发布门禁五步（fixture 构建）'
+        run: |
+          .\scripts\release_gate.ps1 -PythonExe (Get-Command python).Source
+        shell: pwsh
+
+      - name: '⑤ 补充：diag 对仓库 app 输出（可二分定位）'
+        run: |
+          python scripts\diag_integrity.py --app-dir app\integrated_app
