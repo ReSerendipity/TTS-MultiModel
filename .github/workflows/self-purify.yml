@@ -1,0 +1,28 @@
+name: Self-Purify Check
+
+# 家族「自净化」检查入口（2026-09-10 建立）。
+# 复用 ReSerendipity/.github 的 self-purify.yml；非阻塞运行，违规时显示
+# 黄色失败但不阻断 CI（家族绿线优先），违规详情见该 job 日志。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # 每周一 02:00 UTC（北京时间 10:00）例行巡检
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-purify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  self-purify:
+    name: 自净化检查（非阻塞）
+    continue-on-error: true
+    uses: ReSerendipity/.github/.github/workflows/self-purify.yml@main

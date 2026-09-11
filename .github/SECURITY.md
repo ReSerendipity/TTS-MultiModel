@@ -37,6 +37,33 @@ Do not publicly disclose the vulnerability until a fix or mitigation has been pu
 
 ---
 
+# 支持版本与私密报告渠道（仓库级补充，2026-09-11 自净化整改）
+
+> 本节合并自原根目录 `SECURITY.md`，消除根/.github 双份漂移；根目录副本已移除，本文件为唯一事实来源。
+
+| 版本 | 支持状态 |
+|------|----------|
+| v2.2.x | ✅ 安全更新 |
+| < v2.2 | ❌ 不再支持 |
+
+- 私密报告：GitHub **Security → Report a vulnerability**（勿公开提 Issue）
+- 报告请包含：① 漏洞描述与影响范围 ② 复现步骤（PoC）③ 受影响版本 ④ 建议修复方案
+- 安全更新流程：报告 → 24 小时内确认（高危遵循上方 Timeline：48h 确认 / 14d 修复）→ 根因分析 → 修复+回归测试 → 补丁发布 → 公告影响范围
+- 依赖安全：唯一声明源 `pyproject.toml`；CI Trivy 容器扫描（CRITICAL/HIGH 阻断）；pre-commit 钩子 14 项（ruff / mypy / check-engine-compat 等）
+
+## 安全架构概览（项目内置防护）
+
+- **鉴权**：API Token + 可选 CSRF 防护（`app/integrated_app/auth.py`、`app/integrated_app/middleware/csrf.py`）
+- **速率限制**：滑动窗口全局限流 + 克隆专用 1h 窗口（`middleware/rate_limit.py`）
+- **内容安全**：6 类正则检测（暴力/仇恨/自残/色情/违法/骚扰）+ 同音字/拼音/外文变体（`security/content_safety.py`）
+- **水印**：DCT 频域不可感知水印 + HMAC 密钥版 v3（`watermark.py`）
+- **PII 加密**：历史记录文本字段 Fernet 加密 + 密钥自动管理（`history_db.py`）
+- **审计日志**：操作审计 + 10MB 轮转（`security/audit.py`）
+- **完整性校验**：核心模块 SHA-256 自检 + 模型权重哈希校验（`security/integrity_check.py`、`security/integrity_selfcheck.py`）
+- **AI 标识**：响应头 `X-AI-Generated` + UI 徽标 + 可选音频提示音
+
+---
+
 # 安全架构与防护策略文档
 
 > TTS_MultiModel 安全架构与防护策略文档。本文件由原 `.github/SECURITY.md`（漏洞报告政策）与 `docs/SECURITY.md`（安全架构）合并而来，路径均已按 `app/integrated_app/` 实际布局校正。
