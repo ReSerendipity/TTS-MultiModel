@@ -786,7 +786,7 @@ def _resolve_failure_mode(failure_mode: str | None) -> str:
     try:
         from .config import get_config
 
-        wm_cfg = get_config().pydantic_config.watermark  # type: ignore[attr-defined]
+        wm_cfg = get_config().pydantic_config.watermark
         mode = getattr(wm_cfg, "failure_mode", "provenance")
     except Exception as e:  # noqa: BLE001
         logger.debug(f"水印失败策略配置读取失败，使用默认 provenance: {e}")
@@ -884,7 +884,8 @@ def watermark_audio(
     try:
         from .config import get_config
 
-        wm_cfg = get_config().pydantic_config.watermark  # type: ignore[attr-defined]  # noqa: E501 - watermark 由代码常量+配置共管，AppConfig 未建模该字段（extra=ignore）
+        # watermark 已在 config_models.WatermarkConfig 建模并挂到 AppConfig（P2-1 整改）
+        wm_cfg = get_config().pydantic_config.watermark
         cfg_strength = getattr(wm_cfg, "strength", None)
         if cfg_strength is not None and isinstance(cfg_strength, (int, float)) and cfg_strength > 0:
             strength = float(cfg_strength)

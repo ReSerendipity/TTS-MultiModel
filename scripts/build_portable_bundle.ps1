@@ -666,6 +666,28 @@ if ($TorchWheelDir -and $RuntimeDir -and -not $SkipOfflineTorchCheck) {
     }
 }
 
+
+# 清理 WinPython Scripts 下 .py 脚本的 shebang 绝对路径：
+# WinPython 自带脚本（jp.py 等）首行 #!硬编码构建机临时路径，
+# 打包后成为本机路径残留，被门禁 3 no-local-path-residue 拦下。统一重写为相对名。
+if ($RuntimeDir) {
+    $scriptsDir = Join-Path $RuntimeDir 'python\Scripts'
+    if (Test-Path $scriptsDir) {
+        $shebangFixed = 0
+        Get-ChildItem $scriptsDir -Filter '*.py' -File -Force | ForEach-Object {
+            $pyLines = [System.IO.File]::ReadAllLines($_.FullName)
+            if ($pyLines.Count -gt 0 -and $pyLines[0] -match '^#!.+python\.exe') {
+                $pyLines[0] = '#!python.exe'
+                [System.IO.File]::WriteAllLines($_.FullName, $pyLines, [System.Text.UTF8Encoding]::new($false))
+                $shebangFixed++
+            }
+        }
+        if ($shebangFixed -gt 0) {
+            Write-Host "  [清理] WinPython shebang 本机路径重写：$shebangFixed 个脚本"
+        }
+    }
+}
+
 $components = @()
 $allParts = @()
 foreach ($id in $Component) {

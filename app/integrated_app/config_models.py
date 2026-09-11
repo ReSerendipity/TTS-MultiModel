@@ -686,6 +686,50 @@ class RateLimitConfig(BaseModel):
     )
 
 
+class WatermarkConfig(BaseModel):
+    """音频水印配置（P2-1 / P3 整改：config.yaml ``watermark:`` 段建模）。
+
+    此前 ``watermark.py`` 通过 ``get_config().pydantic_config.watermark`` 读取
+    失败策略与强度，但 ``AppConfig`` 未建模该字段（依赖 ``extra="ignore"`` 兜底），
+    属于「代码访问了未在配置模型中定义的字段」——``scripts/check_config_refs.py``
+    门禁因此报红。此处把 ``config.yaml`` 的 ``watermark:`` 段完整建模，使其成为
+    受校验的配置字段。
+
+    Attributes:
+        enabled_in_code: 是否启用代码侧水印嵌入（当前由代码常量强制启用，此开关用于文档化）。
+        method: 水印算法标识（当前实现为 DCT 频域嵌入）。
+        product_id: 产品标识，写入水印 payload 用于溯源。
+        embed_timestamp: 是否在 payload 中嵌入时间戳。
+        embed_task_id: 是否在 payload 中嵌入任务 ID。
+        strength: 嵌入强度，建议区间 0.001~0.062（越大越鲁棒、失真越高）。
+        failure_mode: 嵌入失败策略——``provenance`` 写侧车文件后返回原音频（fail-open 留痕）；
+            ``block`` 抛 ``WatermarkEmbedError`` 阻断产出（fail-closed）。
+        retry: 嵌入失败重试次数（固定 1 次；此处仅文档化，实际由代码常量控制）。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    enabled_in_code: bool = Field(
+        default=True,
+        description="是否启用代码侧水印嵌入（当前由代码常量强制启用，此开关用于文档化）",
+    )
+    method: str = Field(default="dct_frequency", description="水印算法标识（当前为 DCT 频域嵌入）")
+    product_id: str = Field(default="TTSMULTI-1", description="产品标识，写入水印 payload 用于溯源")
+    embed_timestamp: bool = Field(default=True, description="是否在 payload 中嵌入时间戳")
+    embed_task_id: bool = Field(default=True, description="是否在 payload 中嵌入任务 ID")
+    strength: float = Field(
+        default=0.062,
+        ge=0.0,
+        le=1.0,
+        description="水印嵌入强度，建议区间 0.001~0.062（越大越鲁棒、失真越高）",
+    )
+    failure_mode: str = Field(
+        default="provenance",
+        description="嵌入失败策略：provenance=写侧车文件后返回原音频（fail-open 留痕）；block=抛错阻断（fail-closed）",
+    )
+    retry: int = Field(default=1, ge=0, description="嵌入失败重试次数（代码常量为准，此处仅文档化）")
+
+
 class AppConfig(BaseModel):
     """根应用配置模型 — 整个配置树的顶层容器。
 
@@ -705,6 +749,7 @@ class AppConfig(BaseModel):
         ui: UIConfig — WebUI 布局参数。
         runtime: RuntimeConfig — 运行时任务队列与断点续跑配置。
         security: SecurityConfig — 安全配置（音频水印等）。
+        watermark: WatermarkConfig — 音频水印嵌入参数（方法/强度/失败策略）。
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -723,6 +768,7 @@ class AppConfig(BaseModel):
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
+    watermark: WatermarkConfig = Field(default_factory=WatermarkConfig)
 
     @field_validator("server")
     @classmethod

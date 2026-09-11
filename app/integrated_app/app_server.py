@@ -598,7 +598,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     async def _periodic_temp_cleanup() -> None:
         """定期清理过期临时文件，避免长时间运行后临时目录堆积。"""
         from .config import get_config
-        from .utils import cleanup_expired_uploads, cleanup_temp_files
+        from .utils import cleanup_expired_training_data, cleanup_expired_uploads, cleanup_temp_files
 
         while not _temp_cleanup_stop.is_set():
             with contextlib.suppress(asyncio.TimeoutError):
@@ -614,6 +614,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 removed_uploads = await run_in_threadpool(cleanup_expired_uploads, ttl_days=ttl)
                 if removed_uploads > 0:
                     logger.info(f"[periodic-cleanup] 超期上传文件清理完成，删除 {removed_uploads} 个")
+                # P2-2：同步清理超期训练会话临时产物（security.training_data_ttl_days）
+                train_ttl = get_config().pydantic_config.security.training_data_ttl_days
+                removed_training = await run_in_threadpool(cleanup_expired_training_data, ttl_days=train_ttl)
+                if removed_training > 0:
+                    logger.info(f"[periodic-cleanup] 超期训练会话临时产物清理完成，删除 {removed_training} 个")
             except Exception:
                 logger.debug("[periodic-cleanup] 定期清理异常（忽略）", exc_info=True)
 
@@ -690,6 +695,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info(f"[lifespan] 超期上传文件清理完成，删除 {removed_uploads} 个文件")
     except Exception as e:
         logger.debug(f"[lifespan] 超期上传文件清理跳过: {e}")
+
+    # P2-2：关闭时清理超期训练会话临时产物（security.training_data_ttl_days）
+    try:
+        from .config import get_config
+        from .utils import cleanup_expired_training_data
+
+        train_ttl = get_config().pydantic_config.security.training_data_ttl_days
+        removed_training = cleanup_expired_training_data(ttl_days=train_ttl)
+        if removed_training > 0:
+            logger.info(f"[lifespan] 超期训练会话临时产物清理完成，删除 {removed_training} 个")
+    except Exception as e:
+        logger.debug(f"[lifespan] 超期训练会话临时产物清理跳过: {e}")
 
     _set_event_loop(None)
     logger.info("[lifespan] Shutdown 阶段完成")

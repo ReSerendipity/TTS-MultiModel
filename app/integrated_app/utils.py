@@ -13,6 +13,7 @@ import contextlib
 import glob
 import logging
 import os
+import shutil
 import tempfile
 import time
 from collections.abc import Iterable
@@ -161,6 +162,61 @@ def cleanup_expired_uploads(ttl_days: int = 30) -> int:
 
     if removed_count > 0:
         logger.info(f"[cleanup_expired_uploads] 已清理 {removed_count} 个超期上传文件（TTL={ttl_days}天）")
+    return removed_count
+
+
+# 系统临时目录下的训练会话临时产物前缀：
+#   tts_multimodel_training_  训练状态 JSON（routes/training.py 写入）
+#   tts_multimodel_train_     训练会话临时目录（会话级中间产物）
+_TRAINING_TEMP_PREFIXES: tuple[str, ...] = (
+    "tts_multimodel_training_",
+    "tts_multimodel_train_",
+)
+
+
+def cleanup_expired_training_data(ttl_days: int = 90) -> int:
+    """清理系统临时目录中超期的训练会话临时产物。
+
+    P2-2 安全整改：``security.training_data_ttl_days`` 声明了训练会话临时数据的
+    留存期限，但此前**无任何代码消费**该配置（属于「声明即生效的假安全感」，
+    已被 ``scripts/check_config_refs.py`` 门禁标记）。本函数把该配置真正接线：
+
+    - 训练**数据本体**由用户路径（``train_manifest`` / ``save_path``）引用，
+      属于用户资产，不在此清理范围内；
+    - 仅清理**会话临时产物**：系统临时目录下的训练状态 JSON 与会话临时目录，
+      避免长期运行后残留（与 ``cleanup_expired_uploads`` 同族的留存治理）。
+
+    Args:
+        ttl_days: 留存天数，超过此天数未修改的条目将被删除。0 表示不清理。
+
+    Returns:
+        int: 实际删除的文件/目录条目数量。
+    """
+    if ttl_days <= 0:
+        return 0
+
+    temp_dir = tempfile.gettempdir()
+    cutoff = time.time() - ttl_days * 86400
+    removed_count = 0
+
+    for prefix in _TRAINING_TEMP_PREFIXES:
+        for entry in glob.glob(os.path.join(temp_dir, f"{prefix}*")):
+            try:
+                if os.path.getmtime(entry) >= cutoff:
+                    continue
+                with contextlib.suppress(OSError):
+                    if os.path.isdir(entry):
+                        shutil.rmtree(entry)
+                    else:
+                        os.remove(entry)
+                    removed_count += 1
+            except OSError:
+                pass
+
+    if removed_count > 0:
+        logger.info(
+            f"[cleanup_expired_training_data] 已清理 {removed_count} 个超期训练会话临时产物（TTL={ttl_days}天）"
+        )
     return removed_count
 
 

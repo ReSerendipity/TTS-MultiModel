@@ -51,11 +51,14 @@ ENV PYTHONUNBUFFERED=1
 # 基础镜像 nvidia/cuda:12.1.0-runtime-ubuntu22.04 自带未打补丁的 openssl/libssl3/dirmngr 等，
 # 不显式升级则 Trivy 安全门禁会因未修复的高危漏洞持续报红。DEBIAN_FRONTEND=noninteractive 已设，无交互阻塞。
 # ⚠ 可复现性提示（P2-2）：upgrade 的补丁集随构建日期漂移，如需可复现构建请锁定基础镜像 digest 并定期 bump。
+# ⚠ python3.12-venv 必装：Ubuntu/deadsnakes 的 python3.12 拆包，ensurepip 由 python3.12-venv 提供；
+#   漏装则下一步 `python3.12 -m ensurepip --upgrade` 报 "No module named ensurepip" 直接构建失败
+#   （与 builder 阶段 :25 保持一致，两处必须同装）。
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common ca-certificates ffmpeg \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends python3.12 \
+    && apt-get install -y --no-install-recommends python3.12 python3.12-venv \
     && rm -rf /var/lib/apt/lists/* \
     && python3.12 -m ensurepip --upgrade \
     && groupadd -r ttsuser \

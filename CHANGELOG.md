@@ -11,6 +11,11 @@
 
 * **integrity:** 核心模块完整性自检 Ed25519 签名 + `enforce` 阻断（P0）；水印密钥从配置文件迁出为 env/`data/.watermark_key`（P0）；便携包清单重算/重签链路（`generate_integrity_manifest.py --app-dir` + EOF 尾换行规范化）、分发负向断言（无密钥/本机路径残留）、篡改模拟门禁（P1-3/P2-1）
 
+### Bug Fixes
+
+* **ci:** 修复 `scripts/check_config_refs.py` 配置门禁红灯——①为 `config.yaml` 的 `watermark:` 段补建 `WatermarkConfig` 模型并挂到 `AppConfig`（`watermark.py` 长期访问未建模字段）；②把此前「只声明未消费」的 `security.training_data_ttl_days` 真正接线（新增 `cleanup_expired_training_data`，随 lifespan 周期清理与关闭清理执行）
+* **docker:** runtime 阶段补装 `python3.12-venv`（Ubuntu/deadsnakes 拆分包，`ensurepip` 由它提供），修复 `python3.12 -m ensurepip --upgrade` 报 `No module named ensurepip` 导致的镜像构建失败（与 builder 阶段对齐）
+
 ### Chore
 
 * **dist:** 便携依赖钉装（`launcher/requirements-small.txt` 93 项 + `torch==2.13.0+cu132` 系列钉版，`sync_requirements.py --check-small` 校验）（P1-1）
