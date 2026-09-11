@@ -295,6 +295,18 @@ Write-Host " 解包完成：$appRoot" -ForegroundColor Green
 if ($ids -contains 'core') {
     Write-Host ' 启动：双击 start-portable.bat → 浏览器打开 http://127.0.0.1:7869' -ForegroundColor Green
     Write-Host ' 提示：双击 start-portable.bat 或 TTSMultiModel.exe 启动；FFmpeg 按 NOTICE 第 4 条不分发' -ForegroundColor Green
+    # 模型缺失检测：core+torch 包不含 model 组件，提示用户从官方源下载
+    $modelDir = Join-Path $appRoot 'model'
+    $ckptDir  = Join-Path $appRoot 'checkpoints'
+    if (-not (Test-Path -LiteralPath $modelDir) -and -not (Test-Path -LiteralPath $ckptDir)) {
+        Write-Host ''
+        Write-Host ' [提示] 本次包未包含模型权重（model/）。' -ForegroundColor Yellow
+        Write-Host ' 模型需从官方源下载后放入以下任一目录：' -ForegroundColor Yellow
+        Write-Host "   $modelDir" -ForegroundColor Yellow
+        Write-Host "   $ckptDir" -ForegroundColor Yellow
+        Write-Host ' 支持的模型：IndexTTS-2.0/2.5、VoxCPM2、SenseVoiceSmall、speech_zipenhancer' -ForegroundColor Yellow
+        Write-Host ' 下载指南见项目 README / docs/。' -ForegroundColor Yellow
+    }
 } else {
     Write-Host " 本次只解包了：$($ids -join ', ')（未含 core，不能启动程序）" -ForegroundColor Yellow
     Write-Host ' 若这是补下模型/torch 组件，则已合并进现有安装目录，无需重复解包 core' -ForegroundColor Yellow
