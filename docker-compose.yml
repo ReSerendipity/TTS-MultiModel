@@ -64,11 +64,11 @@ services:
         limits:
           memory: 16G
           cpus: "4.0"
-          # GPU 硬上限（需 nvidia-container-toolkit + compose v2.27+）
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+        # 注：Compose 规范不支持 limits.devices —— GPU 只能经 reservations.devices
+        # 声明（见上），limits 仅接受 cpus/memory/pids。此前把 devices 写在 limits
+        # 下会被 `docker compose config -q` 判为 schema 非法
+        # （services.tts.deploy.resources.limits additional properties 'devices' not
+        #  allowed），导致 Docker Smoke 的「Compose file validity」门禁红（2026-09-11 修复）。
     # PyTorch DataLoader / 多 worker 需要更大的 /dev/shm，默认 64MB 易 OOM
     shm_size: "2gb"
     # 限制进程数，防止 fork 炸弹

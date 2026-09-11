@@ -17,6 +17,11 @@
       仅覆盖 zh/en/ja/ko；两者语义不同，不强制一致。
     - vram_gb / ram_gb：config 与 registry 的 vram_requirement 口径可能不同
       （config 含 ASR/Enhancer 余量，registry 为模型基线），仅做信息展示。
+    - model_dir 磁盘存在性：**权重是外部产物，不随仓库分发**（``/model/`` 已列入
+      .gitignore，运行时以卷挂载提供，见 Dockerfile 注释）。仓库未附带 ``model/``
+      权重目录时（CI / 纯净克隆），磁盘校验降级为 WARN——否则该门禁在 CI 中结构性
+      不可通过（本门禁首次上线即因此从未真正跑绿，2026-09-11 修复）；仅当 ``model/``
+      已存在（开发机有权重）时，某引擎目录缺失才判 FAIL，用于抓真实的规格漂移。
 
 用法：
     python scripts/check_engine_specs.py
@@ -103,6 +108,19 @@ def _check_model_path(model_dir: str) -> tuple[bool, str]:
     return True, f"存在（{len(files)} 个文件）"
 
 
+def _model_root_provisioned() -> bool:
+    """仓库是否已附带 ``model/`` 权重目录（含至少一个文件）。
+
+    权重是外部产物：``/model/`` 已列入 .gitignore，运行时以卷挂载提供
+    （见 Dockerfile 注释）。CI / 纯净克隆没有权重，此时磁盘存在性校验无意义，
+    必须降级为 WARN，否则门禁在 CI 中结构性不可通过。
+    """
+    root = _PROJECT_ROOT / "model"
+    if not root.is_dir():
+        return False
+    return any(p.is_file() for p in root.rglob("*"))
+
+
 def run_all_checks() -> list[CheckResult]:
     results: list[CheckResult] = []
 
@@ -187,17 +205,27 @@ def run_all_checks() -> list[CheckResult]:
                 )
             )
 
-        # 磁盘模型路径
+        # 磁盘模型路径（权重为外部产物；仓库未附带 model/ 时降级 WARN，见模块 docstring）
         model_dir = cfg.get("model_dir", "")
         if model_dir:
-            ok, detail = _check_model_path(model_dir)
-            results.append(
-                CheckResult(
-                    f"{name}.model_path",
-                    "OK" if ok else "FAIL",
-                    f"model/{model_dir}: {detail}",
+            if not _model_root_provisioned():
+                results.append(
+                    CheckResult(
+                        f"{name}.model_path",
+                        "WARN",
+                        f"model/{model_dir}: 仓库未附带权重目录（权重为外部产物，"
+                        "运行时卷挂载提供），跳过磁盘存在性校验",
+                    )
                 )
-            )
+            else:
+                ok, detail = _check_model_path(model_dir)
+                results.append(
+                    CheckResult(
+                        f"{name}.model_path",
+                        "OK" if ok else "FAIL",
+                        f"model/{model_dir}: {detail}",
+                    )
+                )
 
     # 4. languages 差异（仅 WARN，不阻断）
     for name in sorted(config_names & registry_names):
