@@ -24,6 +24,7 @@
 
 * **launcher:** 便携钉装自洽修复（真实构建暴露）——全新 WinPython 3.12.10.1 上 `pip install -r requirements-small.txt` 报 ResolutionImpossible，9 项版本对齐 .venv 实测（antlr4 4.9.3 / pydantic-core 2.46.4 / mpmath 1.3.0 / tokenizers 0.21.0 + transformers 4.52.1 / huggingface-hub 0.36.2 / protobuf 3.19.6 / fsspec 2026.6.0 / uvicorn 0.52.4），移除已不引用的 tensorboardx 钉版；92 项 dry-run 全解
 * **dist:** 清理 WinPython 自带脚本 shebang 本机路径残留——`Scripts/jp.py` 首行 `#!` 硬编码构建机临时路径，被门禁 ③ no-local-path-residue 拦下；build 脚本离线验证后自动重写为 `#!python.exe`
+* **dist:** 发布门禁补 ⑤ 冒烟启动——便携包解包后用包内 WPy64 python 跑 `diag_integrity.py --enforce` 自检（断言 `selfcheck=True`/`VERIFY=True`），将完整性 enforce 闭环到分发产物；④ 篡改模拟前清理 `installed`/`out-bundle` 释放磁盘（峰值 116GB→58GB）
 
 ### Chore
 

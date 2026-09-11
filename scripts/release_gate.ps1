@@ -149,6 +149,21 @@ $localPaths = @(Get-ChildItem -LiteralPath $payloadRoot -Recurse -File -Force -E
     Select-String -Pattern 'C:\\Users\\Doro' -List -ErrorAction SilentlyContinue)
 Assert-Step ($localPaths.Count -eq 0) 'no-local-path-residue' "hits=$($localPaths.Count)"
 
+# ================ ⑤ 冒烟启动 ================
+Write-Step '⑤ 冒烟启动（自检 + 验签）'
+# 真实便携解释器优先：解包载荷内的 WPy64 运行时 python.exe（真实启动自检）
+$payloadRootPath = Join-Path $installed 'TTSMultiModel-Portable'
+$payloadPy = @(Get-ChildItem -LiteralPath $payloadRootPath -Recurse -File -Filter 'python.exe' -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match 'WPy64' } | Select-Object -First 1).FullName
+$smokePython = if ($payloadPy) { $payloadPy } else { $PythonExe }
+$smokeOut = & $smokePython (Join-Path $PSScriptRoot 'diag_integrity.py') --app-dir $payloadApp --enforce 2>&1
+$smokeExit = $LASTEXITCODE
+$smokeOut | Select-Object -Last 2 | ForEach-Object { Write-Host "  [smoke] $_" -ForegroundColor DarkGray }
+Assert-Step ($smokeExit -eq 0 -and ($smokeOut -match 'selfcheck=True') -and ($smokeOut -match 'VERIFY=True')) 'smoke' "diag-exit=$smokeExit py=$([System.IO.Path]::GetFileName([System.IO.Path]::GetDirectoryName($smokePython)))"
+if (-not $payloadPy) {
+    Write-Host '  [note] 载荷内未找到便携 python，⑤ 回退仓库 .venv（等价逻辑）；真实构建应有 WPy64 运行时' -ForegroundColor DarkGray
+}
+
 # ================ ④ 篡改模拟 ================
 Write-Step '④ 篡改模拟（改 1 字节 → 校验失败）'
 $tamperBundle = Join-Path $WorkDir 'tamper-bundle'
@@ -172,6 +187,16 @@ Write-Host "  [tamper] rejected=$tamperRejected  $($tamperMsg.Split([Environment
 Assert-Step $tamperRejected 'tamper-blocked' "rejected=$tamperRejected（校验必须失败）"
 # enforce 阻断：篡改后的包若强行解包并启动自检，应被 enforce 拒绝（④ 的运行时面）
 if ($tamperRejected) {
+    # 磁盘调度：⑤ 已跑完，installed/out-bundle 不再需要；
+    # 删除两者释放空间，供 tamper-install 解包（峰值从 116GB 降到 ~58GB）。
+    if (Test-Path -LiteralPath $installed) {
+        Remove-Item -LiteralPath $installed -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "  [清理] 删除 installed 释放磁盘" -ForegroundColor DarkGray
+    }
+    if (Test-Path -LiteralPath $outBundle) {
+        Remove-Item -LiteralPath $outBundle -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "  [清理] 删除 out-bundle 释放磁盘（tamper-bundle 为副本）" -ForegroundColor DarkGray
+    }
     $tamperInstall = Join-Path $WorkDir 'tamper-install'
     try {
         $null = & (Join-Path $PSScriptRoot 'unpack_portable_bundle.ps1') -BundleDir $tamperBundle `
@@ -179,28 +204,13 @@ if ($tamperRejected) {
     } catch {
         Write-Host "  [enforce] 篡改包解包被拒（$($_.Exception.Message.Split([Environment]::NewLine)[0])）" -ForegroundColor DarkGray
     }
-    if (Test-Path -LiteralPath (Join-Path $tamperInstall 'TTSMultiModel-Portable\app\integrated_app')) {
-        $enforceOut = & $PythonExe (Join-Path $PSScriptRoot 'diag_integrity.py') --app-dir (Join-Path $tamperInstall 'TTSMultiModel-Portable\app\integrated_app') --enforce 2>&1
+    $tamperPayload = Join-Path $tamperInstall 'TTSMultiModel-Portable\app\integrated_app'
+    if (Test-Path -LiteralPath $tamperPayload) {
+        $enforceOut = & $PythonExe (Join-Path $PSScriptRoot 'diag_integrity.py') --app-dir $tamperPayload --enforce 2>&1
         $enforceExit = $LASTEXITCODE
         $enforceOut | Select-Object -Last 2 | ForEach-Object { Write-Host "  [enforce] $_" -ForegroundColor DarkGray }
-        # diag --enforce 中 enforce=True 抛 RuntimeError 被记为 False → exit 1 = 阻断成功
         Assert-Step ($enforceExit -ne 0) 'enforce-rejects-tamper' "exit=$enforceExit（enforce 必须拒绝）"
     }
-}
-
-# ================ ⑤ 冒烟启动 ================
-Write-Step '⑤ 冒烟启动（自检 + 验签）'
-# 真实便携解释器优先：解包载荷内的 WPy64 运行时 python.exe（真实启动自检）
-$payloadRootPath = Join-Path $installed 'TTSMultiModel-Portable'
-$payloadPy = @(Get-ChildItem -LiteralPath $payloadRootPath -Recurse -File -Filter 'python.exe' -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -match 'WPy64' } | Select-Object -First 1).FullName
-$smokePython = if ($payloadPy) { $payloadPy } else { $PythonExe }
-$smokeOut = & $smokePython (Join-Path $PSScriptRoot 'diag_integrity.py') --app-dir $payloadApp --enforce 2>&1
-$smokeExit = $LASTEXITCODE
-$smokeOut | Select-Object -Last 2 | ForEach-Object { Write-Host "  [smoke] $_" -ForegroundColor DarkGray }
-Assert-Step ($smokeExit -eq 0 -and ($smokeOut -match 'selfcheck=True') -and ($smokeOut -match 'VERIFY=True')) 'smoke' "diag-exit=$smokeExit py=$([System.IO.Path]::GetFileName([System.IO.Path]::GetDirectoryName($smokePython)))"
-if (-not $payloadPy) {
-    Write-Host '  [note] 载荷内未找到便携 python，⑤ 回退仓库 .venv（等价逻辑）；真实构建应有 WPy64 运行时' -ForegroundColor DarkGray
 }
 
 # ---------- 汇总 ----------
