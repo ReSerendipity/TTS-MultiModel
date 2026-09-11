@@ -20,6 +20,11 @@
 * **security:** 重新生成并重签 `app/integrated_app/security/integrity_manifest.json`，使核心模块完整性清单与本批代码变更一致（否则 enforce 模式启动被拒，E2E 红）
 * **ci:** 修复覆盖率预算门禁在 CI 结构性假红——`tests/training/*` 的 `skipif` 依赖 `datasets/einops/argbind/soundfile`（属 `pyproject.toml [training]` extra），而 CI 只装 `-r requirements.txt` → 训练测试整体跳过 → `training/{data,packers,state}.py` 覆盖率 0%，12 个矩阵项全部 `Check coverage budget` 失败；现三个平台的依赖安装步骤补装该 extra
 
+### Bug Fixes
+
+* **launcher:** 便携钉装自洽修复（真实构建暴露）——全新 WinPython 3.12.10.1 上 `pip install -r requirements-small.txt` 报 ResolutionImpossible，9 项版本对齐 .venv 实测（antlr4 4.9.3 / pydantic-core 2.46.4 / mpmath 1.3.0 / tokenizers 0.21.0 + transformers 4.52.1 / huggingface-hub 0.36.2 / protobuf 3.19.6 / fsspec 2026.6.0 / uvicorn 0.52.4），移除已不引用的 tensorboardx 钉版；92 项 dry-run 全解
+* **dist:** 清理 WinPython 自带脚本 shebang 本机路径残留——`Scripts/jp.py` 首行 `#!` 硬编码构建机临时路径，被门禁 ③ no-local-path-residue 拦下；build 脚本离线验证后自动重写为 `#!python.exe`
+
 ### Chore
 
 * **dist:** 便携依赖钉装（`launcher/requirements-small.txt` 93 项 + `torch==2.13.0+cu132` 系列钉版，`sync_requirements.py --check-small` 校验）（P1-1）
