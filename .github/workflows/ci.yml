@@ -112,6 +112,10 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
+          # 训练层测试依赖（= pyproject.toml [training] extra）：缺失时
+          # tests/training/* 因 skipif 整体跳过 → training/{data,packers,state}.py
+          # 覆盖率 0%，覆盖率预算门禁结构性假红（2026-09-11 修复）。
+          pip install datasets einops argbind tensorboard
           pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
 
@@ -121,6 +125,10 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio
           pip install -r requirements.txt
+          # 训练层测试依赖（= pyproject.toml [training] extra）：缺失时
+          # tests/training/* 因 skipif 整体跳过 → training/{data,packers,state}.py
+          # 覆盖率 0%，覆盖率预算门禁结构性假红（2026-09-11 修复）。
+          pip install datasets einops argbind tensorboard
           pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
 
@@ -130,6 +138,10 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
+          # 训练层测试依赖（= pyproject.toml [training] extra）：缺失时
+          # tests/training/* 因 skipif 整体跳过 → training/{data,packers,state}.py
+          # 覆盖率 0%，覆盖率预算门禁结构性假红（2026-09-11 修复）。
+          pip install datasets einops argbind tensorboard
           pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
         shell: pwsh

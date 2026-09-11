@@ -18,6 +18,7 @@
 * **ci:** 修复 `scripts/check_engine_specs.py` 引擎规格三向门禁在 CI 结构性不可通过——权重目录 `/model/` 已列入 `.gitignore`（外部产物、运行时卷挂载），门禁却强制要求其存在；现仓库未附带权重时磁盘存在性降级为 WARN，仅当 `model/` 已存在时才 FAIL（该门禁此前被上一道 config 门禁遮蔽，从未在 CI 跑过）
 * **docker:** 修复 `docker-compose.yml` 中 `deploy.resources.limits.devices` 非法字段（Compose 规范 `limits` 仅接受 `cpus`/`memory`/`pids`，GPU 属 `reservations.devices`），该字段使 Docker Smoke 的 Compose 校验失败
 * **security:** 重新生成并重签 `app/integrated_app/security/integrity_manifest.json`，使核心模块完整性清单与本批代码变更一致（否则 enforce 模式启动被拒，E2E 红）
+* **ci:** 修复覆盖率预算门禁在 CI 结构性假红——`tests/training/*` 的 `skipif` 依赖 `datasets/einops/argbind/soundfile`（属 `pyproject.toml [training]` extra），而 CI 只装 `-r requirements.txt` → 训练测试整体跳过 → `training/{data,packers,state}.py` 覆盖率 0%，12 个矩阵项全部 `Check coverage budget` 失败；现三个平台的依赖安装步骤补装该 extra
 
 ### Chore
 
