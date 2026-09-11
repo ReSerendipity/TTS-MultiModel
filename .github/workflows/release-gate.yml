@@ -3,15 +3,22 @@ name: release-gate
 # 发布门禁五步（任务书阶段四 / 报告2 §4.1）：
 #   ① 构建  ② 拆包验证（清单完整 + 公钥验签） ③ 负向断言（无密钥/私钥/残留）
 #   ④ 篡改模拟（改 1 字节 → 校验失败） ⑤ 冒烟启动（自检 + Ed25519 验签）
-# 实现：scripts/release_gate.ps1（fixture 构建，快）+ scripts/diag_integrity.py
-# CI 只调脚本路径，不内联 python -c（报告2 §七-3）。
+# 实现：scripts/release_gate.ps1 + scripts/diag_integrity.py
 #
-# 触发：workflow_dispatch（手动）/ 推送 tag v*（发布前必经）。
-# 真实权重构建（WinPython + torch wheels + model/ 27GB）不在本工作流：
-# 模型资产不在仓库内、外部源未在报告范围，属「需人工决策」项（见执行对照表）。
+# 两种模式：
+#   fixture（默认，ubuntu/windows-latest）：小样本快速验证脚本逻辑与签名机制，~2min
+#   real（self-hosted）：真实 WinPython + torch wheels + model/ 27GB，需 ≥60GB 磁盘
+#
+# 触发：workflow_dispatch（可选 fixture/real）/ 推送 tag v*（自动 fixture）。
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: '门禁模式'
+        type: choice
+        options: [fixture, real]
+        default: fixture
   push:
     tags:
       - 'v*'
@@ -21,9 +28,9 @@ permissions:
 
 jobs:
   gate:
-    name: Release gate (5 steps)
-    runs-on: windows-latest
-    timeout-minutes: 60
+    name: Release gate (${{ github.event.inputs.mode || 'fixture' }})
+    runs-on: ${{ github.event.inputs.mode == 'real' && 'self-hosted' || 'windows-latest' }}
+    timeout-minutes: ${{ github.event.inputs.mode == 'real' && 90 || 10 }}
     defaults:
       run:
         shell: pwsh
@@ -40,9 +47,24 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install cryptography
 
-      - name: '①-⑤ 发布门禁五步（fixture 构建）'
+      - name: '①-⑤ 发布门禁（fixture 模式）'
+        if: ${{ github.event.inputs.mode != 'real' }}
         run: |
           .\scripts\release_gate.ps1 -PythonExe (Get-Command python).Source
+        shell: pwsh
+
+      - name: '①-⑤ 发布门禁（真实模式，self-hosted）'
+        if: ${{ github.event.inputs.mode == 'real' }}
+        run: |
+          # 真实模式要求 self-hosted runner 上已有：
+          #   model/ 目录（27GB 权重）、dist/real-wheels/（torch cu132 wheels）
+          # 磁盘要求：≥60GB 空闲（分卷 28GB + 解包 30GB 共存）
+          .\scripts\release_gate.ps1 `
+            -PythonExe (Get-Command python).Source `
+            -ModelDir 'D:\model' `
+            -TorchWheelDir 'D:\tts-wheels' `
+            -MaxPartBytes 1992294400 `
+            -Version ${{ github.ref_name }}
         shell: pwsh
 
       - name: '⑤ 补充：diag 对仓库 app 输出（可二分定位）'
