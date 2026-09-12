@@ -46,6 +46,7 @@ import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from typing import Any
 
 from cryptography.fernet import Fernet
@@ -700,6 +701,11 @@ class HistoryDatabase:
             "添加血缘扩展列（engine_version/persona_version/vram_peak_mb）",
             "_migrate_add_lineage_columns",
         ),
+        (
+            "v007_deleted_at",
+            "添加 deleted_at 列（回收站保留时间戳，支持按保留期清理）",
+            "_migrate_add_deleted_at_column",
+        ),
     ]
 
     def _ensure_migrations_table(self) -> None:
@@ -726,6 +732,15 @@ class HistoryDatabase:
         self._migrate_add_column("engine_version", "TEXT DEFAULT ''")
         self._migrate_add_column("persona_version", "TEXT DEFAULT ''")
         self._migrate_add_column("vram_peak_mb", "REAL DEFAULT 0")
+
+    def _migrate_add_deleted_at_column(self) -> None:
+        """软删除回收站：添加 'deleted_at' 列（保留时间戳，支持按保留期清理）。
+
+        deleted_at 为 ISO 字符串（UTC，``datetime('now')`` 格式），NULL 表示
+        未删除 / 已恢复。隐藏（hidden=1）记录若 deleted_at 非空即进入回收站
+        并参与按保留期（默认 30 天）的物理清理。
+        """
+        self._migrate_add_column("deleted_at", "TEXT DEFAULT NULL")
 
     def _run_versioned_migrations(self) -> None:
         """按版本顺序执行未执行的迁移，并记录到 _schema_migrations 表。
@@ -2014,7 +2029,7 @@ class HistoryDatabase:
             placeholders = ",".join("?" * len(chunk))
             with self._transaction() as conn:
                 cursor = conn.execute(
-                    f"UPDATE generation_history SET hidden = 1 WHERE filename IN ({placeholders}) AND hidden = 0",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
+                    f"UPDATE generation_history SET hidden = 1, deleted_at = datetime('now') WHERE filename IN ({placeholders}) AND hidden = 0",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 total += cursor.rowcount
@@ -2041,7 +2056,7 @@ class HistoryDatabase:
             placeholders = ",".join("?" * len(chunk))
             with self._transaction() as conn:
                 cursor = conn.execute(
-                    f"UPDATE generation_history SET hidden = 0 WHERE filename IN ({placeholders}) AND hidden = 1",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
+                    f"UPDATE generation_history SET hidden = 0, deleted_at = NULL WHERE filename IN ({placeholders}) AND hidden = 1",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 total += cursor.rowcount
@@ -2068,7 +2083,7 @@ class HistoryDatabase:
             placeholders = ",".join("?" * len(chunk))
             with self._transaction() as conn:
                 cursor = conn.execute(
-                    f"UPDATE generation_history SET hidden = 1 WHERE id IN ({placeholders}) AND hidden = 0",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
+                    f"UPDATE generation_history SET hidden = 1, deleted_at = datetime('now') WHERE id IN ({placeholders}) AND hidden = 0",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 total += cursor.rowcount
@@ -2095,7 +2110,7 @@ class HistoryDatabase:
             placeholders = ",".join("?" * len(chunk))
             with self._transaction() as conn:
                 cursor = conn.execute(
-                    f"UPDATE generation_history SET hidden = 0 WHERE id IN ({placeholders}) AND hidden = 1",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
+                    f"UPDATE generation_history SET hidden = 0, deleted_at = NULL WHERE id IN ({placeholders}) AND hidden = 1",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
                     chunk,
                 )
                 total += cursor.rowcount
@@ -2111,6 +2126,84 @@ class HistoryDatabase:
             cursor = conn.execute("UPDATE generation_history SET hidden = 0 WHERE hidden = 1")
             return cursor.rowcount
 
+    # ------------------------------------------------------------------
+    # 回收站（软删除保留 / 恢复 / 按期清理）
+    # ------------------------------------------------------------------
+
+    def list_deleted_records(self, limit: int = 50, offset: int = 0) -> tuple[list[dict[str, Any]], int]:
+        """列出回收站中的记录（hidden=1），按删除时间倒序。
+
+        回收站记录即被隐藏的历史记录；deleted_at 为 NULL 的旧记录排在末尾。
+        用于 UI 回收站列表与运维清理核查。
+
+        Returns:
+            (records, total)：记录字典列表与回收站总数。
+        """
+        cursor = self._execute("SELECT COUNT(*) as count FROM generation_history WHERE hidden = 1")
+        total = int(cursor.fetchone()["count"])
+        cursor = self._execute(
+            "SELECT * FROM generation_history WHERE hidden = 1 "
+            "ORDER BY (CASE WHEN deleted_at IS NULL THEN 1 ELSE 0 END), deleted_at DESC "
+            "LIMIT ? OFFSET ?",
+            (limit, offset),
+        )
+        return [dict(row) for row in cursor.fetchall()], total
+
+    def restore_records(self, record_ids: list[int]) -> int:
+        """从回收站恢复记录（清除 hidden 标记与 deleted_at 时间戳）。
+
+        Args:
+            record_ids: 要恢复的记录 ID 列表（自动去重）。
+
+        Returns:
+            int: 实际被恢复的记录行数。
+        """
+        return self.show_multiple_records_by_ids(record_ids)
+
+    def purge_deleted_records(self, keep_days: int = 30) -> tuple[int, list[str]]:
+        """物理清理回收站中保留超过 keep_days 天的记录及其磁盘文件。
+
+        仅清理 hidden=1 且 deleted_at 早于阈值（now - keep_days）的记录；
+        deleted_at 为 NULL 的旧隐藏记录不参与自动清理（无保留期基准）。
+        遵循 H-R4 设计：先收集 filepath，再删文件，最后删 DB 行，保证 DB 为事实源。
+
+        Args:
+            keep_days: 回收站保留天数，超过则物理删除，默认 30。
+
+        Returns:
+            (purged_count, failed_files)：实际删除的记录数与删除失败的磁盘文件路径。
+        """
+        threshold = (datetime.utcnow() - timedelta(days=keep_days)).strftime("%Y-%m-%d %H:%M:%S")
+        cursor = self._execute(
+            "SELECT id, filepath FROM generation_history WHERE hidden = 1 "
+            "AND deleted_at IS NOT NULL AND deleted_at < ?",
+            (threshold,),
+        )
+        rows = cursor.fetchall()
+        if not rows:
+            return (0, [])
+        ids: list[int] = [row["id"] for row in rows]
+        filepaths: list[str] = [row["filepath"] for row in rows if row["filepath"]]
+        failed_files: list[str] = []
+        for fp in filepaths:
+            if fp and os.path.exists(fp):
+                try:
+                    os.remove(fp)
+                except OSError as e:
+                    logger.error("回收站清理删除文件失败 %s: %s", fp, e)
+                    failed_files.append(fp)
+        purged_count = 0
+        for chunk_start in range(0, len(ids), _CHUNK_SIZE):
+            chunk = ids[chunk_start : chunk_start + _CHUNK_SIZE]
+            placeholders = ",".join("?" * len(chunk))
+            with self._transaction() as conn:
+                cursor = conn.execute(
+                    f"DELETE FROM generation_history WHERE id IN ({placeholders})",  # nosec B608: 占位符仅生成 ?，chunk 全部参数绑定
+                    chunk,
+                )
+                purged_count += cursor.rowcount
+        return (purged_count, failed_files)
+
     def clear_all_records(self, hide_only: bool = True) -> int:
         """清空所有历史记录。
 
@@ -2122,7 +2215,9 @@ class HistoryDatabase:
         """
         if hide_only:
             with self._transaction() as conn:
-                cursor = conn.execute("UPDATE generation_history SET hidden = 1 WHERE hidden = 0")
+                cursor = conn.execute(
+                    "UPDATE generation_history SET hidden = 1, deleted_at = datetime('now') WHERE hidden = 0"
+                )
                 return cursor.rowcount
         else:
             with self._transaction() as conn:
