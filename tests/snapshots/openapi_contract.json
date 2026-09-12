@@ -94,6 +94,15 @@
       ]
     }
   },
+  "/api/generate/voicebox/convert": {
+    "POST": {
+      "operationId": "voicebox_convert_endpoint_api_generate_voicebox_convert_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
   "/api/generate/voxcpm_clone": {
     "POST": {
       "operationId": "generate_voxcpm_clone_api_generate_voxcpm_clone_post",

@@ -65,6 +65,21 @@ models:
       supported_features: ["clone", "emotion_control"]
       sample_rate: 22050
       requires_gpu: true
+    voicebox:
+      name: "voicebox"
+      display_name: "Voicebox VC"
+      model_dir: "OpenVoice"
+      vram_gb: 4.0
+      ram_gb: 8.0
+      languages: ["zh", "en", "ja", "ko", "es", "fr", "de"]
+      quality: "high"
+      license: "MIT"
+      supported_features: ["voice_conversion", "zero_shot_clone"]
+      sample_rate: 22050
+      requires_gpu: false
+      # Voicebox 专用配置（基于 OpenVoice ToneColorConverter）
+      base_se_path: "model/OpenVoice/base_se.pth"  # base speaker 嵌入，可选
+      default_tau: 0.3  # 默认音色转换强度 0.0-1.0
 ui:
   theme: dark
   language: zh-CN

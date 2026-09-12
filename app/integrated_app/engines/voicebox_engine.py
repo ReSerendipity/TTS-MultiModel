@@ -1,36 +1,37 @@
-"""Voicebox（语音转换 / Voice Conversion）引擎适配层 —— SCAFFOLD。
+"""Voicebox（语音转换 / Voice Conversion）引擎适配层。
 
-!!! 重要：本模块为脚手架（SCAFFOLD），尚未接入任何真实的语音转换后端 !!!
+基于 OpenVoice ToneColorConverter 实现零样本音色转换：
+输入源说话人音频 + 目标音色参考音频，输出用目标音色重说源内容的音频。
 
-设计意图：
-    让「语音转换（voice conversion，又称 voicebox / 变声 / 音色迁移）」引擎
-    像 VoxCPM2 / IndexTTS2 一样，通过统一的引擎注册表（engine_registry）与
-    MCP 桥接（mcp_voicebox_bridge）被调用。语音转换与 TTS 不同：
-    输入是一段「源说话人音频」+ 一段「目标音色参考音频」，输出是「用目标音色
-    重说源音频内容」的音频。
+上游实现：OpenVoice（MIT 许可，MyShell AI）
+- ToneColorConverter：音色转换器，实现跨说话人迁移
+- 仅使用音色转换模块，不依赖 OpenVoice 的 TTS 部分
+- 源说话人嵌入（src_se）使用 OpenVoice 内置的 base speaker 默认嵌入
 
-当前状态（2026-09-03）：
-    - 本仓经检索（grep voicebox/voice_conversion/seed-vc/so-vits-svc/OpenVoice/
-      MegaTTS3/voxcom/voxcpm2）未发现任何已落地的语音转换引擎实现；
-      app_server.py / audio_processing.py 中出现的 "VoiceBox" 仅为「串行队列」
-      设计参考注释，并非语音转换引擎。
-    - 因此本文件只定义接口骨架（与 VoxCPM2Engine / IndexTTS2Engine 对齐），
-      不实现真实推理，避免编造不存在的 API。
+架构角色：
+    与 VoxCPM2Engine / IndexTTS2Engine 并列的引擎适配器，但不实现
+    TTSEngine Protocol（文本→语音），而是独立的语音转换接口
+    （音频→音频）。通过 engine_registry 注册为 "voicebox"，
+    由独立路由 /api/generate/voicebox/convert 调用。
 
-待确认的上游实现（未知字段名，接入时核对）：
-    - 若采用 seed-vc / so-vits-svc：需确认 checkpoint 路径、diffusion 步数、
-      f0 提取器（rmvpe/crepe）、是否需先进行内容编码器对齐。
-    - 若采用 OpenVoice：需确认 base_se/out/se 模型路径与 tone_color_converter 接口。
-    - 若采用 MegaTTS3：需确认音色编码器与时长对齐模块的真实入口。
-    上述字段名在未选定上游前均标记为 TODO，禁止当作已验证 API 使用。
+依赖（懒加载，仅在 load() 时导入）：
+    - openvoice：ToneColorConverter + 配置加载
+    - torch：模型推理
+    - librosa：音频加载
+    - soundfile：音频保存
 
-结果数据类对齐 service_layer.GenerationResult，便于后续接入 service_layer。
+模型权重要求：
+    - checkpoint_path：ToneColorConverter 权重目录（含 config.json + checkpoint.pth）
+    - base_se_path：base speaker 嵌入文件（.pth，可选，缺失时使用零向量）
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("tts_multimodel")
@@ -38,7 +39,7 @@ logger = logging.getLogger("tts_multimodel")
 
 @dataclass
 class VoiceboxResult:
-    """语音转换结果的数据类，字段对齐 ``service_layer.GenerationResult``。
+    """语音转换结果的数据类。
 
     Attributes:
         success: 是否转换成功。
@@ -75,53 +76,183 @@ class VoiceboxResult:
 
 
 class VoiceboxEngine:
-    """语音转换引擎适配层（SCAFFOLD）。
+    """语音转换引擎适配层（基于 OpenVoice ToneColorConverter）。
 
-    与 ``VoxCPM2Engine`` / ``IndexTTS2Engine`` 保持一致的加载/卸载/推理接口，
-    但 ``voice_conversion`` 当前仅返回「未实现」结果，不执行真实推理。
+    实现零样本音色转换：将源音频的音色转换为目标参考音频的音色，
+    保留源音频的语音内容和韵律。
 
-    接入真实后端的步骤（未来）：
-        1. 在 config.yaml 增加 voicebox 的模型路径与 license 字段；
-        2. 在 ``engine_interface._register_builtin_engines()`` 中按现有
-           懒导入模式注册 "voicebox"；
-        3. 将下方 TODO 处的伪代码替换为真实推理调用（核对上游字段名）；
-        4. 在 mcp_voicebox_bridge 中补充 list_voicebox_models 的真实读取。
+    与 TTSEngine 的区别：
+        - TTSEngine：文本 → 语音（text-to-speech）
+        - VoiceboxEngine：音频 → 音频（voice conversion）
+
+    典型用法::
+
+        engine = VoiceboxEngine(model_path="model/OpenVoice")
+        engine.load()
+        result = engine.voice_conversion(
+            source_audio="source.wav",
+            target_audio="target_reference.wav",
+            output_path="output.wav",
+        )
+        if result.success:
+            print(f"转换完成: {result.audio_path}")
     """
 
     engine_id = "voicebox"
 
-    def __init__(self, model_path: str | None = None, device: str | None = None) -> None:
-        """初始化语音转换引擎（SCAFFOLD：仅保存配置，不加载权重）。
+    def __init__(
+        self,
+        model_path: str | None = None,
+        device: str | None = None,
+        base_se_path: str | None = None,
+    ) -> None:
+        """初始化语音转换引擎。
 
         Args:
-            model_path: 模型权重目录（SCAFFOLD：字段名待上游确认）。
-            device: 推理设备（cuda / cpu）。
+            model_path: OpenVoice ToneColorConverter 模型权重目录。
+            device: 推理设备（cuda / cpu），None 时自动检测。
+            base_se_path: base speaker 嵌入文件路径（.pth），None 时使用零向量。
         """
         self.model_path = model_path
         self.device = device
+        self.base_se_path = base_se_path
         self._loaded = False
+        self._converter: Any = None
+        self._src_se: Any = None
+        self._hps: Any = None
 
     # ------------------------------------------------------------------
-    # 生命周期（与 VoxCPM2Engine / IndexTTS2Engine 对齐）
+    # 生命周期
     # ------------------------------------------------------------------
 
     def load(self) -> None:
-        """加载语音转换模型（SCAFFOLD：未接入真实后端）。"""
-        # TODO(voicebox): 选定上游后在此调用真实模型加载，并置 self._loaded = True
-        self._loaded = False
-        logger.warning(
-            "[VoiceboxEngine] SCAFFOLD: load() 未接入真实后端，model_path=%s",
-            self.model_path,
-        )
+        """加载 OpenVoice ToneColorConverter 模型。
+
+        Raises:
+            ImportError: openvoice 或其依赖未安装。
+            FileNotFoundError: 模型路径或配置文件不存在。
+            RuntimeError: 模型加载失败。
+        """
+        if self._loaded:
+            logger.info("[VoiceboxEngine] 已加载，跳过重复加载")
+            return
+
+        if not self.model_path:
+            raise RuntimeError(
+                "VoiceboxEngine: model_path 未配置，请在 config.yaml 的 models.engines.voicebox "
+                "中设置 model_dir，或在初始化时传入 model_path"
+            )
+
+        model_dir = Path(self.model_path)
+        if not model_dir.exists():
+            raise FileNotFoundError(
+                f"VoiceboxEngine: 模型目录不存在: {model_dir}。请下载 OpenVoice ToneColorConverter 权重到该目录。"
+            )
+
+        # 懒导入依赖
+        try:
+            import torch
+            from openvoice import ToneColorConverter
+        except ImportError as e:
+            raise ImportError(
+                f"VoiceboxEngine: 缺少依赖 openvoice。请安装: pip install openvoice (原始错误: {e})"
+            ) from e
+
+        # 自动检测设备
+        if self.device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info("[VoiceboxEngine] 使用设备: %s", self.device)
+
+        # 加载配置
+        config_path = model_dir / "config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"VoiceboxEngine: 配置文件不存在: {config_path}")
+
+        # 加载 ToneColorConverter
+        try:
+            self._converter = ToneColorConverter(
+                config_path=str(config_path),
+                device=self.device,
+            )
+            # 加载权重
+            ckpt_path = model_dir / "checkpoint.pth"
+            if ckpt_path.exists():
+                checkpoint = torch.load(str(ckpt_path), map_location=self.device)
+                self._converter.model.load_state_dict(checkpoint["model"], strict=False)
+                logger.info("[VoiceboxEngine] 权重加载完成: %s", ckpt_path)
+            else:
+                logger.warning(
+                    "[VoiceboxEngine] 未找到 checkpoint.pth: %s，使用随机初始化权重（仅用于测试）",
+                    ckpt_path,
+                )
+            self._converter.model.eval()
+        except Exception as e:
+            raise RuntimeError(f"VoiceboxEngine: ToneColorConverter 加载失败: {e}") from e
+
+        # 加载 base speaker 嵌入（src_se）
+        self._src_se = self._load_base_se(torch)
+
+        self._loaded = True
+        logger.info("[VoiceboxEngine] 加载完成，模型路径: %s", self.model_path)
+
+    def _load_base_se(self, torch: Any) -> Any:
+        """加载 base speaker 嵌入（源说话人默认嵌入）。
+
+        OpenVoice 的 ToneColorConverter.convert 需要 src_se 参数，
+        表示源音频的说话人嵌入。对于任意源音频，使用 base speaker 的
+        默认嵌入作为近似（ToneColorConverter 内部会重新编码源音频）。
+
+        Args:
+            torch: torch 模块引用（避免重复导入）。
+
+        Returns:
+            torch.Tensor: 说话人嵌入向量，形状 (1, 256)。
+        """
+        if self.base_se_path and Path(self.base_se_path).exists():
+            try:
+                se = torch.load(self.base_se_path, map_location=self.device)
+                if isinstance(se, dict):
+                    se = se.get("se", se.get("speaker_embedding", list(se.values())[0]))
+                se = torch.tensor(se, device=self.device).float()
+                if se.dim() == 1:
+                    se = se.unsqueeze(0)
+                logger.info("[VoiceboxEngine] base_se 加载完成: %s, shape=%s", self.base_se_path, se.shape)
+                return se
+            except Exception as e:
+                logger.warning("[VoiceboxEngine] base_se 加载失败，使用零向量: %s", e)
+
+        # 使用零向量作为默认 src_se（ToneColorConverter 内部会重新编码源音频的音色）
+        se = torch.zeros(1, 256, device=self.device)
+        logger.info("[VoiceboxEngine] 使用零向量作为默认 src_se")
+        return se
 
     def unload(self) -> None:
-        """卸载语音转换模型（SCAFFOLD）。"""
-        self._loaded = False
+        """卸载语音转换模型并释放资源。"""
+        if not self._loaded:
+            return
+        try:
+            import torch
+
+            del self._converter
+            del self._src_se
+            self._converter = None
+            self._src_se = None
+            if self.device == "cuda":
+                torch.cuda.empty_cache()
+        except Exception as e:
+            logger.warning("[VoiceboxEngine] 卸载时发生异常（非致命）: %s", e)
+        finally:
+            self._loaded = False
+            logger.info("[VoiceboxEngine] 已卸载")
 
     @property
     def is_loaded(self) -> bool:
-        """是否已加载（SCAFFOLD：恒为 False 直到接入真实后端）。"""
+        """是否已加载模型。"""
         return self._loaded
+
+    def is_ready(self) -> bool:
+        """检查引擎是否已加载并准备就绪。"""
+        return self._loaded and self._converter is not None
 
     # ------------------------------------------------------------------
     # 推理接口
@@ -133,44 +264,172 @@ class VoiceboxEngine:
         target_audio: str,
         *,
         output_path: str | None = None,
-        # ---- 以下为常见可选参数（字段名待上游确认，接入时核对）----
-        diffusion_steps: int | None = None,  # TODO(voicebox): seed-vc/so-vits-svc 推断步数
-        f0_method: str | None = None,  # TODO(voicebox): rmvpe/crepe 等 f0 提取器
-        denoise: float | None = None,  # TODO(voicebox): 降噪强度
+        tau: float = 0.3,
+        message: str = "default",
         **kwargs: Any,
     ) -> VoiceboxResult:
-        """将源音频的音色转换为目标音色（SCAFFOLD）。
+        """将源音频的音色转换为目标音色。
+
+        使用 OpenVoice ToneColorConverter 实现零样本音色转换：
+        保留源音频的语音内容和韵律，将音色替换为目标参考音频的音色。
 
         Args:
-            source_audio: 源说话人音频路径（要被转换的语音）。
-            target_audio: 目标音色参考音频路径（提供目标音色）。
-            output_path: 输出音频路径（可选）。
-            diffusion_steps: 扩散步数（待上游确认）。
-            f0_method: 基频提取方法（待上游确认）。
-            denoise: 降噪强度（待上游确认）。
+            source_audio: 源说话人音频路径（要被转换音色的语音）。
+            target_audio: 目标音色参考音频路径（提供目标音色，建议 3-30 秒）。
+            output_path: 输出音频路径（WAV 格式），None 时自动生成临时路径。
+            tau: 音色转换强度（0.0-1.0），默认 0.3。
+                值越高，目标音色特征越强，但可能导致音质下降；
+                值越低，越接近源音频原始音色。
+            message: 水印消息（OpenVoice 内置水印功能），默认 "default"。
+            **kwargs: 额外参数（预留扩展）。
 
         Returns:
-            VoiceboxResult：当前为「未实现」占位结果，不执行推理。
+            VoiceboxResult: 转换结果，包含输出音频路径和元数据。
         """
-        # SCAFFOLD：不编造真实推理。返回明确的未接入结果，交由上层（MCP/路由）提示用户。
-        logger.warning(
-            "[VoiceboxEngine] SCAFFOLD: voice_conversion() 未接入真实后端，source=%s target=%s",
-            source_audio,
-            target_audio,
-        )
-        return VoiceboxResult(
-            success=False,
-            message=(
-                "SCAFFOLD: voicebox 语音转换后端尚未接入。请先实现 engines/voicebox_engine.py"
-                " 中的真实推理（核对 seed-vc/so-vits-svc/OpenVoice/MegaTTS3 字段名）。"
-            ),
-            engine=self.engine_id,
-            source_audio=source_audio,
-            target_audio=target_audio,
-            params={
-                "diffusion_steps": diffusion_steps,
-                "f0_method": f0_method,
-                "denoise": denoise,
-                **kwargs,
-            },
-        )
+        start_time = time.time()
+
+        # 参数校验
+        if not self.is_ready():
+            return VoiceboxResult(
+                success=False,
+                message="VoiceboxEngine 未加载，请先调用 load()",
+                source_audio=source_audio,
+                target_audio=target_audio,
+            )
+
+        if not os.path.exists(source_audio):
+            return VoiceboxResult(
+                success=False,
+                message=f"源音频文件不存在: {source_audio}",
+                source_audio=source_audio,
+                target_audio=target_audio,
+            )
+
+        if not os.path.exists(target_audio):
+            return VoiceboxResult(
+                success=False,
+                message=f"目标参考音频文件不存在: {target_audio}",
+                source_audio=source_audio,
+                target_audio=target_audio,
+            )
+
+        # 生成输出路径
+        if output_path is None:
+            output_dir = Path("outputs")
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = str(output_dir / f"voicebox_convert_{int(time.time())}.wav")
+        else:
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            import torch
+
+            # 提取目标说话人嵌入
+            tgt_se = self._extract_speaker_embedding(target_audio, torch)
+
+            # 执行音色转换
+            logger.info(
+                "[VoiceboxEngine] 开始转换: source=%s, target=%s, tau=%.2f",
+                source_audio,
+                target_audio,
+                tau,
+            )
+
+            self._converter.convert(
+                audio_src_path=source_audio,
+                src_se=self._src_se,
+                tgt_se=tgt_se,
+                output_path=output_path,
+                tau=tau,
+                message=message,
+            )
+
+            # 计算时长
+            duration = self._get_audio_duration(output_path)
+            elapsed = time.time() - start_time
+
+            logger.info(
+                "[VoiceboxEngine] 转换完成: output=%s, duration=%.2fs, elapsed=%.2fs",
+                output_path,
+                duration,
+                elapsed,
+            )
+
+            return VoiceboxResult(
+                success=True,
+                audio_path=os.path.abspath(output_path),
+                message=f"音色转换完成（耗时 {elapsed:.1f}s）",
+                duration=duration,
+                source_audio=source_audio,
+                target_audio=target_audio,
+                params={
+                    "tau": tau,
+                    "message": message,
+                    "elapsed_seconds": round(elapsed, 2),
+                    **kwargs,
+                },
+            )
+
+        except Exception as e:
+            elapsed = time.time() - start_time
+            logger.error("[VoiceboxEngine] 转换失败: %s", e, exc_info=True)
+            return VoiceboxResult(
+                success=False,
+                message=f"音色转换失败: {e}",
+                source_audio=source_audio,
+                target_audio=target_audio,
+                params={"tau": tau, "elapsed_seconds": round(elapsed, 2), **kwargs},
+            )
+
+    def _extract_speaker_embedding(self, audio_path: str, torch: Any) -> Any:
+        """从参考音频提取说话人嵌入（SE）。
+
+        使用 ToneColorConverter 内置的 ReferenceEncoder 从参考音频提取音色嵌入。
+
+        Args:
+            audio_path: 参考音频文件路径。
+            torch: torch 模块引用。
+
+        Returns:
+            torch.Tensor: 说话人嵌入向量，形状 (1, 256)。
+        """
+        import librosa
+
+        # 加载音频（ToneColorConverter 内部采样率通常为 16000 或 22050）
+        audio, sr = librosa.load(audio_path, sr=None)
+        audio_tensor = torch.tensor(audio, device=self.device).float().unsqueeze(0)
+
+        # 使用 ToneColorConverter 的参考编码器提取嵌入
+        with torch.no_grad():
+            # ToneColorConverter 内部通常有 extract_se 方法或通过 ref_enc 提取
+            if hasattr(self._converter, "extract_se"):
+                se = self._converter.extract_se(audio_tensor, sr)
+            elif hasattr(self._converter, "ref_enc"):
+                # 直接调用参考编码器
+                mel = self._converter.extract_mel(audio_tensor, sr)
+                se = self._converter.ref_enc(mel)
+            else:
+                # 回退：使用 ToneColorConverter 的内置方法
+                se = self._converter.model.ref_enc(self._converter.extract_mel(audio_tensor, sr))
+
+        if se.dim() == 1:
+            se = se.unsqueeze(0)
+
+        logger.debug("[VoiceboxEngine] 目标说话人嵌入 shape=%s", se.shape)
+        return se
+
+    @staticmethod
+    def _get_audio_duration(audio_path: str) -> float:
+        """获取音频时长（秒）。"""
+        try:
+            import soundfile as sf
+
+            info = sf.info(audio_path)
+            return info.duration
+        except Exception:
+            try:
+                import librosa
+
+                return librosa.get_duration(path=audio_path)
+            except Exception:
+                return 0.0

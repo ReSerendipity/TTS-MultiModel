@@ -20,6 +20,9 @@
     IndexTTS2 引擎（前缀 ``/api/generate/indextts2``）：
         - POST /indextts2              — 情感合成：零样本克隆 + 8 维情感向量 + 时长控制
 
+    Voicebox 引擎（前缀 ``/api/generate/voicebox``）：
+        - POST /voicebox/convert       — 语音转换：源音频音色 → 目标参考音频音色（音频→音频）
+
 **架构说明**：
     本模块作为 generate 子包的路由聚合入口，负责：
     1. 导入 generate/voxcpm2 和 generate/indextts2 两个引擎子模块，触发其路由注册
@@ -52,9 +55,9 @@
 
 import logging
 
-from . import generic, indextts2, voxcpm2  # noqa: F401 — 导入以触发路由注册
+from . import generic, indextts2, voicebox, voxcpm2  # noqa: F401 — 导入以触发路由注册
 from .utils import router
 
 logger = logging.getLogger("tts_multimodel")
 
-__all__ = ["router", "indextts2", "voxcpm2", "generic"]
+__all__ = ["router", "indextts2", "voxcpm2", "generic", "voicebox"]

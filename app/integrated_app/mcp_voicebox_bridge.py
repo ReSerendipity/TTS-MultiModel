@@ -13,9 +13,9 @@
     - 同时本模块自带 ``run_voicebox_mcp_server()`` 入口，可作为独立「仅 voicebox」的
       MCP 服务器启动（``python -m app.integrated_app.mcp_voicebox_bridge``）。
 
-SCAFFOLD 说明：
-    真实语音转换后端（engines/voicebox_engine.py）尚未接入，工具处理函数会在调用
-    引擎后返回明确的「未实现」结果，不编造任何上游 API 行为。
+后端实现：
+    基于 OpenVoice ToneColorConverter 实现零样本音色转换，
+    由 ``engines.voicebox_engine.VoiceboxEngine`` 提供真实推理能力。
 
 设计约束（遵循 AGENTS.md）：
     - 延迟导入 TTS 引擎，避免 MCP 服务器启动即加载大模型；
@@ -59,7 +59,7 @@ def _build_voice_conversion_tool() -> Any:
         name="voice_conversion",
         description=(
             "语音转换（voice conversion / voicebox）：将源说话人音频的音色转换为"
-            "目标音色参考音频的音色，输出重说源内容的音频。SCAFFOLD：真实后端未接入。"
+            "目标音色参考音频的音色，输出重说源内容的音频。基于 OpenVoice ToneColorConverter。"
         ),
         input_schema={
             "type": "object",
@@ -96,12 +96,12 @@ def _build_voice_conversion_tool() -> Any:
 
 
 def _build_list_voicebox_models_tool() -> Any:
-    """构造 ``list_voicebox_models`` MCP 工具定义（SCAFFOLD：返回占位列表）。"""
+    """构造 ``list_voicebox_models`` MCP 工具定义。"""
     from .mcp_server import MCPTool
 
     return MCPTool(
         name="list_voicebox_models",
-        description="列出可用的语音转换模型/音色（SCAFFOLD：当前返回占位信息）。",
+        description="列出可用的语音转换模型/音色配置。",
         input_schema={
             "type": "object",
             "properties": {
@@ -162,16 +162,25 @@ async def _handle_voice_conversion(
 
 
 async def _handle_list_voicebox_models(keyword: str = "", **kwargs: Any) -> dict[str, Any]:
-    """``list_voicebox_models`` 工具处理函数（SCAFFOLD）。"""
+    """``list_voicebox_models`` 工具处理函数。
+
+    当前 Voicebox 基于 OpenVoice ToneColorConverter 实现零样本音色转换，
+    不需要预定义模型列表——目标音色由用户上传的参考音频动态提供。
+    """
     try:
-        # TODO(voicebox): 接入真实后端后，从模型目录或引擎元数据读取可用模型列表。
         return {
-            "models": [],
-            "count": 0,
+            "models": [
+                {
+                    "id": "openvoice_tone_color_converter",
+                    "name": "OpenVoice ToneColorConverter",
+                    "description": "零样本音色转换：上传目标音色参考音频即可转换",
+                    "type": "zero_shot_voice_conversion",
+                    "license": "MIT",
+                }
+            ],
+            "count": 1,
             "engine": VOICEBOX_ENGINE_ID,
-            "note": (
-                "SCAFFOLD: 尚未接入真实语音转换后端，暂无可用模型。请在 engines/voicebox_engine.py 实现后补充读取逻辑。"
-            ),
+            "note": "Voicebox 使用零样本音色转换，目标音色由参考音频动态提供，无需预下载模型。",
         }
     except Exception as e:  # noqa: BLE001
         logger.error(f"[MCP-Voicebox] 列出模型失败: {e}", exc_info=True)

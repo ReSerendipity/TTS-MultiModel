@@ -60,6 +60,7 @@ class EngineFeature(str, Enum):
     PROMPT_CONTINUE = "prompt_continue"
     LORA = "lora"
     BATCH = "batch"
+    VOICE_CONVERSION = "voice_conversion"  # 语音转换（音频→音频，非 TTS）
 
 
 # ---------------------------------------------------------------------------
@@ -446,12 +447,66 @@ INDEXTTTS2_UI_DATA = EngineUIData(
 
 
 # ---------------------------------------------------------------------------
+# Voicebox 语音转换引擎 UI 数据
+# ---------------------------------------------------------------------------
+
+VOICEBOX_UI_DATA = EngineUIData(
+    engine_id="voicebox",
+    name_i18n="engine.voicebox.name",
+    description_i18n="engine.voicebox.description",
+    version="1.0.0",
+    min_vram_gb=2.0,
+    recommended_vram_gb=4.0,
+    features=[
+        EngineFeature.VOICE_CONVERSION,
+    ],
+    tab_order=30,
+    icon="swap_horiz",
+    color="#10b981",
+    sample_rate=22050,
+    params=[
+        ParamDefinition(
+            key="source_audio",
+            label_i18n="param.voicebox.source_audio.label",
+            description_i18n="param.voicebox.source_audio.description",
+            param_type=ParamType.FILE,
+            group=ParamGroup.BASIC,
+            file_types=[".wav", ".mp3", ".flac", ".ogg", ".m4a"],
+            required=True,
+        ),
+        ParamDefinition(
+            key="target_audio",
+            label_i18n="param.voicebox.target_audio.label",
+            description_i18n="param.voicebox.target_audio.description",
+            param_type=ParamType.FILE,
+            group=ParamGroup.REFERENCE,
+            file_types=[".wav", ".mp3", ".flac", ".ogg", ".m4a"],
+            required=True,
+        ),
+        ParamDefinition(
+            key="tau",
+            label_i18n="param.voicebox.tau.label",
+            description_i18n="param.voicebox.tau.description",
+            param_type=ParamType.SLIDER,
+            group=ParamGroup.BASIC,
+            default=0.3,
+            min=0.0,
+            max=1.0,
+            step=0.05,
+            affects_quality=True,
+        ),
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
 # 引擎注册表
 # ---------------------------------------------------------------------------
 
 _ENGINE_UI_REGISTRY: dict[str, EngineUIData] = {
     VOXCPM2_UI_DATA.engine_id: VOXCPM2_UI_DATA,
     INDEXTTTS2_UI_DATA.engine_id: INDEXTTTS2_UI_DATA,
+    VOICEBOX_UI_DATA.engine_id: VOICEBOX_UI_DATA,
 }
 
 
