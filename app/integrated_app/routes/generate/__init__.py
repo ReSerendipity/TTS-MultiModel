@@ -23,6 +23,9 @@
     Voicebox 引擎（前缀 ``/api/generate/voicebox``）：
         - POST /voicebox/convert       — 语音转换：源音频音色 → 目标参考音频音色（音频→音频）
 
+    Step-Audio-EditX 引擎（前缀 ``/api/generate/step-audio-editx``）：
+        - POST /step-audio-editx/edit   — 音频编辑：情绪/风格/副语言/语速编辑（参考音频→编辑后音频）
+
 **架构说明**：
     本模块作为 generate 子包的路由聚合入口，负责：
     1. 导入 generate/voxcpm2 和 generate/indextts2 两个引擎子模块，触发其路由注册
@@ -55,9 +58,9 @@
 
 import logging
 
-from . import generic, indextts2, voicebox, voxcpm2  # noqa: F401 — 导入以触发路由注册
+from . import generic, indextts2, step_audio_editx, voicebox, voxcpm2  # noqa: F401 — 导入以触发路由注册
 from .utils import router
 
 logger = logging.getLogger("tts_multimodel")
 
-__all__ = ["router", "indextts2", "voxcpm2", "generic", "voicebox"]
+__all__ = ["router", "indextts2", "voxcpm2", "generic", "voicebox", "step_audio_editx"]

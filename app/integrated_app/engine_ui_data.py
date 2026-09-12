@@ -61,6 +61,7 @@ class EngineFeature(str, Enum):
     LORA = "lora"
     BATCH = "batch"
     VOICE_CONVERSION = "voice_conversion"  # 语音转换（音频→音频，非 TTS）
+    AUDIO_EDITING = "audio_editing"  # 音频编辑（情绪/风格/副语言/语速）
 
 
 # ---------------------------------------------------------------------------
@@ -500,6 +501,100 @@ VOICEBOX_UI_DATA = EngineUIData(
 
 
 # ---------------------------------------------------------------------------
+# Step-Audio-EditX 音频编辑引擎 UI 数据
+# ---------------------------------------------------------------------------
+
+STEP_AUDIO_EDITX_UI_DATA = EngineUIData(
+    engine_id="step-audio-editx",
+    name_i18n="engine.step_audio_editx.name",
+    description_i18n="engine.step_audio_editx.description",
+    version="1.0.0",
+    min_vram_gb=6.0,
+    recommended_vram_gb=12.0,
+    features=[
+        EngineFeature.AUDIO_EDITING,
+        EngineFeature.EMOTION_CONTROL,
+    ],
+    tab_order=40,
+    icon="tune",
+    color="#f59e0b",
+    sample_rate=22050,
+    params=[
+        ParamDefinition(
+            key="source_audio",
+            label_i18n="param.editx.source_audio.label",
+            description_i18n="param.editx.source_audio.description",
+            param_type=ParamType.FILE,
+            group=ParamGroup.BASIC,
+            file_types=[".wav", ".mp3", ".flac", ".ogg", ".m4a"],
+            required=True,
+        ),
+        ParamDefinition(
+            key="source_text",
+            label_i18n="param.editx.source_text.label",
+            description_i18n="param.editx.source_text.description",
+            param_type=ParamType.TEXTAREA,
+            group=ParamGroup.BASIC,
+            placeholder_i18n="param.editx.source_text.placeholder",
+            required=True,
+        ),
+        ParamDefinition(
+            key="edit_type",
+            label_i18n="param.editx.edit_type.label",
+            description_i18n="param.editx.edit_type.description",
+            param_type=ParamType.SELECT,
+            group=ParamGroup.BASIC,
+            default="emotion",
+            options=[
+                ParamOption("emotion", "param.editx.type.emotion"),
+                ParamOption("style", "param.editx.type.style"),
+                ParamOption("paralinguistic", "param.editx.type.paralinguistic"),
+                ParamOption("speed", "param.editx.type.speed"),
+            ],
+            required=True,
+        ),
+        ParamDefinition(
+            key="edit_info",
+            label_i18n="param.editx.edit_info.label",
+            description_i18n="param.editx.edit_info.description",
+            param_type=ParamType.SELECT,
+            group=ParamGroup.BASIC,
+            default="",
+            options=[
+                ParamOption("", "param.editx.info.none"),
+                # emotion
+                ParamOption("happy", "emotion.happy"),
+                ParamOption("sad", "emotion.sad"),
+                ParamOption("angry", "emotion.angry"),
+                ParamOption("surprised", "emotion.surprised"),
+                ParamOption("fear", "emotion.fear"),
+                ParamOption("excited", "emotion.excited"),
+                ParamOption("gentle", "emotion.gentle"),
+                # style
+                ParamOption("serious", "param.editx.style.serious"),
+                ParamOption("whisper", "param.editx.style.whisper"),
+                ParamOption("child", "param.editx.style.child"),
+                ParamOption("older", "param.editx.style.older"),
+                ParamOption("sweet", "param.editx.style.sweet"),
+                # speed
+                ParamOption("faster", "param.editx.speed.faster"),
+                ParamOption("slower", "param.editx.speed.slower"),
+            ],
+        ),
+        ParamDefinition(
+            key="target_text",
+            label_i18n="param.editx.target_text.label",
+            description_i18n="param.editx.target_text.description",
+            param_type=ParamType.TEXTAREA,
+            group=ParamGroup.ADVANCED,
+            placeholder_i18n="param.editx.target_text.placeholder",
+            default="",
+        ),
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
 # 引擎注册表
 # ---------------------------------------------------------------------------
 
@@ -507,6 +602,7 @@ _ENGINE_UI_REGISTRY: dict[str, EngineUIData] = {
     VOXCPM2_UI_DATA.engine_id: VOXCPM2_UI_DATA,
     INDEXTTTS2_UI_DATA.engine_id: INDEXTTTS2_UI_DATA,
     VOICEBOX_UI_DATA.engine_id: VOICEBOX_UI_DATA,
+    STEP_AUDIO_EDITX_UI_DATA.engine_id: STEP_AUDIO_EDITX_UI_DATA,
 }
 
 

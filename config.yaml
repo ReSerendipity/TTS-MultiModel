@@ -80,6 +80,24 @@ models:
       # Voicebox 专用配置（基于 OpenVoice ToneColorConverter）
       base_se_path: "model/OpenVoice/base_se.pth"  # base speaker 嵌入，可选
       default_tau: 0.3  # 默认音色转换强度 0.0-1.0
+    step-audio-editx:
+      name: "step-audio-editx"
+      display_name: "Step-Audio-EditX"
+      model_dir: "Step-Audio-EditX"
+      vram_gb: 8.0
+      ram_gb: 16.0
+      languages: ["zh", "en", "ja", "ko"]
+      quality: "high"
+      license: "Apache-2.0"
+      supported_features: ["audio_editing", "emotion_control", "style_control", "paralinguistic"]
+      sample_rate: 22050
+      requires_gpu: true
+      # Step-Audio-EditX 专用配置
+      repo_path: "reference_repos/TTS_MultiModel/Step-Audio-EditX"  # 上游仓库路径（用于 Python path）
+      tokenizer_path: ""  # Step-Audio-Tokenizer 目录（空则自动检测同级目录）
+      gpu_memory_utilization: 0.5  # vLLM 显存利用率
+      max_model_len: 3072  # 最大序列长度
+      dtype: "bfloat16"  # 模型数据类型
 ui:
   theme: dark
   language: zh-CN

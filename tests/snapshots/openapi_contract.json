@@ -67,6 +67,15 @@
       ]
     }
   },
+  "/api/generate/step-audio-editx/edit": {
+    "POST": {
+      "operationId": "step_audio_editx_edit_endpoint_api_generate_step_audio_editx_edit_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
   "/api/generate/streaming": {
     "POST": {
       "operationId": "streaming_generation_api_generate_streaming_post",
