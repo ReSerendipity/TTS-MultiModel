@@ -68,6 +68,7 @@ from .data import (
 )
 from .state import TrainingState
 from .tracker import TrainingTracker
+from .trainer import LoRATrainer, TrainResult
 
 __all__ = [
     "Accelerator",
@@ -75,6 +76,8 @@ __all__ = [
     "HFVoxCPMDataset",
     "BatchProcessor",
     "TrainingState",
+    "LoRATrainer",
+    "TrainResult",
     "load_audio_text_datasets",
     "build_dataloader",
 ]
