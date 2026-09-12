@@ -788,6 +788,82 @@ async def show_all_history(request: Request) -> Response:
     return JSONResponse({"status": "ok", "count": count})
 
 
+@router.get("/history/recycle", summary="回收站列表", description="列出回收站中的历史记录（已软删除）")
+async def list_recycle_history(request: Request) -> Response:
+    """列出回收站（被隐藏的历史记录），分页返回，按删除时间倒序。"""
+    try:
+        limit = int(request.query_params.get("limit", "50"))
+        offset = int(request.query_params.get("offset", "0"))
+    except ValueError:
+        return JSONResponse({"status": "error", "message": "limit/offset 必须为整数"}, status_code=400)
+    limit = max(1, min(limit, 500))
+
+    history_manager = get_history_db()
+    try:
+        records, total = history_manager.list_deleted_records(limit=limit, offset=offset)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("回收站列表查询失败: %s", exc, exc_info=True)
+        return JSONResponse({"status": "error", "message": "操作失败，请稍后重试"}, status_code=500)
+    items = [
+        {
+            "id": r.get("id"),
+            "filename": r.get("filename"),
+            "filepath": r.get("filepath"),
+            "created_timestamp": r.get("created_timestamp"),
+            "deleted_at": r.get("deleted_at"),
+        }
+        for r in records
+    ]
+    return JSONResponse({"status": "ok", "items": items, "total": total})
+
+
+@router.post("/history/recycle/restore", summary="回收站恢复", description="从回收站恢复指定历史记录")
+async def restore_recycle_history(request: Request) -> Response:
+    """批量恢复回收站中的记录（清除隐藏标记，重新出现在 UI 列表）。
+
+    Body JSON：``{"ids": [int,...]}``
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "message": "无效的 JSON 请求体"}, status_code=400)
+
+    ids = payload.get("ids", [])
+    valid_ids, err_msg = _validate_ids(ids)
+    if err_msg:
+        return JSONResponse({"status": "error", "message": err_msg}, status_code=400)
+
+    history_manager = get_history_db()
+    try:
+        count = history_manager.restore_records(valid_ids)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("回收站恢复失败: %s", exc, exc_info=True)
+        return JSONResponse({"status": "error", "message": "操作失败，请稍后重试"}, status_code=500)
+    return JSONResponse({"status": "ok", "count": count})
+
+
+@router.delete("/history/recycle/purge", summary="回收站清理", description="物理清理回收站中超过保留期的记录")
+async def purge_recycle_history(request: Request) -> Response:
+    """物理清理回收站中保留超过 keep_days 天的记录及其磁盘文件。
+
+    Query 参数：``keep_days``（默认 30 天）。仅清理有 deleted_at 时间戳且超期的记录。
+    """
+    try:
+        keep_days = int(request.query_params.get("keep_days", "30"))
+    except ValueError:
+        return JSONResponse({"status": "error", "message": "keep_days 必须为整数"}, status_code=400)
+    if keep_days < 0:
+        return JSONResponse({"status": "error", "message": "keep_days 不能为负"}, status_code=400)
+
+    history_manager = get_history_db()
+    try:
+        purged_count, failed_files = history_manager.purge_deleted_records(keep_days=keep_days)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("回收站清理失败: %s", exc, exc_info=True)
+        return JSONResponse({"status": "error", "message": "操作失败，请稍后重试"}, status_code=500)
+    return JSONResponse({"status": "ok", "purged": purged_count, "failed_files": failed_files})
+
+
 @router.post("/history/sync", summary="同步记录", description="触发后台增量同步文件系统与数据库")
 async def sync_history(background_tasks: BackgroundTasks) -> Response:
     """触发后台增量同步历史记录（CSRF 由中间件校验）。

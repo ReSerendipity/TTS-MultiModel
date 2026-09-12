@@ -189,6 +189,30 @@
       ]
     }
   },
+  "/api/history/recycle": {
+    "GET": {
+      "operationId": "list_recycle_history_api_history_recycle_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/history/recycle/purge": {
+    "DELETE": {
+      "operationId": "purge_recycle_history_api_history_recycle_purge_delete",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/history/recycle/restore": {
+    "POST": {
+      "operationId": "restore_recycle_history_api_history_recycle_restore_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
   "/api/history/show": {
     "POST": {
       "operationId": "show_history_records_api_history_show_post",
