@@ -2,6 +2,8 @@
 
 # TTS MultiModel
 
+[![gitleaks](https://img.shields.io/badge/secret%20scan-gitleaks%20passing-0080FF?style=for-the-badge)](https://github.com/ReSerendipity/TTS_MultiModel/actions/workflows/gitleaks.yml)
+
 **多模型语音合成平台 | Multi-Model Text-to-Speech Platform**
 
 基于 VoxCPM2 和 IndexTTS 2.5 的开源语音合成平台，支持声音克隆、声音设计、LoRA 微调与多角色剧本配音

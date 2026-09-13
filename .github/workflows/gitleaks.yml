@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # gitleaks 版本升级维护：只改这一处（与本地 gitleaks --version 保持一致）
+  GITLEAKS_VERSION: '8.30.1'
+
 jobs:
   gitleaks:
     name: Secret Scan (gitleaks, full history)
@@ -23,10 +27,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 直接运行官方 CLI 二进制（无需 GITLEAKS_LICENSE，版本锁定可复现）
+      # 直接运行官方 CLI 二进制（无需 GITLEAKS_LICENSE，版本由 env 集中管理）
       - name: Run gitleaks scan
         run: |
-          GITLEAKS_VERSION="8.30.1"
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
           tar -xzf gitleaks.tar.gz
           chmod +x gitleaks
