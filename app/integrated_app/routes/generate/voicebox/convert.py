@@ -69,19 +69,20 @@ def _get_voicebox_engine(request: Request):
         from ....engines.voicebox_engine import VoiceboxEngine
 
         config = get_config()
-        engines_config = config.get("models", {}).get("engines", {})
-        voicebox_config = engines_config.get("voicebox", {})
+        models_cfg = config.pydantic_config.models
+        voicebox_spec = models_cfg.get_engine_spec("voicebox")
+        model_dir = voicebox_spec.model_dir if voicebox_spec else "OpenVoice"
 
-        # 解析模型路径
-        model_source_mode = config.get("models", {}).get("model_source_mode", "portable")
-        model_dir = voicebox_config.get("model_dir", "OpenVoice")
-        if model_source_mode == "shared":
-            shared_root = config.get("models", {}).get("shared_models_root", "")
-            model_path = os.path.join(shared_root, model_dir) if shared_root else model_dir
+        # 解析模型路径（shared / portable 双模式，对齐 config.py get_pretrained_dir）
+        if models_cfg.model_source_mode == "shared" and models_cfg.shared_models_root:
+            model_path = os.path.join(models_cfg.shared_models_root, model_dir)
+        elif models_cfg.model_source_mode == "shared":
+            # shared 模式但 shared_models_root 为空：与旧 raw-config 缺省一致，回退到相对 model_dir
+            model_path = model_dir
         else:
             model_path = os.path.join("model", model_dir)
 
-        base_se_path = voicebox_config.get("base_se_path", "")
+        base_se_path = voicebox_spec.base_se_path if voicebox_spec else ""
         device = None  # 自动检测
 
         engine = VoiceboxEngine(
@@ -186,8 +187,8 @@ async def voicebox_convert_endpoint(
     <div class="voicebox-result" data-audio-filename="{audio_filename}">
         <div class="result-success">
             <p>✅ 音色转换完成（耗时 {elapsed:.1f}s）</p>
-            <p>源音频: {os.path.basename(source_path)}</p>
-            <p>目标音色: {os.path.basename(target_path)}</p>
+            <p>源音频: {os.path.basename(source_path or "")}</p>
+            <p>目标音色: {os.path.basename(target_path or "")}</p>
             <p>转换强度 (tau): {tau}</p>
             <p>输出时长: {result.duration:.2f}s</p>
         </div>

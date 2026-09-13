@@ -289,6 +289,17 @@ class EngineSpecConfig(BaseModel):
     )
     sample_rate: int = Field(default=24000, description="输出采样率 (Hz)")
     requires_gpu: bool = Field(default=True, description="是否需要 GPU（False 表示 CPU 可用）")
+    # 各引擎可选的本地覆盖参数（按引擎需要选填）。原本散落在 config.yaml
+    # ``models.engines.<name>.*`` 的自由键，旧代码用 ``config.get("models")...get("<name>")``
+    # 字典式读取，迁移到类型化 AppConfig 后被 ``extra="ignore"`` 静默丢弃，路由层也无从强类型读取。
+    # 此处显式建模，使路由层改用 ``get_engine_spec(name).<field>`` 读取，既消除
+    # mypy「AppConfig has no attribute get」报错，又保留原始可配置行为。
+    base_se_path: str = Field(default="", description="Voicebox 引擎 base_se_path（OpenVoice SE 权重路径）覆盖")
+    repo_path: str = Field(default="", description="Step-Audio-EditX 仓库路径覆盖")
+    tokenizer_path: str = Field(default="", description="Step-Audio-EditX tokenizer 路径覆盖")
+    gpu_memory_utilization: float = Field(default=0.5, description="Step-Audio-EditX vLLM GPU 显存利用率")
+    max_model_len: int = Field(default=3072, description="Step-Audio-EditX vLLM 最大上下文长度")
+    dtype: str = Field(default="bfloat16", description="Step-Audio-EditX 推理 dtype")
 
 
 class ModelConfig(BaseModel):

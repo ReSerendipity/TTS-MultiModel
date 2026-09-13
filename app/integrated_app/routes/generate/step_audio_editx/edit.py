@@ -74,23 +74,24 @@ def _get_editx_engine(request: Request):
         from ....engines.step_audio_editx_engine import StepAudioEditXEngine
 
         config = get_config()
-        engines_config = config.get("models", {}).get("engines", {})
-        editx_config = engines_config.get("step-audio-editx", {})
+        models_cfg = config.pydantic_config.models
+        editx_spec = models_cfg.get_engine_spec("step-audio-editx")
+        model_dir = editx_spec.model_dir if editx_spec else "Step-Audio-EditX"
 
-        # 解析模型路径
-        model_source_mode = config.get("models", {}).get("model_source_mode", "portable")
-        model_dir = editx_config.get("model_dir", "Step-Audio-EditX")
-        if model_source_mode == "shared":
-            shared_root = config.get("models", {}).get("shared_models_root", "")
-            model_path = os.path.join(shared_root, model_dir) if shared_root else model_dir
+        # 解析模型路径（shared / portable 双模式，对齐 config.py get_pretrained_dir）
+        if models_cfg.model_source_mode == "shared" and models_cfg.shared_models_root:
+            model_path = os.path.join(models_cfg.shared_models_root, model_dir)
+        elif models_cfg.model_source_mode == "shared":
+            # shared 模式但 shared_models_root 为空：与旧 raw-config 缺省一致，回退到相对 model_dir
+            model_path = model_dir
         else:
             model_path = os.path.join("model", model_dir)
 
-        repo_path = editx_config.get("repo_path", "")
-        tokenizer_path = editx_config.get("tokenizer_path", "")
-        gpu_memory_utilization = float(editx_config.get("gpu_memory_utilization", 0.5))
-        max_model_len = int(editx_config.get("max_model_len", 3072))
-        dtype = editx_config.get("dtype", "bfloat16")
+        repo_path = editx_spec.repo_path if editx_spec else ""
+        tokenizer_path = editx_spec.tokenizer_path if editx_spec else ""
+        gpu_memory_utilization = editx_spec.gpu_memory_utilization if editx_spec else 0.5
+        max_model_len = editx_spec.max_model_len if editx_spec else 3072
+        dtype = editx_spec.dtype if editx_spec else "bfloat16"
 
         engine = StepAudioEditXEngine(
             model_path=model_path,
@@ -198,7 +199,7 @@ async def step_audio_editx_edit_endpoint(
             <p>✅ 音频编辑完成（耗时 {elapsed:.1f}s）</p>
             <p>编辑类型: {edit_type}</p>
             <p>编辑标签: {edit_info or "(无)"}</p>
-            <p>参考音频: {os.path.basename(source_path)}</p>
+            <p>参考音频: {os.path.basename(source_path or "")}</p>
             <p>输出时长: {result.duration:.2f}s</p>
         </div>
         <audio controls preload="metadata">
