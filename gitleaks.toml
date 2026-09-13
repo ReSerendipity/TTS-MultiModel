@@ -1,0 +1,10 @@
+# TTS_MultiModel gitleaks 配置
+# 基于官方默认规则扩展（useDefault = true 保留全部内置检测规则），
+# 追加经人工核验的误报 allowlist 路径，保证 CI 门禁可用且不误伤。
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "经人工核验的统一误报清单（SHA-256 完整性哈希、本地 curl 调试示例）"
+paths = ['''integrity_manifest\.json''', '''IMPROVEMENT_GUIDEBOOK\.md''']

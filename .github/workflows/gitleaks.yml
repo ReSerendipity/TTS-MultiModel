@@ -1,0 +1,42 @@
+name: Secret Scan (gitleaks)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # 每周日 01:00 UTC 全量历史扫描
+    - cron: '0 1 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Secret Scan (gitleaks, full history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 直接运行官方 CLI 二进制（无需 GITLEAKS_LICENSE，版本锁定可复现）
+      - name: Run gitleaks scan
+        run: |
+          GITLEAKS_VERSION="8.30.1"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz
+          chmod +x gitleaks
+          # --redact 保证报告不输出真实密钥；发现泄露时 gitleaks 以非零码退出，流程失败即门禁
+          ./gitleaks detect --source . --redact --config gitleaks.toml \
+            --report-format json --report-path gitleaks-report.json
+
+      - name: Upload gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
