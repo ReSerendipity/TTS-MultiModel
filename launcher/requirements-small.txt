@@ -90,7 +90,7 @@ starlette==1.6.0
 sympy==1.14.0
 threadpoolctl==3.6.0
 tiktoken==0.14.0
-tokenizers==0.21.0
+tokenizers==0.23.2
 torch-complex==0.4.4
 tqdm==4.70.0
 transformers==5.10.1
