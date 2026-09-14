@@ -877,5 +877,8 @@
   "will_split": "将分为 ",
   "youth_voice": "活力少年",
   "consent_declare": "我已确认拥有该参考声音的使用权或已获得其授权",
-  "consent_required": "请先勾选「我已确认拥有该参考声音的使用权或已获得其授权」后再使用该参考音频"
+  "consent_required": "请先勾选「我已确认拥有该参考声音的使用权或已获得其授权」后再使用该参考音频",
+  "consent_why": "用于声音克隆的参考音频须为本人声音或已获版权方授权，否则后端将拒绝生成。",
+  "voice_creating": "创建中…",
+  "voice_create_success": "音色创建成功！"
 }

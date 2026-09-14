@@ -81,7 +81,7 @@
                             <div class="fg">
                                 <label class="fl" for="vd-persona-name">{{ "select_voice"|t(lang) }}</label>
                                 <div style="display:flex;gap:8px;align-items:center">
-                                    <select name="persona_name" id="vd-persona-name" class="fs" style="flex:1">
+                                    <select name="persona_name" id="vd-persona-name" class="fs" style="flex:1" :disabled="vdTab !== 'saved'">
                                         {% if not persona_list %}
                                         <option value="" disabled selected>{{ "no_saved_voice"|t(lang) }}</option>
                                         {% endif %}
@@ -297,7 +297,21 @@
         counterId: 'vd-char-counter',
         maxChars: {{ engine_max_total_chars }},
         segmentMaxChars: {{ gen_split_max_chars }},
-        counterClass: 'tts-char-counter'
+        counterClass: 'tts-char-counter',
+        // 描述创建模式下要求有 instruction 或选中至少一个音色标签，
+        // 否则后端会返回"音色描述不能为空"400，前端提前拦截更友好。
+        extraCheck: function() {
+            var personaSelect = document.getElementById('vd-persona-name');
+            // 在"已保存音色"tab时persona下拉可见，由通用的voiceSelector检查覆盖
+            if (personaSelect && personaSelect.offsetParent !== null) return '';
+            var instruction = document.getElementById('vd-instruction');
+            var hasInstruction = instruction && instruction.value.trim();
+            var hasTag = document.querySelector('.voice-tag.active, .tag-btn.active');
+            if (!hasInstruction && !hasTag) {
+                return (window.I18N && window.I18N['enter_voice_desc']) || '请输入音色描述或选择一个音色标签';
+            }
+            return '';
+        }
     });
 
     // Check for duplicate persona name before saving
@@ -335,9 +349,14 @@
 
     window.fillVdInstruct = function(el) {
         var input = document.getElementById('vd-instruction');
-        if (input) { input.value = el.textContent; input.focus(); }
-        document.querySelectorAll('#vd-tab-create .tag').forEach(function(t){ t.classList.remove('active'); });
+        if (input) { input.value = el.textContent; input.focus(); input.dispatchEvent(new Event('input', {bubbles: true})); }
+        // U11: 单选音色标签，切换 .active 高亮态并同步 aria-pressed 可访问性
+        document.querySelectorAll('#vd-tab-create .tag').forEach(function(t){
+            t.classList.remove('active');
+            t.setAttribute('aria-pressed', 'false');
+        });
         el.classList.add('active');
+        el.setAttribute('aria-pressed', 'true');
         var countHint = document.getElementById('vd-tag-count');
         if (countHint) {
             countHint.style.display = '';
@@ -457,6 +476,66 @@
                         btnText.textContent = prevText;
                     }, 2000);
                 }
+            }
+        });
+    }
+
+    function initVdSaveVoiceFeedback() {
+        // U3: "保存音色/创建音色"按钮完整交互反馈
+        // 此前点击后零反馈（无 loading / 无成功提示 / 音色列表不刷新）
+        var form = document.getElementById('vd-form');
+        if (!form) return;
+        var saveBtn = form.querySelector('button[hx-post="/api/persona/save"]');
+        if (!saveBtn) return;
+        var originalHtml = saveBtn.innerHTML;
+        var busyText = '{{ "voice_creating"|t(lang, default="创建中…") }}';
+
+        form.addEventListener('htmx:beforeRequest', function(e) {
+            var path = e.detail && e.detail.pathInfo ? e.detail.pathInfo.requestPath : '';
+            if (!path || path.indexOf('/api/persona/save') === -1) return;
+            saveBtn.disabled = true;
+            saveBtn.classList.add('btn-loading');
+            saveBtn.innerHTML = '<span class="btn-text" style="opacity:.8">' + busyText + '</span>';
+        });
+
+        document.addEventListener('htmx:afterRequest', function(e) {
+            var detail = e.detail;
+            if (!detail || !detail.pathInfo) return;
+            var path = detail.pathInfo.requestPath || '';
+            if (path.indexOf('/api/persona/save') === -1) return;
+            // 恢复按钮态（无论成败）
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('btn-loading');
+            saveBtn.innerHTML = originalHtml;
+
+            var xhr = detail.xhr;
+            var needConfirm = xhr && xhr.getResponseHeader && xhr.getResponseHeader('X-Persona-Confirm') === '1';
+            // 重名覆盖确认分支由 app_init.js 处理（翻 overwrite 字段，等用户再点一次），这里不弹成功
+            if (needConfirm) return;
+
+            if (detail.successful) {
+                if (window.Toast) Toast.show('{{ "voice_create_success"|t(lang, default="音色创建成功！") }}', 'success');
+                // 刷新"已保存音色"下拉框，让新音色立即可选
+                fetch('/api/persona/list', { headers: { 'Accept': 'text/html' } })
+                    .then(function(r){ return r.text(); })
+                    .then(function(html){
+                        var sel = document.getElementById('vd-persona-name');
+                        if (sel && html) {
+                            sel.innerHTML = html;
+                            // 选中刚创建的同名音色
+                            var saveInput = document.getElementById('vd-save-name');
+                            if (saveInput && saveInput.value) sel.value = saveInput.value;
+                        }
+                    }).catch(function(){ /* 列表刷新失败不影响主流程 */ });
+            } else if (xhr) {
+                var errMsg = 'HTTP ' + xhr.status;
+                try {
+                    var tmp = document.createElement('div');
+                    tmp.innerHTML = xhr.responseText || '';
+                    var htmlErr = tmp.querySelector('.error-message, .status-message.error');
+                    if (htmlErr && htmlErr.textContent.trim()) errMsg = htmlErr.textContent.trim();
+                } catch(e) {}
+                if (window.Toast) Toast.show(errMsg, 'error');
             }
         });
     }
@@ -852,6 +931,7 @@
     }
 
     initVdGenerateBtn();
+    initVdSaveVoiceFeedback();
     initVdAdvancedState();
     initVdSSEProgress();
     }

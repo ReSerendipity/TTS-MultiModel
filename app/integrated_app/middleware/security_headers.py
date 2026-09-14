@@ -25,10 +25,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
 
-# 默认 CSP（保留 unsafe-inline 以兼容现有前端内联事件与内联样式）
+# 默认 CSP（保留 unsafe-inline 以兼容现有前端内联事件与内联样式；
+# 保留 unsafe-eval 因为 Alpine.js v3 用 new Function() 求值 x-data/@click/:class 表达式，
+# 缺少 unsafe-eval 会导致所有 Alpine 交互静默失效（子标签切换、x-show 等全部不工作））
 _DEFAULT_CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline'; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data: blob:; "
     "connect-src 'self'; "

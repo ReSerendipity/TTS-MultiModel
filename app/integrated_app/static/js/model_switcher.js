@@ -95,6 +95,24 @@ window._setModelTabsDisabled = function(disabled) {
     });
 };
 
+// U4: 某引擎已加载后，给其它（非激活）模型 tab 一个悬浮说明。
+// 用 CSS 自定义 tooltip（data-inactive-tip + .model-tab-inactive），不占用 title，
+// 避免与上面 _setModelTabsDisabled 的 title 管理互相覆盖。
+window._applyInactiveTabTip = function(activeModel) {
+    var tipText = (window.I18N && window.I18N['switch_engine_hint']) ||
+        '当前已加载其它引擎，点击可切换（将自动卸载并重新加载）';
+    document.querySelectorAll('.model-tab').forEach(function(tab) {
+        var isActive = tab.dataset.model === activeModel;
+        var showInactive = !!activeModel && !isActive;
+        tab.classList.toggle('model-tab-inactive', showInactive);
+        if (showInactive) {
+            tab.setAttribute('data-inactive-tip', tipText);
+        } else {
+            tab.removeAttribute('data-inactive-tip');
+        }
+    });
+};
+
 // @deprecated 使用 TTSApp.model.switch 替代，此 window 挂载点将在未来版本移除
 window.switchModel = function(modelName) {
     if (window._modelSwitching) return;
@@ -272,12 +290,16 @@ window.updateEngineStatus = function(status, modelName, extra) {
         statusText.classList.add('status-weight-bold');
         if (statusIcon) { statusIcon.classList.add('status-icon-hidden'); statusIcon.innerHTML = ''; }
         announceText = (window.I18N && window.I18N['model_none']) || 'None';
+        // 无引擎时清除 U4 非激活说明
+        if (typeof window._applyInactiveTabTip === 'function') window._applyInactiveTabTip(null);
     } else if (status === 'loading') {
         statusEl.classList.add('loading');
         statusText.textContent = extra || (window.I18N && window.I18N["loading"]) || 'Loading...';
         statusText.classList.remove('status-weight-bold');
         if (statusIcon) { statusIcon.classList.remove('status-icon-hidden'); statusIcon.innerHTML = iconLoading; }
         announceText = extra || (window.I18N && window.I18N["loading"]) || 'Loading...';
+        // 加载进行中：清除稳态非激活说明（由 _setModelTabsDisabled 接管 loading 提示）
+        if (typeof window._applyInactiveTabTip === 'function') window._applyInactiveTabTip(null);
     } else if (status === 'loaded') {
         statusEl.classList.add('loaded');
         statusText.textContent = modelName + ' | ' + ((window.I18N && window.I18N["ready"]) || 'Ready');
@@ -287,6 +309,8 @@ window.updateEngineStatus = function(status, modelName, extra) {
         // Re-enable model tabs after loading completes
         window._modelSwitching = false;
         window._setModelTabsDisabled(false);
+        // U4: 给其它非激活模型 tab 加悬浮说明
+        if (typeof window._applyInactiveTabTip === 'function') window._applyInactiveTabTip(modelName);
         // Remove engine switch progress bar immediately
         _removeSwitchBar();
     } else if (status === 'error') {
@@ -315,6 +339,10 @@ window.updateEngineStatus = function(status, modelName, extra) {
 // Sync generate buttons enabled/disabled state with model status
 function _syncGenerateButtonsState(status) {
     var buttons = document.querySelectorAll('.btn-generate, .generate-btn');
+    // status='none' 表示 DOM 推断不到明确状态（#engine-status 无 loaded/loading/error class），
+    // 此时不做任何变更——避免首屏渲染瞬态把按钮永久 disabled。
+    // 真实状态由 _syncInitialState 的 API fetch 覆盖。
+    if (status === 'none') return;
     var isReady = (status === 'loaded') && !window._isGenerating;
     var isGenerating = window._isGenerating;
     var hintKey = 'model_not_loaded_hint';
@@ -578,5 +606,127 @@ window.ModelSwitcher = {
             setTimeout(tryClean, 5000);
             setTimeout(tryClean, 10000);
         })();
+    }
+})();
+
+/* ===== U2: 模型加载 / 引擎切换全屏遮罩控制器 =====
+ * 订阅 SSE model_load 与 engine_switch（payload 同形：
+ * {active, step, status, error, engine}）。SSE 循环会按当前状态周期性重发，
+ * 故按 status 驱动：in_progress 显示并刷新阶段；completed 短暂停留后收起；
+ * failed 显示错误并延时收起；idle/active=false 收起。
+ * 注意：model_switcher.js 先于 sse_manager.js 加载，需轮询等待 SSEManager 就绪。 */
+(function ModelLoadingOverlayController() {
+    'use strict';
+
+    var _overlay = null;
+    var _engineEl = null;
+    var _stepEl = null;
+    var _hideTimer = null;
+    var _shown = false;
+
+    function _ensureRefs() {
+        if (_overlay) return true;
+        _overlay = document.getElementById('ml-loading-overlay');
+        if (!_overlay) return false;
+        _engineEl = document.getElementById('ml-loading-engine');
+        _stepEl = document.getElementById('ml-loading-step');
+        return true;
+    }
+
+    var _ENGINE_NAMES = {
+        voxcpm2: 'VoxCPM2',
+        indextts2: 'IndexTTS 2.5',
+        indextts20: 'IndexTTS 2.0'
+    };
+    function _engineName(e) { return _ENGINE_NAMES[e] || e || ''; }
+
+    function _show(engine, step, isError) {
+        if (!_ensureRefs()) return;
+        if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null; }
+        _overlay.hidden = false;
+        void _overlay.offsetWidth; // 强制 reflow，确保过渡动画生效
+        _overlay.classList.add('active');
+        _overlay.classList.toggle('is-error', !!isError);
+        if (_engineEl) _engineEl.textContent = _engineName(engine) + ' 模型';
+        if (_stepEl) _stepEl.textContent = step || '正在加载...';
+        _shown = true;
+    }
+
+    function _hide(delayMs) {
+        if (!_ensureRefs()) return;
+        var doHide = function() {
+            if (!_overlay) return;
+            _overlay.classList.remove('active');
+            _overlay.classList.remove('is-error');
+            var ov = _overlay;
+            setTimeout(function() { ov.hidden = true; }, 260);
+            _hideTimer = null;
+            _shown = false;
+        };
+        if (delayMs && delayMs > 0) {
+            if (_hideTimer) clearTimeout(_hideTimer);
+            _hideTimer = setTimeout(doHide, delayMs);
+        } else {
+            if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null; }
+            doHide();
+        }
+    }
+
+    function _onModelLoadEvent(data) {
+        if (!data || typeof data !== 'object') return;
+        if (data.status === 'in_progress' && data.active !== false) {
+            _show(data.engine, data.step || '正在加载...', false);
+        } else if (data.status === 'completed') {
+            // 完成：短暂停留"完成"再收起 500ms
+            _show(data.engine, (window.I18N && window.I18N['ready']) || '加载完成', false);
+            _hide(500);
+        } else if (data.status === 'failed') {
+            _show(data.engine,
+                (data.error || (window.I18N && window.I18N['error']) || '加载失败'),
+                true);
+            _hide(1800);
+        } else {
+            // idle / active=false：无进行中加载才立即收起；
+            // 若 completed/failed 已排好延时收起，则不打断它
+            if (_shown && !_hideTimer) _hide(0);
+        }
+    }
+
+    function _bind() {
+        if (window.SSEManager && typeof window.SSEManager.on === 'function') {
+            window.SSEManager.on('model_load', _onModelLoadEvent);
+            window.SSEManager.on('engine_switch', _onModelLoadEvent);
+            return true;
+        }
+        return false;
+    }
+
+    // 初始化时通过 API 获取真实模型状态，避免 #engine-status 类名未就绪时
+    // 默认 'none' 导致所有生成按钮永久 disabled。
+    function _syncInitialState() {
+        window._syncGenerateButtons();
+        fetch('/api/model/status', {credentials: 'same-origin'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var status = data.loaded ? 'loaded' : (data.model_status || 'idle');
+                _syncGenerateButtonsState(status);
+            })
+            .catch(function() { /* API 不可达时保留 DOM 推断结果 */ });
+    }
+
+    function _waitAndBind() {
+        if (_bind()) { _syncInitialState(); return; }
+        var tries = 0;
+        var timer = setInterval(function() {
+            tries++;
+            if (_bind()) { clearInterval(timer); _syncInitialState(); }
+            else if (tries > 50) clearInterval(timer);
+        }, 100);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _waitAndBind);
+    } else {
+        _waitAndBind();
     }
 })();

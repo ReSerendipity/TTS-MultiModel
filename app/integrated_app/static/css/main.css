@@ -3586,7 +3586,11 @@ body {
    all of which must be explicitly overridden to avoid cascade leaks. */
 .sidebar {
     position: relative !important;
-    z-index: 20 !important;
+    /* B5 修复：桌面端侧边栏原为 z-index:20，低于 sticky 顶栏(50)，展开时底部
+       设置/页脚按钮被顶栏或其下固定层遮挡。提到 60：高于顶栏(50)，仍远低于
+       移动端侧边栏(1000)、遮罩(999)、模态框(9999)与加载遮罩(2000)。
+       顶栏折叠按钮(.sidebar-toggle-desktop)自带 z-index:100，保持可点击。 */
+    z-index: 60 !important;
     top: auto !important;
     left: auto !important;
     bottom: auto !important;
@@ -4242,4 +4246,143 @@ textarea {
     input, select, textarea {
         border-width: 2px;
     }
+}
+
+/* ============================================================
+ * UI 提升：U2 模型加载遮罩 / U4 禁用模型 tab tooltip / U5 队列横幅
+ * （纯新增类名，前缀 ml-/qwb-/model-tab-inactive，不与现有冲突）
+ * ============================================================ */
+
+/* ---- U2: 模型加载 / 引擎切换遮罩 ---- */
+.ml-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000; /* 侧边栏60 < 遮罩2000 < 健康面板9999 < Toast10001 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--overlay-bg, rgba(15, 18, 24, 0.55));
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+.ml-loading-overlay.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+.ml-loading-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    min-width: 280px;
+    max-width: 90vw;
+    padding: 32px 40px;
+    border-radius: 16px;
+    background: var(--bg-secondary, #fff);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    text-align: center;
+}
+.ml-loading-spinner {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 4px solid var(--bg-tertiary, rgba(0, 0, 0, 0.08));
+    border-top-color: var(--accent-primary, #5e7d5a);
+    animation: ml-spin 0.9s linear infinite;
+}
+.ml-loading-overlay.is-error .ml-loading-spinner {
+    border-top-color: var(--accent-error, #dc2626);
+    animation-play-state: paused;
+}
+@keyframes ml-spin {
+    to { transform: rotate(360deg); }
+}
+.ml-loading-engine {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary, #222);
+}
+.ml-loading-step {
+    font-size: 13px;
+    color: var(--text-secondary, #666);
+    line-height: 1.5;
+    max-width: 320px;
+    word-break: break-word;
+}
+.ml-loading-overlay.is-error .ml-loading-step {
+    color: var(--accent-error, #dc2626);
+}
+
+/* ---- U4: 非激活模型 tab 的悬浮说明（CSS tooltip，不占用 title，避免与加载态冲突） ---- */
+.model-tab.model-tab-inactive {
+    position: relative;
+    opacity: 0.6;
+}
+.model-tab.model-tab-inactive::after {
+    content: attr(data-inactive-tip);
+    position: absolute;
+    /* 模型 tab 位于顶部栏（贴近视口顶部），tooltip 向下弹出避免被视口上边缘裁切 */
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-2px);
+    min-width: 160px;
+    max-width: 260px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--bg-elevated, #222);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.45;
+    white-space: normal;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 60;
+}
+.model-tab.model-tab-inactive:hover::after,
+.model-tab.model-tab-inactive:focus::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ---- U5: 队列等待横幅 ---- */
+.queue-wait-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 18px;
+    background: linear-gradient(90deg, #fff7ed, #ffedd5);
+    border-bottom: 1px solid #fed7aa;
+    color: #9a3412;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+html.dark .queue-wait-banner,
+[data-theme="dark"] .queue-wait-banner {
+    background: linear-gradient(90deg, rgba(146, 64, 14, 0.25), rgba(154, 52, 18, 0.18));
+    border-bottom-color: rgba(234, 88, 12, 0.4);
+    color: #fdba74;
+}
+.queue-wait-banner[hidden] {
+    display: none;
+}
+.queue-wait-icon {
+    flex-shrink: 0;
+    animation: qwb-pulse 1.6s ease-in-out infinite;
+}
+@keyframes qwb-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+.queue-wait-text {
+    flex: 1;
 }

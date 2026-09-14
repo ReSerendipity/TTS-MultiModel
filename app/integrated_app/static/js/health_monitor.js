@@ -282,3 +282,66 @@ window.HealthMonitor = {
     initMini: window.initMiniMonitor
 };
 })();
+
+/* ===== U5: 队列等待醒目横幅（SSE time_estimate 驱动） =====
+ * 后端 sse.py：当 queue_depth>0（有任务排队）时推送 time_estimate.status='generating'，
+ * 并带 text/remaining；队列清空时推 'idle'/'complete'。横幅显示在主区域顶部，
+ * 黄色醒目，队列清空后自动隐藏。health_monitor.js 先于 sse_manager.js 加载，
+ * 故轮询等待 SSEManager 就绪后再订阅。 */
+(function QueueWaitBannerController() {
+    'use strict';
+
+    var _banner = null;
+    var _textEl = null;
+
+    function _ensureRefs() {
+        if (_banner) return true;
+        _banner = document.getElementById('queue-wait-banner');
+        if (!_banner) return false;
+        _textEl = document.getElementById('queue-wait-text');
+        return true;
+    }
+
+    function _show(text) {
+        if (!_ensureRefs()) return;
+        _banner.hidden = false;
+        if (_textEl) _textEl.textContent = text || '当前有任务排队中…';
+    }
+
+    function _hide() {
+        if (!_ensureRefs()) return;
+        _banner.hidden = true;
+    }
+
+    function _onTimeEstimate(data) {
+        if (!data || typeof data !== 'object') return;
+        if (data.status === 'generating') {
+            _show(data.text || '当前有任务排队中…');
+        } else if (data.status === 'idle' || data.status === 'complete') {
+            _hide();
+        }
+    }
+
+    function _bind() {
+        if (window.SSEManager && typeof window.SSEManager.on === 'function') {
+            window.SSEManager.on('time_estimate', _onTimeEstimate);
+            return true;
+        }
+        return false;
+    }
+
+    function _waitAndBind() {
+        if (_bind()) return;
+        var tries = 0;
+        var timer = setInterval(function() {
+            tries++;
+            if (_bind() || tries > 50) clearInterval(timer);
+        }, 100);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _waitAndBind);
+    } else {
+        _waitAndBind();
+    }
+})();

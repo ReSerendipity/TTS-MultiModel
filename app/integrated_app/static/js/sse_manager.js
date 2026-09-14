@@ -142,7 +142,7 @@ window.SSEManager = (function () {
         try { data = JSON.parse(e.data); } catch (_) { /* 纯文本事件（如 complete:"done"）保留原样 */ }
         _state[type] = { data: data, ts: Date.now() };
         _dispatchDOM('tts-sse', { type: type, data: data });
-        var hs = _handlersFor(type);
+        var hs = _handlers[type] || [];
         for (var i = 0; i < hs.length; i++) {
             try { hs[i](data, e); } catch (err) { console.error('[SSEManager] handler error (' + type + '):', err); }
         }

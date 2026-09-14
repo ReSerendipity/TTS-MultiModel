@@ -287,6 +287,12 @@
                 </div>
             </div>
 
+            <!-- U5: 队列等待醒目横幅（SSE time_estimate 驱动，有排队时显示） -->
+            <div class="queue-wait-banner" id="queue-wait-banner" role="status" aria-live="polite" hidden>
+                <svg class="queue-wait-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="queue-wait-text" id="queue-wait-text">队列等待中…</span>
+            </div>
+
             <div class="main-content-inner">
                 <!-- Global tab-loading indicator -->
                 <div id="tab-loading" class="htmx-indicator tts-tab-loading" aria-live="polite" aria-busy="true">
@@ -352,6 +358,16 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- U2: 模型加载/切换全屏遮罩（SSE model_load / engine_switch 驱动）。
+         z-index 2000：高于侧边栏(60)/顶栏(50)，低于模态框(9999)/Toast(10001)。 -->
+    <div class="ml-loading-overlay" id="ml-loading-overlay" role="status" aria-live="assertive" aria-busy="true" hidden>
+        <div class="ml-loading-card">
+            <div class="ml-loading-spinner" aria-hidden="true"></div>
+            <div class="ml-loading-engine" id="ml-loading-engine">加载模型</div>
+            <div class="ml-loading-step" id="ml-loading-step">正在初始化...</div>
+        </div>
     </div>
 
     <!-- Shortcut Help Panel -->

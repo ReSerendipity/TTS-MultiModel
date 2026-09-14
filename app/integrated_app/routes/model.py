@@ -125,10 +125,17 @@ def _safe_error_message(exc: Exception, max_length: int = _ERROR_MESSAGE_MAX_LEN
 
 
 def _get_vram_used_mb() -> int:
-    """获取当前进程已占用的 GPU 显存（MB）。失败时返回 0。"""
+    """获取当前进程已占用的 GPU 显存（MB）。失败时返回 0。
+
+    B8 修复：``GPUMemoryMonitor.get_vram_info()`` 返回的字典键是
+    ``{"total", "used", "free"}``（单位均为 **bytes**），并不存在
+    ``allocated_mb`` 键——此前 ``info.get("allocated_mb", 0)`` 永远命中默认值 0，
+    导致 ``/api/model/status`` 的 ``vram_used_mb`` 恒为 0。
+    现改为读取 ``used`` 并按 1024*1024 换算为整数 MB。
+    """
     try:
         info = GPUMemoryMonitor.get_vram_info()
-        return int(info.get("allocated_mb", 0))
+        return int(info.get("used", 0)) // (1024 * 1024)
     except Exception as exc:  # noqa: BLE001
         logger.debug("获取显存占用失败: %s", exc)
         return 0

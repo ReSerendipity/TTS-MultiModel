@@ -251,3 +251,34 @@ if (typeof window.showToast !== 'function') {
         console.log('[TOAST '+(type||'info').toUpperCase()+']', msg);
     };
 }
+
+/* ============================================================================
+   U8: 生成成功 Toast 反馈
+   各生成页（htmx 非流式）成功后只在结果区渲染内嵌播放器/成功徽标，
+   没有统一的"成功"Toast。这里监听 htmx:afterSettle：当被替换的结果容器
+   里出现 <audio> 元素即视为生成成功，弹一次成功 Toast。
+   流式生成（submitStreaming）自行渲染并已弹 toast，不走 htmx 交换，故不重复。
+   用时间戳去重，避免分段/连续交换刷屏。
+   ========================================================================== */
+(function uxGenSuccessToast() {
+    'use strict';
+    var lastToastAt = 0;
+    var GAP = 2500;
+    document.addEventListener('htmx:afterSettle', function(e) {
+        try {
+            if (!e.detail || !e.detail.successful) return;
+            var target = e.detail.target;
+            if (!target || !target.querySelector) return;
+            // 只关心结果容器（id 以 -result 结尾），且确实换入了音频
+            if (!/-result$/i.test(target.id || '')) return;
+            if (!target.querySelector('audio, [data-audio-filename]')) return;
+            var now = Date.now();
+            if (now - lastToastAt < GAP) return;
+            lastToastAt = now;
+            var msg = (window.I18N && window.I18N['gen_success']) || '语音生成成功！';
+            if (window.Toast) Toast.show(msg, 'success');
+        } catch (err) {
+            /* 不影响主流程 */
+        }
+    });
+})();

@@ -598,15 +598,25 @@ async def streaming_generation(
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
 
     def _run():
-        """在线程池中执行流式生成"""
+        """在线程池中执行流式生成。
+
+        B2 修复：``engine.generate_streaming`` 返回的是**惰性 Generator**。
+        若直接 ``return`` 该 Generator，``loop.run_in_executor`` 只会把 Generator
+        对象传回事件循环而**从不消费它**——下游 ``isinstance(result, list)`` 恒为
+        False，``merged`` 被赋成 Generator 后传入 ``_save_wav_compatible`` 失败，
+        整条请求退化成 400「生成失败」。必须在此工作线程内用 ``list()`` 彻底消费
+        Generator（逐段产出 numpy 数组），主线程再 ``np.concatenate`` 拼接存盘。
+        """
         engine = registry.get_current_engine()
-        return engine.generate_streaming(
-            text,
-            actual_ref_path,
-            cfg_value=cfg_value,
-            inference_timesteps=inference_timesteps,
-            denoise=stream_denoise,
-            seed=seed,
+        return list(
+            engine.generate_streaming(
+                text,
+                actual_ref_path,
+                cfg_value=cfg_value,
+                inference_timesteps=inference_timesteps,
+                denoise=stream_denoise,
+                seed=seed,
+            )
         )
 
     start_time: float = time.monotonic()

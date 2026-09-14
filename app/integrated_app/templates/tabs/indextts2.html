@@ -27,9 +27,14 @@
                     <div id="it2-ref-audio-name" class="tts-file-name">{{ "supported_formats"|t(lang) }}</div>
                 </div>
                 {# P0-1 声音克隆授权：上传参考音频必须显式声明拥有使用权/已获授权 #}
-                <label class="tts-checkbox-label" style="margin-top:8px">
-                    <input type="checkbox" name="has_consent" id="it2-has-consent" value="true"> {{ "consent_declare"|t(lang) }}
-                </label>
+                {# U6: 放大复选框 + 醒目授权提示，漏勾前橙色提醒，勾选后变绿 #}
+                <div class="consent-field" id="it2-consent-field">
+                    <input type="checkbox" name="has_consent" id="it2-has-consent" value="true" class="consent-checkbox" onchange="document.getElementById('it2-consent-field').classList.toggle('checked', this.checked)">
+                    <div>
+                        <span class="consent-label">⚠️ {{ "consent_declare"|t(lang) }}</span>
+                        <span class="consent-why">{{ "consent_why"|t(lang, default="用于声音克隆的参考音频须为本人声音或已获版权方授权，否则后端将拒绝生成。") }}</span>
+                    </div>
+                </div>
 
                 {# 前后端一致性整改（报告 B9）：参考文本输入已删除——indextts2 端点虽声明 ref_text
                    字段但从不消费（引擎 infer 无此参数），docstring 宣称的音质收益与实现不符。 #}

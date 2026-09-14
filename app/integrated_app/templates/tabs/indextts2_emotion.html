@@ -31,9 +31,13 @@
                             </div>
                         </div>
                         {# P0-1 声音克隆授权：上传参考/音色音频必须显式声明拥有使用权/已获授权 #}
-                        <div class="fg" style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
-                            <input type="checkbox" name="has_consent" id="it2e-has-consent" value="true" style="margin-top:2px" required>
-                            <label for="it2e-has-consent" class="fl" style="font-size:12px;margin:0;line-height:1.5">{{ "consent_declare"|t(lang) }}</label>
+                        {# U6: 放大复选框 + 醒目授权提示，漏勾前橙色提醒，勾选后变绿 #}
+                        <div class="consent-field" id="it2e-consent-field">
+                            <input type="checkbox" name="has_consent" id="it2e-has-consent" value="true" required class="consent-checkbox" onchange="document.getElementById('it2e-consent-field').classList.toggle('checked', this.checked)">
+                            <div>
+                                <span class="consent-label">⚠️ {{ "consent_declare"|t(lang) }}</span>
+                                <span class="consent-why">{{ "consent_why"|t(lang, default="用于声音克隆的参考音频须为本人声音或已获版权方授权，否则后端将拒绝生成。") }}</span>
+                            </div>
                         </div>
 
                         <!-- Same Prompt Mode -->

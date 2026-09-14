@@ -738,3 +738,68 @@ html.dark .btn-hint-tooltip {
     transform: none !important;
     box-shadow: none !important;
 }
+
+/* ============================================================
+   U1: 未就绪锁定视觉（class 锁，非原生 disabled，保证 hover 仍显示 title）
+   ============================================================ */
+.btn-generate.is-locked,
+.generate-btn.is-locked,
+.tts-btn.is-locked {
+    cursor: not-allowed !important;
+    opacity: 0.55 !important;
+    filter: grayscale(0.2);
+    pointer-events: auto; /* 保持鼠标事件，否则 title 不显示 */
+}
+.btn-generate.is-locked:hover,
+.generate-btn.is-locked:hover,
+.tts-btn.is-locked:hover {
+    transform: none !important;
+    box-shadow: none !important;
+    filter: grayscale(0.2) brightness(0.98);
+}
+
+/* ============================================================
+   U6: has_consent 授权复选框放大 + 醒目提示
+   ============================================================ */
+.consent-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1.5px solid rgba(245, 158, 11, 0.55);
+    background: rgba(245, 158, 11, 0.08);
+    border-radius: 8px;
+    transition: border-color .2s ease, background .2s ease;
+}
+.consent-field.checked {
+    border-color: rgba(16, 185, 129, 0.55);
+    background: rgba(16, 185, 129, 0.08);
+}
+.consent-field input[type="checkbox"].consent-checkbox {
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--accent-primary, #7c5cbf);
+    transform: scale(1.15);
+}
+.consent-field .consent-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.45;
+    color: var(--text-primary, #1f2937);
+    cursor: pointer;
+}
+.consent-field.checked .consent-label { color: var(--green, #10b981); }
+.consent-field .consent-why {
+    display: block;
+    margin-top: 3px;
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--text-muted, #6b7280);
+}
+

@@ -678,14 +678,62 @@ def _record_to_history_db(
 # ===========================================================================
 
 
+# U9: 技术错误串 → 用户友好消息映射表（按顺序匹配，子串命中即返回；均小写匹配）。
+# 设计动机：底层引擎/库抛出的异常类型五花八门（ValueError / RuntimeError /
+# GenerationError / 原生 torch RuntimeError），仅靠 isinstance 分支无法覆盖所有
+# 技术术语。在类型分支之前先对消息体做一次大小写不敏感的子串扫描，无论异常
+# 包装了多少层，只要正文里出现技术术语就翻译成用户可理解、可操作的提示。
+# 元组第二项为友好文案；保持不含文件路径/堆栈/SQL 等敏感信息。
+_FRIENDLY_ERROR_PATTERNS: tuple[tuple[str, str], ...] = (
+    (
+        "use_qwen_emo",
+        "情感文本描述功能需要启用 Qwen 情感分析模块。您可以："
+        "1) 在设置中开启该模块后重新加载模型；"
+        "2) 改用 8 维情感向量滑杆控制情绪；"
+        "3) 上传一段带目标情感的参考音频。",
+    ),
+    (
+        "qwen_emo",
+        "情感文本描述功能需要启用 Qwen 情感分析模块。您可以："
+        "1) 在设置中开启该模块后重新加载模型；"
+        "2) 改用 8 维情感向量滑杆控制情绪；"
+        "3) 上传一段带目标情感的参考音频。",
+    ),
+    (
+        "out of memory",
+        "显存不足，请尝试缩短文本、卸载其他模型或关闭占用 GPU 的程序后重试。",
+    ),
+    (
+        "cuda out of memory",
+        "显存不足，请尝试缩短文本、卸载其他模型或关闭占用 GPU 的程序后重试。",
+    ),
+    (
+        "cuda error",
+        "显卡运算发生错误，请重启服务或切换到其他引擎后重试。",
+    ),
+    (
+        "未加载",
+        "模型尚未加载，请先在设置页面加载模型后再生成。",
+    ),
+    (
+        "not loaded",
+        "模型尚未加载，请先在设置页面加载模型后再生成。",
+    ),
+    (
+        "engine not ready",
+        "模型尚未加载，请先在设置页面加载模型后再生成。",
+    ),
+)
+
+
 def _safe_error_msg(exc: BaseException) -> str:
-    """根据异常类型返回用户友好的错误消息。
+    """根据异常类型与消息内容返回用户友好的错误消息（U9 技术术语脱敏）。
 
     Args:
         exc: 已捕获的异常对象。
 
     Returns:
-        用户可读的错误描述（中文，不超过 200 字符）。
+        用户可读的错误描述（中文，不含文件路径/堆栈等技术细节）。
     """
     if isinstance(exc, InsufficientVRAMError):
         return f"显存不足：{str(exc)}"
@@ -693,15 +741,23 @@ def _safe_error_msg(exc: BaseException) -> str:
         return f"引擎切换失败：{str(exc)}"
     if isinstance(exc, TTSError):
         return str(exc)
+
+    exc_str: str = str(exc)
+    lowered: str = exc_str.lower()
+
+    # U9: 通用子串映射 — 不依赖异常类型，先把技术术语翻译成可操作提示。
+    for pattern, friendly in _FRIENDLY_ERROR_PATTERNS:
+        if pattern in lowered:
+            return friendly
+
     if isinstance(exc, RuntimeError):
-        exc_str: str = str(exc)
-        if "CUDA" in exc_str or "VRAM" in exc_str or "out of memory" in exc_str.lower():
+        if "cuda" in lowered or "vram" in lowered or "out of memory" in lowered:
             return "显存不足，请尝试缩短文本、关闭其他GPU程序，或在设置中切换到CPU模式"
         return f"运行时错误：{exc_str[:200]}"
     if isinstance(exc, ValueError):
-        return f"参数错误：{str(exc)[:200]}"
+        return f"参数错误：{exc_str[:200]}"
     if isinstance(exc, FileNotFoundError):
-        return "音频文件不存在或已被删除"
+        return "参考音频文件不存在或已被删除，请重新上传"
     if isinstance(exc, TimeoutError):
         return "请求超时，请稍后重试"
     if isinstance(exc, ConnectionError):

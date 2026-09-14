@@ -123,6 +123,42 @@ _EMOTION_MODE_TEXT: str = "text"
 _EMOTION_MODE_AUDIO: str = "audio"
 _EMOTION_MODE_VECTOR: str = "vector"
 
+# B3: emo_text 模式依赖引擎构造时以 use_qwen_emo=True 加载 QwenEmotion 模型。
+# 未启用时引擎 infer 内部会 raise ValueError("...use_qwen_emo=True...")。
+# 这里把技术异常翻译成用户可理解的三选一引导（与 U9 通用映射保持一致）。
+_EMO_TEXT_QWEN_HINT: str = (
+    "情感文本描述功能需要启用 Qwen 情感分析模块。您可以："
+    "1) 在设置中开启该模块后重新加载模型；"
+    "2) 改用 8 维情感向量滑杆控制情绪；"
+    "3) 上传一段带目标情感的参考音频。"
+)
+
+
+def _infer_accepts_kwarg(engine: Any, kwarg_name: str) -> bool:
+    """B6 防御：检测引擎 ``infer`` 是否显式声明了指定形参。
+
+    IndexTTS 2.5 的 ``infer`` 形参表里显式带 ``seed``，但 2.0 或其他变体的底层
+    实现可能不接受该参数（即便 ``infer`` 签名带 ``**kwargs`` 兜底，部分底层封装
+    仍会对未支持参数抛错导致整条请求 400）。这里用 ``inspect.signature`` 探测：
+    仅当形参表**显式命中**时才下传该参数，否则静默跳过并记 warning。
+    探测失败（签名不可内省）时保守返回 True，不阻断既有可用路径。
+
+    Args:
+        engine: 当前引擎实例。
+        kwarg_name: 要探测的关键字参数名（如 "seed"）。
+
+    Returns:
+        True 表示引擎 infer 接受该参数；False 表示应跳过下传。
+    """
+    try:
+        import inspect
+
+        sig = inspect.signature(engine.infer)
+        return kwarg_name in sig.parameters
+    except (TypeError, ValueError):
+        # 引擎未实现可内省签名（C 扩展/动态代理）：保守放行，避免误伤
+        return True
+
 
 @router.post(
     "/indextts2",
@@ -241,6 +277,28 @@ async def generate_indextts2(
     if err is not None:
         return err
 
+    # ------------------------------------------------------------------
+    # B4/U7: IndexTTS 音色克隆**必须**有参考音频。区分两种情况，避免把
+    # "用户根本没上传"误报成引擎内部的"音频文件不存在或已被删除"：
+    #   - ref_audio_path 为 None/空  → 用户未上传（save_uploaded_audio 对
+    #     空文件返回 (None, None)），给出明确的上传引导；
+    #   - 路径已拿到但落盘后文件不在磁盘 → 上传后被清理任务误删等极端情况，
+    #     才提示"文件丢失，请重新上传"。
+    # ------------------------------------------------------------------
+    if not ref_audio_path:
+        return _error_html(
+            request,
+            "IndexTTS 需要上传参考音频才能进行音色克隆。"
+            "请先在上方上传一段参考音频（建议 3-10 秒清晰人声），再点击生成。",
+            error_type="validation",
+        )
+    if not os.path.isfile(ref_audio_path):
+        return _error_html(
+            request,
+            "参考音频文件不存在或已被删除，请重新上传",
+            error_type="validation",
+        )
+
     emo_audio_path, err = await save_uploaded_audio(request, emo_audio)
     if err is not None:
         return err
@@ -337,6 +395,13 @@ async def generate_indextts2(
         # IndexTTS 2.5 / 2.0 原生输出 22050Hz；以引擎实际返回的 sample_rate 为准，
         # 不再硬编码 44100（那会让浏览器按 2 倍速播放，音调与时长全错）。
         out_sample_rate: int = 22050
+        # B6: 启动前探测一次引擎 infer 是否显式支持 seed。不支持则整段循环都
+        # 不下传 seed，避免向 2.0/其他变体下传导致底层报错 400。
+        supports_seed: bool = _infer_accepts_kwarg(engine, "seed")
+        if seed > 0 and not supports_seed:
+            from ..utils import logger as _logger
+
+            _logger.warning("[IndexTTS2] 当前引擎 infer 不接受 seed 参数，已忽略 seed=%d", seed)
         for seg in segments:
             seg = seg.strip()
             if not seg:
@@ -363,7 +428,7 @@ async def generate_indextts2(
                 infer_kwargs["target_duration"] = target_dur
             elif duration_factor is not None:
                 infer_kwargs["duration_factor"] = duration_factor
-            if seed > 0:
+            if seed > 0 and supports_seed:
                 infer_kwargs["seed"] = seed
 
             # engine.infer() 的对外契约是 (sample_rate, wav, output_path) 三元组
@@ -371,7 +436,17 @@ async def generate_indextts2(
             # 历史上本行把返回值当 str 用并对 tuple 调 os.path.exists()，
             # 导致 IndexTTS 每次都「推理已完成、wav 已落盘」却在收尾抛
             # `_path_exists: path should be ... not tuple` → 整条请求 400、前端拿不到音频。
-            seg_result = engine.infer(**infer_kwargs)
+            #
+            # B3: emo_text 模式未启用 QwenEmotion 时，引擎 infer 内部 raise
+            # ValueError("...use_qwen_emo=True...")。这里在路由层捕获并转为
+            # 用户友好引导（返回 (None, msg)，由 _execute_generation_impl 渲染成
+            # 友好 toast），其余 ValueError 原样上抛走 _safe_error_msg 兜底。
+            try:
+                seg_result = engine.infer(**infer_kwargs)
+            except ValueError as ve:
+                if "qwen" in str(ve).lower():
+                    return None, _EMO_TEXT_QWEN_HINT
+                raise
             if not seg_result:
                 continue
             seg_sr, seg_wav, seg_path = seg_result

@@ -72,10 +72,31 @@ window.TTSForm = (function() {
 
         var originalHtml = submitBtn.innerHTML;
 
+        // U1: 按钮在 busy（生成中）被原生禁用时，原生 disabled 按钮在多数浏览器
+        // 不响应鼠标事件、title 也不显示。这里在禁用瞬间挂一个"生成中"提示，
+        // 恢复时还原原 title。未就绪（未选音色/未输入文本）的锁定提示由
+        // initReadinessGate 负责（用 class 而非原生 disabled，保证 tooltip 可见）。
+        var busyTip = config.busyTip || ((window.I18N && window.I18N['gen_in_progress']) || '正在生成，请稍候…');
+
         function setBtnState(state) {
             submitBtn.classList.remove('btn-loading', 'btn-success', 'btn-error');
             if (state) {
                 submitBtn.classList.add(state);
+            }
+        }
+
+        function applyBusyTip(on) {
+            if (on) {
+                submitBtn.dataset.prevTitle = submitBtn.getAttribute('title') || '';
+                submitBtn.setAttribute('title', busyTip);
+            } else {
+                var prev = submitBtn.dataset.prevTitle || '';
+                if (prev) {
+                    submitBtn.setAttribute('title', prev);
+                } else {
+                    submitBtn.removeAttribute('title');
+                }
+                delete submitBtn.dataset.prevTitle;
             }
         }
 
@@ -85,6 +106,7 @@ window.TTSForm = (function() {
             form.addEventListener('htmx:beforeRequest', function() {
                 submitBtn.disabled = true;
                 setBtnState('btn-loading');
+                applyBusyTip(true);
             });
 
             document.addEventListener('htmx:afterRequest', function(evt) {
@@ -102,6 +124,7 @@ window.TTSForm = (function() {
                             setBtnState('btn-success');
                             setTimeout(function() {
                                 setBtnState(null);
+                                applyBusyTip(false);
                                 submitBtn.disabled = false;
                             }, 1500);
                         } else {
@@ -142,6 +165,7 @@ window.TTSForm = (function() {
                             if (window.Toast) Toast.show(errorMsg || ((window.I18N && window.I18N['gen_failed']) || '生成失败'), 'error');
                             setTimeout(function() {
                                 setBtnState(null);
+                                applyBusyTip(false);
                                 submitBtn.disabled = false;
                             }, 2000);
                         }
@@ -179,6 +203,7 @@ window.TTSForm = (function() {
                 if (window.Toast) Toast.show(errorMsg, 'error');
                 setTimeout(function() {
                     setBtnState(null);
+                    applyBusyTip(false);
                     submitBtn.disabled = false;
                 }, 2000);
             });
@@ -194,10 +219,120 @@ window.TTSForm = (function() {
                 if (window.Toast) Toast.show(errorMsg, 'error');
                 setTimeout(function() {
                     setBtnState(null);
+                    applyBusyTip(false);
                     submitBtn.disabled = false;
                 }, 2000);
             });
         }
+    }
+
+    /**
+     * U1: 未就绪锁定提示。
+     * 当表单未满足生成前提（未输入文本 / 未选择可见音色下拉框中的音色）时，
+     * 给提交按钮加 `.is-locked` 视觉降级并在 title 里写明原因；hover 即可看到，
+     * 点击/提交时再弹出对应提示。使用 class 而非原生 disabled，避免：
+     *   1) 原生 disabled 按钮在 Chrome 不显示 title；
+     *   2) 禁用原生 submit 按钮会导致 form.requestSubmit()（快捷"重新生成"按钮调用）失效。
+     * 注意：busy（生成中）状态由 initSubmitState 用原生 disabled 接管，这里会让路。
+     */
+    function initReadinessGate(config) {
+        var form = document.getElementById(config.formId);
+        if (!form) return;
+        var buttons;
+        if (config.submitBtnId || config.submitId) {
+            var one = document.getElementById(config.submitBtnId || config.submitId);
+            buttons = one ? [one] : [];
+        } else {
+            buttons = Array.prototype.slice.call(
+                form.querySelectorAll('button[type="submit"], .generate-btn, .btn-generate')
+            );
+        }
+        if (buttons.length === 0) return;
+
+        var textSel = config.textareaSelector || ('textarea[name="' + (config.textInputName || 'text') + '"]');
+        var voiceSel = config.voiceSelector || 'select[name="persona_name"], select[name="voice_id"], select[name="speaker"]';
+
+        var emptyTextMsg = config.emptyTextMsg || ((window.I18N && window.I18N['enter_text']) || '请先输入要生成的文本');
+        var noVoiceMsg = config.noVoiceMsg || ((window.I18N && window.I18N['please_select_voice']) || '请先选择一个音色');
+
+        function isVisible(el) {
+            if (!el) return false;
+            if (el.type === 'hidden') return false;
+            if (el.offsetParent === null) return false;
+            var cs = window.getComputedStyle(el);
+            return cs.display !== 'none' && cs.visibility !== 'hidden';
+        }
+
+        function anyBusy() {
+            // 只检查 btn-loading（生成中），不检查原生 disabled。
+            // 原因：disabled 可能被 model_switcher 因"模型未加载"而长期持有，
+            // 若此处也检查 disabled，会导致 refresh() 永远不执行、is-locked 死锁。
+            for (var i = 0; i < buttons.length; i++) {
+                if (buttons[i].classList.contains('btn-loading')) return true;
+            }
+            return false;
+        }
+
+        // 返回 '' 表示就绪；否则返回最关键的一条原因（优先文本为空）
+        function reason() {
+            var ta = form.querySelector(textSel);
+            if (ta && !ta.value.trim()) {
+                return emptyTextMsg;
+            }
+            // 只在音色下拉框可见且未选择时才要求选音色
+            var vs = form.querySelector(voiceSel);
+            if (vs && isVisible(vs) && !vs.value) {
+                return noVoiceMsg;
+            }
+            // 扩展校验：各页面可传入 extraCheck() 返回额外的未就绪原因
+            // （如声音设计页要求"描述创建"模式下必须有 instruction 或选中标签）
+            if (typeof config.extraCheck === 'function') {
+                try {
+                    var extra = config.extraCheck();
+                    if (extra) return extra;
+                } catch (e) { /* extraCheck 抛错不阻断主流程 */ }
+            }
+            return '';
+        }
+
+        function refresh() {
+            // busy 时让路给 initSubmitState
+            if (anyBusy()) return;
+            var r = reason();
+            buttons.forEach(function(btn) {
+                if (r) {
+                    btn.classList.add('is-locked');
+                    btn.setAttribute('title', r);
+                    btn.setAttribute('aria-disabled', 'true');
+                } else {
+                    btn.classList.remove('is-locked');
+                    btn.removeAttribute('title');
+                    btn.removeAttribute('aria-disabled');
+                }
+            });
+        }
+
+        // 捕获阶段拦截未就绪的提交，给出提示而不是静默发请求/触发后端 400
+        form.addEventListener('submit', function(e) {
+            if (anyBusy()) return;
+            var r = reason();
+            if (r) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                if (window.Toast) Toast.show(r, 'warning');
+                return false;
+            }
+        }, true);
+
+        form.addEventListener('input', refresh);
+        form.addEventListener('change', refresh);
+        form.addEventListener('click', refresh);  // Alpine子标签切换等点击操作需重算可见性
+        document.addEventListener('htmx:afterRequest', refresh);
+        document.addEventListener('htmx:afterSettle', refresh);
+        // Alpine / 内联 tab 切换后下拉框可见性会变，延迟重算
+        setTimeout(refresh, 300);
+        setTimeout(refresh, 800);
+        refresh();
     }
 
     /**
@@ -277,6 +412,10 @@ window.TTSForm = (function() {
             initValidation(config);
             initSubmitState(config);
             initAutoPlay(config);
+            // U1: 默认启用未就绪锁定提示；如需关闭传 readinessGate: false
+            if (config.readinessGate !== false) {
+                initReadinessGate(config);
+            }
 
             if (!config.textareaId) {
                 var form = document.getElementById(config.formId);
@@ -300,7 +439,8 @@ window.TTSForm = (function() {
         initValidation: initValidation,
         initSubmitState: initSubmitState,
         initAutoPlay: initAutoPlay,
-        initCharCounter: initCharCounter
+        initCharCounter: initCharCounter,
+        initReadinessGate: initReadinessGate
     };
 })();
 
