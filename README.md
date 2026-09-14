@@ -176,23 +176,40 @@ docker run -d --gpus all -p 7869:7869 \
 
 ## 模型下载
 
-模型需单独下载并放入 `model/` 目录：
+本项目是**多引擎编排框架（Apache-2.0），本身不含任何模型权重**。所有模型权重需从官方仓库由用户自行下载，放入 `model/` 下对应子目录（详见 [模型许可说明](#模型许可说明)）。
 
-### VoxCPM2 引擎所需模型
+### 推荐：统一一键下载（国内镜像优先）
 
-| 模型     | 说明     | 存放目录   | 下载源    |
-| ------ | ------ | ------ | ------ |
-| <br /> | <br /> | <br /> | <br /> |
+项目内置 `scripts/download_models.py`，覆盖全部 7 个模型集合，并固化「国内社区优先」策略：
 
-### 引擎所需模型
-
-从 HuggingFace 或 ModelScope 下载，也可以使用项目内置的快捷下载脚本：
+- **优先 Hugging Face 镜像社区** `https://hf-mirror.com`（国内通畅）；
+- **缺失 / 失败自动回退魔搭社区** ModelScope（国内通畅）；
+- 个别权重仅 ModelScope 有（如 `speech_zipenhancer`）→ 直连 ModelScope；
+- 下载走官方 SDK 的 `snapshot_download`，**天然断点续传**。
 
 ```bash
-python scripts/download_indextts2.py   # 自动从 ModelScope 下载 IndexTTS 2.5（IndexTeam/IndexTTS-2.5）
+pip install huggingface_hub modelscope
+python scripts/download_models.py --all                  # 拉全部 7 个（HF 镜像优先，失败回退魔搭）
+python scripts/download_models.py --model voxcpm2        # 只拉某一个
+python scripts/download_models.py --all --source modelscope   # 强制只用魔搭
+python scripts/download_models.py --all --no-verify           # 跳过 SHA256 校验
 ```
 
-详细说明见 `docs/plans/MODEL_DOWNLOADS.md`（本地文档，未随仓库发布）。
+下载完成后可用 `python scripts/verify_model_checksums.py` 校验完整性。
+
+### 各模型存放目录与来源
+
+| 模型目录 | 归属引擎 | 官方仓库（HF / ModelScope） | 许可 |
+| --- | --- | --- | --- |
+| `model/VoxCPM2/` | voxcpm2 | `openbmb/VoxCPM2` / `OpenBMB/VoxCPM2` | Apache-2.0 |
+| `model/SenseVoiceSmall/` | voxcpm2（ASR） | `FunAudioLLM/SenseVoiceSmall` / `iic/SenseVoiceSmall` | 需确认 |
+| `model/speech_zipenhancer/` | voxcpm2（降噪） | 仅 ModelScope `iic/speech_zipenhancer_ans_multiloss_16k_base` | 需确认 |
+| `model/IndexTTS-2.5/` | indextts2 | `IndexTeam/IndexTTS-2.5` | bilibili 自定义 |
+| `model/IndexTTS-2.0/` | indextts20 | `IndexTeam/IndexTTS-2` | bilibili 自定义 |
+| `model/OpenVoice/` | voicebox | `myshell-ai/OpenVoice` / `myshell-ai/OpenVoice` | MIT（代码） |
+| `model/Step-Audio-EditX/` | step-audio-editx | `stepfun-ai/Step-Audio-EditX` | 代码 Apache-2.0 |
+
+完整下载步骤、目录结构与常见问题见 `docs/plans/MODEL_DOWNLOAD_GUIDE.md`。
 
 ## 配置
 
@@ -346,19 +363,27 @@ TTS_MultiModel/
 ## 模型许可说明
 
 > 本表为**模型权重**的许可清单（项目代码为 Apache-2.0，见 [LICENSE](LICENSE)）。
+> 本项目**只做编排、不打包任何权重**——所有模型权重均来自下表官方仓库、由用户自取，因此框架分发本身不涉及再分发权重风险；但**使用各模型仍须遵守其各自许可**，商用前请逐项核对。
 > **接入新引擎时：更新本表 + `config.yaml` 中对应引擎的 `license` 字段。**
 
-| 引擎 | 权重许可 | 商用 | 说明 |
-|---|---|---|---|
-| VoxCPM2（面壁智能/OpenBMB） | Apache-2.0 | ✅ 可商用 | 默认推荐引擎；persona 微调基座 |
-| IndexTTS 2.5（bilibili Index Team） | bilibili Model Use License Agreement | ⚠️ **商用须事先向 bilibili 登记并取得书面授权** | 见引擎仓库 LICENSE |
-| CosyVoice2 / ChatTTS / F5-TTS（data/ 参考或历史引擎） | Apache-2.0 / CC BY-NC 等 | ⚠️ 逐项核对（ChatTTS、F5-TTS 模型为非商用许可） | 仅作研究参考或标注后使用 |
+| 模型 / 权重 | 归属引擎 | 权重许可 | 商用提示 | 说明 |
+|---|---|---|---|---|
+| VoxCPM2 | voxcpm2 | Apache-2.0 | ✅ 可商用 | 默认推荐引擎 |
+| SenseVoiceSmall | voxcpm2（ASR） | FunAudioLLM 许可 | ⚠️ 需确认 | 研究为主，商用前核对 |
+| speech_zipenhancer | voxcpm2（降噪） | iic 社区权重 | ⚠️ 需确认 | 仅 ModelScope 有 |
+| IndexTTS 2.5 | indextts2 | bilibili Model Use License Agreement | ⚠️ **商用须事先向 bilibili 登记并取得书面授权** | 见引擎仓库 LICENSE |
+| IndexTTS 2.0 | indextts20 | bilibili Model Use License Agreement | ⚠️ 同上 | 2.5 的旧版本变体，权重不通用 |
+| OpenVoice | voicebox | MIT（代码） | ⚠️ 权重许可需确认 | ToneColorConverter 权重 |
+| Step-Audio-EditX | step-audio-editx | 代码 Apache-2.0 | ⚠️ 权重许可未明示 | 权重使用前核对 |
 
-### 非官方声明
+> 历史 / 参考引擎（非默认分发）：CosyVoice2 / ChatTTS / F5-TTS 等曾出现在 `data/` 参考实现中，许可为 Apache-2.0 / CC BY-NC 等，其中 ChatTTS、F5-TTS 模型为**非商用**许可，仅作研究参考或标注后使用，不得作为商用发行默认引擎。
 
-- "IndexTTS" 为 bilibili 的商标/产品名，使用须遵守 **bilibili Model Use License Agreement**：其第 5.2 条仅允许合理且符合惯例的描述性引用，不得暗示官方背书；**商用须事先向 bilibili 登记并取得书面授权**（详见上表及引擎仓库 LICENSE）。
+### 免责声明
+
+- 本项目按 Apache-2.0 提供，不对任何第三方模型权重的许可合规性、适用性、准确性负责；用户须自行核对所下载权重的许可并承担使用后果。
+- "IndexTTS" 为 bilibili 的商标/产品名，使用须遵守 **bilibili Model Use License Agreement**：其第 5.2 条仅允许合理且符合惯例的描述性引用，不得暗示官方背书；**商用须事先向 bilibili 登记并取得书面授权**。
 - 使用 IndexTTS 引擎还须遵守其 DISCLAIMER，包括**禁止合成政治人物、公众人物等声音**；请勿将本项目用于侵权、诈骗、伪造等违法用途。
-**新增引擎检查清单**：① `config.yaml` 填写真实 `license` 字段；② 更新本表；③ 非商用模型（NC/自定义许可）不得作为商用发行默认引擎、不随商业发行物分发；④ 使用前核对许可最新版本。
+- **新增引擎检查清单**：① `config.yaml` 填写真实 `license` 字段；② 更新本表；③ 非商用模型（NC/自定义许可）不得作为商用发行默认引擎、不随商业发行物分发；④ 使用前核对许可最新版本。
 
 ## 许可证
 
@@ -368,7 +393,7 @@ Copyright (c) 2026 ReSerendipity
 
 ## 文档
 
-- `docs/plans/MODEL_DOWNLOADS.md`（本地文档，未随仓库发布）- 模型下载与配置
+- `docs/plans/MODEL_DOWNLOAD_GUIDE.md`（本地文档，未随仓库发布）- 模型下载与配置（HF 镜像优先、全 7 模型）
 - `docs/plans/MODEL_EXTENSION_GUIDE.md`（本地文档，未随仓库发布）- 添加新 TTS 引擎
 - `docs/plans/INDEXTTS2_INTEGRATION_GUIDE.md`（本地文档，未随仓库发布）- IndexTTS 2.5 集成详情
 - `docs/project/PROJECT_ARCHITECTURE.md`（本地文档，未随仓库发布）- 系统架构概览

@@ -435,3 +435,5 @@ scripts/installer/pyproject.toml
 
 # 本地 git 目录备份（scripts 备份工具产物，不入库，2026-09-12）
 backups/
+
+tts_test/

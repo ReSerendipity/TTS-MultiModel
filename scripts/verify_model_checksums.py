@@ -149,6 +149,8 @@ def main() -> int:
         ("IndexTTS-2.0", _MODELS_DIR / "IndexTTS-2.0"),
         ("SenseVoiceSmall", _MODELS_DIR / "SenseVoiceSmall"),
         ("speech_zipenhancer", _MODELS_DIR / "speech_zipenhancer"),
+        ("OpenVoice", _MODELS_DIR / "OpenVoice"),
+        ("Step-Audio-EditX", _MODELS_DIR / "Step-Audio-EditX"),
     ]
 
     dir_ok = True
