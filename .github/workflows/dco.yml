@@ -10,6 +10,8 @@ permissions:
 jobs:
   dco:
     name: DCO Check
+    # DCO 的 Signed-off-by 是对人类贡献者的来源认证，Dependabot 生成的 commit 无法携带签名。
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

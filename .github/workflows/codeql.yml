@@ -14,9 +14,15 @@ permissions:
   security-events: write
   actions: read
 
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    # Dependabot PR 只改依赖版本声明、不改第一方源码；main push 与每周 schedule 仍完整覆盖。
+    if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
