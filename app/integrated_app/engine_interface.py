@@ -12,7 +12,7 @@
         ↓ 运行时动态发现/注册/切换
     Concrete Engines（具体引擎实现，如 engines/voxcpm2/engine.py、engines/indextts2_engine.py）
 
-核心职责：
+    核心职责：
     1. 定义统一引擎契约：通过 Protocol 进行类型安全的鸭子类型检查，
        所有引擎（VoxCPM2、IndexTTS2 等）必须实现 TTSEngine 协议方法。
     2. 支持高级控制能力：ControllableTTSEngine 扩展协议，为支持终极克隆、
@@ -22,8 +22,14 @@
     4. 启动性能优化：通过懒导入（lazy import）避免在应用启动时加载
        所有重型依赖（VoxCPM2 的 voxcpm/funasr、IndexTTS2 等），
        显著缩短冷启动时间并降低初始内存占用。
+    5. 接入捷径：新增第三方 TTS 时推荐继承 :class:`BaseTTSEngine` /
+       :class:`BaseControllableTTSEngine`（已提供全部 Protocol 方法的安全默认
+       实现），再用 ``engine_registry.register(...)`` 注册即可被路由层自动发现；
+       另见 ``get_engine_class`` / ``iter_registered_engines`` /
+       ``engine_implements_controllable`` 等查询辅助函数。
 """
 
+from abc import ABC, abstractmethod
 from collections.abc import Generator
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
@@ -382,6 +388,141 @@ class ControllableTTSEngine(Protocol):
                   其他情况（未加载、已加载但禁用、已卸载）均返回 False。
         """
         ...
+
+
+class BaseTTSEngine(ABC):
+    """新增 TTS 引擎的**推荐基类**（可选，非强制）。
+
+    设计意图：
+        引擎层当前以 :class:`TTSEngine` / :class:`ControllableTTSEngine`
+        两个 ``runtime_checkable`` Protocol 做结构化契约（鸭子类型），
+        路由层只认方法不认父类。但纯 Protocol 没有默认实现，新引擎作者
+        要为每一个方法手写桩，接入成本高。本基类为所有 Protocol 方法提供
+        **安全默认实现**，降低接入口径的摩擦：
+
+        - 生命周期方法 ``is_ready`` / ``unload`` 给出合理默认
+          （``load`` 仍为 ``abstractmethod``，强制子类实现模型加载）；
+        - 未实现的生成/增强方法默认抛出 ``NotImplementedError``，
+          由路由层按能力探测（``isinstance(engine, ControllableTTSEngine)``）
+          决定是否暴露对应 UI，不会静默给出错误结果。
+
+    继承策略：
+        - 仅做基础 TTS（design / clone / script / streaming）→ 继承 ``BaseTTSEngine``；
+        - 还要暴露终极克隆 / LoRA / Prompt 续写 → 继承 ``BaseControllableTTSEngine``。
+
+    注意：现役引擎（VoxCPM2Engine / IndexTTS2Engine 等）直接实现 Protocol、
+    并未继承本基类，这是允许的——本基类只是给"新接入的第三方 TTS"用的捷径，
+    不影响现有引擎。
+    """
+
+    # ---- 生命周期 ----
+    def __init__(self) -> None:
+        self._loaded: bool = False
+
+    def is_ready(self) -> bool:
+        """默认实现：返回内部 ``_loaded`` 标志。
+
+        子类若用别的就绪判据（如权重引用非空），可重写本方法。
+        """
+        return self._loaded
+
+    @abstractmethod
+    def load(self) -> None:
+        """子类必须实现：加载模型权重并初始化推理管线。
+
+        成功后将 ``self._loaded`` 置为 ``True``；失败应抛 ``ModelLoadError`` /
+        ``InsufficientVRAMError``（由具体引擎定义）。
+        """
+        ...
+
+    def unload(self) -> None:
+        """默认实现：仅翻转就绪标志，幂等。
+
+        子类若有显式资源释放需求（CUDA 缓存、句柄关闭），重写本方法。
+        """
+        self._loaded = False
+
+    # ---- 基础生成（TTSEngine） ----
+    def generate_voice_design(
+        self, text: str, instruction: str = "", normalize: bool = True, **kwargs: Any
+    ) -> tuple[Any, str]:
+        raise NotImplementedError("该引擎未实现 voice design（语音设计）")
+
+    def generate_voice_clone(
+        self,
+        text: str,
+        reference_audio_path: str | None = None,
+        instruction: str = "",
+        normalize: bool = True,
+        **kwargs: Any,
+    ) -> tuple[Any, str]:
+        raise NotImplementedError("该引擎未实现 voice clone（语音克隆）")
+
+    def generate_script(
+        self,
+        text: str,
+        speaker_map: dict[str, Any] | None = None,
+        persona_map: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> tuple[Any, str]:
+        raise NotImplementedError("该引擎未实现 script（剧本工坊）")
+
+    def generate_streaming(
+        self,
+        text: str,
+        reference_audio_path: str | None = None,
+        **kwargs: Any,
+    ) -> Generator[tuple[Any, str], None, None]:
+        raise NotImplementedError("该引擎未实现 streaming（流式生成）")
+
+    # ---- 可控增强（ControllableTTSEngine） ----
+    def generate_ultimate_clone(
+        self,
+        text: str,
+        instruction: str = "",
+        ref_audio_path: str | None = None,
+        advanced_cfg: float = 2.0,
+        advanced_norm: bool = True,
+        advanced_denoise: float = 1.0,
+        advanced_steps: int = 10,
+        advanced_seed: int = -1,
+        **kwargs: Any,
+    ) -> tuple[Any, str]:
+        raise NotImplementedError("该引擎未实现 ultimate clone（终极克隆）")
+
+    def generate_with_prompt(self, text: str, prompt_wav_path: str, prompt_text: str, **kwargs: Any) -> tuple[Any, str]:
+        raise NotImplementedError("该引擎未实现 prompt 续写")
+
+    def load_lora(self, lora_weights_path: str) -> tuple[list[str], list[str]]:
+        raise NotImplementedError("该引擎未实现 LoRA 加载")
+
+    def unload_lora(self) -> None:
+        raise NotImplementedError("该引擎未实现 LoRA 卸载")
+
+    def set_lora_enabled(self, enabled: bool) -> None:
+        raise NotImplementedError("该引擎未实现 LoRA 开关")
+
+    def get_lora_state_dict(self) -> dict[str, Any]:
+        raise NotImplementedError("该引擎未实现 LoRA 状态读取")
+
+    @property
+    def lora_enabled(self) -> bool:
+        return False
+
+
+class BaseControllableTTSEngine(BaseTTSEngine):
+    """可控增强引擎基类：在 :class:`BaseTTSEngine` 基础上，**默认实现**全部
+    ``ControllableTTSEngine`` 方法（含 LoRA / 终极克隆 / Prompt 续写）。
+
+    适用于"支持高级参数调节"的引擎。默认实现仍走 ``NotImplementedError`` 桩，
+    子类只重写自己真正支持的方法即可；路由层用
+    ``isinstance(engine, ControllableTTSEngine)`` 探测时会得到 True，
+    因此**务必**为已重写的方法提供真实能力，未重写的保持抛错桩。
+    """
+
+    # 此处不新增方法体：BaseTTSEngine 已包含全部 Controllable 桩。
+    # 单独成类仅为让"支持可控增强"的引擎在 isinstance 探测时语义清晰，
+    # 同时给作者一个明确的继承落点。
 
 
 @runtime_checkable
@@ -795,3 +936,58 @@ def _register_builtin_engines() -> None:
 
 
 _register_builtin_engines()
+
+
+# ====================================================================
+# 通用接入口径辅助函数（新增第三方 TTS 时的快捷查询）
+# ====================================================================
+
+
+def get_engine_class(name: str) -> type | None:
+    """按注册名获取引擎类引用（优先缓存，必要时触发懒导入）。
+
+    Args:
+        name: 引擎唯一标识符（如 "voxcpm2"、"indextts2"）。
+
+    Returns:
+        Optional[type]: 引擎类；未注册或懒导入失败返回 None。
+    """
+    return engine_registry.get(name)
+
+
+def iter_registered_engines() -> list[str]:
+    """列出所有已注册引擎标识符（立即注册 + 懒导入）。"""
+    return engine_registry.list_engines()
+
+
+def engine_implements_controllable(name: str) -> bool:
+    """探测某引擎类是否实现 ``ControllableTTSEngine`` 扩展协议。
+
+    用于路由层决定是否为该引擎暴露终极克隆 / LoRA / Prompt 续写等高级 UI。
+
+    WHY 用 ``hasattr`` 而非 ``issubclass``：
+        ``ControllableTTSEngine`` 是 ``runtime_checkable`` Protocol，但其中
+        包含非方法成员（``lora_enabled`` 属性），Python 对含非方法成员的
+        Protocol 禁止 ``issubclass`` 检查（抛 ``TypeError``）。``runtime_checkable``
+        的本质就是按成员是否存在做鸭子类型探测，因此直接用 ``hasattr`` 检查
+        全部成员是否与 Protocol 定义一致，等价于 ``isinstance`` 的判定逻辑。
+
+    Args:
+        name: 引擎注册名。
+
+    Returns:
+        bool: 引擎类存在且具备 ``ControllableTTSEngine`` 全部成员时返回 True。
+    """
+    cls = engine_registry.get(name)
+    if cls is None:
+        return False
+    required = (
+        "generate_ultimate_clone",
+        "generate_with_prompt",
+        "load_lora",
+        "unload_lora",
+        "set_lora_enabled",
+        "get_lora_state_dict",
+        "lora_enabled",
+    )
+    return all(hasattr(cls, attr) for attr in required)

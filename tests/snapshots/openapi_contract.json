@@ -32,6 +32,23 @@
       ]
     }
   },
+  "/api/engines/list": {
+    "GET": {
+      "operationId": "list_engines_api_engines_list_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/engines/{engine_id}/info": {
+    "GET": {
+      "operationId": "engine_info_api_engines__engine_id__info_get",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
   "/api/generate/cancel": {
     "POST": {
       "operationId": "cancel_generation_api_generate_cancel_post",

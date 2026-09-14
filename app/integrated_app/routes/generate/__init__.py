@@ -58,9 +58,24 @@
 
 import logging
 
-from . import generic, indextts2, step_audio_editx, voicebox, voxcpm2  # noqa: F401 — 导入以触发路由注册
+from . import (  # noqa: F401 — 导入以触发路由注册
+    engine_discovery,
+    generic,
+    indextts2,
+    step_audio_editx,
+    voicebox,
+    voxcpm2,
+)
 from .utils import router
 
 logger = logging.getLogger("tts_multimodel")
 
-__all__ = ["router", "indextts2", "voxcpm2", "generic", "voicebox", "step_audio_editx"]
+__all__ = [
+    "router",
+    "indextts2",
+    "voxcpm2",
+    "generic",
+    "voicebox",
+    "step_audio_editx",
+    "engine_discovery",
+]
