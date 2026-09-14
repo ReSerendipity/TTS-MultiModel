@@ -83,7 +83,26 @@ jobs:
           if (-not $ref) { $ref = '${{ github.ref_name }}' }
           Invoke-WebRequest "https://codeload.github.com/${{ github.repository }}/tar.gz/refs/heads/$ref" -OutFile src.tgz -UseBasicParsing
           New-Item -ItemType Directory -Path repo -Force | Out-Null
-          tar -xzf src.tgz -C repo --strip-components=1
+          # Windows 自带 tar（bsdtar）对归档中的中文文件名会报
+          # "Invalid empty pathname"（编码缺陷，参见 SeedVR2-lite#86），改用 Python tarfile（UTF-8 安全）解压。
+          @'
+          import tarfile
+          t = tarfile.open("src.tgz", "r:gz")
+          members = [m for m in t.getmembers() if not m.isdir()]
+          top = members[0].name.split("/")[0] + "/"
+          n = 0
+          for m in members:
+              rel = m.name[len(top):]
+              if not rel:
+                  continue
+              m.name = rel
+              try:
+                  t.extract(m, "repo", filter="data")
+              except TypeError:
+                  t.extract(m, "repo")
+              n += 1
+          print("extracted:", n)
+          '@ | python -
           Remove-Item src.tgz -Force
           Get-ChildItem repo | Select-Object Name
 
