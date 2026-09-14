@@ -14,11 +14,17 @@
 """
 
 import argparse
+import contextlib
 import json
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        with contextlib.suppress(OSError, ValueError):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TARGET = "app/integrated_app/"

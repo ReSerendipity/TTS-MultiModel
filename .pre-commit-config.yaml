@@ -115,6 +115,15 @@ repos:
         pass_filenames: false
         files: ^(app/integrated_app/(routes|app_server|engine_interface)|tests/test_openapi_snapshot|tests/snapshots/openapi_contract)/
         stages: [pre-commit, pre-push]
+      # 完整性清单同步门禁：核心模块当前哈希与 integrity_manifest.json 一致
+      # （防止「改核心模块未重新生成清单」→ enforce 启动拒绝；见 GOTCHAS #77）
+      - id: check-integrity-manifest-sync
+        name: Integrity Manifest Sync Check
+        entry: python scripts/check_integrity_manifest_sync.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
 
 # Configuration
 
@@ -127,6 +136,11 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
+  # 密钥扫描：本地 gitleaks（需系统安装，见家族 gitleaks.toml 统一配置）
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks-system
 
 default_language_version:
   python: python3.12
