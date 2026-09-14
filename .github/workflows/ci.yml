@@ -65,6 +65,12 @@ jobs:
           pip install pyyaml
           python scripts/check_declared_capabilities.py
 
+      - name: Integrity manifest sync gate (security)
+        # 防止「核心模块代码已改、完整性清单未重新生成」→ enforce 启动拒绝
+        # （docs/agents/GOTCHAS.md #77）。判据与本地 pre-commit 钩子同源。
+        run: |
+          python scripts/check_integrity_manifest_sync.py
+
   # 类型门禁（mypy ratchet，家族底线；2026-09-03 接入组织级 reusable workflow）
   # 门禁逻辑统一维护在 ReSerendipity/.github 的 python-quality-baseline.yml，
   # 本仓只传参数。模板口径与历史内联实现完全一致（mypy==2.3.1、
