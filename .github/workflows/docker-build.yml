@@ -67,5 +67,7 @@ jobs:
           scanners: vuln
           # 本项目镜像约 25GB 展开，Trivy 默认 5m 内部超时会在分析阶段被
           # "context deadline exceeded" 打断（见 dependabot docker/build-push-action-7 PR，
-          # run 33582820315：扫描跑满 300s 后 FATAL）。拉长到 10m，job 上限 60m 仍余量充足。
-          timeout: "10m"
+          # run 33582820315：扫描跑满 300s 后 FATAL）。10m 在大镜像层逐文件分析时
+          # 仍会 "semaphore acquire: context deadline exceeded"（run 34766431887，
+          # 卡在 libcusparseLt.so 分析约 10m 处），拉长到 20m，job 上限 60m 仍余量充足。
+          timeout: "20m"
