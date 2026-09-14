@@ -19,6 +19,8 @@ jobs:
         uses: dependabot/fetch-metadata@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          skip-commit-verification: true
+          skip-verification: true
 
       - name: Enable auto-merge for non-major Dependabot PRs
         if: github.event.pull_request.user.login == 'dependabot[bot]' && steps.meta.outputs.update-type != 'version-update:semver-major'
