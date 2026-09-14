@@ -33,6 +33,16 @@ EXPECTED_FEATURES: dict[str, set[str]] = {
         "clone",
         "emotion_control",
     },
+    "voicebox": {
+        "voice_conversion",
+        "zero_shot_clone",
+    },
+    "step-audio-editx": {
+        "audio_editing",
+        "emotion_control",
+        "style_control",
+        "paralinguistic",
+    },
 }
 
 # 能力 → 对应方法名映射（用于验证声明的能力有真实实现）
@@ -44,6 +54,10 @@ FEATURE_METHOD_MAP: dict[str, str] = {
     "ultimate": "generate_ultimate_clone",
     "prompt": "generate_with_prompt",
     "lora": "load_lora",
+    # voicebox / step-audio-editx 的方法级能力；zero_shot_clone / style_control /
+    # paralinguistic 属参数级能力（无独立方法），与 emotion_control 同口径跳过
+    "voice_conversion": "voice_conversion",
+    "audio_editing": "edit_audio",
 }
 
 # 已知全部能力集合（用于反向验证：未声明的能力不应被实现）
@@ -150,5 +164,16 @@ class TestEngineCapabilityContract:
 
     def test_feature_method_map_covers_all_method_features(self):
         """FEATURE_METHOD_MAP 必须覆盖所有有对应方法的能力。"""
-        method_features = {"voice_design", "clone", "script", "streaming", "ultimate", "prompt", "lora"}
+        method_features = {
+            "voice_design",
+            "clone",
+            "script",
+            "streaming",
+            "ultimate",
+            "prompt",
+            "lora",
+            # voicebox / step-audio-editx 引入的方法级能力
+            "voice_conversion",
+            "audio_editing",
+        }
         assert set(FEATURE_METHOD_MAP.keys()) == method_features

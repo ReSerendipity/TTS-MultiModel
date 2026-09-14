@@ -85,6 +85,12 @@ class EngineName(str, Enum):
             Prompt 续写、LoRA 微调等全功能。
         INDEXTTS2 (str): "indextts2" —— IndexTTS 2.5 情感控制引擎，
             支持零样本克隆、8 维情感向量控制、时长控制，显存占用更低。
+        VOICEBOX (str): "voicebox" —— Voicebox 语音转换引擎（音频→音频，
+            不实现 TTSEngine Protocol），支持零样本音色转换，
+            由 /api/generate/voicebox/convert 路由调用。
+        STEP_AUDIO_EDITX (str): "step-audio-editx" —— Step-Audio-EditX 音频编辑
+            引擎（音频→音频），支持情感/风格/副语言编辑控制，
+            由 /api/generate/step-audio-editx/edit 路由调用。
 
     使用示例::
 
@@ -96,6 +102,8 @@ class EngineName(str, Enum):
     VOXCPM2 = "voxcpm2"
     INDEXTTS2 = "indextts2"
     INDEXTTS20 = "indextts20"
+    VOICEBOX = "voicebox"
+    STEP_AUDIO_EDITX = "step-audio-editx"
 
 
 #: IndexTTS 家族成员集合。2.5（indextts2）与 2.0（indextts20）是同一推理
@@ -112,6 +120,8 @@ ENGINE_DISPLAY_NAMES: dict[str, str] = {
     EngineName.VOXCPM2.value: "VoxCPM2",
     EngineName.INDEXTTS2.value: "IndexTTS 2.5",
     EngineName.INDEXTTS20.value: "IndexTTS 2.0",
+    EngineName.VOICEBOX.value: "Voicebox VC",
+    EngineName.STEP_AUDIO_EDITX.value: "Step-Audio-EditX",
 }
 
 #: 各引擎的基线显存需求字典（单位 GB，浮点数）。
@@ -123,6 +133,8 @@ ENGINE_VRAM_REQUIREMENTS: dict[str, float] = {
     EngineName.VOXCPM2.value: 6.5,
     EngineName.INDEXTTS2.value: 6.0,
     EngineName.INDEXTTS20.value: 5.5,
+    EngineName.VOICEBOX.value: 4.0,
+    EngineName.STEP_AUDIO_EDITX.value: 8.0,
 }
 
 # --- 声明式引擎规格缓存（由 load_engine_specs_from_config 填充） ---
