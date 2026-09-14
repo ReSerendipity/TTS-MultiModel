@@ -1,0 +1,5 @@
+{
+  "_protocol": "一仓一 fixer：开工前把 session 改为你的标识并提交；收工置回 null。检测到 session 非空且非本会话时，本会话禁止 commit。",
+  "session": null,
+  "since": null
+}
