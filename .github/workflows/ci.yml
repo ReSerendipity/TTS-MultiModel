@@ -79,7 +79,7 @@ jobs:
   # 独立成 job 的理由不变：mypy 与 ruff 处置节奏不同，
   # 不让「ruff 已可阻断」被 mypy 的存量债务拖住。
   # ⚠️ 改 mypy 版本或依赖集 = 换测量口径，必须用基线注释命令重算基线。
-  #（原内联实现见 git 历史；迁移记录 docs/reports/家族模板迁移_mypy_ratchet_20260903.md）
+  #（原内联实现见 git 历史；迁移记录 docs/reports/mypy-ratchet-组织级门禁迁移_20260903.md）
   typecheck:
     name: Typecheck (mypy ratchet)
     uses: ReSerendipity/.github/.github/workflows/python-quality-baseline.yml@main

@@ -1,6 +1,6 @@
 {
   "version": "2.2.1",
-  "release_date": "2026-09-10",
+  "release_date": "2026-08-22",
   "minimum_shell_version": "2.2.1",
-  "changelog": "桌面分发与安全加固：完整性自检签名（Ed25519 + HMAC 回退）、水印密钥环境注入与失败策略、便携依赖钉装、Tauri 桌面壳。"
+  "changelog": "2.2.1 补丁发布（release-please）：修复 EngineRegistry 导入错误（tests）、README CI 徽章整理、ruff 终检 11→0 与安全/后端/容器化评估整改批次收尾（working-tree batch，AGENTS 同步至 v1.19）。桌面分发与安全加固（Tauri 壳/完整性签名/便携分卷）属 2.2.1 之后的 Unreleased 内容"
 }

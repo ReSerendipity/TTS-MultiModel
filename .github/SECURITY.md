@@ -8,8 +8,8 @@ We actively maintain the code in this repository. If you discover a security iss
 
 Please DO NOT open a public issue for security vulnerabilities. Instead, contact the maintainers privately:
 
-- Preferred: Open a private Discussion in the repository and mark it "security" (if Discussions is enabled).
-- Alternative: Open a private issue and add the label `security` (maintainers will convert it to a private channel if needed).
+- Preferred: GitHub **Security → Report a vulnerability** (private vulnerability report).
+- Alternative: Email `ReSerendipity@outlook.com` with subject prefixed `[SECURITY]`.
 
 Include:
 
@@ -22,7 +22,7 @@ We will respond as soon as possible and coordinate a fix and disclosure plan.
 
 ## Supported Contact
 
-Maintainers will triage reports via GitHub Discussions / Issues. If you need a direct contact, use the repository owner's public contact information on GitHub.
+Maintainers triage reports via GitHub Security Advisories and the email channel above (same channels as the Chinese section below).
 
 ## Timeline
 
@@ -48,7 +48,7 @@ Do not publicly disclose the vulnerability until a fix or mitigation has been pu
 
 - 私密报告：GitHub **Security → Report a vulnerability**（勿公开提 Issue）
 - 报告请包含：① 漏洞描述与影响范围 ② 复现步骤（PoC）③ 受影响版本 ④ 建议修复方案
-- 安全更新流程：报告 → 24 小时内确认（高危遵循上方 Timeline：48h 确认 / 14d 修复）→ 根因分析 → 修复+回归测试 → 补丁发布 → 公告影响范围
+- 安全更新流程：报告 → 48 小时内确认（与上方 Timeline 一致）→ 高危 14 天内提供修复或缓解计划→ 根因分析 → 修复+回归测试 → 补丁发布 → 公告影响范围
 - 依赖安全：唯一声明源 `pyproject.toml`；CI Trivy 容器扫描（CRITICAL/HIGH 阻断）；pre-commit 钩子 14 项（ruff / mypy / check-engine-compat 等）
 
 ## 安全架构概览（项目内置防护）
@@ -56,7 +56,7 @@ Do not publicly disclose the vulnerability until a fix or mitigation has been pu
 - **鉴权**：API Token + 可选 CSRF 防护（`app/integrated_app/auth.py`、`app/integrated_app/middleware/csrf.py`）
 - **速率限制**：滑动窗口全局限流 + 克隆专用 1h 窗口（`middleware/rate_limit.py`）
 - **内容安全**：6 类正则检测（暴力/仇恨/自残/色情/违法/骚扰）+ 同音字/拼音/外文变体（`security/content_safety.py`）
-- **水印**：DCT 频域不可感知水印 + HMAC 密钥版 v3（`watermark.py`）
+- **水印**：频域不可感知水印（16–20 kHz 频段、FFT 帧 2048）+ HMAC-SHA256 密钥版 v3，载荷 source_id/timestamp/content_hash（`watermark.py`，与 docs/project/WATERMARK_LIMITATIONS.md 口径一致）
 - **PII 加密**：历史记录文本字段 Fernet 加密 + 密钥自动管理（`history_db.py`）
 - **审计日志**：操作审计 + 10MB 轮转（`security/audit.py`）
 - **完整性校验**：核心模块 SHA-256 自检 + 模型权重哈希校验（`security/integrity_check.py`、`security/integrity_selfcheck.py`）
