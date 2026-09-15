@@ -282,15 +282,34 @@ document.body.addEventListener('htmx:afterRequest', function(evt) {
     if (field) field.value = 'true';
 });
 
-// ===== 语音设计页：把最近一次生成结果的文件名回填进保存表单 =====
-// 设计页没有参考音频可上传，可固化的只有生成结果；后端结果片段已带
+// ===== 生成成功后统一接线（htmx 与 SSE 流式两条路径共用）=====
+// WHY 抽成公共函数：htmx 路径（afterSwap）与 SSE 流式路径（done 事件）此前各自
+// 手写「显示后处理折叠区 + 回填保存表单的结果文件名」，流式分支两次漏写，导致
+// 流式生成完成后后处理区不出现、点「保存为音色」被后端判为"缺少音频"：
+//   · voice_clone.html 流式：漏显示 vc-pp-section（后处理区永不出现）
+//   · voice_design.html 流式：漏回填 vd-result-audio（保存时 result_audio 为空）
+// 任何新增的结果渲染路径都必须调用本函数，不要再各写一份。
+//
+// 命名约定（与 partials/post_processing.html 一致）：结果容器 id 为
+// `<prefix>-result`，配套元素为 `<prefix>-pp-section`（后处理折叠区）与
+// `<prefix>-result-audio`（保存表单隐藏字段，可缺省）。
+window.wireGenerationResult = function (rootEl) {
+    if (!rootEl || !rootEl.id || !/-result$/.test(rootEl.id)) return;
+    var holder = rootEl.querySelector('[data-audio-filename]');
+    if (!holder) return; // 错误块等「本次没有生成结果」的场景 → 不接线
+    var prefix = rootEl.id.slice(0, -'-result'.length);
+    var ppSection = document.getElementById(prefix + '-pp-section');
+    if (ppSection) ppSection.style.display = '';
+    var field = document.getElementById(prefix + '-result-audio');
+    if (field) field.value = holder.getAttribute('data-audio-filename') || '';
+};
+
+// 语音设计页：设计页没有参考音频可上传，可固化的只有生成结果；后端结果片段已带
 // data-audio-filename，这里取出写入隐藏字段，避免新增一个暴露服务端路径的接口。
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     var target = evt.detail && evt.detail.target;
     if (!target || target.id !== 'vd-result') return;
-    var holder = target.querySelector('[data-audio-filename]');
-    var field = document.getElementById('vd-result-audio');
-    if (holder && field) field.value = holder.getAttribute('data-audio-filename') || '';
+    window.wireGenerationResult(target);
 });
 
 // Auto-switch tab for engine

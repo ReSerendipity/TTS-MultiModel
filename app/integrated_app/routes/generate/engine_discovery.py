@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -89,16 +90,27 @@ def list_engines() -> dict:
     return {"engines": engines}
 
 
-@router.get("/{engine_id}/info")
-def engine_info(engine_id: str) -> dict:
+@router.get("/{engine_id}/info", response_model=None)
+def engine_info(engine_id: str) -> dict[str, Any] | JSONResponse:
     """查询单个引擎的元数据与能力；未注册返回 404。
 
     Args:
         engine_id: 引擎注册名。
 
     Returns:
-        dict: 含 ``name`` / ``display_name`` / ``metadata`` / ``capabilities``；
-              未注册时返回 404 JSON。
+        dict[str, Any] | JSONResponse: 含 ``name`` / ``display_name`` /
+            ``metadata`` / ``capabilities``；未注册时返回 404 JSON。
+
+    WHY 返回标注是联合类型 + 装饰器带 ``response_model=None``：
+        本函数有两条 return 路径，404 分支返回的是 ``JSONResponse`` 而非 dict。
+        ① 此前只写 ``-> dict``，mypy 报
+        ``Incompatible return value type (got "JSONResponse", expected "dict[Any, Any]")``
+        ——即 2026-09-14 提交 024572e 引入、让 mypy 棘轮从 103 涨到 104 的那个错误。
+        ② 但只把标注改成联合类型还不够：FastAPI 会拿返回标注去推断响应模型，
+        ``dict[str, Any] | JSONResponse`` 不是合法 Pydantic 字段类型，模块导入期就抛
+        ``FastAPIError: Invalid args for response field``（整个 routes 发现链会连带失败）。
+        故按 FastAPI 官方提示加 ``response_model=None`` 关闭推断，两条 return 路径
+        的类型标注与实际返回就此一致。
     """
     if not engine_registry.is_registered(engine_id):
         return JSONResponse(

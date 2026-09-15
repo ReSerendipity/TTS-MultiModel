@@ -731,11 +731,12 @@
                             // 由用户手动点播，避免隐形播放 / 双音源叠加
                             if (doneData.filename && window.EmbeddedPlayer) {
                                 resultEl.innerHTML = '<div data-audio-filename="' + doneData.filename + '">'
-                                    + window.EmbeddedPlayer.html('/output/' + doneData.filename)
+                                    + window.EmbeddedPlayer.html('/api/audio/' + encodeURIComponent(doneData.filename))
                                     + '<div class="status-message success">生成完成 - ' + doneData.filename + '</div></div>';
                                 window.EmbeddedPlayer.scan();
-                                var ppStream = document.getElementById('vd-pp-section');
-                                if (ppStream) ppStream.style.display = '';
+                                // 与 htmx 路径共用生成后接线：显示后处理区 + 回填 vd-result-audio。
+                                // 流式此前只做了前者，漏了回填，点「保存为音色」会被后端判为"缺少音频"。
+                                window.wireGenerationResult(resultEl);
                             }
                         } catch (e) {
                             console.warn('[Streaming] Done event parse failed:', e);

@@ -772,14 +772,17 @@ async def streaming_audio_generation(
         duration: float = time.monotonic() - start_time
         _log_generation("Streaming", text, "voxcpm2", "streaming", True, duration)
 
-        safe_filename: str = quote(filename)
+        # 播放地址必须是 /api/audio/{filename}（routes/audio.py 的动态路由，
+        # 带三重路径校验 + Range 支持）。历史遗留的 /output/ 从未注册过任何
+        # 路由或静态挂载，写它会直接 404（见 GOTCHAS #86）。
+        safe_filename: str = quote(filename, safe="")
         safe_display: str = html.escape(filename)
         return HTMLResponse(
             f"""<div class="tts-success-block">流式生成完成！音频已开始播放 ({safe_display})</div>
 <audio class="tts-audio-hidden" id="streaming-audio">
-    <source src="/output/{safe_filename}" type="audio/wav">
+    <source src="/api/audio/{safe_filename}" type="audio/wav">
 </audio>
-{_EMBEDDED_PLAYER_HTML.format(audio_url="/output/" + safe_filename)}
+{_EMBEDDED_PLAYER_HTML.format(audio_url="/api/audio/" + safe_filename)}
 <script>
 (function(){{
     var audio = document.getElementById('streaming-audio');

@@ -8,6 +8,7 @@ on:
       - 'app/integrated_app/static/**'
       - 'tests/frontend/**'
       - 'tests/scripts/render_pages.py'
+      - 'tests/package.json'
       - '.github/workflows/frontend.yml'
   pull_request:
     branches: [main]
@@ -16,6 +17,7 @@ on:
       - 'app/integrated_app/static/**'
       - 'tests/frontend/**'
       - 'tests/scripts/render_pages.py'
+      - 'tests/package.json'
       - '.github/workflows/frontend.yml'
   workflow_dispatch:
 
@@ -61,6 +63,13 @@ jobs:
 
       - name: Run frontend smoke tests (jsdom)
         run: node tests/frontend/smoke.js
+
+      # 2026-09-14：生成结果「统一接线」行为测试。
+      # tests/test_fe_be_consistency.py 的守卫 6 只证明「流式模板调用了
+      # window.wireGenerationResult()」（调用点），本步骤证明该函数本身行为正确
+      # （显示 <prefix>-pp-section + 回填 <prefix>-result-audio）。两者互补。
+      - name: Run generation-result wiring test (jsdom)
+        run: node tests/frontend/wire_generation_result.js
 
       - name: Upload rendered pages (debug artifact)
         if: failure()

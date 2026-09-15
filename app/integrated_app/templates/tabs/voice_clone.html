@@ -487,13 +487,14 @@
                         } catch(e) {}
                         break;
                     case 'audio':
+                        // 服务端 `event: audio` 的 data 是**裸 base64 字符串**（非 JSON），
+                        // 见 routes/generate/voxcpm2/streaming.py 的 yield。此前这里
+                        // 误用 JSON.parse，异常被 catch 吞掉，导致所有音频块静默丢弃。
                         try {
-                            var audioData = JSON.parse(currentData);
-                            if (audioData && audioData.pcm) {
-                                var pcm16 = base64ToPCM16(audioData.pcm);
-                                audioChunks.push(pcm16);
-                            }
-                        } catch(e) {}
+                            audioChunks.push(base64ToPCM16(currentData));
+                        } catch(e) {
+                            console.warn('[Streaming] Audio chunk decode failed:', e);
+                        }
                         break;
                     case 'done':
                         try {
@@ -504,11 +505,18 @@
                             // 由用户手动点播，避免隐形播放 / 双音源叠加
                             if (done.filename && window.EmbeddedPlayer) {
                                 statusEl.innerHTML = '<div data-audio-filename="' + done.filename + '">'
-                                    + window.EmbeddedPlayer.html('/output/' + done.filename)
+                                    + window.EmbeddedPlayer.html('/api/audio/' + encodeURIComponent(done.filename))
                                     + '<div class="status-message success">生成完成 - ' + done.filename + '</div></div>';
                                 window.EmbeddedPlayer.scan();
+                                // 注意：本函数内 statusEl 绑定的是 #vc-result（见 submitCloneStreaming
+                                // 开头 var statusEl = document.getElementById('vc-result')），不是 #vc-status。
+                                // 与 htmx 路径共用生成后接线，否则 vc-pp-section 永不出现。
+                                window.wireGenerationResult(statusEl);
                             }
-                        } catch(e) {}
+                        } catch(e) {
+                            // 不静默：空 catch 会吞掉接线/解析异常（历史上已因此丢过全部音频块）
+                            console.warn('[Streaming] Done event handling failed:', e);
+                        }
                         break;
                     case 'error':
                         try {
