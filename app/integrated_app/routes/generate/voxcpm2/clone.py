@@ -142,6 +142,17 @@ def _check_clone_consent(
         return None
 
     state = get_persona_consent_state(persona_name)
+    if state == "unverified":
+        # P2-7：unverified 放行开关（默认 True 保持存量兼容；False 时未声明音色一律拒绝）。
+        from ....config import get_config
+
+        if not get_config().pydantic_config.security.clone_unverified_allow:
+            return _error_html(
+                request,
+                "音色 ["
+                + os.path.basename(persona_name)
+                + "] 缺少声音使用授权声明（unverified），且当前配置禁止放行未声明音色",
+            )
     log_audit(
         "voice_clone",
         detail=f"persona={os.path.basename(persona_name)} consent_state={state}",

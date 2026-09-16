@@ -202,12 +202,12 @@ python scripts/download_models.py --all --no-verify           # 跳过 SHA256 �
 | 模型目录 | 归属引擎 | 官方仓库（HF / ModelScope） | 许可 |
 | --- | --- | --- | --- |
 | `model/VoxCPM2/` | voxcpm2 | `openbmb/VoxCPM2` / `OpenBMB/VoxCPM2` | Apache-2.0 |
-| `model/SenseVoiceSmall/` | voxcpm2（ASR） | `FunAudioLLM/SenseVoiceSmall` / `iic/SenseVoiceSmall` | 需确认 |
-| `model/speech_zipenhancer/` | voxcpm2（降噪） | 仅 ModelScope `iic/speech_zipenhancer_ans_multiloss_16k_base` | 需确认 |
+| `model/SenseVoiceSmall/` | voxcpm2（ASR） | `FunAudioLLM/SenseVoiceSmall` / `iic/SenseVoiceSmall` | 自定义 model-license（2026-09-16 经 HF API 核实 `license: other/model-license`；FunASR 官网标注开源可商用；商用遵循模型许可） |
+| `model/speech_zipenhancer/` | voxcpm2（降噪） | 仅 ModelScope `iic/speech_zipenhancer_ans_multiloss_16k_base` | Apache-2.0（2026-09-15 经 ModelScope API 核实） |
 | `model/IndexTTS-2.5/` | indextts2 | `IndexTeam/IndexTTS-2.5` | bilibili 自定义 |
 | `model/IndexTTS-2.0/` | indextts20 | `IndexTeam/IndexTTS-2` | bilibili 自定义 |
-| `model/OpenVoice/` | voicebox | `myshell-ai/OpenVoice` / `myshell-ai/OpenVoice` | MIT（代码） |
-| `model/Step-Audio-EditX/` | step-audio-editx | `stepfun-ai/Step-Audio-EditX` | 代码 Apache-2.0 |
+| `model/OpenVoice/` | voicebox | `myshell-ai/OpenVoice` / `myshell-ai/OpenVoice` | MIT（2026-09-16 经 HF API 核实：OpenVoice 与 OpenVoiceV2 模型卡均标 MIT，权重顾虑解除） |
+| `model/Step-Audio-EditX/` | step-audio-editx | `stepfun-ai/Step-Audio-EditX` | Apache-2.0（2026-09-16 经 GitHub API 核实代码许可；HF 卡未单列权重标签，按随官方仓库对待） |
 
 完整下载步骤、目录结构与常见问题见 `docs/plans/MODEL_DOWNLOAD_GUIDE.md`。
 
@@ -369,12 +369,12 @@ TTS_MultiModel/
 | 模型 / 权重 | 归属引擎 | 权重许可 | 商用提示 | 说明 |
 |---|---|---|---|---|
 | VoxCPM2 | voxcpm2 | Apache-2.0 | ✅ 可商用 | 默认推荐引擎 |
-| SenseVoiceSmall | voxcpm2（ASR） | FunAudioLLM 许可 | ⚠️ 需确认 | 研究为主，商用前核对 |
-| speech_zipenhancer | voxcpm2（降噪） | iic 社区权重 | ⚠️ 需确认 | 仅 ModelScope 有 |
+| SenseVoiceSmall | voxcpm2（ASR） | 自定义 model-license | ✅ 可商用（遵循模型许可；2026-09-16 HF API 核实 license: model-license，FunASR 标注可商用） | 沿用官方模型卡 |
+| speech_zipenhancer | voxcpm2（降噪） | Apache-2.0 | ✅ 可商用（2026-09-15 经 ModelScope API 核实） | 仅 ModelScope 有 |
 | IndexTTS 2.5 | indextts2 | bilibili Model Use License Agreement | ⚠️ **商用须事先向 bilibili 登记并取得书面授权** | 见引擎仓库 LICENSE |
 | IndexTTS 2.0 | indextts20 | bilibili Model Use License Agreement | ⚠️ 同上 | 2.5 的旧版本变体，权重不通用 |
-| OpenVoice | voicebox | MIT（代码） | ⚠️ 权重许可需确认 | ToneColorConverter 权重 |
-| Step-Audio-EditX | step-audio-editx | 代码 Apache-2.0 | ⚠️ 权重许可未明示 | 权重使用前核对 |
+| OpenVoice | voicebox | MIT | ✅ 可商用（2026-09-16 经 HF API 核实 V1/V2 卡均 MIT） | ToneColorConverter 权重 |
+| Step-Audio-EditX | step-audio-editx | Apache-2.0 | ✅ 代码经 GitHub API 实证（2026-09-16）；HF 卡未单列权重标签，按随官方仓库对待 | 权重使用前留意官方更新 |
 
 > 历史 / 参考引擎（非默认分发）：CosyVoice2 / ChatTTS / F5-TTS 等曾出现在 `data/` 参考实现中，许可为 Apache-2.0 / CC BY-NC 等，其中 ChatTTS、F5-TTS 模型为**非商用**许可，仅作研究参考或标注后使用，不得作为商用发行默认引擎。
 

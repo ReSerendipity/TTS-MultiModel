@@ -10,6 +10,8 @@
     - engine (str, 可选)：目标引擎名，仅用于前置就绪校验；默认使用当前引擎。
     - prompt_text (str, 可选)：参考音频对应转写文本（传给 instruction）。
     - persona_name (str, 可选)：已注册 Persona 名称，作为参考音频来源。
+    - has_consent (bool, 可选)：上传参考音频时必须勾选的授权声明
+      （P0-1 补口，与 voxcpm2/clone.py 同款门禁）。
     - ref_audio (File, 可选)：直接上传的参考音频文件。
     - tempo_factor / voice_enhancement / target_lufs：通用后处理参数。
 
@@ -32,6 +34,7 @@ from fastapi.responses import HTMLResponse
 
 from ....config import MAX_TEXT_LENGTH
 from ....model_registry import registry
+from ....persona_manager import get_persona_consent_state
 from ..utils import (
     _error_html,
     _execute_generation,
@@ -55,6 +58,7 @@ async def generic_clone_endpoint(
     engine: str = Form(""),
     prompt_text: str = Form(""),
     persona_name: str = Form(""),
+    has_consent: bool = Form(False),
     ref_audio: UploadFile | None = File(None),
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
@@ -83,6 +87,38 @@ async def generic_clone_endpoint(
     Returns:
         HTMLResponse: 成功/失败的 HTMX 片段。
     """
+    # 0. P0-1 声音克隆授权 v1 补口：与 voxcpm2/clone.py 同款门禁（fail-safe，
+    #    先于 pre_validate 执行，避免被 EngineNotReady 短路而形同虚设）。
+    #    上传来源必须显式勾选；persona 来源默认放行但审计（unverified 可经
+    #    security.clone_unverified_allow=False 收紧为拒绝）。
+    wants_clone = (ref_audio is not None and bool(ref_audio.filename)) or bool(persona_name)
+    if wants_clone:
+        from ....security.audit import log_audit
+
+        if not persona_name:
+            if not has_consent:
+                return _error_html(
+                    request,
+                    "请先勾选「我已确认拥有该参考声音的使用权或已获得其授权」再生成",
+                )
+        else:
+            state = get_persona_consent_state(persona_name)
+            if state == "unverified":
+                from ....config import get_config
+
+                if not get_config().pydantic_config.security.clone_unverified_allow:
+                    return _error_html(
+                        request,
+                        f"音色 [{persona_name}] 缺少声音使用授权声明（unverified），且当前配置禁止放行未声明音色",
+                    )
+            log_audit(
+                "voice_clone",
+                detail=f"persona={persona_name} consent_state={state} endpoint=generic/clone",
+                severity="warning" if state == "unverified" else "info",
+                outcome="success",
+                request_id=getattr(request.state, "request_id", None),
+            )
+
     # 1. 前置校验：引擎就绪 + 文本非空 + 长度限制
     invalid = pre_validate(request, engine or None, text, MAX_TEXT_LENGTH)
     if invalid:

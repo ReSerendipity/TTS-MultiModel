@@ -576,7 +576,9 @@ class BatchGenerationManager:
                 # IndexTTS2 引擎
                 infer_kwargs: dict[str, Any] = {
                     "text": text,
-                    "spk_audio_prompt": params.get("ref_audio_path", ""),
+                    # P0-1：OpenAI 兼容端点不提供任意参考音频通道；
+                    # 原 params.get("ref_audio_path") 为不可达死代码，移除以防回归。
+                    "spk_audio_prompt": "",
                 }
                 voice = params.get("voice", "")
                 if voice and voice not in _VOICE_PERSONA_MAP:
@@ -769,8 +771,58 @@ class OpenAICompatibleRouter:
             """
             from .model_registry import registry
 
-            # 检查引擎是否就绪
+            # P0-1 声音克隆授权 v1 补口（OpenAI 兼容端点）：
+            # 1) 拒绝携带参考音频/路径参数的请求——本端点只提供预设音色与已声明音色，
+            #    不提供「任意本地音频克隆」通道（防 API 绕过 UI 授权门禁）。
+            # 2) voxcpm2 引擎下 voice 传入非预设名时，必须是已登记且完成授权声明的
+            #    音色（granted/self；OpenAI 端点无勾选交互，unverified 一律拒绝）。
+            try:
+                raw_keys = set((await request.json()).keys())
+            except Exception:  # noqa: BLE001 - 非 JSON 体交给后续模型解析报错
+                raw_keys = set()
+            _forbidden = {"ref_audio_path", "spk_audio_prompt", "reference_audio", "ref_audio"}
+            if raw_keys & _forbidden:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "OpenAI 兼容端点不支持参考音频参数（ref_audio_path 等）。"
+                        "如需克隆指定音色，请先在 Web UI 登记音色并完成授权声明，再用 voice 传入音色名。"
+                    ),
+                )
+
             engine_name = _MODEL_ENGINE_MAP.get(body.model, "voxcpm2")
+            if engine_name == "voxcpm2" and body.voice and body.voice not in _VOICE_PERSONA_MAP:
+                import os as _os
+
+                from .persona_manager import PERSONA_DIR, get_persona_consent_state
+
+                if not _os.path.exists(_os.path.join(PERSONA_DIR, f"{body.voice}.wav")):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"未知音色 '{body.voice}'。可选预设音色：{sorted(_VOICE_PERSONA_MAP)}；"
+                            "或在 Web UI 登记音色并完成授权声明后传入音色名。"
+                        ),
+                    )
+                _voice_state = get_persona_consent_state(body.voice)
+                if _voice_state not in ("granted", "self"):
+                    raise HTTPException(
+                        status_code=403,
+                        detail=(
+                            f"音色 '{body.voice}' 缺少声音使用授权声明（{_voice_state}）。"
+                            "OpenAI 兼容端点无法呈现勾选交互，请先在 Web UI 完成授权声明后重试。"
+                        ),
+                    )
+                from .security.audit import log_audit
+
+                log_audit(
+                    "voice_clone",
+                    actor="openai_client",
+                    detail=f"persona={body.voice} consent_state={_voice_state} endpoint=openai_speech",
+                    outcome="success",
+                )
+
+            # 检查引擎是否就绪
             if not registry.model_loaded:
                 raise HTTPException(
                     status_code=503,
@@ -899,6 +951,40 @@ class OpenAICompatibleRouter:
             body: BatchSpeechRequest,
         ):
             """提交批量生成任务。"""
+            # P0-1 补口：同 /audio/speech——拒绝参考音频参数；voxcpm2 非预设 voice
+            # 必须是已登记且完成授权声明的音色。
+            try:
+                raw_keys = set((await request.json()).keys())
+            except Exception:  # noqa: BLE001
+                raw_keys = set()
+            _forbidden = {"ref_audio_path", "spk_audio_prompt", "reference_audio", "ref_audio"}
+            if raw_keys & _forbidden:
+                raise HTTPException(
+                    status_code=400,
+                    detail="OpenAI 兼容端点不支持参考音频参数（ref_audio_path 等）。",
+                )
+            _engine_name = _MODEL_ENGINE_MAP.get(body.model, "voxcpm2")
+            if _engine_name == "voxcpm2" and body.voice and body.voice not in _VOICE_PERSONA_MAP:
+                import os as _os
+
+                from .persona_manager import PERSONA_DIR, get_persona_consent_state
+
+                if not _os.path.exists(_os.path.join(PERSONA_DIR, f"{body.voice}.wav")):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"未知音色 '{body.voice}'。可选预设音色：{sorted(_VOICE_PERSONA_MAP)}；"
+                            "或在 Web UI 登记音色并完成授权声明。"
+                        ),
+                    )
+                _voice_state = get_persona_consent_state(body.voice)
+                if _voice_state not in ("granted", "self"):
+                    raise HTTPException(
+                        status_code=403,
+                        detail=(
+                            f"音色 '{body.voice}' 缺少声音使用授权声明（{_voice_state}）。请先在 Web UI 完成授权声明。"
+                        ),
+                    )
             batch_id = await self._batch_manager.submit_batch(
                 texts=body.texts,
                 params={

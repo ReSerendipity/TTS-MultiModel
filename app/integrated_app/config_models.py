@@ -637,6 +637,14 @@ class SecurityConfig(BaseModel):
         default=True,
         description="P1：是否启用结构化审计日志（默认开启，10MB 轮转；detail 不含 PII 文本）",
     )
+    clone_unverified_allow: bool = Field(
+        default=True,
+        description=(
+            "P2-7：persona 来源克隆的 unverified（存量/缺失声明）放行开关。"
+            "True 保持存量兼容（放行 + 审计 WARN）；False 时未声明音色在克隆类端点一律拒绝。"
+            "OpenAI 兼容端点不受此开关影响，unverified 始终拒绝（无勾选交互）。"
+        ),
+    )
     upload_ttl_days: int = Field(
         default=30,
         ge=0,

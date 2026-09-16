@@ -85,3 +85,58 @@ def test_clone_upload_with_consent_not_blocked_by_gate(client):
     )
     # gate 放行后进入正常流程；不应再返回「请勾选使用权」的 400 文案
     assert "请先勾选" not in r.text and "使用权" not in r.text
+
+
+# ---------------------------------------------------------------------------
+# 4. generic/clone 门禁（P0-1 补口，2026-09-15）
+# ---------------------------------------------------------------------------
+
+
+def test_generic_clone_upload_without_consent_rejected(client):
+    """generic/clone 上传克隆未勾选授权 → 400 并提示勾选（与 voxcpm_clone 同口径）。"""
+    r = client.post(
+        "/api/generate/generic/clone",
+        data={"text": "测试通用克隆"},
+        files={"ref_audio": ("ref.wav", io.BytesIO(_FAKE_WAV), "audio/wav")},
+        headers=_csrf_headers(client),
+    )
+    assert r.status_code == 400
+    assert "使用权" in r.text or "授权" in r.text
+
+
+def test_generic_clone_with_consent_passes_gate(client):
+    """勾选授权后不再被授权门禁拦截（后续错误不属于门禁范围）。"""
+    r = client.post(
+        "/api/generate/generic/clone",
+        data={"text": "测试通用克隆", "has_consent": "true"},
+        files={"ref_audio": ("ref.wav", io.BytesIO(_FAKE_WAV), "audio/wav")},
+        headers=_csrf_headers(client),
+    )
+    assert "请先勾选" not in r.text and "使用权" not in r.text
+
+
+# ---------------------------------------------------------------------------
+# 5. OpenAI 兼容端点防绕过（P0-1 补口，2026-09-15）
+# ---------------------------------------------------------------------------
+
+
+def test_openai_speech_rejects_ref_audio_path(client):
+    """/v1/audio/speech 携带 ref_audio_path → 400（gate 先于模型就绪检查）。"""
+    r = client.post(
+        "/v1/audio/speech",
+        json={"model": "tts-1", "input": "测试", "voice": "alloy", "ref_audio_path": "personas/x.wav"},
+        headers=_csrf_headers(client),
+    )
+    assert r.status_code == 400
+    assert "参考音频" in r.text or "ref_audio_path" in r.text
+
+
+def test_openai_speech_rejects_unknown_voice_for_voxcpm2(client):
+    """voxcpm2 引擎下 voice 传非预设名且非已登记音色 → 400。"""
+    r = client.post(
+        "/v1/audio/speech",
+        json={"model": "tts-1", "input": "测试", "voice": "mystery-voice"},
+        headers=_csrf_headers(client),
+    )
+    assert r.status_code == 400
+    assert "未知音色" in r.text or "音色" in r.text
