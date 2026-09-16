@@ -143,7 +143,6 @@ def silent_exception_handler(loop, context):
     loop.default_exception_handler(context)
 
 
-
 def auto_open_browser(ip, port, timeout=300):
     """
     等待服务就绪后自动打开浏览器

@@ -20,9 +20,7 @@ CFG = os.path.join(os.path.dirname(HERE), "ci", "branch-protection.json")
 
 def gh(args: list[str]) -> tuple[int, str, str]:
     """调用 gh api，返回 (returncode, stdout, stderr)。"""
-    r = subprocess.run(
-        ["gh", "api", *args], capture_output=True, text=True, check=False
-    )
+    r = subprocess.run(["gh", "api", *args], capture_output=True, text=True, check=False)
     return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
 
 
@@ -55,17 +53,12 @@ def compute_drift(cur: dict, want: dict, slug: str) -> list[str]:
     d: list[str] = []
     pr = cur.get("required_pull_request_reviews") or {}
     want_pr = want["required_pull_request_reviews"]
-    if (
-        pr.get("required_approving_review_count")
-        != want_pr["required_approving_review_count"]
-    ):
+    if pr.get("required_approving_review_count") != want_pr["required_approving_review_count"]:
         d.append("review")
     rsc = cur.get("required_status_checks") or {}
     if bool(rsc.get("strict")) != want["required_status_checks"]["strict"]:
         d.append("strict")
-    if set(rsc.get("contexts") or []) != set(
-        want["required_status_checks"]["contexts"]
-    ):
+    if set(rsc.get("contexts") or []) != set(want["required_status_checks"]["contexts"]):
         d.append("contexts")
     if bool((cur.get("enforce_admins") or {}).get("enabled")) != want["enforce_admins"]:
         d.append("enforce_admins")
@@ -105,9 +98,7 @@ def main() -> int:
     body = {k: v for k, v in want.items() if not k.startswith("_")}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(body, f, ensure_ascii=False)
-    c, _, e = gh(
-        ["-X", "PUT", "repos/" + slug + "/branches/main/protection", "--input", path]
-    )
+    c, _, e = gh(["-X", "PUT", "repos/" + slug + "/branches/main/protection", "--input", path])
     print("apply ->", "OK" if c == 0 else e[:200])
     if cfg["policy"]["allow_auto_merge"]:
         gh(["-X", "PATCH", "repos/" + slug, "-F", "allow_auto_merge=true"])

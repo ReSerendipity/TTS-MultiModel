@@ -11,6 +11,7 @@ v2 改进（2026-09-07 / 2026-09-09）：
   - 2026-09-09：改用 f-string、去掉 coding 声明，满足 ruff UP009/UP031，
     避免污染各仓的 lint 门禁。
 """
+
 import os
 import re
 import subprocess
@@ -64,9 +65,9 @@ def ignored_set(repo, entries):
     if not entries:
         return set()
     try:
-        r = subprocess.run(["git", "check-ignore", "--stdin"], cwd=repo,
-                           input="\n".join(entries).encode("utf-8"),
-                           capture_output=True)
+        r = subprocess.run(
+            ["git", "check-ignore", "--stdin"], cwd=repo, input="\n".join(entries).encode("utf-8"), capture_output=True
+        )
         return set(x for x in r.stdout.decode("utf-8", "replace").splitlines() if x)
     except Exception:
         return set()
@@ -126,9 +127,11 @@ def main():
     if fails:
         print(f"\nstructure-guard: {len(fails)} failure(s), {len(warns)} warning(s).")
         return 1
-    print("structure-guard: OK "
-          f"({len(entries)} root entries, {len(checked)} checked, "
-          f"{len(ignored)} ignored, {len(warns)} warning(s)).")
+    print(
+        "structure-guard: OK "
+        f"({len(entries)} root entries, {len(checked)} checked, "
+        f"{len(ignored)} ignored, {len(warns)} warning(s))."
+    )
     return 0
 
 
