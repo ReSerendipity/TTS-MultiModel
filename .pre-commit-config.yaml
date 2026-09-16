@@ -141,6 +141,7 @@ repos:
     rev: v8.30.1
     hooks:
       - id: gitleaks-system
+        pass_filenames: false
 
 default_language_version:
   python: python3.12
