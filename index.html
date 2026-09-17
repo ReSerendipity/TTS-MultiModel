@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTS MultiModel · 多引擎语音合成 — 演示页</title>
+<style>
+  :root{
+    --bg0:#1a1815; --bg1:#272421; --card:#26221e; --card2:#2e2a25;
+    --ink:#eae6e1; --ink2:#a49c91; --line:#3a3530;
+    --acc:#8fae7f; --acc-soft:rgba(143,174,127,.14);
+    --warn:#d9b48a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",Arial,sans-serif;min-height:100vh;color:var(--ink);
+    background:radial-gradient(1100px 480px at 50% -12%,rgba(143,174,127,.14) 0%,rgba(143,174,127,0) 60%),linear-gradient(180deg,#272421 0%,#1e1c19 46%,#1a1815 100%)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px 40px}
+  .winbar{height:52px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+  .dot{width:11px;height:11px;border-radius:50%;opacity:.8}
+  .winbar .brand{font-size:13px;letter-spacing:1.2px;color:var(--ink2);font-weight:600}
+  .winbar .sub{margin-left:auto;font-size:12px;color:var(--ink2)}
+  main{display:grid;grid-template-columns:1.25fr .95fr;gap:20px;margin-top:22px}
+  @media(max-width:960px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+  .card h2{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .card h2 .n{width:22px;height:22px;border-radius:7px;background:var(--acc-soft);color:var(--acc);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+  /* 引擎选择 */
+  .engines{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px}
+  .eng{border:1px solid var(--line);border-radius:13px;padding:12px 13px;cursor:pointer;background:var(--card2);transition:border-color .15s,transform .15s}
+  .eng:hover{transform:translateY(-2px)}
+  .eng.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+  .eng .t{font-size:13.5px;font-weight:700}
+  .eng .e{font-size:10.5px;color:var(--ink2);margin:3px 0 8px;letter-spacing:.3px}
+  .eng .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .eng .tags i{font-style:normal;font-size:10px;padding:2.5px 7px;border-radius:99px;background:var(--acc-soft);color:var(--acc)}
+  .eng .tags i.w{background:rgba(217,180,138,.13);color:var(--warn)}
+  /* 表单 */
+  .lbl{font-size:12px;color:var(--ink2);margin:16px 0 7px;display:flex;justify-content:space-between}
+  textarea{width:100%;height:150px;resize:vertical;background:#201d1a;border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:13px;font-size:13px;line-height:1.7;font-family:inherit}
+  textarea:focus{outline:none;border-color:var(--acc)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  select{background:#201d1a;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 12px;font-size:12.5px;flex:1;min-width:150px}
+  .chk{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink2);padding:9px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;user-select:none}
+  .chk input{accent-color:var(--acc)}
+  .go{margin-top:16px;width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(135deg,#7aa375,#5e7d5a);color:#faf7f2;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:1px;transition:filter .15s,transform .15s}
+  .go:hover{filter:brightness(1.08)}
+  .go:active{transform:scale(.985)}
+  .go:disabled{opacity:.5;cursor:not-allowed}
+  /* 任务列表 */
+  .tasks{display:flex;flex-direction:column;gap:10px;min-height:300px}
+  .task{border:1px solid var(--line);border-radius:13px;padding:13px 14px;background:var(--card2)}
+  .task .head{display:flex;align-items:center;gap:9px}
+  .task .role{font-size:12px;font-weight:700;padding:3px 9px;border-radius:7px;background:var(--acc-soft);color:var(--acc)}
+  .task .txt{font-size:12.5px;color:var(--ink);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .task .eng{font-size:10.5px;color:var(--ink2);border:none;background:none;padding:0}
+  .task .bar{height:5px;border-radius:99px;background:#37322d;margin-top:11px;overflow:hidden}
+  .task .bar i{display:block;height:100%;background:var(--acc);border-radius:99px;transition:width .4s}
+  .task .meta{display:flex;justify-content:space-between;font-size:11px;color:var(--ink2);margin-top:8px}
+  .play{background:transparent;border:1px solid var(--line);color:var(--acc);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer}
+  .play:hover{background:var(--acc-soft)}
+  .empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:60px 0;color:var(--ink2);font-size:12.5px}
+  .empty svg{width:40px;height:40px;opacity:.4}
+  .foot{margin-top:26px;text-align:center;font-size:12px;color:var(--ink2)}
+  .foot code{background:rgba(255,255,255,.06);padding:2px 8px;border-radius:6px;font-size:11.5px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spin{animation:spin 1s linear infinite}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="winbar">
+    <span class="dot" style="background:#e0745f"></span><span class="dot" style="background:#e0b65f"></span><span class="dot" style="background:#7aa375"></span>
+    <span class="brand">TTS MULTIMODEL</span>
+    <span class="sub">五引擎语音合成平台 · 演示页</span>
+  </div>
+
+  <main>
+    <section class="card">
+      <h2><span class="n">1</span>选择合成引擎</h2>
+      <div class="engines" id="engines"></div>
+
+      <div class="lbl"><span>剧本 / 文本输入</span><span style="color:var(--acc)">支持多角色剧本</span></div>
+      <textarea id="ta">旁白: 清晨的阳光洒进房间，少年揉了揉眼睛。
+林晚: 又是新的一天，今天一定要把项目收尾。
+旁白: 他伸了个懒腰，声音里带着一点期待。</textarea>
+
+      <div class="lbl">音色</div>
+      <div class="row">
+        <select id="voice">
+          <optgroup label="内置音色">
+            <option>晓晓（温柔女声）</option><option>云希（沉稳男声）</option><option>晓伊（活泼少女）</option><option>云扬（磁性男声）</option>
+          </optgroup>
+          <optgroup label="克隆音色（示例）">
+            <option>我的声音克隆 · 2026-09-10</option><option>项目配音 · 旁白 1</option>
+          </optgroup>
+        </select>
+        <label class="chk"><input type="checkbox" checked> 流式输出</label>
+        <label class="chk"><input type="checkbox"> 自动分段</label>
+      </div>
+      <button class="go" id="goBtn">开始合成</button>
+    </section>
+
+    <section class="card">
+      <h2><span class="n">2</span>合成任务</h2>
+      <div class="tasks" id="tasks">
+        <div class="empty" id="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 4a8 8 0 1 0 8 8"/><path d="M12 4v8l4 2"/></svg><span>输入文本并点击「开始合成」<br>演示页模拟生成过程，真实合成需连接本地服务</span></div>
+      </div>
+    </section>
+  </main>
+
+  <p class="foot">TTS MultiModel 演示页（前端模拟）· 仓库：<code>github.com/ReSerendipity/TTS_MultiModel</code> · VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX</p>
+</div>
+
+<script>
+  const ENGINES = [
+    {name:"VoxCPM2", key:"VoxCPM2", en:"voxcpm2", tags:["声音克隆","流式"]},
+    {name:"IndexTTS 2.5", key:"IndexTTS 2.5", en:"indextts-2.5", tags:["声音克隆","流式","多语言"]},
+    {name:"IndexTTS 2.0", key:"IndexTTS 2.0", en:"indextts-2.0", tags:["声音克隆","轻量"]},
+    {name:"OpenVoice", key:"OpenVoice", en:"openvoice", tags:["音色转换","快速"]},
+    {name:"Step-Audio-EditX", key:"Step-Audio-EditX", en:"step-audio", tags:["声音设计","编辑"], hot:true}
+  ];
+  let cur = 0;
+  const engBox = document.getElementById("engines");
+  ENGINES.forEach((e,i)=>{
+    const d = document.createElement("div");
+    d.className = "eng" + (i===0?" on":"");
+    d.innerHTML = '<div class="t">'+e.name+(e.hot?' <span style="font-size:10px;color:#d9b48a">NEW</span>':'')+'</div><div class="e">'+e.en+'</div><div class="tags">'+e.tags.map(t=>'<i>'+t+'</i>').join('')+'</div>';
+    d.onclick = ()=>{ document.querySelectorAll(".eng").forEach(x=>x.classList.remove("on")); d.classList.add("on"); cur = i; };
+    engBox.appendChild(d);
+  });
+
+  const tasks = document.getElementById("tasks"), empty = document.getElementById("empty");
+  const ta = document.getElementById("ta"), goBtn = document.getElementById("goBtn");
+  let seq = 0;
+  function estimateChars(t){ return t.replace(/\s/g,"").length; }
+  function addTask(){
+    const text = ta.value.trim();
+    if(!text){ goBtn.style.border="1px solid #e0745f"; setTimeout(()=>goBtn.style.border="none",800); return; }
+    empty.style.display = "none";
+    const id = "t"+(++seq);
+    const eng = ENGINES[cur];
+    const role = text.split(":")[0].trim().slice(0,6) || "旁白";
+    const dur = (estimateChars(text)/4.2).toFixed(1);
+    const el = document.createElement("div");
+    el.className = "task";
+    el.innerHTML = '<div class="head"><span class="role">'+role+'</span><span class="txt">'+text.split("\n")[0].slice(0,32)+'…</span><button class="play" disabled>生成中</button></div><div class="bar"><i style="width:4%"></i></div><div class="meta"><span>'+eng.name+' · 音色：'+document.getElementById("voice").value+'</span><span>0.0 / '+dur+' s</span></div>';
+    tasks.appendChild(el);
+    const barI = el.querySelector(".bar i"), meta = el.querySelector(".meta span:last-child");
+    let p = 0;
+    const iv = setInterval(()=>{
+      p += 2 + Math.random()*5;
+      if(p >= 100){
+        p = 100; clearInterval(iv);
+        el.querySelector(".bar i").style.width = "100%";
+        meta.textContent = dur + " s";
+        const b = el.querySelector(".play");
+        b.disabled = false; b.textContent = "试听";
+        b.onclick = ()=>{ b.textContent = "播放中…"; setTimeout(()=>{ b.textContent = "试听"; }, 1800); };
+      } else {
+        barI.style.width = p + "%";
+        meta.textContent = (p/100*dur).toFixed(1) + " / " + dur + " s";
+      }
+    }, 90);
+  }
+  goBtn.onclick = addTask;
+</script>
+</body>
+</html>
