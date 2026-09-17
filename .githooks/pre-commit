@@ -33,5 +33,14 @@ if [ -f .pre-commit-config.yaml ]; then
         fi
         exit 0
     fi
+    # 回退：pre-commit 控制台命令（uv tool / pipx / PATH 安装，无 venv 时保证框架仍生效）
+    if command -v pre-commit >/dev/null 2>&1; then
+        echo "[pre-commit] 使用 pre-commit 框架（控制台命令）"
+        if ! pre-commit run --config .pre-commit-config.yaml; then
+            echo "[pre-commit] 框架检查未通过。紧急绕过：git commit --no-verify" >&2
+            exit 1
+        fi
+        exit 0
+    fi
 fi
 exec "$(dirname "$0")/pre-commit-lite"
