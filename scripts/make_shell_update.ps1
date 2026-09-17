@@ -46,27 +46,45 @@ if (-not (Test-Path -LiteralPath (Join-Path $InstallRoot 'start_portable.py'))) 
     throw "安装根缺少 start_portable.py：$InstallRoot"
 }
 
-# ---------- staging：安装根内容（排除 PRESERVE_TOP_DIRS / 运行时状态 / 壳 / 开发杂物） ----------
+# ---------- staging：安装根内容（白名单顶层条目，排除 PRESERVE_TOP_DIRS / 运行时状态 / 开发杂物） ----------
+# 白名单 = 发布安装根的代码部分，与 assemble_release_staging.ps1 复制的根文件清单一致；
+# 开发目录（.trae/.ci/backups/checkpoints/configs/launcher/docs 等）绝不进包。
 $staging = Join-Path $OutDir "_staging-$Version"
 Remove-TTSMultiModelTreeFast -Path $staging
 New-Item -ItemType Directory -Path $staging -Force | Out-Null
 
+# app/ 子树内需排除的运行时状态 / 密钥 / 缓存（顶级白名单已挡开发杂物）
 $exclude = @(
-    'runtime\*', 'model\*', 'data\*', 'logs\*',          # PRESERVE_TOP_DIRS（更新器保留旧目录，不进包）
-    'cache\*', 'torch_compile_cache\*', 'outputs\*',     # 可再生的运行时状态
-    'TTSMultiModel.exe',                                 # 壳本体不由应用增量更新
     '__pycache__\*', '*.pyc', '*.pyo', '.pytest_cache\*',
     '*.db', '*.db-wal', '*.db-shm', '*.log', '*.bak', '*.bak.*',
-    '.csrf_secret', '.pii_key', '.history_hmac_key', '.integrity_hmac_secret',
-    '.manifest_signing_key', '.watermark_key',
-    'node_modules\*', '.venv\*', 'dist\*', 'build\*', 'desktop\*',
-    'docs\*', 'tests\*', 'scripts\*', 'baselines\*', 'benchmarks\*', 'demo\*',
-    'examples\*', 'perf\*', 'personas\*', 'reference_repos\*', 'screenshots\*', '_archive\*',
-    '.git\*', '.github\*', '.gitignore', '.pre-commit-config.yaml', '.githooks\*',
-    'coverage.xml', '.coverage', '.ruff_cache\*', '.mypy_cache\*', '*.egg-info\*', '.pytest_cache\*'
+    '.server_port', '.csrf_secret', '.pii_key', '.history_hmac_key',
+    '.integrity_hmac_secret', '.manifest_signing_key', '.watermark_key',
+        'cache\*', 'torch_compile_cache\*', 'outputs\*', '*.egg-info\*',
+    'cert.pem', 'key.pem', 'SHA256SUMS.known-good', 'start_ui_test.py',
+    'general_settings.json', 'start_app.bat', 'tts_test\*'
 )
-$stats = Copy-TTSMultiModelTree -Source $InstallRoot -Dest $staging -ExcludePatterns $exclude
-Write-Host ("[make_shell_update] staging：{0} 文件 / {1}（排除 runtime/model/data/logs 等保留目录）" -f $stats.Files, (Format-TTSMultiModelSize $stats.Bytes))
+
+$topInclude = @(
+    'app',                                              # 后端应用代码（子树再按 $exclude 过滤运行时状态）
+    'start_portable.py', 'config.yaml', 'version.json', # 壳启动契约 + 本地版本识别
+    'start.bat',                                        # 用户/维护用启动脚本
+        'LICENSE', 'README.md'                              # 许可与说明（仅用户可见项）
+)
+$stats = @{ Files = 0; Bytes = [long]0 }
+foreach ($item in $topInclude) {
+    $srcPath = Join-Path $InstallRoot $item
+    if (-not (Test-Path -LiteralPath $srcPath)) { continue }
+    if ($item -eq 'app') {
+        $s = Copy-TTSMultiModelTree -Source $srcPath -Dest (Join-Path $staging 'app') -ExcludePatterns $exclude
+        $stats.Files += $s.Files
+        $stats.Bytes += $s.Bytes
+    } else {
+        Copy-Item -LiteralPath $srcPath -Destination (Join-Path $staging $item) -Force
+        $stats.Files += 1
+        $stats.Bytes += (Get-Item -LiteralPath (Join-Path $staging $item)).Length
+    }
+}
+Write-Host ("[make_shell_update] staging：{0} 文件 / {1}（白名单顶层条目 + app 子树，排除运行时状态）" -f $stats.Files, (Format-TTSMultiModelSize $stats.Bytes))
 
 # 包内必须含 version.json（更新器按它判定本地版本）
 $verJson = Join-Path $staging 'version.json'

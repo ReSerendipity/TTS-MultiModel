@@ -8,7 +8,7 @@
 
 ## 1. 版本号规范
 
-- 遵循 SemVer `MAJOR.MINOR.PATCH`。当前 **v2.2.1**。
+- 遵循 SemVer `MAJOR.MINOR.PATCH`。当前 **v2.2.2**。
 - 版本位：`pyproject.toml` + `config.yaml`（release-please 驱动前端缓存参数需人工补齐，见 AGENTS.md #9）+ `CHANGELOG.md`。
 - 发布由 `release-please` 自动生成 GitHub Release 并打 semver tag。
 

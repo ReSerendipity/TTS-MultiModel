@@ -17,7 +17,7 @@ $script:DefaultMaxPartBytes = 1900MB
 # 必须用通配：imageio-ffmpeg 的 wheel 内自带 ffmpeg-win64-v7.1.exe，精确名匹配会漏。
 $script:ForbiddenLeafPatterns = @('ffmpeg*.exe', 'ffprobe*.exe')
 # 禁止进入任何分发物的本机私有文件（密钥 / 真实环境变量 / 配置备份）。
-$script:DeniedLeafNames = @('.watermark_key', '.integrity_hmac_secret', '.manifest_signing_key', '.csrf_secret', '.pii_key', '.history_hmac_key', '.env', 'config.yaml.bak')
+$script:DeniedLeafNames = @('.watermark_key', '.integrity_hmac_secret', '.manifest_signing_key', '.csrf_secret', '.pii_key', '.history_hmac_key', '.env', 'config.yaml.bak', 'cert.pem', 'key.pem')
 
 function Get-TTSMultiModelGithubAssetLimit {
     <# 返回 GitHub Release 单文件字节上限。 #>

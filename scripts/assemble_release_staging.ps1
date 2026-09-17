@@ -52,8 +52,8 @@ New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 $total = [long]0
 
 $copyLeaf = {
-    param($Src, $Dst)
-    $stats = Copy-TTSMultiModelTree -Source $Src -Dest $Dst -ExcludePatterns @('*.tmp', '*.bak', '__pycache__\*', '*.log')
+    param($Src, $Dst, $Extra = @())
+    $stats = Copy-TTSMultiModelTree -Source $Src -Dest $Dst -ExcludePatterns (@('*.tmp', '*.bak', '__pycache__\*', '*.log') + $Extra)
     Write-Host ("  · {0,-14} {1,6} 文件 / {2}" -f (Split-Path -Leaf $Dst), $stats.Files, (Format-TTSMultiModelSize $stats.Bytes))
     return $stats.Bytes
 }
@@ -64,7 +64,7 @@ Copy-Item -LiteralPath $ShellExe -Destination (Join-Path $OutDir 'TTSMultiModel.
 $total += (Get-Item -LiteralPath (Join-Path $OutDir 'TTSMultiModel.exe')).Length
 Write-Host ("  · TTSMultiModel.exe（{0}）" -f (Format-TTSMultiModelSize (Get-Item -LiteralPath (Join-Path $OutDir 'TTSMultiModel.exe')).Length))
 # 2) 根文件：start_portable.py / config.yaml / version.json / 许可与说明
-foreach ($f in @('start_portable.py', 'config.yaml', 'version.json', 'LICENSE', 'README.md', 'SECURITY.md', 'CHANGELOG.md', 'start.bat', 'pyproject.toml', 'requirements-lock.txt')) {
+foreach ($f in @('start_portable.py', 'config.yaml', 'version.json', 'LICENSE', 'README.md', 'start.bat')) {
     $src = Join-Path $root $f
     if (Test-Path -LiteralPath $src -PathType Leaf) {
         Copy-Item -LiteralPath $src -Destination (Join-Path $OutDir $f) -Force
@@ -75,9 +75,10 @@ $appExclude = @(
     '__pycache__\*', '*.pyc', '*.pyo', '.pytest_cache\*',
     'app\integrated_app\data\*', 'logs\*.log', '*.db', '*.db-wal', '*.db-shm', '*.log',
     '.csrf_secret', '.pii_key', '.history_hmac_key', '.integrity_hmac_secret',
-    '.manifest_signing_key', '.watermark_key', '*.bak', '*.bak.*', 'cache\*', 'torch_compile_cache\*', 'outputs\*'
+    '.manifest_signing_key', '.watermark_key', '*.bak', '*.bak.*', 'cache\*', 'torch_compile_cache\*', 'outputs\*',
+    'cert.pem', 'key.pem', '.server_port', 'general_settings.json', 'SHA256SUMS.known-good',  'start_ui_test.py', 'start_app.bat', '*.egg-info\*'
 )
-$total += (& $copyLeaf (Join-Path $root 'app') (Join-Path $OutDir 'app'))
+$total += (& $copyLeaf (Join-Path $root 'app') (Join-Path $OutDir 'app') $appExclude)
 # 4) runtime/（可选；缺失时壳可用系统 .venv 开发启动，发布包必须提供）
 if ($RuntimeDir -and (Test-Path -LiteralPath $RuntimeDir)) {
     $total += (& $copyLeaf $RuntimeDir (Join-Path $OutDir 'runtime'))
@@ -86,7 +87,10 @@ if ($RuntimeDir -and (Test-Path -LiteralPath $RuntimeDir)) {
 }
 # 5) 模型目录（可选）
 if ($ModelDir -and (Test-Path -LiteralPath $ModelDir)) {
-    $total += (& $copyLeaf $ModelDir (Join-Path $OutDir (Split-Path -Leaf $ModelDir)))
+    $ms = Copy-TTSMultiModelTree -Source $ModelDir -Dest (Join-Path $OutDir (Split-Path -Leaf $ModelDir)) `
+        -ExcludePatterns @('*.tmp', '*.bak', '__pycache__\*', '*.log', '.cache\*', '*.lock')
+    Write-Host ("  · {0,-14} {1,6} 文件 / {2}" -f (Split-Path -Leaf $ModelDir), $ms.Files, (Format-TTSMultiModelSize $ms.Bytes))
+    $total += $ms.Bytes
 }
 # 6) 运行期自建目录占位（data/logs/cache 由后端首次启动创建，这里不预建以避免空目录进入包）
 

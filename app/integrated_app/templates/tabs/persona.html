@@ -483,7 +483,12 @@
     window.confirmDeletePersona = function(name) {
         var modal = document.querySelector('.custom-modal');
         if (modal) modal.remove();
-        fetch('/api/persona/' + encodeURIComponent(name), { method: 'DELETE' })
+        // CSRF double-submit：原生 fetch 不受 base.html 的 htmx:configRequest 影响，
+        // 必须手动从 csrf_token cookie 读取 token 注入 X-CSRF-Token 头，否则中间件返回 403。
+        fetch('/api/persona/' + encodeURIComponent(name), {
+            method: 'DELETE',
+            headers: { 'X-CSRF-Token': window.getCsrfToken ? window.getCsrfToken() : '' }
+        })
             .then(function(r){ return r.json(); })
             .then(function(data){
                 if (data.status === 'ok') {

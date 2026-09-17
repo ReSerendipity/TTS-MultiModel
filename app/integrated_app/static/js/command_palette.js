@@ -270,7 +270,7 @@
         category: '模型',
         icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
         action: function() {
-          fetch('/api/model/unload', { method: 'POST' })
+          fetch('/api/model/unload', { method: 'POST', headers: { 'X-CSRF-Token': window.getCsrfToken ? window.getCsrfToken() : '' } })
             .then(function(r) { return r.json(); }).then(function(d) {
               if (window.TTSApp && window.TTSApp.toast) {
                 window.TTSApp.toast.show(d.message || '模型已卸载', 'info');

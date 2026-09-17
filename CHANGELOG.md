@@ -2,13 +2,24 @@
 
 ## [Unreleased]
 
+## [2.2.2](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.1...v2.2.2) (2026-09-16)
+
 ### Features
 
 * **desktop:** Tauri 桌面壳（`desktop/src-tauri`）：完整性自检签名 + enforce、水印密钥管理、启动契约（`runtime\python.exe` + `start_portable.py`，`--port` 由壳指定）（对应《桌面分发与安全加固-20260910》P1-2）
 * **dist:** 便携分卷打包（core/torch/model 三组件、1900MB 7z 原生分卷、SHA256SUMS 全覆盖 + 回读校验）、NSIS 安装器（`scripts/installer`，kill 子进程 + 许可页）、增量更新（`make_shell_update.ps1` 生成 zip + `shell-update.json` 扁平契约）、发布门禁五步（`release_gate.ps1`）与完整性逐环节诊断（`diag_integrity.py`）（对应 P1-3/P2-1）
+* **desktop:** 主界面窗口控制适配——无边框壳导航到后端页面后由桥接注入自绘标题栏（拖拽/双击最大化/最小化/关闭，`window_start_dragging`/`window_is_maximized`/`window_request_close` 三新命令与权限）；splash 补最大化按钮；关闭语义与系统 X 一致（尊重 `close_to_tray`）（GOTCHAS #104）
+
+### Bug Fixes
+
+* **dist:** 修复 requirements-lock.txt / requirements-small.txt 与 .venv 实测的版本漂移脱节（antlr4/pydantic/pydantic-core/mpmath/protobuf/transformers/tokenizers 按实测回退），解决全新 WinPython 上 `pip install -r requirements-small.txt` 连续 ResolutionImpossible（GOTCHAS #102）
+* **dist:** 修复 `release_tauri.ps1` 单卷产物 bug：`$volumes` 非数组致 `manifest.json` 的 `volume_count: null`（改为 `@()` 强制数组）；`upload-list.txt` 引用不存在的 `unpack_portable_bundle.ps1`（改回实际分发的 `unpack_desktop.ps1`）
+* **dist:** 补全 TTS 桌面解包器 `scripts/unpack_desktop.ps1`（此前缺失致分卷 `unpack_helper` 悬空；移植自 SeedVR2，适配根级 `runtime\`/`TTSMultiModel.exe` 布局，UTF-8 BOM）
+* **dist:** NSIS 安装器正式发布形态落地——`license.txt` 升级为「中文安装须知与用户条款（合法使用承诺/隐私声明/第三方模型商用限制/免责）+ Apache-2.0 全文」；安装前告知弹窗（磁盘/离线/AI 标识义务，静默自动确认）；修复 `assemble_installer_data.ps1` 顶层文件被 `Copy-TTSMultiModelTree` 打包成同名目录的布局错误（GOTCHAS #103）+ 安装器嵌套布局防御断言；`TTSMultiModel-Setup-v2.2.2.exe` 端到端静默安装→布局断言→VoxCPM2 引擎就绪→卸载复验全过
 
 ### Security
 
+* **dist:** 发布物剔除本机泄漏与开发遗留——`app/cert.pem`/`app/key.pem`（本机 HTTPS 私钥曾随包分发！）与 `start_ui_test.py`/`general_settings.json`/`SHA256SUMS.known-good`/`.server_port`/`tts_test/`/egg-info 全量进排除清单，`DeniedLeafNames` 门禁补 cert/key（进包即构建失败）；发布根目录剔除 CHANGELOG/SECURITY/pyproject/requirements-lock（GOTCHAS #104）
 * **integrity:** 核心模块完整性自检 Ed25519 签名 + `enforce` 阻断（P0）；水印密钥从配置文件迁出为 env/`data/.watermark_key`（P0）；便携包清单重算/重签链路（`generate_integrity_manifest.py --app-dir` + EOF 尾换行规范化）、分发负向断言（无密钥/本机路径残留）、篡改模拟门禁（P1-3/P2-1）
 
 ### Bug Fixes

@@ -97,7 +97,7 @@ $arc = New-TTSMultiModelArchive -SourceDir $pkgParent -OutFile $archivePath -For
 Remove-Item -LiteralPath $pkgParent -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ("[release_tauri] 归档 {0:N2} GB，开始分卷（每卷 <= {1:N0} MB）" -f ($arc.Bytes/1GB), ($MaxPartBytes/1MB))
-$volumes = Split-TTSMultiModelFileIntoVolumes -File $arc.Path -MaxBytes $MaxPartBytes
+$volumes = @(Split-TTSMultiModelFileIntoVolumes -File $arc.Path -MaxBytes $MaxPartBytes)
 if (Test-Path -LiteralPath $arc.Path) {
     Remove-Item -LiteralPath $arc.Path -Force
 }
@@ -161,7 +161,7 @@ foreach ($v in $volumes) {
 }
 $upload += Join-Path $OutDir 'SHA256SUMS.txt'
 $upload += Join-Path $OutDir 'manifest.json'
-$upload += Join-Path $OutDir 'unpack_portable_bundle.ps1'
+$upload += Join-Path $OutDir 'unpack_desktop.ps1'
 $upload += Join-Path $OutDir 'portable_bundle_lib.ps1'
 [System.IO.File]::WriteAllLines((Join-Path $OutDir 'upload-list.txt'), $upload)
 

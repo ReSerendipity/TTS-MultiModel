@@ -27,6 +27,9 @@
     "allow-window-minimize",
     "allow-window-maximize-toggle",
     "allow-window-close",
+    "allow-window-start-dragging",
+    "allow-window-is-maximized",
+    "allow-window-request-close",
     "allow-window-toggle-fullscreen",
     "allow-window-is-fullscreen"
   ],

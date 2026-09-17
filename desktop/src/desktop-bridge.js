@@ -369,6 +369,78 @@
   }
 
   // ---------- 主入口 ----------
+  // ---------- 任务 9：自绘标题栏（无边框主界面的 拖拽/最小化/最大化/关闭） ----------
+  // 壳侧 decorations(false)（window.rs）：splash 页自带 .winbar；导航到后端页面后
+  // 由这里注入统一控制条。拖拽走 window_start_dragging 命令
+  // （data-tauri-drag-region 的属性脚本不覆盖远程源页面，不可靠）。
+  function installTitleBar() {
+    if (!document.body) return;
+    if (document.querySelector(".winbar") || document.getElementById("tts-desktop-winbar")) return;
+    var bar = document.createElement("div");
+    bar.id = "tts-desktop-winbar";
+    bar.style.cssText =
+      "position:relative;display:flex;align-items:center;height:34px;flex:0 0 auto;" +
+      "padding:0 6px 0 14px;user-select:none;-webkit-user-select:none;" +
+      "font-family:'Segoe UI','Microsoft YaHei',Arial,sans-serif;font-size:11px;letter-spacing:1.5px;" +
+      "background:rgba(127,127,127,.06);color:inherit;border-bottom:1px solid rgba(127,127,127,.14);";
+    var brand = document.createElement("span");
+    brand.textContent = "TTS MULTIMODEL";
+    brand.style.cssText = "opacity:.5;font-weight:600;pointer-events:none;";
+    var ctr = document.createElement("div");
+    ctr.style.cssText = "margin-left:auto;display:flex;gap:2px;";
+    function mkBtn(glyph, label, onClick, isClose) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = glyph;
+      b.title = label;
+      b.setAttribute("aria-label", label);
+      b.style.cssText =
+        "width:40px;height:28px;display:inline-flex;align-items:center;justify-content:center;" +
+        "border:none;background:transparent;color:inherit;border-radius:5px;cursor:pointer;font-size:13px;line-height:1;";
+      b.addEventListener("mouseenter", function () {
+        b.style.background = isClose ? "#e81123" : "rgba(127,127,127,.28)";
+        if (isClose) b.style.color = "#fff";
+      });
+      b.addEventListener("mouseleave", function () {
+        b.style.background = "transparent";
+        b.style.color = "";
+      });
+      b.addEventListener("click", onClick);
+      return b;
+    }
+    var maxBtn;
+    function syncMax() {
+      invoke("window_is_maximized").then(function (m) {
+        if (!maxBtn) return;
+        maxBtn.textContent = m ? "\u29C9" : "\u25A1";
+        maxBtn.title = m ? "向下还原" : "最大化";
+      }).catch(function () {});
+    }
+    function toggleMax() {
+      invoke("window_maximize_toggle").catch(function () {});
+      setTimeout(syncMax, 160);
+    }
+    ctr.appendChild(mkBtn("\u2212", "最小化", function () { invoke("window_minimize").catch(function () {}); }));
+    maxBtn = mkBtn("\u25A1", "最大化", toggleMax);
+    ctr.appendChild(maxBtn);
+    ctr.appendChild(mkBtn("\u2715", "关闭", function () {
+      // 与系统 X 同语义：CloseRequested 由 Rust 按 close_to_tray 配置决定隐藏/退出
+      invoke("window_request_close").catch(function () { invoke("window_close").catch(function () {}); });
+    }, true));
+    bar.appendChild(brand);
+    bar.appendChild(ctr);
+    bar.addEventListener("dblclick", function (e) {
+      if (e.target === bar || e.target === brand) toggleMax();
+    });
+    bar.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0) return;
+      if (e.target !== bar && e.target !== brand) return;
+      invoke("window_start_dragging").catch(function () {});
+    });
+    document.body.insertBefore(bar, document.body.firstChild);
+    syncMax();
+  }
+
   function boot() {
     // 防御：极端注入时序下 document 可能尚未就绪（正常 WebView2 恒存在）。
     // 无 document 时不触碰 DOM；文件尾部的顶层导出（__tts_multimodelShell）仍会执行。
@@ -383,6 +455,7 @@
     wireEvents();
     wireDrag();
     initUpdateWindow();
+    installTitleBar();
     // 主应用页面才挂任务生命周期观察器（TTS 页面标记：htmx 合成表单/音频上传区）
     if (document.getElementById("it2-form") || findUploadInput() || document.querySelector(".tts-file-upload, .file-upload-area")) {
       watchTaskLifecycle();

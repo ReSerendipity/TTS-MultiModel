@@ -1,6 +1,6 @@
 # 完成定义（Definition of Done）
 
-> **来源**：家族通用 DOD 模板 `.spec_audit/family_DOD.md`（源自 SpiritPal definition-of-done.md 泛化），本仓本地化。
+> **来源**：家族通用 DOD 模板 `.spec_audit/family_DOD.md`（源自 SpiritPal definition-of-done.md 泛化；该家族模板已归档，2026-09-17 起按本仓本地化内容维护），本仓本地化。
 > **适用范围**：TTS_MultiModel 全项目所有功能开发任务。
 
 ---

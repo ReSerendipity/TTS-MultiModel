@@ -5,7 +5,7 @@ Unicode true
 !include "LogicLib.nsh"
 
 Name "TTSMultiModel 桌面版"
-OutFile "TTSMultiModel-Setup-v2.2.1.exe"
+OutFile "TTSMultiModel-Setup-v2.2.2.exe"
 InstallDir "$LOCALAPPDATA\Programs\TTSMultiModel"
 InstallDirRegKey HKCU "Software\TTSMultiModel" "InstallDir"
 RequestExecutionLevel user
@@ -13,7 +13,7 @@ SetCompressor /SOLID lzma
 CRCCheck on
 BrandingText "TTSMultiModel"
 
-!define APP_VERSION "2.2.1"
+!define APP_VERSION "2.2.2"
 !define DATA_PREFIX "TTSMultiModel-Data.7z"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\TTSMultiModel"
 !define APP_ICON "${__FILEDIR__}\..\..\desktop\src-tauri\icons\icon.ico"
@@ -52,6 +52,13 @@ Var TOOLSDIR
 
 ; ---------- 安装 ----------
 Section "TTSMultiModel 桌面版" SEC_APP
+  ; ---------- 安装前告知（静默模式自动确认） ----------
+  MessageBox MB_OKCANCEL|MB_ICONINFORMATION "安装前请知悉：`n`n  - 完全安装需约 31GB 磁盘（应用 + 便携 Python 运行时 + PyTorch + 语音模型），约需 5~15 分钟`n  - 本软件本机离线运行，不上传任何用户数据`n  - 语音克隆仅限您拥有权利的音频，严禁冒充他人；AI 生成音频请依法标识`n  - IndexTTS 模型商用需 bilibili 书面授权`n`n完整条款见上一页「许可协议」。确定继续安装？" /SD IDOK
+  Pop $0
+  ${If} $0 == "IDCANCEL"
+    Abort
+  ${EndIf}
+
   ; 自建临时工具目录（不依赖 $PLUGINSDIR，该变量在 NSIS 3.10 实测为空）
   StrCpy $TOOLSDIR "$TEMP\tts_multimodel-tools"
   RMDir /r "$TOOLSDIR"
@@ -82,10 +89,14 @@ Section "TTSMultiModel 桌面版" SEC_APP
   File "TTSMultiModel.exe"
   SetOutPath "$INSTDIR\app"
   File "version.json"
-  SetOutPath "$INSTDIR\app"
-  File "pyproject.toml"
 
 
+
+  ; ---------- 防御：数据卷布局异常（顶层文件被打包成同名目录） ----------
+  ${If} ${FileExists} "$INSTDIR\TTSMultiModel.exe\*.*"
+  MessageBox MB_ICONSTOP "安装异常：TTSMultiModel.exe 被解压为目录（数据卷布局错误，由旧版打包脚本产生）。`n请重新生成数据分卷后再安装。" /SD IDOK
+    Abort
+  ${EndIf}
 
   ; 校验主程序存在
   ${IfNot} ${FileExists} "$INSTDIR\TTSMultiModel.exe"
@@ -110,7 +121,7 @@ Section "TTSMultiModel 桌面版" SEC_APP
   WriteRegStr HKCU "${UNINST_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoRepair" 1
-  WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" 12000000
+  WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" 31000000
 
   ; 卸载器
   WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -120,7 +131,7 @@ Section "TTSMultiModel 桌面版" SEC_APP
 SectionEnd
 
 ; ---------- 版本信息 ----------
-VIProductVersion "2.2.1.0"
+VIProductVersion "2.2.2.0"
 VIAddVersionKey "ProductName" "TTSMultiModel 桌面版"
 VIAddVersionKey "LegalCopyright" "Copyright (C) 2026 TTSMultiModel"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"

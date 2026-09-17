@@ -76,6 +76,13 @@ New-Item -ItemType Directory -Path $merge -Force | Out-Null
 $staged = Get-ChildItem -LiteralPath $StagingDir -Force
 $totalBytes = [long]0
 foreach ($item in $staged) {
+    if (-not $item.PSIsContainer) {
+        # 单文件顶层条目：直接落到 merge 根（Copy-TTSMultiModelTree 的文件分支会多套一层同名目录）
+        $mode = New-TTSMultiModelHardLink -SourceFile $item.FullName -LinkPath (Join-Path $merge $item.Name)
+        Write-Host ("  · {0,-14} {1,6} 文件 / {2}" -f $item.Name, 1, (Format-TTSMultiModelSize $item.Length))
+        $totalBytes += $item.Length
+        continue
+    }
     $stats = Copy-TTSMultiModelTree -Source $item.FullName -Dest (Join-Path $merge $item.Name) `
         -ExcludePatterns @('*.tmp', '*.bak', '*.bak.*', '__pycache__\*', '*.log')
     $totalBytes += $stats.Bytes
