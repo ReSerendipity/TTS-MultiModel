@@ -17,8 +17,9 @@ BrandingText "TTSMultiModel"
 !define DATA_PREFIX "TTSMultiModel-Data.7z"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\TTSMultiModel"
 !define APP_ICON "${__FILEDIR__}\..\..\desktop\src-tauri\icons\icon.ico"
+; 7za 默认从 PATH 查找，或用 makensis -DSRC_7ZA=... 指定（勿写死本机绝对路径）
 !ifndef SRC_7ZA
-!define SRC_7ZA "C:\Users\Doro\Tools\7z-extra\x64\7za.exe"
+!define SRC_7ZA "7za.exe"
 !endif
 
 Var StartMenuFolder

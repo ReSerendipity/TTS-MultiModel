@@ -4,13 +4,14 @@ Name "diag7z"
 OutFile "diag7z-test.exe"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
+; 7za 默认从 PATH 查找，或用 makensis -DSRC_7ZA=... 指定（勿写死本机绝对路径）
+!ifndef SRC_7ZA
+!define SRC_7ZA "7za.exe"
+!endif
 
 Section
   SetOutPath "$PLUGINSDIR"
   File "${SRC_7ZA}"
-!ifndef SRC_7ZA
-!define SRC_7ZA "C:\Users\Doro\Tools\7z-extra\x64\7za.exe"
-!endif
   FileOpen $1 "$TEMP\diag7z-result.txt" w
   FileWrite $1 "PLUGINSDIR=$PLUGINSDIR`n"
   ${If} ${FileExists} "$PLUGINSDIR\7za.exe"
