@@ -41,3 +41,6 @@
 *.mp4  binary
 *.db   binary
 *.sqlite binary
+
+# Pin .gitignore to LF in the working tree (CRLF working copy creates a catch-all ignore rule)
+/.gitignore text eol=lf
