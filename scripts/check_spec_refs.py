@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Thin wrapper -> shared family auditor. Fail if NEW phantom refs appear.
 
-The auditor lives OUTSIDE this repo (C:\\Users\\Doro\\.spec_audit).  On a
+The auditor lives OUTSIDE this repo (a sibling .spec_audit directory next to
 developer machine it is found and the check is authoritative; in a fresh CI
 checkout it is absent and the check degrades to "skip" (keeps CI green).
 """

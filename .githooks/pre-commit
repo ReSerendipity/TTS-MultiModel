@@ -2,6 +2,19 @@
 # 通用 pre-commit 分发器（无机器特定路径，可随仓库分发）。
 #   1) 仓库有 .pre-commit-config.yaml 且 pre-commit 框架可用 -> 交给框架
 #   2) 否则 -> 交给同目录的 pre-commit-lite（大文件/密钥/冲突标记 + 根目录守卫）
+# 0) 路径可移植性检查：阻止本机绝对路径入库（规则见 docs/CODING_STANDARDS.md 第 1 节）
+if [ -f scripts/check_no_hardcoded_paths.py ]; then
+    PY_BIN=""
+    for c in python python3; do
+        command -v "$c" >/dev/null 2>&1 && PY_BIN="$c" && break
+    done
+    if [ -n "$PY_BIN" ]; then
+        if ! "$PY_BIN" scripts/check_no_hardcoded_paths.py; then
+            echo "[pre-commit] 检测到本机绝对路径（C:\Users\... 等），提交已拒绝。绕过：git commit --no-verify" >&2
+            exit 1
+        fi
+    fi
+fi
 if [ -f .pre-commit-config.yaml ]; then
     PY=""
     for cand in ".venv/Scripts/python.exe" ".venv/bin/python"; do
