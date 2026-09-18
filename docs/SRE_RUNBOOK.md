@@ -135,3 +135,9 @@ SHA-256 复验（`scripts/generate_model_checksums.py` 生成，C1 加载链路�
 | 审计日志（近 N 条） | `GET /api/system/audit?limit=100`（受 `/api/*` 鉴权保护） |
 | 优雅关闭 | `POST /api/system/shutdown` |
 | 权重哈希清单生成 | `python scripts/generate_model_checksums.py --out model_checksums.json` |
+
+## 治理与勘误速查（2026-09-18）
+
+- **钩子**：`.githooks/pre-commit` 分发器四级回退（.venv → PATH python → 控制台 pre-commit → pre-commit-lite）；`precheck.ps1` 同款 python 回退，依赖缺失打印 `[WARN]` 跳过，完整门禁由 CI 承担。
+- **分支**：`main` 受保护（enforce_admins=true，3 项必查：`Lint (ruff)` / `Test (pytest) (3.12, ubuntu-latest)` / `Typecheck (mypy ratchet)`）→ 本地不可直推，变更走功能分支 + PR；pre-push gitleaks 扫描待推送提交（0 泄露才放行）。
+- **Python 安全注释**：bandit 豁免用纯 `# nosec`（`# nosec B603,B607` 只压 B607 不压 B603）；subprocess 一律列表参数。

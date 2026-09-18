@@ -10,7 +10,7 @@ git config core.hooksPath .githooks      # 或执行 ./.githooks/install.sh
 
 | 钩子 | 作用 |
 | --- | --- |
-| `pre-commit` | 有 `.pre-commit-config.yaml` 且框架可用 → 走 pre-commit；否则走 `pre-commit-lite` |
+| `pre-commit` | 分发器按「.venv → PATH python → 控制台 pre-commit → pre-commit-lite」四级回退执行框架检查（见下方说明） |
 | `pre-push` | 执行仓库内 `precheck.ps1`（无则退回根目录守卫） |
 | `prepare-commit-msg` | 自动追加 `Signed-off-by`（幂等，插在注释块之前） |
 | `commit-msg` | DCO 硬校验（缺签名阻断）+ conventional 规范软提示 |
@@ -22,3 +22,6 @@ git config core.hooksPath .githooks      # 或执行 ./.githooks/install.sh
 - `pre-commit-lite` 找不到 Python 时会打印醒目 `[WARN]` 并放行；设 `GUARD_STRICT=1` 可让它改为阻断。
 - 大文件阈值默认 5MB，可用 `GUARD_MAX_FILE_MB` 调整。
 - `core.hooksPath` 是**本地**配置，不会随克隆传播——换机器请重新执行上面那行命令。
+
+- `pre-commit` 分发器框架解析优先级（2026-09-17 升级）：① 仓库 `.venv` 内的 python → ② PATH 上的 `python` → ③ 控制台命令 `pre-commit`（系统/用户级安装）→ ④ 均不可用时回退 `pre-commit-lite` 兜底。无 venv 的机器不再静默跳过框架钩子。
+- 存在 `precheck.ps1` 时（入库或本地），其内部同样做 python 回退（`.venv` → PATH）；依赖缺失打印 `[WARN]` 后跳过对应步骤，完整门禁由 CI 承担。
