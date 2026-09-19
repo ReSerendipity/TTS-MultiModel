@@ -1,7 +1,7 @@
 """Engine protocol compliance tests using mocks.
 
 Test that all engine implementations conform to the TTSEngine Protocol.
-This is L2 (engine interface) testing as described in AGENTS.md section 4.1.
+This is L2 (engine interface) testing as described in AGENTS.md (local-only, not distributed) section 4.1.
 
 Run like::
 

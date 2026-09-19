@@ -11,7 +11,7 @@
 设计原则：
     - 安全优先：默认**只生成提交、不自动 push**，需人工 review 后 push 再部署；
     - 可审计：使用 ``git revert``（非 ``git reset``），历史完整保留，可再 forward；
-    - 离线：仅操作本地 git，不请求任何外部服务（AGENTS.md 硬约束 #5）。
+    - 离线：仅操作本地 git，不请求任何外部服务（AGENTS.md（本地维护、不随仓库分发） 硬约束 #5）。
 
 示例：
     python scripts/rollback_release.py --list

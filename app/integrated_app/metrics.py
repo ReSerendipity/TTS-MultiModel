@@ -12,7 +12,7 @@ Why 独立成模块：
     二者职责互补：前者管「输出什么」，后者管「进程内实时计数」。
 
 设计约束：
-    - AGENTS.md 硬约束 #5 离线优先：``prometheus_client`` 未安装时应用照常运行，
+    - AGENTS.md（本地维护、不随仓库分发） 硬约束 #5 离线优先：``prometheus_client`` 未安装时应用照常运行，
       所有仪表调用静默降级为 no-op。
     - 所有指标名统一以 ``tts_`` 前缀，与 observability/metrics.py 保持一致，
       便于 Prometheus 端统一查询与告警规则复用。

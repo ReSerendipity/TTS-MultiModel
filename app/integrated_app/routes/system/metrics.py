@@ -12,7 +12,7 @@
 本模块仅负责 ``/metrics`` 一个端点，避免 ``_discover_routes`` 自动发现时产生
 重复路由歧义。
 
-设计约束（AGENTS.md 硬约束 #5 离线工作）：
+设计约束（AGENTS.md（本地维护、不随仓库分发） 硬约束 #5 离线工作）：
   - **零第三方依赖**：不引入 prometheus-client，直接输出 Prometheus 文本格式。
   - 指标聚合统一下沉到 ``observability.metrics.build_metrics_text``（结构化优先、
     覆盖 HealthMonitor / 历史库 / 告警计数等多数据源），本端点只负责 HTTP 封装，

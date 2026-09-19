@@ -8,7 +8,7 @@
     - 容器化评估 P2-8「引入 prometheus_client 暴露 /metrics」
 
 Why 手写而非依赖 prometheus_client：
-    - AGENTS.md 硬约束 #5 要求一切外部资源可离线工作；引入新依赖会增加
+    - AGENTS.md（本地维护、不随仓库分发） 硬约束 #5 要求一切外部资源可离线工作；引入新依赖会增加
       安装失败面（CI 多 OS 矩阵）。
     - Prometheus 的「文本 exposition 格式」本身是简单稳定的规范，手写
       完全满足 scrape 需求，且 100% 可单测、无网络依赖。
@@ -19,7 +19,7 @@ Why 手写而非依赖 prometheus_client：
     ``collect_metrics()`` 产出 ``dict[str, float]``（唯一事实源，供 SLO / 告警 / 单测复用），
     ``build_metrics_text()`` 仅负责把它渲染成 Prometheus 文本。
     ⚠️ 早期实现是「先渲染文本再反解析」，反解析要求行内含 ``=``，会静默丢掉所有
-    无 label 的样本（见 AGENTS.md 陷阱记录）。改为结构化优先后从根上消除这类问题。
+    无 label 的样本（见 AGENTS.md（本地维护、不随仓库分发） 陷阱记录）。改为结构化优先后从根上消除这类问题。
 
 指标事实源：
     - ``monitor.HealthMonitor`` 单例（进程内运行时统计 + GPU）

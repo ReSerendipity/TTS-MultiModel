@@ -17,7 +17,7 @@
     基于 OpenVoice ToneColorConverter 实现零样本音色转换，
     由 ``engines.voicebox_engine.VoiceboxEngine`` 提供真实推理能力。
 
-设计约束（遵循 AGENTS.md）：
+设计约束（遵循 AGENTS.md（本地维护、不随仓库分发））：
     - 延迟导入 TTS 引擎，避免 MCP 服务器启动即加载大模型；
     - 工具处理函数均为 async，异常由 MCPServer 的 tools/call 调度统一捕获；
     - 仅使用本仓已存在的数据类与日志器，不引入新依赖。

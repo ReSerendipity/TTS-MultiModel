@@ -16,7 +16,7 @@
     唤醒机制（不携带 payload，仅用于状态变化时打断轮询 sleep）。
 
 与轮询的替代关系：
-    遵循 AGENTS.md §6「SSE 状态推送」要求，前端禁止使用 setInterval 轮询，
+    遵循 AGENTS.md（本地维护、不随仓库分发） §6「SSE 状态推送」要求，前端禁止使用 setInterval 轮询，
     统一使用 EventSource 订阅本端点。心跳 + 事件驱动推送保证实时性的同时，
     将空闲连接 CPU 占用降到接近 0。
 """

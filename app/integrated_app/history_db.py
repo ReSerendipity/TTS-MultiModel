@@ -15,15 +15,15 @@
   走 mmap 而非 read() 系统调用，吞吐量提升约 40%
 - busy_timeout=5s：锁等待超时阈值，避免默认 0ms 立即报错
 
-H-R2~H-R5 重构要点与 AGENTS.md 硬约束的对应关系：
+H-R2~H-R5 重构要点与 AGENTS.md（本地维护、不随仓库分发） 硬约束的对应关系：
 - H-R2（统一 INSERT 逻辑）：add_record / insert / insert_batch 三处写入
   统一复用 _INSERT_SQL 常量 + _build_record_tuple 方法，字段错位零风险
 - H-R3（连接管理）：_apply_pragmas 统一 PRAGMA 配置，_all_connections
   set 追踪所有线程连接，新增 close_all() 应用退出时统一清理
-- H-R4（删除一致性 / AGENTS.md 硬约束）：delete_multiple_records 先在
+- H-R4（删除一致性 / AGENTS.md（本地维护、不随仓库分发） 硬约束）：delete_multiple_records 先在
   DB 事务内删除成功并收集 filepath，事务提交后再删除磁盘文件；DB 失败
   时文件不会被删，保证 DB 为事实源（不会出现"文件删了但记录还在"）
-- H-R5（批量分块 / AGENTS.md 硬约束）：所有批量 IN 子句与 executemany
+- H-R5（批量分块 / AGENTS.md（本地维护、不随仓库分发） 硬约束）：所有批量 IN 子句与 executemany
   均按 _CHUNK_SIZE=500 分块，避免触发 SQLITE_MAX_VARIABLE_NUMBER 限制
 
 重构说明 (H-R2/R3/R4/R5):

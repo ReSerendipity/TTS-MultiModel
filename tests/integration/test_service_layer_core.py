@@ -3,7 +3,7 @@
 Test the critical business logic paths in TTSGenerationService, ModelService,
 and PersonaService using mocks for engine/model dependencies.
 
-AGENTS.md Section 4.1 L3: Service layer integration tests with mocked engines.
+AGENTS.md (local-only, not distributed), Section 4.1 L3: Service layer integration tests with mocked engines.
 
 Run like::
 

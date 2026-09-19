@@ -1,7 +1,7 @@
 """可观测性子包（SRE 评估 P0~P2 落地）。
 
 集中收纳指标导出、告警、SLO、容量采样等运维能力，统一从 ``app.integrated_app.monitor``
-的 ``HealthMonitor`` 单例读取事实源。设计原则（AGENTS.md 硬约束 #5 离线优先）：
+的 ``HealthMonitor`` 单例读取事实源。设计原则（AGENTS.md（本地维护、不随仓库分发） 硬约束 #5 离线优先）：
 - 不引入任何外部服务强依赖（Prometheus 文本格式手写，无需 ``prometheus_client``）。
 - 所有能力本地可运行；外部 exporter / webhook 仅作为可选增强通道。
 

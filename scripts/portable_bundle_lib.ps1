@@ -9,7 +9,7 @@
 #   3. 只依赖 Windows PowerShell 5.1 + 系统自带 tar.exe（bsdtar）；7-Zip 存在时优先用（压缩率更高）。
 #      禁止使用 PowerShell 7 专属语法（?? 、三元、-Parallel、[IO.Path]::GetRelativePath）。
 #   4. 本文件含中文，必须存为 **UTF-8 with BOM**：PowerShell 5.1 对无 BOM 的 .ps1 按 ANSI(GBK)
-#      解码，中文会碎成乱码并直接破坏语法（同 AGENTS.md 陷阱 #18 一类问题）。
+#      解码，中文会碎成乱码并直接破坏语法（同 AGENTS.md（本地维护、不随仓库分发） 陷阱 #18 一类问题）。
 
 $script:GithubAssetLimitBytes = 2147483648
 $script:DefaultMaxPartBytes = 1900MB

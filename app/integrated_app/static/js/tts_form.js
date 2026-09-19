@@ -372,7 +372,7 @@ window.TTSForm = (function() {
      * 生成完成后的结果处理（原"自动播放"逻辑已废弃）：
      * 结果卡内嵌播放器（window.EmbeddedPlayer）负责试听，这里不再调用
      * 全局播放器自动播放，避免"生成后隐形播放 / 双音源叠加"问题
-     * （见 AGENTS.md Known Gotchas #9）。
+     * （见 AGENTS.md（本地维护、不随仓库分发） Known Gotchas #9）。
      * @param {Object} config
      * @param {string} config.formId - Form element ID
      * @param {string} config.resultId - Result container ID

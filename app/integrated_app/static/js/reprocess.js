@@ -53,7 +53,7 @@ var Reprocess = (function() {
         .then(function(html) {
             if (resultEl) resultEl.innerHTML = html;
             // 不再自动调用全局播放器播放：结果片段已含内嵌播放器（EmbeddedPlayer），
-            // 由用户手动点播，避免与全局播放器双音源叠加（见 AGENTS.md Known Gotchas #9）
+            // 由用户手动点播，避免与全局播放器双音源叠加（见 AGENTS.md（本地维护、不随仓库分发） Known Gotchas #9）
             var audioSrc = resultEl ? resultEl.querySelector('audio') : null;
             // Show audio element if hidden
             var audioEl = document.getElementById(config.audioElementId);
