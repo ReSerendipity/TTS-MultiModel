@@ -153,8 +153,11 @@ Assert-Step ($localPaths.Count -eq 0) 'no-local-path-residue' "hits=$($localPath
 Write-Step '⑤ 冒烟启动（自检 + 验签）'
 # 真实便携解释器优先：解包载荷内的 WPy64 运行时 python.exe（真实启动自检）
 $payloadRootPath = Join-Path $installed 'TTSMultiModel-Portable'
+# fixture 模式塞进载荷的是 19 字节的文本假 python.exe（见本文件 fixture 段的
+# 'not-a-real-python'），按目录名匹配会被当成真实便携解释器，⑤ 于是永远走不到
+# 下面那条「回退仓库 .venv」分支；真实 WinPython 的 python.exe 远大于该阈值。
 $payloadPy = @(Get-ChildItem -LiteralPath $payloadRootPath -Recurse -File -Filter 'python.exe' -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -match 'WPy64' } | Select-Object -First 1).FullName
+    Where-Object { $_.FullName -match 'WPy64' -and $_.Length -gt 65536 } | Select-Object -First 1).FullName
 $smokePython = if ($payloadPy) { $payloadPy } else { $PythonExe }
 $smokeOut = & $smokePython (Join-Path $PSScriptRoot 'diag_integrity.py') --app-dir $payloadApp --enforce 2>&1
 $smokeExit = $LASTEXITCODE
