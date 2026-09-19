@@ -4,7 +4,7 @@
     本模块是 ``model_manager`` 与 ``model_registry`` 的薄代理层，
     对应前端 Settings 页与模型加载控制按钮提供后端能力；所有写操作
     （load / unload / switch / LoRA）通过 ``model_manager`` 的内部
-    RLock 串行化执行，符合 AGENTS.md §6「单 Worker 串行」硬约束，
+    RLock 串行化执行，符合 AGENTS.md（本地维护、不随仓库分发） §6「单 Worker 串行」硬约束，
     防止并发显存占用触发 CUDA OOM。
 
 路径前缀：
@@ -157,7 +157,7 @@ def _is_lora_enabled() -> bool:
 
 
 # Why 所有 load/switch/unload 都走 model_manager 的串行 RLock：
-#   AGENTS.md §6 硬约束「单 Worker 串行」：若前端并发点 2 次 load
+#   AGENTS.md（本地维护、不随仓库分发） §6 硬约束「单 Worker 串行」：若前端并发点 2 次 load
 #   /api/model/load?voxcpm2 + /api/model/load?indextts2 会同时占用
 #   两份 GPU 显存，立即触发 CUDA OOM。model_manager 在函数内部通过
 #   串行锁让第二个请求排队等待第一个完成，保证任意时刻只有一次显存操作。

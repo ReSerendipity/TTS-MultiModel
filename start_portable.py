@@ -19,8 +19,16 @@ TTS MultiModel - 桌面壳便携版启动入口（Desktop Shell）
 环境变量: 与 clean_launch.py 一致（离线模式、OpenMP 兼容、缓存路径、自动加载模型）。
 """
 
+import contextlib
 import os
 import sys
+
+# cp1252 控制台（英文 Windows / CI runner）无法编码中文 print，冒烟步骤会当场抛
+# UnicodeEncodeError；统一按 UTF-8 输出，日志落点亦为 UTF-8。
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        with contextlib.suppress(OSError, ValueError):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
 
 # --- 环境初始化（与 clean_launch.py 对齐，仅本地离线部署） ---
 os.environ["TRANSFORMERS_OFFLINE"] = "1"

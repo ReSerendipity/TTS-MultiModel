@@ -481,7 +481,7 @@ class AppConfig:
         """可观测性配置（alerting / slo / exporter），读取 config.yaml ``observability`` 段。
 
         该段为可选配置；缺省时返回空字典，由各消费模块使用内置默认值。
-        设计原则（AGENTS.md 硬约束 #5 离线优先）：所有值均可本地配置，
+        设计原则（AGENTS.md（本地维护、不随仓库分发） 硬约束 #5 离线优先）：所有值均可本地配置，
         不依赖任何外部服务即可生效，外部 exporter / webhook 仅作为可选增强。
         """
         self._ensure_loaded()

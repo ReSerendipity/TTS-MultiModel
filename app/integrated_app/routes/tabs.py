@@ -45,6 +45,11 @@ router = APIRouter(tags=["tabs"])
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(_BASE_DIR, "templates"))
+# 保持与 app_server.py 一致：显式在 TTS_DEBUG=1 时启用 Jinja 模板自动重载。
+# 注：Starlette 1.6.0 的 Jinja2Templates 默认 auto_reload 即为 True，故本改动
+# 在此环境下属防御性对齐（意图显式化），并非修复"不热重载"——详见 GOTCHAS #106。
+if os.environ.get("TTS_DEBUG", "0") == "1":
+    templates.env.auto_reload = True
 register_i18n_filters(templates.env)
 
 # Tab 名称 -> 模板文件路径映射（向后兼容 100%，保留原键名）

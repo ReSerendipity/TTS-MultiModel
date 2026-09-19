@@ -1,7 +1,8 @@
 # 完成定义（Definition of Done）
 
-> **来源**：家族通用 DOD 模板 `.spec_audit/family_DOD.md`（源自 SpiritPal definition-of-done.md 泛化），本仓本地化。
+> **来源**：家族通用 DOD 模板 `.spec_audit/family_DOD.md`（源自 SpiritPal definition-of-done.md 泛化；该家族模板已归档，2026-09-17 起按本仓本地化内容维护），本仓本地化。
 > **适用范围**：TTS_MultiModel 全项目所有功能开发任务。
+> **关于 `AGENTS.md`**：下文多处引用的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略），clone 本仓的读者无需查找该文件，相关约束以本文条目正文为准。
 
 ---
 
@@ -20,8 +21,8 @@
 - [ ] 功能已实现，覆盖 PRD / Spec 定义的所有验收标准（AC）
 - [ ] `ruff` / `ruff-format` 通过（0 error）；mypy 命中 `.ci/mypy_baseline` 无新增
 - [ ] 无调试残留（`print()` / `breakpoint()` / `pdb`，诊断日志除外需标记 `[diag]`）
-- [ ] 未引入跨层违规引用（遵守 AGENTS.md §3 模块边界 + 禁区表）
-- [ ] 涉及引擎改动遵守 AGENTS.md SOP / `docs/project/MULTI_ENGINE_DESIGN.md` + `DI_SINGLETONS.md`
+- [ ] 未引入跨层违规引用（遵守本地 AGENTS.md §3 模块边界 + 禁区表）
+- [ ] 涉及引擎改动遵守本地 AGENTS.md SOP / `docs/project/MULTI_ENGINE_DESIGN.md` + `DI_SINGLETONS.md`
 - [ ] 新增路由遵守 routes 分层约定（generate / system）
 
 ## 2. 测试覆盖
@@ -34,8 +35,8 @@
 
 ## 3. 文档同步
 
-- [ ] `AGENTS.md` 已同步（目录结构 / 模块边界 / 配置 / 环境变量）
-- [ ] 新增模块在 AGENTS.md §3 / `docs/project/ARCHITECTURE.md` 有对应条目
+- [ ] `AGENTS.md` 已同步（本地维护、不随仓库分发；目录结构 / 模块边界 / 配置 / 环境变量）
+- [ ] 新增模块在本地 AGENTS.md §3 / `docs/project/ARCHITECTURE.md` 有对应条目
 - [ ] 踩坑已追加到 `docs/project/KNOWN_GOTCHAS.md`（触发/现象/做法/日期）
 - [ ] `CHANGELOG.md` 已记录变更（type 对应 Added/Fixed/…）
 - [ ] `python scripts/check_spec_refs.py` 退出码 0（无幻影/死链/假门禁）

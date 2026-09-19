@@ -19,7 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 def _resolve_base_url() -> str:
     """读取 config.yaml 的 server.port，回退 127.0.0.1:7869（项目默认端口）。
 
-    离线工作约束（AGENTS.md 硬约束 #5）：仅解析本地 config.yaml，不请求外部资源。
+    离线工作约束（AGENTS.md（本地维护、不随仓库分发） 硬约束 #5）：仅解析本地 config.yaml，不请求外部资源。
     """
     host, port = "127.0.0.1", 7869
     try:

@@ -11,7 +11,7 @@
     start.bat → app/clean_launch.py → app/integrated_app/app_server.py
     → uvicorn.run(create_app()) → lifespan(startup) → 路由自动注册 → 服务监听
 
-硬约束（AGENTS.md §6）：
+硬约束（AGENTS.md（本地维护、不随仓库分发） §6）：
     - workers=1：GPU 单 Worker 串行，避免并发显存爆炸
     - server.auto_load_model=true：lifespan startup 阶段自动预加载模型
     - 模型加载失败不阻止应用启动：用户可手动在 Settings 页加载模型

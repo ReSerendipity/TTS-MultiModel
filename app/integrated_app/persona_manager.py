@@ -87,7 +87,7 @@ def _validate_persona_name(name: str) -> tuple[bool, str]:
     """
     if not name:
         return False, "名称不能为空"
-    if not _PERSONA_NAME_RE.match(name):
+    if not _PERSONA_NAME_RE.fullmatch(name):
         return False, "名称格式不合法（仅支持字母、数字、下划线、连字符、中文，1-50字符）"
     return True, ""
 
@@ -433,6 +433,14 @@ def load_persona_embedding(name: str) -> Any | None:
         EngineNotLoadedError: 走到在线计算分支但 VoxCPM2 模型尚未加载时抛出，
             ``engine`` 属性固定为 ``"voxcpm2"``。
     """
+    # 与 _save/_delete 一致的第二段防线（realpath 前缀比对）放在函数入口：
+    # 读路径的调用方各自用 os.path.basename 兜底，收敛到这里后不再依赖调用方自觉，
+    # 也避免越出 PERSONA_DIR 的 name 命中内存缓存。
+    _persona_root = os.path.realpath(PERSONA_DIR)
+    if not os.path.realpath(os.path.join(_persona_root, f"{name}.wav")).startswith(_persona_root):
+        logger.warning(f"[嵌入加载] 音色名越出 PERSONA_DIR，拒绝加载: {name!r}")
+        return None
+
     cached = _persona_embedding_cache.get(name)
     if cached is not None:
         return cached

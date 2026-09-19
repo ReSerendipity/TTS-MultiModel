@@ -2,7 +2,7 @@
 
 架构说明：HealthMonitor 作为全局单例运行，包含以下四大核心监控能力：
 ① GPU 显存泄漏检测：基于 100 样本滑动窗口，通过前后均值差诊断潜在泄漏；
-② 显存熔断检查：显存占用超过 90% 立即触发熔断，终止当前推理（AGENTS.md §6 硬约束）；
+② 显存熔断检查：显存占用超过 90% 立即触发熔断，终止当前推理（AGENTS.md（本地维护、不随仓库分发） §6 硬约束）；
 ③ 模型加载预检：加载新模型前验证可用显存 ≥ 模型权重大小 × 1.5 倍安全裕度；
 ④ 运行统计：总生成数、错误数、OOM 重试次数、熔断触发次数等健康指标。
 
@@ -53,7 +53,7 @@ def _get_gpu_device() -> int:
 class HealthMonitor:
     """应用健康监控器：GPU 显存趋势、模型状态、熔断机制。
 
-    显存熔断机制（AGENTS.md §6 硬约束）：
+    显存熔断机制（AGENTS.md（本地维护、不随仓库分发） §6 硬约束）：
     - 推理前调用 check_vram_circuit_breaker() 检查显存占用
     - 占用超过 90% 时返回熔断标志，调用方立即抛 InsufficientVRAMError 终止推理
     - 推理过程中周期性检查，超阈值则中断生成并清理缓存
@@ -415,7 +415,7 @@ class HealthMonitor:
         """模型加载预检：检查可用显存是否满足模型权重 × 1.5 倍安全裕度。
 
         安全系数 1.5 倍的拆解：模型权重本身占 X GB + ASR/辅助模型约 0.3X +
-        推理过程中中间激活峰值约 0.2X = 合计 1.5X。AGENTS.md §6 硬约束，
+        推理过程中中间激活峰值约 0.2X = 合计 1.5X。AGENTS.md（本地维护、不随仓库分发） §6 硬约束，
         加载前必须预检通过以防 OOM 导致加载中途失败、显存碎片残留。
 
         若 model_size_gb ≤ 0（输入异常）则 fail-open：记录警告后跳过检查视为通过。
@@ -452,7 +452,7 @@ class HealthMonitor:
             needed_gb = model_size_gb * self.VRAM_PRELOAD_SAFETY_FACTOR
 
             # VRAM_PRELOAD_SAFETY_FACTOR=1.5：为什么需要 0.5 倍——权重本身占 X GB +
-            # ASR/辅助模型 ≈0.3X + 中间激活峰值 ≈0.2X = 刚好 1.5X，AGENTS.md §6 硬约束
+            # ASR/辅助模型 ≈0.3X + 中间激活峰值 ≈0.2X = 刚好 1.5X，AGENTS.md（本地维护、不随仓库分发） §6 硬约束
             if free_gb < needed_gb:
                 msg = (
                     f"显存不足：模型需要 {needed_gb:.1f}GB (权重 {model_size_gb:.1f}GB "

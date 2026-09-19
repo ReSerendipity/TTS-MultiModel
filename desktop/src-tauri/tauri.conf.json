@@ -33,7 +33,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUcxcGJtbHphV2R1SUhCMVlteHBZeUJyWlhrNklFRkdRa1V4UlRZME1VSXlOa1UwTmtRS1VsZFNkRFZEV1dKYVFqWXJjaXMyTURCME9VaDVZMDV5VVcxWFYzVkpOV281YTJJdlNYVkJNMlEwV21rNGNXODJjVE4wWmxWb1MyUUs=",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFGQkUxRTY0MUIyNkU0NkQKUldSdDVDWWJaQjYrcis2MDB0OUh5Y05yUW1XV3VJNWo5a2IvSXVBM2Q0Wmk4cW82cTN0ZlVoS2QK",
       "endpoints": [
         "https://github.com/ReSerendipity/TTS_MultiModel/releases/latest/download/shell-update.json"
       ],

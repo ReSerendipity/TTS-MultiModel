@@ -34,6 +34,10 @@ jobs:
     defaults:
       run:
         shell: pwsh
+    # windows runner 的控制台默认 cp1252，中文 print 会抛 UnicodeEncodeError
+    # （历史红：run 35344911236）。与 scripts/*.py 内的 sys.stdout.reconfigure 互为双保险。
+    env:
+      PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
 

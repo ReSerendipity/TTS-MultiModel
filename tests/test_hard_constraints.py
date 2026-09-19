@@ -1,4 +1,4 @@
-"""AGENTS.md §6 硬约束的机械验证测试（CPU-only，全部基于 mock）。
+"""AGENTS.md（本地维护、不随仓库分发） §6 硬约束的机械验证测试（CPU-only，全部基于 mock）。
 
 覆盖三大硬约束：
 1. 显存预检（1.5 倍规则）—— GPUMemoryMonitor.can_load_model / _check_vram_prereq

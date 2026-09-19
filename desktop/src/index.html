@@ -98,6 +98,7 @@
     <div class="winbar-brand">TTS MULTIMODEL</div>
     <div class="win-controls" id="winControls">
       <button class="win-btn" id="winMinimize" title="最小化" aria-label="最小化">&#x2212;</button>
+      <button class="win-btn" id="winMaximize" title="最大化" aria-label="最大化">&#x25A1;</button>
       <button class="win-btn win-btn-close" id="winClose" title="关闭" aria-label="关闭">&#x2715;</button>
     </div>
   </div>
@@ -128,7 +129,35 @@
         } catch (e) {}
       }
       document.getElementById('winMinimize').addEventListener('click', function () { invoke('window_minimize'); });
-      document.getElementById('winClose').addEventListener('click', function () { invoke('window_close'); });
+      var maxBtn = document.getElementById('winMaximize');
+      function syncMax() {
+        var r = invoke('window_is_maximized');
+        if (r && r.then) r.then(function (m) {
+          if (!maxBtn) return;
+          maxBtn.innerHTML = m ? '&#x29C9;' : '&#x25A1;';
+          maxBtn.title = m ? '向下还原' : '最大化';
+        }).catch(function () {});
+      }
+      function toggleMax() { invoke('window_maximize_toggle'); setTimeout(syncMax, 160); }
+      if (maxBtn) maxBtn.addEventListener('click', toggleMax);
+      document.getElementById('winClose').addEventListener('click', function () {
+        // 与系统 X 同语义：由 Rust 按 close_to_tray 配置决定隐藏托盘或退出
+        var r = invoke('window_request_close');
+        if (!r || !r.catch) invoke('window_close');
+        else r.catch(function () { invoke('window_close'); });
+      });
+      var winbar = document.querySelector('.winbar');
+      if (winbar) {
+        winbar.addEventListener('dblclick', function (e) {
+          if (e.target === winbar || e.target.classList.contains('winbar-brand')) toggleMax();
+        });
+        winbar.addEventListener('pointerdown', function (e) {
+          if (e.button !== 0) return;
+          if (e.target !== winbar && !e.target.classList.contains('winbar-brand')) return;
+          invoke('window_start_dragging');
+        });
+      }
+      syncMax();
     })();
     // 监听来自 Rust 壳的启动状态
     if (window.__TAURI__) {

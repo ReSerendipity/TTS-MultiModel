@@ -1,4 +1,4 @@
-﻿//! 窗口管理增强（对应指导文档任务 2）：
+//! 窗口管理增强（对应指导文档任务 2）：
 //! - 窗口状态记忆：关闭/移动/缩放时记录大小、位置、最大化，下次启动恢复；
 //!   存储于 `%APPDATA%/TTSMultiModel/window_state.json`（见 [`crate::config::WindowState`]）。
 //! - 外部链接：非本机地址不在 WebView 内跳转，改用系统默认浏览器打开
@@ -210,6 +210,32 @@ pub fn window_maximize_toggle(app: AppHandle) {
 #[tauri::command]
 pub fn window_close(app: AppHandle) {
     hide_to_tray(&app);
+}
+
+/// 前端命令：拖拽移动窗口。自绘标题栏 `pointerdown` 后调用（比
+/// `data-tauri-drag-region` 可靠——该属性脚本不覆盖远程源页面）。
+#[tauri::command]
+pub fn window_start_dragging(app: AppHandle) {
+    if let Some(win) = app.get_webview_window(MAIN_LABEL) {
+        let _ = win.start_dragging();
+    }
+}
+
+/// 前端命令：当前是否最大化（自绘标题栏按钮字形 □/❐ 同步用）
+#[tauri::command]
+pub fn window_is_maximized(app: AppHandle) -> bool {
+    app.get_webview_window(MAIN_LABEL)
+        .and_then(|w| w.is_maximized().ok())
+        .unwrap_or(false)
+}
+
+/// 前端命令：关闭（语义等同系统 X：走 `CloseRequested` 事件，由 main.rs
+/// 按 `close_to_tray` 配置决定隐藏到托盘还是真退出）。
+#[tauri::command]
+pub fn window_request_close(app: AppHandle) {
+    if let Some(win) = app.get_webview_window(MAIN_LABEL) {
+        let _ = win.close();
+    }
 }
 
 /// 前端命令：全屏/退出全屏切换，返回切换后的全屏状态（供前端更新标题栏样式）

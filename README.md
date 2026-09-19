@@ -37,9 +37,17 @@ A powerful open-source multi-engine Text-to-Speech platform with voice cloning, 
 
 ## Demo
 
-> 界面截图（6 张）：`声音设计 / 声音克隆 / 极致克隆 / 剧本配音 / LoRA 管理 / 系统设置`，规划存放于本地 `docs/screenshots/`（该目录当前为空、待补录）。
+在线模拟演示（无需 GPU / 模型权重，纯前端仿真）：<https://reserendipity.github.io/TTS_MultiModel/>
 
-> 在线模拟演示（无需 GPU / 模型权重，纯前端仿真）：<https://reserendipity.github.io/TTS_MultiModel/>
+界面截图（VoxCPM2 引擎，1440×900 视口）已入库 `docs/screenshots/`：
+
+| 声音设计 | 声音克隆 | 极致克隆 |
+|---|---|---|
+| ![声音设计](docs/screenshots/voxcpm2_01_voice_design_viewport.png) | ![声音克隆](docs/screenshots/voxcpm2_02_voice_clone_viewport.png) | ![极致克隆](docs/screenshots/voxcpm2_03_ultimate_clone_viewport.png) |
+| **剧本配音** | **LoRA 管理** | **系统设置** |
+| ![剧本配音](docs/screenshots/voxcpm2_04_script_workshop_viewport.png) | ![LoRA 管理](docs/screenshots/voxcpm2_06_lora_viewport.png) | ![系统设置](docs/screenshots/voxcpm2_08_settings_viewport.png) |
+
+> 文件名编号 05/07 缺位是有意为之，不代表有截图待补；`.gitignore` 里对这 6 个文件名做了显式白名单。
 
 > 欢迎在 [Discussions](https://github.com/ReSerendipity/TTS_MultiModel/discussions) 中分享你的使用体验！
 

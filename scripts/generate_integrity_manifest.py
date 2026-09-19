@@ -15,10 +15,18 @@
 """
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
 import sys
+
+# Windows runner 的控制台默认 cp1252，中文 print 会抛 UnicodeEncodeError
+# （便携包 A-6 清单重算在 release-gate 上崩过一次）；与 sign_integrity_manifest.py 同写法。
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        with contextlib.suppress(OSError, ValueError):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
 
 # 确保可以导入 integrated_app 包
 _APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")

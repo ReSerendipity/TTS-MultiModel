@@ -6,7 +6,7 @@
 #     git config core.hooksPath .githooks      （或运行 ./.githooks/install.sh）
 # 墓碑目的：让“已退役”随文件本身生效——运行会立即打印 RETIRED 并以非零码退出，
 # 不再劫持 hooksPath。下方保留退役前原始逻辑（逐字存档，因 exit 1 永不执行）。
-# 见 AGENTS.md「钩子复现」条 与 docs/agents/REVISION_LOG.md v1.45。
+# 见 AGENTS.md（本地维护、不随仓库分发）「钩子复现」条 与 docs/agents/REVISION_LOG.md v1.45。
 # =============================================================================
 Write-Host "RETIRED: scripts/install-hooks.ps1 is retired."
 Write-Host "RETIRED: use git config core.hooksPath .githooks  (or run ./.githooks/install.sh)"

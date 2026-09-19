@@ -8,9 +8,12 @@
 
 ## 1. 版本号规范
 
-- 遵循 SemVer `MAJOR.MINOR.PATCH`。当前 **v2.2.1**。
-- 版本位：`pyproject.toml` + `config.yaml`（release-please 驱动前端缓存参数需人工补齐，见 AGENTS.md #9）+ `CHANGELOG.md`。
-- 发布由 `release-please` 自动生成 GitHub Release 并打 semver tag。
+- 遵循 SemVer `MAJOR.MINOR.PATCH`。**源码版本 2.2.2（未发布）｜已发布最新 = v2.2.1**。
+  版本号出现在 11 处（`version.json`/`pyproject.toml`/`config.yaml`/`desktop/*`/`scripts/installer/setup.nsi`），
+  但只有 tag + GitHub Release 同时存在才算发出去；核对：`gh release view v<版本>`。
+- 版本位：`pyproject.toml` + `config.yaml`（release-please 驱动前端缓存参数需人工补齐，见本地 AGENTS.md #9（AGENTS.md 为本地维护、不随仓库分发））+ `CHANGELOG.md`。
+- 发布由 `release-please` 自动生成 GitHub Release 并打 semver tag；该作业若失败**不会**再被吞掉
+  （v2.2.2 曾在工作流全绿的情况下既没 tag 迁移也没 Release，原因见 `CHANGELOG.md` 该条标注）。
 
 ## 2. 发布流程
 

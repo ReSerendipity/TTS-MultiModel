@@ -11,7 +11,7 @@
 |---|---:|---|
 | CI 门禁（`typecheck` job） | **141** | 仅装 mypy，不装项目依赖（torch/soundfile 等第三方符号为 `Any`）；命令见 `ci.yml` |
 | 本机全依赖 venv | **268** | 装齐 torch/soundfile/datasets 等后，底层 attr-defined/assignment 错误全部浮现 |
-| 旧 AGENTS.md 描述 | 220 | 过时估计，已废弃；统一改为引用上面两种真实口径 |
+| 旧 AGENTS.md 描述（AGENTS.md 为本地维护、不随仓库分发的资产） | 220 | 过时估计，已废弃；统一改为引用上面两种真实口径 |
 
 ## 重新生成基线（改 mypy 版本或 `typecheck` 依赖集时必跑）
 

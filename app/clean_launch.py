@@ -44,8 +44,16 @@ TTS MultiModel - 应用启动脚本
     - 支持 Ctrl+C 优雅关闭服务
 """
 
+import contextlib
 import os
 import sys
+
+# cp1252 控制台（英文 Windows / CI runner）无法编码中文 print，启动链路会当场抛
+# UnicodeEncodeError；统一按 UTF-8 输出。
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        with contextlib.suppress(OSError, ValueError):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
 
 # --- 【暴力补丁：必须在最前面】 ---
 # 注意：以下 SSL 相关补丁仅适用于本地离线部署场景。

@@ -9,7 +9,7 @@
 #   3. 只依赖 Windows PowerShell 5.1 + 系统自带 tar.exe（bsdtar）；7-Zip 存在时优先用（压缩率更高）。
 #      禁止使用 PowerShell 7 专属语法（?? 、三元、-Parallel、[IO.Path]::GetRelativePath）。
 #   4. 本文件含中文，必须存为 **UTF-8 with BOM**：PowerShell 5.1 对无 BOM 的 .ps1 按 ANSI(GBK)
-#      解码，中文会碎成乱码并直接破坏语法（同 AGENTS.md 陷阱 #18 一类问题）。
+#      解码，中文会碎成乱码并直接破坏语法（同 AGENTS.md（本地维护、不随仓库分发） 陷阱 #18 一类问题）。
 
 $script:GithubAssetLimitBytes = 2147483648
 $script:DefaultMaxPartBytes = 1900MB
@@ -17,7 +17,7 @@ $script:DefaultMaxPartBytes = 1900MB
 # 必须用通配：imageio-ffmpeg 的 wheel 内自带 ffmpeg-win64-v7.1.exe，精确名匹配会漏。
 $script:ForbiddenLeafPatterns = @('ffmpeg*.exe', 'ffprobe*.exe')
 # 禁止进入任何分发物的本机私有文件（密钥 / 真实环境变量 / 配置备份）。
-$script:DeniedLeafNames = @('.watermark_key', '.integrity_hmac_secret', '.manifest_signing_key', '.csrf_secret', '.pii_key', '.history_hmac_key', '.env', 'config.yaml.bak')
+$script:DeniedLeafNames = @('.watermark_key', '.integrity_hmac_secret', '.manifest_signing_key', '.csrf_secret', '.pii_key', '.history_hmac_key', '.env', 'config.yaml.bak', 'cert.pem', 'key.pem')
 
 function Get-TTSMultiModelGithubAssetLimit {
     <# 返回 GitHub Release 单文件字节上限。 #>
@@ -174,18 +174,44 @@ function Read-TTSMultiModelJson {
     return $text | ConvertFrom-Json
 }
 
+function Get-TTSMultiModelLongPath {
+    <# 把 8.3 短名展开成长名（用户目录的 "~" 缩写形式 -> 完整目录名）。
+
+       GitHub Windows runner 的 TEMP 环境变量本身就是短名形式，而 .NET 的文件枚举
+       返回长名；两者混在一个前缀比对里就会「明明在目录下却判成不在」。
+       路径不存在或拿不到长名时退回词法归一，保证两侧规则一致。 #>
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not ('TtsMultiModel.WinPath' -as [type])) {
+        Add-Type -Namespace TtsMultiModel -Name WinPath -MemberDefinition @'
+[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+public static extern uint GetLongPathNameW(string lpszShortPath, [Out] System.Text.StringBuilder lpszLongPath, uint cchBuffer);
+'@
+    }
+    $sb = New-Object System.Text.StringBuilder 32768
+    $len = [TtsMultiModel.WinPath]::GetLongPathNameW($Path, $sb, [uint32]$sb.Capacity)
+    if ($len -eq 0) {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+    return $sb.ToString()
+}
+
 function ConvertTo-TTSMultiModelRelative {
     <# 计算 $Full 相对 $Root 的路径（不依赖 .NET Core 的 GetRelativePath）。 #>
     param(
         [Parameter(Mandatory = $true)][string]$Root,
         [Parameter(Mandatory = $true)][string]$Full
     )
-    $rootFull = (Resolve-Path -LiteralPath $Root).Path.TrimEnd('\', '/')
-    $fullResolved = [System.IO.Path]::GetFullPath($Full)
-    if ($fullResolved.Length -le $rootFull.Length) {
+    $rootFull = (Get-TTSMultiModelLongPath (Resolve-Path -LiteralPath $Root).Path).TrimEnd('\', '/')
+    $fullResolved = Get-TTSMultiModelLongPath $Full
+    if ($fullResolved.TrimEnd('\', '/') -eq $rootFull) {
         return ''
     }
-    if ($fullResolved.Substring(0, $rootFull.Length).ToLowerInvariant() -ne $rootFull.ToLowerInvariant()) {
+    if (-not $fullResolved.StartsWith($rootFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "ConvertTo-TTSMultiModelRelative: $fullResolved 不在 $rootFull 之下"
+    }
+    # 前缀相等但分隔符缺失 = 同名兄弟目录（/a/bc 之于 /a/b），不能算在 $Root 之下
+    if ($fullResolved.Length -gt $rootFull.Length -and
+        $fullResolved[$rootFull.Length] -ne '\' -and $fullResolved[$rootFull.Length] -ne '/') {
         throw "ConvertTo-TTSMultiModelRelative: $fullResolved 不在 $rootFull 之下"
     }
     return $fullResolved.Substring($rootFull.Length).TrimStart('\', '/')
