@@ -4,6 +4,9 @@
 本文件覆盖此前未覆盖的 `.pt` 预计算嵌入加载链路——新格式（含 `_meta.origin`）、
 旧格式（无 `_meta` 向后兼容）、origin 不匹配告警、`.pt` 损坏降级删除、缓存命中，
 以及缺 `.wav` 时的早退返回 None。
+
+另覆盖 ``TestLoadPersonaEmbeddingPathContainment``：把 name 带出 PERSONA_DIR 的
+读路径封死（对应 CodeQL #53 py/unsafe-deserialization 的可达性前提）。
 """
 
 import sys
@@ -112,3 +115,42 @@ class TestLoadPersonaEmbedding:
         _save_pt(root / "frank.pt", payload, origin=pm.PERSONA_PT_ORIGIN)
 
         assert pm.load_persona_embedding("frank") == payload
+
+
+class TestLoadPersonaEmbeddingPathContainment:
+    """name 不得把读路径带出 PERSONA_DIR。
+
+    CodeQL #53（py/unsafe-deserialization, critical）落在
+    ``torch.load(pt_path, weights_only=True)``。``weights_only=True`` 已挡掉任意
+    对象反序列化，剩下可被利用的前提是「攻击者能决定 pt_path 指向哪个文件」——
+    这里锁掉该前提：越界 name 直接返回 None，而不是走到在线计算分支抛错。
+    """
+
+    def test_relative_traversal_is_rejected(self, persona_env):
+        """``../victim`` 形式即便在 PERSONA_DIR 外真有 .wav，也不加载。"""
+        import os
+
+        root, pm = persona_env
+        outside = root.parent / "victim"
+        outside.with_suffix(".wav").write_bytes(b"RIFF....WAVEfmt ")
+        name = os.path.relpath(str(outside), str(root))
+
+        assert ".." in name, "夹具本身要真的越出 PERSONA_DIR"
+        assert pm.load_persona_embedding(name) is None
+
+    def test_absolute_name_is_rejected(self, persona_env):
+        """Windows/POSIX 下 ``os.path.join(dir, 绝对名)`` 会整体替换目录，同样要挡。"""
+        root, pm = persona_env
+        outside = root.parent / "abs"
+        outside.with_suffix(".wav").write_bytes(b"RIFF....WAVEfmt ")
+
+        assert pm.load_persona_embedding(str(outside)) is None
+
+    def test_in_dir_name_still_loads(self, persona_env):
+        """守卫不能顺手挡掉正常音色（回归断言，与上面两条互为对照）。"""
+        root, pm = persona_env
+        _write_persona_files(root, "grace")
+        payload = ("grace.wav", "参考文本")
+        _save_pt(root / "grace.pt", payload, origin=pm.PERSONA_PT_ORIGIN)
+
+        assert pm.load_persona_embedding("grace") == payload
