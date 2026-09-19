@@ -32,7 +32,6 @@ import logging
 from fastapi import File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse
 
-from ....config import MAX_TEXT_LENGTH
 from ....model_registry import registry
 from ....persona_manager import get_persona_consent_state
 from ..utils import (
@@ -120,7 +119,7 @@ async def generic_clone_endpoint(
             )
 
     # 1. 前置校验：引擎就绪 + 文本非空 + 长度限制
-    invalid = pre_validate(request, engine or None, text, MAX_TEXT_LENGTH)
+    invalid = pre_validate(request, engine or None, text)
     if invalid:
         return invalid
 

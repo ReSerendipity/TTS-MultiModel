@@ -5,6 +5,38 @@
 window.TTSForm = (function() {
     'use strict';
 
+    function _escHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    /**
+     * 把失败信息渲染进状态区。
+     * 服务端已经把「可读中文 + 立即加载/重试按钮」拼成 HTML 片段返回了，优先整块采用；
+     * 以前这里只抠 `.error-message` 的文字，于是**按钮被丢掉**——而 htmx 默认不 swap 4xx，
+     * 用户看到的错误永远只剩一行字，没有下一步可做（GOTCHAS #133 第二面）。
+     * 回退路径的文案统一转义：errorMsg 可能含用户上传的文件名等外部输入。
+     */
+    function _renderErrorBlock(statusEl, responseText, fallbackMsg) {
+        var frag = null;
+        try {
+            var tmp = document.createElement('div');
+            tmp.innerHTML = responseText || '';
+            frag = tmp.querySelector('.tts-error-block');
+        } catch (e) {
+            frag = null;
+        }
+        if (frag && frag.querySelector('button')) {
+            statusEl.innerHTML = frag.outerHTML;
+            return true;
+        }
+        statusEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">'
+            + _escHtml((window.I18N && window.I18N['gen_failed']) || '生成失败')
+            + '</div><div class="error-message">' + _escHtml(fallbackMsg || '请求失败') + '</div></div>';
+        return false;
+    }
+
     /**
      * Initialize form validation for TTS generation forms
      * @param {Object} config
@@ -160,7 +192,7 @@ window.TTSForm = (function() {
                                 } else {
                                     errorMsg = (window.I18N && window.I18N['request_failed']) || '请求失败';
                                 }
-                                statusEl.innerHTML = '<div class="tts-error-block"><div class="error-title">' + ((window.I18N && window.I18N['gen_failed']) || '生成失败') + '</div><div class="error-message">' + errorMsg + '</div></div>';
+                                _renderErrorBlock(statusEl, xhr ? xhr.responseText : '', errorMsg);
                             }
                             if (window.Toast) Toast.show(errorMsg || ((window.I18N && window.I18N['gen_failed']) || '生成失败'), 'error');
                             setTimeout(function() {
@@ -198,7 +230,7 @@ window.TTSForm = (function() {
                     }
                 }
                 if (statusEl) {
-                    statusEl.innerHTML = '<div class="tts-error-block"><div class="error-title">' + ((window.I18N && window.I18N['gen_failed']) || '生成失败') + '</div><div class="error-message">' + errorMsg + '</div></div>';
+                    _renderErrorBlock(statusEl, evt.detail && evt.detail.xhr ? evt.detail.xhr.responseText : '', errorMsg);
                 }
                 if (window.Toast) Toast.show(errorMsg, 'error');
                 setTimeout(function() {
@@ -214,7 +246,8 @@ window.TTSForm = (function() {
                 var statusEl = document.getElementById(config.statusId);
                 var errorMsg = (window.I18N && window.I18N['network_error']) || '网络错误，请检查连接';
                 if (statusEl) {
-                    statusEl.innerHTML = '<div class="tts-error-block"><div class="error-title">' + ((window.I18N && window.I18N['gen_failed']) || '生成失败') + '</div><div class="error-message">' + errorMsg + '</div></div>';
+                    // sendError 没有响应体，只能走回退形态
+                    _renderErrorBlock(statusEl, '', errorMsg);
                 }
                 if (window.Toast) Toast.show(errorMsg, 'error');
                 setTimeout(function() {

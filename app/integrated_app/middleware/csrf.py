@@ -44,6 +44,27 @@ _CSRF_INVALID_CODE: str = "CSRF_INVALID"
 _CSRF_FATAL_CODE: str = "CSRF_FATAL"
 
 
+class _DownstreamError(Exception):
+    """给「下游 handler 自己抛的异常」打标，让它穿过 dispatch 的 fail-closed 兜底。
+
+    WHY：``dispatch`` 整体套在一个 ``try`` 里、结尾是 ``except Exception`` → 403。
+    于是任何路由内部未处理的异常都会被伪装成 ``CSRF_FATAL`` 403：既绕过
+    ``error_handler`` 的中文错误块，又把 5xx 从错误率统计里抹成 403（GOTCHAS #132）。
+    fail-closed 的语义只该作用于 CSRF 自身的错误，不该吞掉别人的。
+    """
+
+    def __init__(self, cause: BaseException) -> None:
+        super().__init__("downstream handler raised")
+        self.cause = cause
+
+
+async def _call_downstream(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    try:
+        return await call_next(request)
+    except Exception as exc:  # noqa: BLE001 — 只打标不改语义，原样在 dispatch 里重抛
+        raise _DownstreamError(exc) from exc
+
+
 def _should_set_secure(request: Request) -> bool:
     """判断是否为 Cookie 启用 Secure 标志。
 
@@ -218,7 +239,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         # 绝不将 Python 异常堆栈暴露至前端或中断 ASGI 调用链。
         try:
             if request.method in _SAFE_METHODS:
-                response = await call_next(request)
+                response = await _call_downstream(request, call_next)
                 if self._cookie_name not in request.cookies:
                     try:
                         token = self._generate_token()
@@ -233,7 +254,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 return response
 
             if _is_skip_path(request.url.path):
-                return await call_next(request)
+                return await _call_downstream(request, call_next)
 
             cookie_token = request.cookies.get(self._cookie_name)
             header_token = request.headers.get(self._header_lookup_key)
@@ -310,11 +331,14 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     },
                 )
 
-            return await call_next(request)
+            return await _call_downstream(request, call_next)
 
+        except _DownstreamError as de:
+            # 下游自己的异常：原样交回 error_handler / Starlette，不伪装成 CSRF 故障。
+            raise de.cause from de
         except Exception as e:
-            # 最终兜底：fail-closed，任何未预期的异常（如 secrets 模块内部错误、
-            # hmac 错误、set_cookie IO 错误）都返回 403，绝不裸抛。
+            # 最终兜底：fail-closed，CSRF 自身任何未预期异常（secrets/hmac/set_cookie）
+            # 都返回 403，绝不裸抛。注意这里**不再**包含下游 handler 的异常。
             logger.exception("[CSRF_FATAL] 中间件处理异常: %s", e)
             return JSONResponse(
                 status_code=403,

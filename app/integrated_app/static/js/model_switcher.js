@@ -113,6 +113,25 @@ window._applyInactiveTabTip = function(activeModel) {
     });
 };
 
+// 引擎切换成功后，让**内容区**跟上引擎。
+// WHY：activateTab() 只改高亮，页面内容靠侧栏按钮上的 hx-get；切换时程序化调用它
+// 不会重新拉模板，于是出现「侧栏写着 IndexTTS 2.5 的语音克隆、屏幕上还是 VoxCPM2 的表单」，
+// 用户点生成就打去 /api/generate/voxcpm_clone → 400（GOTCHAS #131）。
+// 只在"当前页属于另一个引擎"时才跳转；引擎无关页（工具组 data-model="all"）与本来就
+// 属于新引擎的页都不动，免得把用户已填的表单清掉。
+window._syncTabToEngine = function (modelName) {
+    var active = window.__ACTIVE_TAB_ID__;
+    if (!active) return; // 不知道屏幕上现在是哪一页就别动，宁可少跳也不要顶掉用户的内容
+    var activeItem = document.querySelector('.sidebar-item[data-tab="' + active + '"]');
+    if (activeItem) {
+        var owner = activeItem.getAttribute('data-model');
+        // 引擎无关页（工具组）与本来就属于新引擎的页都不动，免得清掉用户已填的表单
+        if (!owner || owner === 'all' || owner === modelName) return;
+    }
+    var target = document.querySelector('.sidebar-item[data-model="' + modelName + '"]');
+    if (target && window.TTSApp && window.TTSApp.sidebar) window.TTSApp.sidebar.gotoTab(target);
+};
+
 // @deprecated 使用 TTSApp.model.switch 替代，此 window 挂载点将在未来版本移除
 window.switchModel = function(modelName) {
     if (window._modelSwitching) return;
@@ -165,10 +184,9 @@ window.switchModel = function(modelName) {
             item.classList.toggle('sidebar-item-hidden', !shouldShow);
         });
 
-        var firstVisible = document.querySelector('.sidebar-item[data-model="' + tabModel + '"]:not(.sidebar-item-hidden)');
-        if (firstVisible) {
-            TTSApp.sidebar.activateTab(firstVisible);
-        }
+        // 这里**不能**提前 activateTab 到新引擎的首个 tab：那只会把高亮挪过去，而
+        // #tab-content 里仍是旧引擎的表单（内容靠按钮的 hx-get 拉，程序化高亮不触发它）。
+        // 高亮与内容一起对齐，交给切换成功后的 _syncTabToEngine()。
 
         // Fade-in transition after switching
         if (tabContent) {
@@ -210,9 +228,11 @@ window.switchModel = function(modelName) {
                 // 报告 B13：切换成功即更新全局引擎缓存
                 window.__CURRENT_ENGINE__ = modelName;
                 window.updateEngineStatus('loaded', modelName, (window.I18N && window.I18N['ready']) || 'Ready');
+                if (window._syncTabToEngine) window._syncTabToEngine(modelName);
             } else if (data.message === '引擎已就绪，无需切换') {
                 window.__CURRENT_ENGINE__ = modelName;
                 window.updateEngineStatus('loaded', modelName, (window.I18N && window.I18N['ready']) || 'Ready');
+                if (window._syncTabToEngine) window._syncTabToEngine(modelName);
             } else {
                 window.updateEngineStatus('error', modelName, data.message || (window.I18N && window.I18N['error']) || 'Error');
                 setTimeout(function() {

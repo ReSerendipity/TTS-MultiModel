@@ -14,10 +14,13 @@
     <title>{{ "app_title"|t(lang) }}</title>
     <link rel="icon" type="image/svg+xml" href="/static/icons/app-icon.svg">
     <link rel="alternate icon" type="image/x-icon" href="/favicon.ico">
-    <!-- 免费开源字体（Google Fonts，SIL OFL / Apache 2.0 协议） -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;600;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+QingKe+HuangYou&family=ZCOOL+KuaiLe&family=Long+Cang&family=Liu+Jian+Mao+Cao&family=Zhi+Mang+Xing&family=Playfair+Display:wght@400;600&family=Cinzel:wght@400;600&family=Great+Vibes&family=Pacifico&family=Dancing+Script:wght@400;600&display=swap" rel="stylesheet">
+    <!-- 标题字体：自托管。以前这里外链 Google Fonts，但 CSP 的 style-src 只允许
+         'self' 'unsafe-inline'、font-src 只允许 'self' data:，所以样式表与字体文件
+         在任何环境（包括联网）都会被浏览器拦掉 —— 每次进页面刷一条 CSP 报错，而
+         字体菜单的 14 个选项全部静默回退成系统 sans/serif/cursive。
+         清单/许可/重生成方式见 static/fonts/README.md（scripts/fetch_title_fonts.py）。
+    -->
+    <link rel="stylesheet" href="/static/css/fonts.local.css?v={{ app_version }}">
     <link rel="stylesheet" href="/static/css/variables.css?v={{ app_version }}">
     <link rel="stylesheet" href="/static/css/styles.css?v={{ app_version }}">
     <link rel="stylesheet" href="/static/css/beautify.css?v={{ app_version }}">
@@ -35,6 +38,24 @@
             });
             // Expose for manual fetch calls
             window.getCsrfToken = getCsrfToken;
+            // 错误块上的「重试」：重新提交本标签页里那张生成表单。
+            // 以前这里调的是 window._retryLastGeneration()，而它在全仓从未定义过，
+            // 加上前半句的 .retry-btn 也不存在，于是重试按钮点了完全没反应（GOTCHAS #133）。
+            window.ttsRetryGeneration = function (btn) {
+                var block = btn && btn.closest ? btn.closest('.tts-error-block') : null;
+                var scope = block ? block.closest('#tab-content') : null;
+                var form = (block && block.closest('form'))
+                    || (scope && scope.querySelector('form[hx-post^="/api/generate/"]'))
+                    || document.querySelector('#tab-content form[hx-post^="/api/generate/"]');
+                if (form && typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                    return;
+                }
+                var toast = (window.TTSApp && window.TTSApp.toast) || window.Toast;
+                if (toast && toast.show) {
+                    toast.show('找不到可重新提交的表单，请重新填写后再点生成', 'error');
+                }
+            };
         })();
     </script>
     <!-- htmx.ext.sse.js 已随报告 D3 移除：SSE 走 sse_manager.js 原生 EventSource，该扩展从未被任何元素使用 -->
@@ -228,8 +249,8 @@
                     <button class="sidebar-toggle-btn" id="lang-toggle-btn" onclick="toggleLang()" title="{{ "switch_lang"|t(lang) }}" aria-label="Switch language">
                         <span id="lang-current-label">{{ '繁' if (lang.startswith('zh-TW') or lang.startswith('zh-Hant')) else ('中' if lang.startswith('zh') else ('EN' if lang == 'en' else ('日' if lang == 'ja' else '한'))) }}</span>
                     </button>
-                    <button class="sidebar-toggle-btn" id="font-toggle-btn" title="切换标题字体" aria-label="Switch font">
-                        <span style="font-weight:700;font-style:italic;font-size:13px">Aa</span>
+                    <button class="sidebar-toggle-btn" id="font-toggle-btn" title="切换标题字体" aria-label="Switch font" aria-haspopup="true" aria-expanded="false">
+                        <span style="font-weight:700;font-style:italic;font-size:13px" aria-hidden="true">Aa</span>
                     </button>
                     <button class="sidebar-help-btn" onclick="toggleHelpDrawer()" title="{{ "help_with_shortcut"|t(lang) }}" aria-label="{{ "help"|t(lang) }}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -605,7 +626,7 @@
     </script>
 
     <!-- Font popup (must be before scripts that reference #fontPop) -->
-    <div id="fontPop" role="menu"></div>
+    <div id="fontPop" role="menu" aria-label="标题字体" aria-orientation="vertical"></div>
 
     <!-- Modular JS files (loaded in dependency order) -->
     <script src="/static/js/namespace.js?v={{ app_version }}"></script>
@@ -721,8 +742,68 @@
 
         function curFont() { try { return localStorage.getItem('tts-font') || ''; } catch (e) { return ''; } }
 
+        // 字体到底有没有生效：量像素，不猜。
+        // computed font-family 和 document.fonts.check() 都会说谎——本机没装的家族照样返回名字、照样返回 true。
+        // 唯一可靠信号是渲染宽度：把「目标家族 + 一个已知回退」与「单独那个回退」放一起量，
+        // 宽度一致说明浏览器根本没用到目标家族，即本机没有这个字体。
+        var _availCache = {};
+        var _fallbackBase = null;
+
+        function _probeWidth(stack) {
+            var s = document.createElement('span');
+            s.style.cssText = 'position:absolute;left:-9999px;top:-9999px;white-space:pre;'
+                + 'font-size:64px;font-weight:400;font-style:normal;font-variant:normal;'
+                + 'font-feature-settings:normal;text-rendering:auto;font-family:' + stack;
+            s.textContent = 'Hamburgefonstiv 永字八法';
+            document.body.appendChild(s);
+            var w = s.getBoundingClientRect().width;
+            document.body.removeChild(s);
+            return Math.round(w * 100) / 100;
+        }
+
+        function _familyOf(stack) {
+            var m = /^\s*"([^"]+)"/.exec(stack);
+            return m ? m[1] : '';
+        }
+
+        function _fontAvailable(stack) {
+            var fam = _familyOf(stack);
+            if (!fam) { return true; }
+            if (fam in _availCache) { return _availCache[fam]; }
+            if (!_fallbackBase) {
+                _fallbackBase = { mono: _probeWidth('monospace'), serif: _probeWidth('serif') };
+            }
+            var ok = Math.abs(_probeWidth('"' + fam + '", monospace') - _fallbackBase.mono) > 0.5
+                  && Math.abs(_probeWidth('"' + fam + '", serif') - _fallbackBase.serif) > 0.5;
+            _availCache[fam] = ok;
+            return ok;
+        }
+
+        // 自托管字体是 @font-face，不随 CSS 解析就到位：首屏 build() 时字节往往还没加载，
+        // 探针量到的仍是回退宽度 → 14 项会被集体误判成"未安装"（真机实测过）。
+        // 所以先用 Font Loading API 显式触发每个家族加载，等就绪后清缓存重算一遍。
+        function _remeasureWhenFontsReady() {
+            if (!document.fonts || !document.fonts.load) { return; }
+            var jobs = [];
+            FONTS.forEach(function (grp) {
+                grp.items.forEach(function (f) {
+                    var fam = _familyOf(f.f);
+                    if (fam) { jobs.push(document.fonts.load('64px "' + fam + '"', '永')); }
+                });
+            });
+            Promise.all(jobs).then(function () {
+                _availCache = {};
+                _fallbackBase = null;
+                build();
+                restore();
+            }).catch(function (e) {
+                console.warn('[FontPop] 字体重测失败，菜单可能偏保守：', e);
+            });
+        }
+
         function build() {
             pop.innerHTML = '';
+            var readyCount = 0;
             FONTS.forEach(function (grp) {
                 var g = document.createElement('div');
                 g.className = 'tts-font-group';
@@ -730,14 +811,26 @@
                 g.style.cssText = 'padding:8px 10px 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.5;font-weight:700;color:var(--text-muted,#888)';
                 pop.appendChild(g);
                 grp.items.forEach(function (f) {
+                    var ok = _fontAvailable(f.f);
+                    if (ok) { readyCount += 1; }
                     var b = document.createElement('button');
                     b.type = 'button';
-                    b.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;background:none;padding:7px 10px;font-size:14px;color:var(--text-primary,#222);border-radius:8px;cursor:pointer;line-height:1.3;font-family:' + f.f;
+                    // 不用原生 disabled：那会把条目从 Tab 序里摘掉，键盘用户就读不到
+                    // title 里「怎么装这个字体」的说明。用 aria-disabled + 点击空转表达同样状态。
+                    b.setAttribute('role', 'menuitem');
+                    b.setAttribute('aria-disabled', ok ? 'false' : 'true');
                     b.dataset.f = f.f;
-                    b.innerHTML = f.n + '<span style="font-size:10px;opacity:.45;font-weight:400;margin-left:auto;white-space:nowrap">' + f.d + '</span>';
-                    b.addEventListener('mouseenter', function () { b.style.background = 'rgba(120,120,120,.1)'; });
+                    b.dataset.avail = ok ? '1' : '0';
+                    b.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;background:none;padding:7px 10px;font-size:14px;color:var(--text-primary,#222);border-radius:8px;cursor:pointer;line-height:1.3;font-family:' + f.f
+                        + (ok ? '' : ';opacity:.4;cursor:not-allowed');
+                    b.innerHTML = f.n + '<span style="font-size:10px;opacity:.45;font-weight:400;margin-left:auto;white-space:nowrap">' + (ok ? f.d : '未安装') + '</span>';
+                    if (!ok) {
+                        b.title = '本机没有「' + _familyOf(f.f) + '」字体，选中也不会有变化。自托管安装方法见 app/integrated_app/static/fonts/README.md';
+                    }
+                    b.addEventListener('mouseenter', function () { if (ok) { b.style.background = 'rgba(120,120,120,.1)'; } });
                     b.addEventListener('mouseleave', function () { b.style.background = 'none'; });
                     b.addEventListener('click', function () {
+                        if (!ok) { return; }
                         document.documentElement.style.setProperty('--tts-font', f.f);
                         try { localStorage.setItem('tts-font', f.f); } catch (e) {}
                         sync();
@@ -746,6 +839,13 @@
                     pop.appendChild(b);
                 });
             });
+            if (readyCount === 0) {
+                var note = document.createElement('div');
+                note.className = 'tts-font-note';
+                note.style.cssText = 'padding:8px 10px 10px;font-size:11px;line-height:1.5;color:var(--text-muted,#888)';
+                note.textContent = '本机未安装以上任何标题字体，菜单暂不可用。自托管方法见 static/fonts/README.md。';
+                pop.appendChild(note);
+            }
             sync();
         }
 
@@ -782,9 +882,33 @@
             if (top < 8) top = 8;
             pop.style.top = top + 'px';
             pop.style.left = left + 'px';
+            btn.setAttribute('aria-expanded', 'true');
+            var first = pop.querySelector('button[data-avail="1"]') || pop.querySelector('button[data-f]');
+            if (first) { first.focus(); }
         }
 
-        function hidePop() { console.log('[FontPop] hidePop called'); pop.style.display = 'none'; }
+        function hidePop() {
+            console.log('[FontPop] hidePop called');
+            // 焦点还在弹层里才收回按钮上：鼠标选中时不该凭空抢焦点、冒出焦点框。
+            var hadFocus = pop.contains(document.activeElement);
+            pop.style.display = 'none';
+            btn.setAttribute('aria-expanded', 'false');
+            if (hadFocus) { btn.focus(); }
+        }
+
+        // 打开后靠方向键在「已安装」的条目间移动；未安装的条目跳过（选中也无效果）。
+        pop.addEventListener('keydown', function (e) {
+            if (['ArrowDown', 'ArrowUp', 'Home', 'End'].indexOf(e.key) < 0) { return; }
+            var items = [].slice.call(pop.querySelectorAll('button[data-avail="1"]'));
+            if (!items.length) { return; }
+            e.preventDefault();
+            var i = items.indexOf(document.activeElement);
+            if (i < 0) { i = e.key === 'ArrowUp' ? items.length - 1 : 0; }
+            else if (e.key === 'Home') { i = 0; }
+            else if (e.key === 'End') { i = items.length - 1; }
+            else { i = (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; }
+            items[i].focus();
+        });
 
         btn.addEventListener('click', function (e) {
             console.log('[FontPop] click handler fired, display=', pop.style.display);
@@ -806,6 +930,7 @@
 
         build();
         restore();
+        _remeasureWhenFontsReady();
     })();
     </script>
 </body>

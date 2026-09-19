@@ -1,5 +1,7 @@
 # Changelog
 
+> 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
+
 ## [Unreleased]
 
 ## [2.2.2](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.1...v2.2.2) (2026-09-16)

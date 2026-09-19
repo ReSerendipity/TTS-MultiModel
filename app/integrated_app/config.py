@@ -844,6 +844,31 @@ _AUDIO_EXTS = {".wav", ".mp3", ".ogg", ".flac"}
 MAX_TEXT_LENGTH = 10000
 MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024  # 100MB
 
+#: 各引擎单次请求的总字符上限。**UI 计数器与后端校验的唯一事实来源**。
+#: WHY 必须同源：此前 tabs.py 里硬编码的 8192/3072 只用于"显示"，路由只校验
+#: MAX_TEXT_LENGTH(10000) —— 用户看到计数器变红却能正常提交，API 客户端更可直
+#: 接塞进 9999 字，让模型在远超其设计范围的输入上产出劣化音频而无人告知。
+ENGINE_TEXT_LIMITS: dict[str, int] = {
+    "voxcpm2": 8192,
+    "indextts2": 3072,
+    "indextts20": 3072,
+    "generic": 4096,
+}
+
+
+def get_engine_text_limit(engine: str | None) -> int:
+    """返回指定引擎的总字符上限（永不超过全局 :data:`MAX_TEXT_LENGTH`）。
+
+    Args:
+        engine (str | None): 引擎注册名；未知/为空时取最保守的 voxcpm2 档。
+
+    Returns:
+        int: 该引擎允许的总字符数。
+    """
+    limit: int = ENGINE_TEXT_LIMITS.get(engine or "", ENGINE_TEXT_LIMITS["voxcpm2"])
+    return min(limit, MAX_TEXT_LENGTH)
+
+
 # --- Persona name validation regex ---
 _PERSONA_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-\u4e00-\u9fff]{1,50}$")
 

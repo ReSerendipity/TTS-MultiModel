@@ -253,3 +253,71 @@ def test_persona_save_does_not_leak_internal_exception(client, monkeypatch):
     assert resp.status_code == 200
     assert "secret" not in resp.text
     assert "保存失败" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# IndexTTS 2.0 / 2.5 共用端点的版本声明（GOTCHAS #131 残留的封堵）
+# ---------------------------------------------------------------------------
+
+#: 6 张共用 /api/generate/indextts2 的页面 → 应声明的引擎版本
+_INDEXTTS_PAGES: dict[str, str] = {
+    "indextts2.html": "indextts2",
+    "indextts2_clone.html": "indextts2",
+    "indextts2_emotion.html": "indextts2",
+    "indextts2_duration.html": "indextts2",
+    "indextts20_clone.html": "indextts20",
+    "indextts20_emotion.html": "indextts20",
+}
+
+
+def test_indextts_pages_declare_their_engine_version():
+    """每张 2.x 页面都必须带 ``expected_engine`` 隐藏字段，且值与页面所属版本一致。
+
+    WHY：2.0 与 2.5 共用同一个引擎槽位与同一个端点，服务端只看 ``current_engine``，
+    所以"在 2.0 的页面上静默拿到 2.5 的音频"这件事以前没有任何一层能发现。
+    """
+    offenders: list[str] = []
+    for name, want in _INDEXTTS_PAGES.items():
+        html = (_TABS_DIR / name).read_text(encoding="utf-8")
+        found = re.findall(r'name="expected_engine"[^>]*value="([a-z0-9_]+)"', html)
+        if found != [want]:
+            offenders.append(f"{name}: 期望恰好一个 expected_engine=indextts2 → 实际 {found or '无'}")
+    assert offenders == [], f"IndexTTS 页面的版本声明不合规：{offenders}"
+
+
+def test_endpoint_rejects_mismatched_engine_version(client, monkeypatch):
+    """页面声明 2.0 而服务端加载 2.5 → 400，并点名两边。"""
+    from integrated_app.model_registry import registry
+
+    monkeypatch.setattr(registry, "indextts2_engine", object(), raising=False)
+    monkeypatch.setattr(registry, "current_engine", "indextts2", raising=False)
+
+    resp = client.post(
+        "/api/generate/indextts2",
+        data={"text": "你好", "expected_engine": "indextts20"},
+        headers={**_csrf_headers(client), "HX-Request": "true"},
+    )
+    assert resp.status_code == 400, resp.text[:200]
+    assert "IndexTTS 2.0" in resp.text and "IndexTTS 2.5" in resp.text
+    assert "Traceback" not in resp.text and "tts-error-block" in resp.text
+
+
+def test_matched_or_absent_declaration_passes_the_gate() -> None:
+    """版本一致、或根本不声明（API 客户端）时这道门必须放行。
+
+    直接测纯函数而不走 HTTP：CSRF 中间件的兜底 ``except Exception`` 会把下游异常
+    伪装成 403 CSRF 故障（GOTCHAS #132），走 HTTP 断不了"放行到哪一步"。
+    """
+    from integrated_app.routes.generate.indextts2.synthesize import _version_gate_message
+
+    names = {"indextts2": "IndexTTS 2.5", "indextts20": "IndexTTS 2.0"}
+    display = names.get
+
+    assert _version_gate_message("", "indextts2", display) is None
+    assert _version_gate_message("indextts2", "indextts2", display) is None
+    assert _version_gate_message("indextts20", "indextts20", display) is None
+
+    msg = _version_gate_message("indextts20", "indextts2", display)
+    assert msg and "IndexTTS 2.0" in msg and "IndexTTS 2.5" in msg
+    # 反向也要抓到
+    assert "IndexTTS 2.5" in (_version_gate_message("indextts2", "indextts20", display) or "")

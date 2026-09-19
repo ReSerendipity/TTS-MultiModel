@@ -53,7 +53,13 @@ from ...bad_case_retry import (
 )
 from ...config import SAVE_DIR
 from ...config_models import AdvancedParamsConfig
-from ...exceptions import EngineSwitchError, GenerationError, TTSError, tts_error_handler
+from ...exceptions import (
+    EngineSwitchError,
+    GenerationCancelledError,
+    GenerationError,
+    TTSError,
+    tts_error_handler,
+)
 from ...generation import (
     _save_wav_compatible,
     increment_seed,
@@ -521,7 +527,7 @@ def generate_with_template(
         for idx, seg in enumerate(segments):
             if _progress_mgr.should_stop():
                 logger.info(f"[{phase_name}] 生成已被用户取消")
-                raise GenerationError("生成已取消")
+                raise GenerationCancelledError("生成已取消")
             seg = seg.strip()
             if not seg:
                 continue

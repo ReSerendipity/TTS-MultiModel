@@ -6,7 +6,7 @@
     IndexTTS2 是由 Index Team 开发的先进 TTS 模型，特点是：
     - 仅需 3-10 秒参考音频即可实现高质量零样本音色克隆
     - 提供业界领先的 8 维离散情感空间控制，支持精细情感调节
-    - 支持精确时长控制（target_duration），满足对口型等场景需求
+    - 时长控制：支持 ``target_duration``（抛 ValidationError 并指引替代方案）与 2.5 的 ``duration_factor`` 倍率
     - 多后端 GPU 支持（NVIDIA CUDA / Apple MPS），CPU 兜底
 
 **架构角色**：
@@ -59,7 +59,7 @@
 **系统要求**：
     - GPU 模式：最低 6GB 显存 + 16GB 内存；推荐 8GB+ 显存获得流畅体验
     - CPU 模式：无 GPU 时自动兜底可用，推理速度较慢（实时比约 1:10~1:30）
-    - 时长控制：支持 ``target_duration`` 参数精确控制输出音频时长（秒）
+    - 时长控制：2.5 支持 ``duration_factor`` 倍率；绝对秒数 ``target_duration`` 不被底层推理库支持，会抛 ``ValidationError``
 
 **与 model_manager.load_indextts2 的协作流程**：
     1. ``model_manager.load_indextts2()`` 被调用
@@ -192,7 +192,7 @@ class IndexTTS2Engine(TTSEngine):
         2. **8 维情感控制**：happy/angry/sad/afraid/disgusted/melancholic/surprised/calm
            每个维度独立连续可调，支持混合情感
         3. **三种情感输入方式**：音频参考、向量直接控制、自然语言文本描述
-        4. **精确时长控制**：通过 target_duration 参数指定输出音频秒数
+        4. **时长倍率控制**：2.5 通过 duration_factor 指定语速倍率（0.75x / 1.25x 等）
         5. **时长缩放因子**：duration_factor 兼容参数，支持变速不变调
         6. **多后端支持**：NVIDIA CUDA（推荐）、Apple MPS、CPU 兜底
         7. **BF16 半精度推理**：CUDA 下自动启用，显存占用降低约 50%
@@ -663,11 +663,12 @@ class IndexTTS2Engine(TTSEngine):
             emo_text: 自然语言情感描述文本（如 ``"非常开心的语气"``）。
                 需配合 ``use_emo_text=True`` 使用。
             use_emo_text: 是否启用文本情感描述模式。
-            target_duration: 目标音频时长（秒），支持精确时长控制。
+            target_duration: 目标音频时长（秒）。底层推理库不接受绝对秒数，
+                ``> 0`` 时抛 :class:`ValidationError` 并指引改用倍率或后处理变速；
                 ``None`` 或 ``<= 0`` 时由模型自适应。
             seed: 随机数种子，用于可复现生成。``None`` 时使用随机种子。
-            duration_factor: 时长缩放因子（兼容参数），``target_duration``
-                优先于本参数。默认 ``1.0``（不缩放）。
+            duration_factor: 时长缩放因子（倍率），仅 2.5 生效；2.0 传入非 ``1.0``
+                时抛 :class:`ValidationError`。默认 ``1.0``（不缩放）。
             lang: 合成语言代码。``None`` 时使用构造时传入的 ``self.lang``
                 默认 ``"Auto"``（自动检测）。
             **kwargs: 额外透传给底层 ``IndexTTS2.infer`` 的参数。
@@ -681,11 +682,13 @@ class IndexTTS2Engine(TTSEngine):
         Raises:
             EngineNotLoadedError: 当前引擎未就绪（``is_ready() == False``）。
             FileNotFoundError: ``spk_audio_prompt`` 或 ``emo_audio_prompt`` 指定的文件不存在。
+            ValidationError: 请求了底层推理库不支持的时长控制（绝对秒数
+                ``target_duration``，或在 2.0 上传非 1.0 的 ``duration_factor``）。
             ValueError: 文本为空字符串，或使用情感文本模式但未启用
                 ``use_qwen_emo``。
             GenerationError: 底层推理过程中发生未分类运行时错误。
         """
-        from ..exceptions import GenerationError
+        from ..exceptions import GenerationError, ValidationError
 
         if not self.is_ready():
             raise EngineNotLoadedError(
@@ -782,21 +785,33 @@ class IndexTTS2Engine(TTSEngine):
             # - alpha=1.0：完全使用情感嵌入，情感最强但可能出现失真
             infer_kwargs["emo_alpha"] = emo_alpha
 
-            # ========== 时长控制参数（互斥，仅 2.5 支持） ==========
-            # target_duration 优先级高于 duration_factor
-            if not self.supports_duration:
-                if (target_duration and target_duration > 0) or duration_factor != 1.0:
-                    logger.debug(
-                        f"[IndexTTS2] {self.version} 不支持显式时长控制，"
-                        f"忽略 target_duration/duration_factor（语速请用后处理 tempo）"
-                    )
-            elif target_duration and target_duration > 0:
-                # 精确时长控制模式：模型会通过时长预测器调整 mel 谱长度
-                # 使最终音频时长精确匹配目标值（误差通常 < 0.1 秒）
-                # 适用场景：对口型、视频配音、固定时长广告等
-                infer_kwargs["target_duration"] = float(target_duration)
-                logger.debug(f"[IndexTTS2] 时长控制模式：精确时长={target_duration}秒")
-            elif duration_factor != 1.0:
+            # ========== 时长控制参数（互斥，倍率仅 2.5 支持） ==========
+            # 底层 indextts.infer_v2_5.infer() 的形参里只有 duration_factor（倍率），
+            # **没有 target_duration**：透传会落进 **generation_kwargs，被
+            # model.generate 以 "The following model_kwargs are not used by the
+            # model: ['target_duration']" 拒绝（400），与 GOTCHAS #90 里 seed 踩过的
+            # 坑完全同型。绝对秒数需要「先按自然语速生成、量出时长、再按
+            # actual/target 复跑一遍」，属于两遍推理的功能，不是这里能顺手实现的，
+            # 因此在引擎层显式拒绝并给出可用替代，绝不静默丢弃用户意图。
+            if target_duration is not None and target_duration > 0:
+                raise ValidationError(
+                    f"{self.version} 的推理库不支持按绝对秒数控制时长"
+                    f"（target_duration={target_duration}秒）。请改用以下任一方式："
+                    "① duration_scale / duration_factor（语速倍率，如 0.75/1.0/1.25）；"
+                    "② 生成后用后处理 tempo_factor 精确变速（tempo_factor ≈ 当前时长 ÷ 目标时长）；"
+                    "③ 需要一次到位的绝对时长，请改用 VoxCPM2 引擎。",
+                    field="target_duration",
+                )
+            if not self.supports_duration and duration_factor != 1.0:
+                # 2.0 走 indextts.infer_v2，其 infer() 连 duration_factor 都没有；
+                # 旧行为是 debug 一句然后静默忽略，用户会拿到一段与请求倍率无关的
+                # 音频却以为生效了。改为明确报错。
+                raise ValidationError(
+                    f"{self.version} 不支持显式时长控制"
+                    f"（duration_factor={duration_factor}）。请改用后处理 tempo_factor 变速。",
+                    field="duration_scale",
+                )
+            if duration_factor != 1.0:
                 # 时长缩放因子模式：相对速度调整
                 # factor > 1.0 变慢，< 1.0 变快；尽量保持音色自然
                 # 适用场景：整体语速微调
@@ -804,10 +819,28 @@ class IndexTTS2Engine(TTSEngine):
                 logger.debug(f"[IndexTTS2] 时长控制模式：缩放因子={duration_factor}")
 
             # ========== 随机种子设置 ==========
-            # 设置固定种子可使生成结果可复现（相同时输入参数得到相同输出）
-            # None 时使用系统随机种子，每次生成结果略有不同
+            # seed 在「引擎层」消费，绝不透传底层：上游 infer_v2/infer_v2_5 的
+            # infer() 形参无 seed，透传会落入 **generation_kwargs 被
+            # model.generate 以 "model_kwargs 'seed' not used" 拒绝（400，见 GOTCHAS #90）。
             if seed is not None:
-                infer_kwargs["seed"] = int(seed)
+                try:
+                    import random as _random
+
+                    _random.seed(int(seed))
+                    try:
+                        import numpy as _np
+
+                        _np.random.seed(int(seed) % (2**32))
+                    except Exception:
+                        pass
+                    import torch as _torch
+
+                    _torch.manual_seed(int(seed))
+                    if _torch.cuda.is_available():
+                        _torch.cuda.manual_seed_all(int(seed))
+                except Exception as _seed_err:
+                    logger.debug(f"[IndexTTS2] 设置随机种子失败 seed={seed}: {_seed_err}")
+                logger.debug(f"[IndexTTS2] 随机种子={seed}（引擎内消费，不透传底层）")
 
             # ========== 语言设置（仅 2.5 的 infer 接受 lang 形参） ==========
             # infer_v2（2.0）的 infer() 无 lang 参数，若下传会落入 **generation_kwargs

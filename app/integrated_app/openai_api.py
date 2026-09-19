@@ -399,6 +399,19 @@ class BatchStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+#: 批量任务的终态集合：进入这些状态后不可再取消，只能清理记录。
+#: 必须与 ``BatchStatus`` 保持一致 —— 曾遗漏 PARTIAL（该值在 540 行确实会被赋值），
+#: 导致部分完成的批次仍可"取消"，并对一个已经结束的任务返回 status=cancelled。
+_TERMINAL_BATCH_STATUS: frozenset[str] = frozenset(
+    {
+        BatchStatus.COMPLETED.value,
+        BatchStatus.FAILED.value,
+        BatchStatus.PARTIAL.value,
+        BatchStatus.CANCELLED.value,
+    }
+)
+
+
 class BatchGenerationManager:
     """批量生成管理器。
 
@@ -678,7 +691,11 @@ class BatchGenerationManager:
             batch = self._batches.get(batch_id)
             if batch is None:
                 return False
-            if batch["status"] in (BatchStatus.COMPLETED, BatchStatus.FAILED, BatchStatus.CANCELLED):
+            # batch["status"] 存的是 BatchStatus 成员；Python 3.11+ 下
+            # str(BatchStatus.COMPLETED) 得到 "BatchStatus.COMPLETED" 而非 "completed"，
+            # 因此必须显式取 .value 再与字符串集合比对。
+            _status_val: str = str(getattr(batch["status"], "value", batch["status"]))
+            if _status_val in _TERMINAL_BATCH_STATUS:
                 return False
 
         return self._cancel_manager.cancel_task(batch_id)
@@ -1011,13 +1028,40 @@ class OpenAICompatibleRouter:
         @self._router.delete(
             "/audio/speech/batch/{batch_id}",
             summary="取消批量任务",
-            description="取消批量语音合成任务",
+            description="取消仍在排队/执行中的批量语音合成任务。任务不存在返回 404；"
+            "已进入终态返回 409（此类任务请改用 "
+            "DELETE /v1/audio/speech/batch/{batch_id}/data 回收记录）。",
         )
         async def cancel_batch(batch_id: str):
-            """取消批量任务。"""
+            """取消批量任务（仅未进入终态的任务可取消）。"""
+            status: dict[str, Any] | None = self._batch_manager.get_batch_status(batch_id)
+            if status is None:
+                raise HTTPException(status_code=404, detail="批量任务不存在")
+            cur: str = str(getattr(status.get("status"), "value", status.get("status")))
+            if cur in _TERMINAL_BATCH_STATUS:
+                # 旧实现在这里也返回 404「不存在或已完成」——但紧随其后的 GET 仍能
+                # 查到该任务，等于对存在的资源谎称不存在；且 404 无法与真正的
+                # "任务不存在"区分，客户端只能盲目重试。
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"批量任务已处于终态（{cur}），无法取消；"
+                    f"如需回收其记录，请调用 DELETE /v1/audio/speech/batch/{batch_id}/data",
+                )
             if not self._batch_manager.cancel_batch(batch_id):
-                raise HTTPException(status_code=404, detail="批量任务不存在或已完成")
+                # 读取与取消之间被别的请求改掉了状态
+                raise HTTPException(status_code=409, detail="批量任务状态已变更，取消未生效")
             return {"batch_id": batch_id, "status": "cancelled"}
+
+        @self._router.delete(
+            "/audio/speech/batch/{batch_id}/data",
+            summary="回收批量任务记录",
+            description="删除批量任务的状态记录并注销其取消句柄；用于终态任务的资源回收。",
+        )
+        async def cleanup_batch_data(batch_id: str):
+            """回收批量任务记录（``cleanup_batch`` 的 HTTP 入口）。"""
+            if not self._batch_manager.cleanup_batch(batch_id):
+                raise HTTPException(status_code=404, detail="批量任务不存在")
+            return {"batch_id": batch_id, "status": "deleted"}
 
         @self._router.get(
             "/models",

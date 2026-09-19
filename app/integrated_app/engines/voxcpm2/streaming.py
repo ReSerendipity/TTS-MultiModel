@@ -26,7 +26,7 @@ from typing import Any, Literal, NamedTuple
 
 import numpy as np
 
-from ...exceptions import ContentSafetyError
+from ...exceptions import ContentSafetyError, GenerationCancelledError
 from ...security.content_safety import check_safety
 from ._base import (
     GenerationError,
@@ -173,6 +173,8 @@ def _wav_to_bytes(wav: np.ndarray, sample_rate: int) -> bytes:
                 "[streaming] 水印嵌入失败（字节流无产出路径，侧车跳过）: %s", wm_meta.get("failure_reason", "")
             )
         wav = wav_wm
+        # 低采样率输入会被上采样后再嵌水印，序列化必须跟随新采样率
+        sample_rate = int(wm_meta.get("sample_rate_out") or sample_rate)
     except WatermarkEmbedError:
         raise
     except Exception as wm_exc:
@@ -495,7 +497,7 @@ def fn_voxcpm_streaming(
     for idx, seg in enumerate(segments):
         if _progress_mgr.should_stop():
             logger.info("[VoxCPM流式] 生成已被用户取消")
-            raise GenerationError("生成已取消")
+            raise GenerationCancelledError("生成已取消")
         seg = seg.strip()
         if not seg:
             continue

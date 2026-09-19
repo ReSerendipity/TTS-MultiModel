@@ -25,4 +25,9 @@ concurrency:
 jobs:
   self-purify:
     name: 自净化检查（非阻塞）
-    uses: ReSerendipity/.github/.github/workflows/self-purify.yml@main
+    # 钉定到 commit SHA（供应链加固：防上游 @main 漂移引入不可控的门禁变更）。
+    # 升级口径（何时/由谁解钉）：仅在本仓需要 org 模板的新功能或安全修复时才解钉，
+    # 由本仓维护者手动核对 ReSerendipity/.github@main 目标 commit 后替换下方 SHA，
+    # 并本地跑 `python scripts/check_spec_refs.py` + YAML 解析（如 `python -c "import yaml;yaml.safe_load(open('.github/workflows/self-purify.yml'))"`，有 actionlint 时一并跑）校验；
+    # 不自动跟随 main。SHA 解析于 2026-09-18（当时 main HEAD=2c0c5ab，提交日期 2026-09-14）。
+    uses: ReSerendipity/.github/.github/workflows/self-purify.yml@2c0c5abbe2acdb8efb793482b5c79411ed34bde6

@@ -72,13 +72,14 @@
 import contextlib
 import os
 import time
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 from fastapi import File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse
 
-from ....config import MAX_TEXT_LENGTH, SAVE_DIR
+from ....config import SAVE_DIR
 from ..utils import (
     _error_html,
     _execute_generation,
@@ -117,6 +118,22 @@ _EMOTION_VECTOR_SUM_UPPER_BOUND: float = 1.0
 # "模型不行"，而前者会让用户"知道我应该调什么范围"）。
 _SPEED_MIN: float = 0.5
 _SPEED_MAX: float = 2.0
+
+
+def _version_gate_message(expected: str, current: str | None, display_name: Callable[[str | None], str]) -> str | None:
+    """页面声明的引擎版本与实际加载不一致时，给出点名两边的提示；一致或不声明时返回 None。
+
+    单独抽成纯函数：CSRF 中间件的兜底 ``except Exception`` 会把下游任何异常伪装成
+    403 CSRF 故障（GOTCHAS #132），走 HTTP 层测这条门会很别扭，直接测函数更准。
+    """
+    if not expected or expected == current:
+        return None
+    want, have = display_name(expected), display_name(current)
+    return (
+        f"这一页是 {want} 的页面，但当前加载的是 {have}。"
+        f"请点顶部切到 {want}（会自动卸载 {have}），或改用侧栏「{have}」分组下的对应页面。"
+    )
+
 
 # 情感注入模式枚举（三选一，优先级按代码顺序）
 _EMOTION_MODE_TEXT: str = "text"
@@ -190,6 +207,7 @@ async def generate_indextts2(
     voice_enhancement: str = Form("false"),
     target_lufs: float = Form(-16.0),
     has_consent: bool = Form(False),
+    expected_engine: str = Form(""),
 ) -> HTMLResponse:
     """IndexTTS2 情感控制语音合成路由。
 
@@ -230,6 +248,10 @@ async def generate_indextts2(
         tempo_factor: 后处理变速倍率（1.0 原速），推荐配合 target_duration 一起用。
         voice_enhancement: 是否启用人声增强后处理（"true"/"false"）。
         target_lufs: 响度归一化目标 (LUFS)，默认 -16.0。
+        expected_engine: 表单声明"这一页属于哪个引擎版本"（``indextts2`` / ``indextts20``）。
+            2.0 与 2.5 共用本端点与同一引擎槽位，版本此前纯由服务端决定，页面声明与
+            实际加载不一致时会静默用另一个版本合成。空串表示不声明（API 客户端与
+            历史行为不变）。
 
     Returns:
         HTMLResponse: HTMX 格式 HTML 片段，携带合成后的 WAV audio 元素。
@@ -253,13 +275,20 @@ async def generate_indextts2(
     # ------------------------------------------------------------------
     # 1. 引擎就绪 + 文本长度统一校验（pre_validate 内部也会判断 current_engine）
     # ------------------------------------------------------------------
-    err: HTMLResponse | None = pre_validate(request, "indextts2", text, MAX_TEXT_LENGTH)
+    err: HTMLResponse | None = pre_validate(request, "indextts2", text)
     if err is not None:
         return err
 
     # 延迟导入，避免模块加载时对 torch 等大依赖的硬耦合
     from ....generation import _save_wav_compatible, split_text_for_tts
     from ....model_registry import registry
+
+    # 1b. 页面声明的版本必须与真正加载的版本一致。
+    # 2.0 与 2.5 共用槽位，_check_engine_ready 只能判"有没有 IndexTTS"，判不出
+    # 是哪一版；不校验就会出现「在 2.0 的页面上静默拿到 2.5 的音频」（GOTCHAS #131 残留）。
+    mismatch = _version_gate_message(expected_engine, registry.current_engine, registry.get_engine_display_name)
+    if mismatch:
+        return _error_html(request, mismatch, error_type="engine_not_ready", engine_id=expected_engine)
 
     # 再次显式取 engine 引用：pre_validate 已检查过非空，这里再取一次用于 infer()
     engine = registry.get_current_engine()

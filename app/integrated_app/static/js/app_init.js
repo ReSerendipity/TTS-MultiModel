@@ -19,6 +19,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Restore sidebar active state
         if (targetTab) {
+            // 同步"当前显示的是哪一页"的真值：_syncTabToEngine() 靠它判断
+            // 自动切引擎后要不要挪页面，不知道就宁可不动（否则会把这里恢复出来的
+            // 那一页顶成引擎的首个标签页）
+            window.__ACTIVE_TAB_ID__ = targetTab;
             var sidebarItem = document.querySelector('.sidebar-item[data-tab="' + targetTab + '"]');
             if (sidebarItem) {
                 document.querySelectorAll('.sidebar-item').forEach(function(s) {

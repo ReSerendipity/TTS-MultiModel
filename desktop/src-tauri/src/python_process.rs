@@ -319,18 +319,34 @@ pub fn resolve_runtime_dir(app_dir: &Path) -> PathBuf {
     PathBuf::from("python")
 }
 
+/// 纯函数：按优先级从可执行文件路径解析应用目录（**打包布局**）；
+/// 无法判定（如开发态 `target/release`）返回 `None`，由调用方回退开发模式。
+///
+/// 优先级：
+///   1. 扁平布局（installer-data 轨）：`exe_dir/start_portable.py` 存在 → 返回 `exe_dir`；
+///   2. app/ 嵌套布局（便携 bundle 轨）：`exe_dir/app/start_portable.py` 存在 → 返回 `exe_dir/app`。
+pub fn resolve_app_dir_from_exe(exe: &std::path::Path) -> Option<PathBuf> {
+    let exe_dir = exe.parent()?;
+    if exe_dir.join("start_portable.py").exists() {
+        return Some(exe_dir.to_path_buf());
+    }
+    let bundled = exe_dir.join("app");
+    if bundled.join("start_portable.py").exists() {
+        return Some(bundled);
+    }
+    None
+}
+
 /// 解析应用代码目录
 pub fn resolve_app_dir() -> PathBuf {
-    // 1. 打包后：优先当前可执行文件目录下的 app/（要求含 start_portable.py，
-    //    避免把无 payload 的裸壳目录误判为应用根）。
+    // 1/2. 打包布局（先扁平后 app/ 嵌套）——见 resolve_app_dir_from_exe。
     if let Ok(exe) = std::env::current_exe() {
-        let bundled = exe.parent().unwrap().join("app");
-        if bundled.join("start_portable.py").exists() {
-            return bundled;
+        if let Some(dir) = resolve_app_dir_from_exe(&exe) {
+            return dir;
         }
     }
 
-    // 2. 开发模式：CARGO_MANIFEST_DIR 上溯到项目根（desktop/src-tauri → 项目根）
+    // 3. 开发模式：CARGO_MANIFEST_DIR 上溯到项目根（desktop/src-tauri → 项目根）
     let dev_app = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -342,4 +358,46 @@ pub fn resolve_app_dir() -> PathBuf {
     }
 
     dev_app
+}
+
+#[cfg(test)]
+mod app_dir_tests {
+    use super::resolve_app_dir_from_exe;
+    use std::path::PathBuf;
+
+    fn tmp(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(name);
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn flat_layout_returns_exe_dir() {
+        // 扁平布局（installer-data 轨）：exe_dir 下有 start_portable.py
+        let d = tmp("tts_appdir_flat");
+        std::fs::write(d.join("start_portable.py"), b"# stub").unwrap();
+        let got = resolve_app_dir_from_exe(&d.join("TTSMultiModel.exe"));
+        assert_eq!(got, Some(d.clone()));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn nested_app_layout_returns_app_subdir() {
+        // app/ 嵌套布局（便携 bundle 轨）
+        let d = tmp("tts_appdir_nested");
+        std::fs::create_dir_all(d.join("app")).unwrap();
+        std::fs::write(d.join("app").join("start_portable.py"), b"# stub").unwrap();
+        let got = resolve_app_dir_from_exe(&d.join("TTSMultiModel.exe"));
+        assert_eq!(got, Some(d.join("app")));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn bare_shell_dir_returns_none() {
+        // 裸壳目录（无 payload）→ None，交给开发模式回退
+        let d = tmp("tts_appdir_bare");
+        assert!(resolve_app_dir_from_exe(&d.join("TTSMultiModel.exe")).is_none());
+        let _ = std::fs::remove_dir_all(&d);
+    }
 }

@@ -62,7 +62,6 @@ from typing import Any
 from fastapi import File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse
 
-from ....config import MAX_TEXT_LENGTH
 from ....model_registry import registry
 from ....monitor import get_health_monitor
 from ....persona_manager import get_persona_consent_state
@@ -174,10 +173,10 @@ async def generate_voxcpm_clone(
     instruction: str = Form(""),
     ref_audio_path: str = Form(""),
     persona_name: str = Form(""),
-    cfg: float = Form(2.0),
+    cfg: float = Form(2.0, ge=0.1, le=10),
     norm: str = Form("true"),
     denoise: str = Form("true"),
-    steps: int = Form(10),
+    steps: int = Form(10, ge=1, le=200),
     ref_audio_upload: UploadFile | None = File(None),
     lang: str = Form("Auto"),
     tempo_factor: float = Form(1.0),
@@ -224,7 +223,7 @@ async def generate_voxcpm_clone(
         return err
 
     # 2. 引擎就绪 + 文本非空/长度统一校验
-    err = pre_validate(request, "voxcpm2", text, MAX_TEXT_LENGTH)
+    err = pre_validate(request, "voxcpm2", text)
     if err is not None:
         return err
 
@@ -310,10 +309,10 @@ async def generate_voxcpm_ultimate(
     instruction: str = Form(""),
     ref_audio_path: str = Form(""),
     persona_name: str = Form(""),
-    cfg: float = Form(2.0),
+    cfg: float = Form(2.0, ge=0.1, le=10),
     norm: str = Form("true"),
     denoise: str = Form("true"),
-    steps: int = Form(10),
+    steps: int = Form(10, ge=1, le=200),
     seed: int = Form(-1),
     denoise_strength: float | None = Form(None),
     ref_audio_upload: UploadFile | None = File(None),
@@ -356,7 +355,7 @@ async def generate_voxcpm_ultimate(
         return err
 
     # 2. 引擎就绪 + 文本非空/长度统一校验
-    err = pre_validate(request, "voxcpm2", text, MAX_TEXT_LENGTH)
+    err = pre_validate(request, "voxcpm2", text)
     if err is not None:
         return err
 
@@ -468,7 +467,7 @@ async def generate_voxcpm_prompt_continue(
         InsufficientVRAMError: 503，CUDA OOM。
         ImportError: 底层依赖缺失（透传）。
     """
-    err: HTMLResponse | None = pre_validate(request, "voxcpm2", text, MAX_TEXT_LENGTH)
+    err: HTMLResponse | None = pre_validate(request, "voxcpm2", text)
     if err is not None:
         return err
     if not prompt_text.strip():

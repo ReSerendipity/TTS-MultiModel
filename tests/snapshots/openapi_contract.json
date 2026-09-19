@@ -701,6 +701,15 @@
       ]
     }
   },
+  "/v1/audio/speech/batch/{batch_id}/data": {
+    "DELETE": {
+      "operationId": "cleanup_batch_data_v1_audio_speech_batch__batch_id__data_delete",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
   "/v1/models": {
     "GET": {
       "operationId": "list_models_v1_models_get",

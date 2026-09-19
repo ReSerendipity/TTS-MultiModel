@@ -9,6 +9,7 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="it20e-form" hx-post="/api/generate/indextts2" hx-target="#it20e-result" hx-swap="innerHTML" hx-indicator="#it20e-spinner" hx-encoding="multipart/form-data" x-data="{ it20eMode: 'same' }">
+                <input type="hidden" name="expected_engine" value="indextts20">
                 <!-- Card: 模式选择 -->
                 <div class="card">
                     <div class="card-hdr">

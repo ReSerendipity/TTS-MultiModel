@@ -54,7 +54,7 @@ import os
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 
-from ....config import MAX_TEXT_LENGTH
+from ....config import get_engine_text_limit
 from ....model_registry import registry
 from ..utils import (
     _check_engine_ready,
@@ -90,8 +90,8 @@ async def generate_voxcpm_design(
     instruction: str = Form(""),
     persona_name: str = Form(""),
     lang: str = Form("Auto"),
-    cfg: float = Form(2.0),
-    steps: int = Form(10),
+    cfg: float = Form(2.0, ge=0.1, le=10),
+    steps: int = Form(10, ge=1, le=200),
     denoise: str = Form("true"),
     norm: str = Form("true"),
     seed: int = Form(-1),
@@ -144,10 +144,13 @@ async def generate_voxcpm_design(
     if not text.strip():
         return _error_html(request, "文本不能为空")
 
-    if len(text) > MAX_TEXT_LENGTH:
+    # 上限按引擎推导，与 UI 计数器同源（此前这里是全局 10000，而 UI 写 8192）
+    _limit: int = get_engine_text_limit("voxcpm2")
+    if len(text) > _limit:
         return _error_html(
             request,
-            f"文本长度超过限制（最大 {MAX_TEXT_LENGTH} 字符）",
+            f"文本长度超过限制（VoxCPM2 单次最大 {_limit} 字符，当前 {len(text)} 字符）；"
+            "请分段生成，或改用「剧本工坊」做长文本多角色合成。",
         )
 
     # Why：如模块级常量注释所述，这里对 instruction 做软限制提示——

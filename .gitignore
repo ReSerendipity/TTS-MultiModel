@@ -430,6 +430,7 @@ desktop/src-tauri/gen/
 scripts/installer/TTSMultiModel.exe
 scripts/installer/TTSMultiModel-Setup-*.exe
 scripts/installer/diag7z-test.exe
+scripts/installer/7za.exe
 scripts/installer/version.json
 scripts/installer/pyproject.toml
 

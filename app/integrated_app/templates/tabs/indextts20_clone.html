@@ -9,6 +9,7 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="it20c-form" hx-post="/api/generate/indextts2" hx-target="#it20c-result" hx-swap="innerHTML" hx-indicator="#it20c-spinner" hx-encoding="multipart/form-data">
+                <input type="hidden" name="expected_engine" value="indextts20">
                 <!-- Card: 参考音频 -->
                 <div class="card">
                     <div class="card-hdr">

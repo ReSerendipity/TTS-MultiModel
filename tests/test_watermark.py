@@ -219,3 +219,41 @@ class TestAIIndicatorTone:
         audio = _sine_wave()
         result = prepend_ai_indicator_tone(audio, SR, duration_ms=0)
         np.testing.assert_array_equal(result, audio)
+
+
+class TestLowSampleRateUpsample:
+    """低采样率输入必须先上采样再嵌水印，否则 IndexTTS 2.5/2.0 产物无溯源标识。
+
+    水印频带 16–20kHz 要求 sr 明显高于 40kHz；IndexTTS 输出 22050Hz 时
+    embed_watermark 会整条跳过（success=False），产物只剩 .provenance.json 侧车。
+    watermark_audio 现在内部上采样到 48kHz，并用 metadata["sample_rate_out"]
+    告知写盘方 —— 写盘若仍用原采样率，播放时长会被拉长 48000/22050 ≈ 2.18 倍。
+    """
+
+    def test_22050_input_gets_watermark_and_reports_new_rate(self):
+        audio = _sine_wave(sample_rate=22050, duration=1.5)
+        watermarked, meta = watermark_audio(audio, 22050, enable=True)
+        assert meta.get("watermarked") is True
+        assert meta.get("sample_rate_out") == 48000
+        assert meta.get("sample_rate_in") == 22050
+        assert len(watermarked) == pytest.approx(len(audio) * 48000 / 22050, rel=1e-3)
+
+    def test_upsampled_output_roundtrips_detection(self):
+        audio = _sine_wave(sample_rate=22050, duration=1.5)
+        watermarked, meta = watermark_audio(audio, 22050, enable=True)
+        result = detect_watermark(watermarked, int(meta["sample_rate_out"]))
+        assert result.success is True
+
+    def test_duration_preserved_across_upsample(self):
+        """上采样只改采样率与样本数，时长必须保持不变。"""
+        audio = _sine_wave(sample_rate=22050, duration=2.0)
+        watermarked, meta = watermark_audio(audio, 22050, enable=True)
+        assert len(audio) / 22050 == pytest.approx(len(watermarked) / 48000, rel=1e-3)
+
+    def test_high_rate_input_untouched(self):
+        """48kHz（VoxCPM2 原生）不得被重复上采样，也不该出现 sample_rate_out。"""
+        audio = _sine_wave(sample_rate=48000, duration=1.0)
+        watermarked, meta = watermark_audio(audio, 48000, enable=True)
+        assert meta.get("watermarked") is True
+        assert "sample_rate_out" not in meta
+        assert len(watermarked) == len(audio)

@@ -1,2 +1,16 @@
-﻿ReSerendipity <zengyangc@outlook.com> <41898282+github-actions[bot]@users.noreply.github.com>
+# 历史身份归并：所有别名统一到主身份 ReSerendipity <zengyangc@outlook.com>
+# 见 https://git-scm.com/docs/gitmailmap
+
+# —— 个人别名（同一邮箱，不同 git config user.name）——
+ReSerendipity <zengyangc@outlook.com> Mavis <zengyangc@outlook.com>
+ReSerendipity <zengyangc@outlook.com> Doro <zengyangc@outlook.com>
+ReSerendipity <zengyangc@outlook.com> PetPal Dev <zengyangc@outlook.com>
+ReSerendipity <zengyangc@outlook.com> DraftPeek Dev <zengyangc@outlook.com>
+
+# —— 本地/其他邮箱变体 ——
+ReSerendipity <zengyangc@outlook.com> <mavis@local>
+ReSerendipity <zengyangc@outlook.com> Doro <ReSerendipity@outlook.com>
+
+# —— GitHub bot（不代表真人，归并到主身份以保持 shortlog 干净）——
+ReSerendipity <zengyangc@outlook.com> <41898282+github-actions[bot]@users.noreply.github.com>
 ReSerendipity <zengyangc@outlook.com> <49699333+dependabot[bot]@users.noreply.github.com>

@@ -137,6 +137,50 @@ ENGINE_VRAM_REQUIREMENTS: dict[str, float] = {
     EngineName.STEP_AUDIO_EDITX.value: 8.0,
 }
 
+#: 配置读取失败时使用的默认显存安全裕度倍数。
+_VRAM_MARGIN_FALLBACK: float = 1.5
+
+#: 未在 ENGINE_VRAM_REQUIREMENTS 中声明的引擎（如通用新式引擎）的基线。
+_VRAM_BASELINE_DEFAULT: float = 6.0
+
+
+def get_vram_safety_margin() -> float:
+    """返回显存安全裕度倍数（``models.vram_safety_margin_gb``）。
+
+    权重基线之外还要叠加 ASR/Enhancer 权重、KV cache 与中间激活值，
+    因此判断"装不装得下"必须乘裕度而不是只看权重。配置不可用或值非正时
+    回退 :data:`_VRAM_MARGIN_FALLBACK`。
+    """
+    try:
+        from .config import get_config
+
+        margin: float = float(get_config().pydantic_config.models.vram_safety_margin_gb)
+        return margin if margin > 0 else _VRAM_MARGIN_FALLBACK
+    except Exception:  # noqa: BLE001 - 回退默认值，预检不应因配置栈异常而失败
+        return _VRAM_MARGIN_FALLBACK
+
+
+def estimate_engine_vram_need_gb(engine_name: str | None) -> float:
+    """某引擎的实际显存需求（GB）= 权重基线 × 安全裕度。
+
+    WHY 需要统一入口：切换预检、热待机判断、引擎加载器三处原先各用一套倍数
+    （1.5 可配 / 1.2 硬编码 / 完全不乘），同一台机器上会同时打印「需要 9.0GB」
+    「目标需要 7.20GB」「需要 6.0GB」三个互相矛盾的数字——预检放行的量，
+    加载器却判定不足，日志也就无法对照。三处的差异只应体现在"可用显存怎么算"
+    （预检可计入卸载收益、热待机不含旧引擎占用），"需求"必须同源。
+
+    Args:
+        engine_name (str | None): 引擎标识符；``None`` 或空串表示无引擎。
+
+    Returns:
+        float: 需求显存（GB）；``engine_name`` 为空时返回 ``0.0``。
+    """
+    if not engine_name:
+        return 0.0
+    baseline: float = ENGINE_VRAM_REQUIREMENTS.get(engine_name, _VRAM_BASELINE_DEFAULT)
+    return round(baseline * get_vram_safety_margin(), 2)
+
+
 # --- 声明式引擎规格缓存（由 load_engine_specs_from_config 填充） ---
 # 存储从 config.yaml 加载的 EngineSpecConfig 对象，key 为引擎名，value 为配置实例。
 # 该缓存为模块级全局字典，避免每次查询引擎规格都重新解析配置文件。

@@ -7,6 +7,7 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="it2d-form" hx-post="/api/generate/indextts2" hx-target="#it2d-result" hx-swap="innerHTML" hx-indicator="#it2d-spinner" hx-encoding="multipart/form-data" x-data="{ it2dMode: 'free' }">
+                <input type="hidden" name="expected_engine" value="indextts2">
                 <!-- Card: 时长控制模式 -->
                 <div class="card">
                     <div class="card-hdr">

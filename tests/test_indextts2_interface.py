@@ -109,3 +109,68 @@ class TestIndexTTS2InitSignature:
 
     def test_init_has_use_qwen_emo_param(self):
         assert "use_qwen_emo" in inspect.signature(IndexTTS2Engine.__init__).parameters
+
+
+class TestDurationControlGuard:
+    """时长控制参数守卫：底层库只认 duration_factor，绝对秒数必须显式拒绝。
+
+    ``indextts.infer_v2_5.infer()`` 的形参表里没有 ``target_duration``，透传会落进
+    ``**generation_kwargs`` 并被 ``model.generate`` 以 "model_kwargs not used" 拒收
+    （400），与 GOTCHAS #90 记录的 seed 同型；2.0 走 ``infer_v2``，连 duration_factor
+    都没有，旧行为是 debug 一句然后静默忽略——用户拿到与请求无关的音频却以为生效。
+    """
+
+    @staticmethod
+    def _bare_engine(version: str, supports_duration: bool):
+        from unittest.mock import MagicMock
+
+        eng = object.__new__(IndexTTS2Engine)
+        eng.tts = MagicMock()
+        eng.tts.infer.return_value = (22050, MagicMock())
+        eng.lang = "Auto"
+        eng.version_str = version  # version 是只读 property，由 version_str 推导
+        eng.supports_duration = supports_duration
+        eng._engine_name = "indextts2" if version == "2.5" else "indextts20"
+        eng.supported_langs = {"Auto", "ZH", "EN", "JA", "ES", "AR"}
+        eng.device = "cpu"
+        eng.use_bf16 = False
+        return eng
+
+    @staticmethod
+    def _ref_audio(tmp_path):
+        ref = tmp_path / "ref.wav"
+        ref.write_bytes(b"RIFF" + b"\x00" * 200)
+        return str(ref)
+
+    def test_target_duration_rejected_on_2_5(self, tmp_path):
+        from integrated_app.exceptions import ValidationError
+
+        eng = self._bare_engine("2.5", supports_duration=True)
+        with pytest.raises(ValidationError, match="不支持按绝对秒数") as exc:
+            eng.infer(
+                text="你好",
+                spk_audio_prompt=self._ref_audio(tmp_path),
+                output_path=str(tmp_path / "out.wav"),
+                target_duration=8.0,
+            )
+        assert exc.value.field == "target_duration"
+        assert exc.value.status_code == 400
+        # self.version 已经带 "IndexTTS " 前缀，文案里再拼一次会变成
+        # "IndexTTS IndexTTS 2.5 …"（真机点击时看到过）
+        assert str(exc.value).startswith("IndexTTS 2.5 ")
+        eng.tts.infer.assert_not_called()
+
+    def test_duration_factor_rejected_on_2_0(self, tmp_path):
+        from integrated_app.exceptions import ValidationError
+
+        eng = self._bare_engine("2.0", supports_duration=False)
+        with pytest.raises(ValidationError, match="不支持显式时长控制") as exc:
+            eng.infer(
+                text="你好",
+                spk_audio_prompt=self._ref_audio(tmp_path),
+                output_path=str(tmp_path / "out.wav"),
+                duration_factor=1.25,
+            )
+        assert exc.value.field == "duration_scale"
+        assert str(exc.value).startswith("IndexTTS 2.0 ")
+        eng.tts.infer.assert_not_called()

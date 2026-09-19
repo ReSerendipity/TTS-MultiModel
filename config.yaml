@@ -93,7 +93,10 @@ models:
       sample_rate: 22050
       requires_gpu: true
       # Step-Audio-EditX 专用配置
-      repo_path: "reference_repos/TTS_MultiModel/Step-Audio-EditX"  # 上游仓库路径（用于 Python path）
+      # ⚠️ 上游仓库（Step-Audio-EditX）**未随安装包/本仓库分发**：此相对路径默认不存在，
+      #    故该引擎开箱**不可用**（可选引擎，引擎层有存在性守卫会安全降级，不影响其它引擎）。
+      #    如需启用：手工放置上游仓库到此路径，或改为其绝对路径。
+      repo_path: "reference_repos/TTS_MultiModel/Step-Audio-EditX"  # 上游仓库路径（用于 Python path；未随包）
       tokenizer_path: ""  # Step-Audio-Tokenizer 目录（空则自动检测同级目录）
       gpu_memory_utilization: 0.5  # vLLM 显存利用率
       max_model_len: 3072  # 最大序列长度

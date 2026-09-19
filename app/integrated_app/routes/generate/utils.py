@@ -40,7 +40,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...audio_processing import enhance_audio
 from ...config import MAX_UPLOAD_SIZE_BYTES, SAVE_DIR, get_config
-from ...exceptions import EngineSwitchError, InsufficientVRAMError, OOMRetryExhaustedError, TTSError
+from ...exceptions import (
+    EngineSwitchError,
+    GenerationCancelledError,
+    InsufficientVRAMError,
+    OOMRetryExhaustedError,
+    TTSError,
+)
 from ...gpu_utils import free_gpu_memory, is_oom_error
 from ...history_db import get_history_db
 from ...model_manager import _time_estimator
@@ -593,16 +599,39 @@ def _check_engine_ready(
 
     if engine_name is None:
         engine_name = registry.current_engine
+
+    def _not_ready_html(need_engine: str) -> HTMLResponse:
+        """未就绪提示：说清「要哪个引擎 / 现在加载的是哪个 / 下一步做什么」。
+
+        以前只会说「X 模型未加载，请先加载模型」，但在**页面与引擎不匹配**这个场景里
+        这句话是误导的：引擎确实加载了，只是不是这一页要的那个，用户照提示去加载反而
+        会把当前引擎卸掉（GOTCHAS #131）。
+        """
+        if registry.voxcpm_model is not None:
+            loaded: str | None = "voxcpm2"
+        elif registry.indextts2_engine is not None:
+            # indextts2 与 indextts20 共用同一个引擎对象，用 current_engine 区分 2.5 / 2.0
+            loaded = registry.current_engine if registry.current_engine in ("indextts2", "indextts20") else "indextts2"
+        else:
+            loaded = None
+        need = registry.get_engine_display_name(need_engine)
+        if loaded and loaded != need_engine:
+            have = registry.get_engine_display_name(loaded)
+            msg = (
+                f"这一页需要 {need}，但当前加载的是 {have}。"
+                f"请改用侧栏「{have}」分组下的对应功能页；"
+                f"确实要用 {need}，就点顶部的 {need} 切换（会自动卸载 {have}）。"
+            )
+        else:
+            msg = f"{need} 模型未加载，请先加载模型"
+        return _error_html(request, msg, error_type="engine_not_ready", engine_id=need_engine)
+
     if engine_name in ("indextts2", "indextts20"):
         if registry.indextts2_engine is None:
-            return _error_html(
-                request, "IndexTTS 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id=engine_name
-            )
+            return _not_ready_html(engine_name)
     else:
         if registry.voxcpm_model is None:
-            return _error_html(
-                request, "VoxCPM2 模型未加载，请先加载模型", error_type="engine_not_ready", engine_id="voxcpm2"
-            )
+            return _not_ready_html("voxcpm2")
     return None
 
 
@@ -964,6 +993,8 @@ def _apply_post_processing_to_file(
                 )
 
             processed, wm_meta = _cb.call(_embed, processed)
+            # 低采样率输入会被上采样后再嵌水印，写盘必须跟随新采样率
+            sr = int(wm_meta.get("sample_rate_out") or sr)
             if wm_meta.get("watermarked"):
                 logger.debug(
                     "后处理水印嵌入成功: source=%s, snr=%.1fdB, hash=%s",
@@ -1241,7 +1272,10 @@ def pre_validate(
         request: FastAPI 请求。
         engine_name: 引擎名（None 用当前引擎）。
         text: 生成文本。
-        max_length: 最大字符数（None 则不限制）。
+        max_length: 最大字符数；**None 时按引擎推导**（见
+            ``config.get_engine_text_limit``），不再回退成"不限制"。
+            WHY：旧行为下"不传/传全局值"会让后端允许比 UI 计数器更长的文本，
+            用户看到计数标红却能提交，API 客户端更可塞进近万字符让模型超范围产出。
 
     Returns:
         校验失败返回 HTMLResponse，成功返回 None。
@@ -1251,6 +1285,13 @@ def pre_validate(
         return model_not_ready
     if not text or not text.strip():
         return _error_html(request, "文本不能为空")
+    if max_length is None:
+        from ...config import get_engine_text_limit
+        from ...model_registry import registry
+
+        # engine_name 为空表示"用当前引擎"（与 _check_engine_ready 同口径），
+        # 这里必须同样回退，否则会错取 voxcpm2 档上限。
+        max_length = get_engine_text_limit(engine_name or registry.current_engine)
     if max_length and len(text) > max_length:
         return _error_html(request, f"文本长度超过限制（最大 {max_length} 字符）")
     return None
@@ -1318,7 +1359,9 @@ def _run_with_oom_retry(
         return result, msg, degraded_note
     except Exception as e:  # noqa: BLE001
         if not is_oom_error(e):
-            logger.error(f"{endpoint_name} failed (non-OOM): {e}")
+            # 用户主动取消是正常操作，不能进错误面（本项目有基于 ERROR 的告警链路）
+            _log = logger.info if isinstance(e, GenerationCancelledError) else logger.error
+            _log(f"{endpoint_name} failed (non-OOM): {e}")
             raise
 
         logger.warning(f"{endpoint_name} hit OOM, attempting degraded retry...")
@@ -1787,7 +1830,8 @@ async def _execute_generation_impl(
         return _success_html(filename, msg)
     except Exception as e:  # noqa: BLE001
         duration = time.monotonic() - start_time
-        logger.error(f"{endpoint_name} generation failed: {e}")
+        _gen_log = logger.info if isinstance(e, GenerationCancelledError) else logger.error
+        _gen_log(f"{endpoint_name} generation failed: {e}")
         _log_generation(endpoint_name, text, engine, voice_or_persona, False, duration, error_msg=str(e))
         error_type: str = "general"
         metric_type: str = "other"

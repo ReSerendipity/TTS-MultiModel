@@ -90,6 +90,10 @@ Section "TTSMultiModel 桌面版" SEC_APP
   SetOutPath "$INSTDIR\app"
   File "version.json"
 
+  ; 清理 runtime 内指向开发机的 editable .pth 残留（2026-09-18）：
+  ; indextts 已实体捆绑进 site-packages，该 .pth 无需保留（且会暴露开发机路径）
+  Delete "$INSTDIR\runtime\Lib\site-packages\_editable_impl_indextts.pth"
+
 
 
   ; ---------- 防御：数据卷布局异常（顶层文件被打包成同名目录） ----------

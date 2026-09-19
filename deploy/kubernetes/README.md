@@ -5,7 +5,7 @@
 > PVC（tts-data 30Gi + tts-models 60Gi）、删除手写 ConfigMap 骨架（配置漂移源）。
 
 本目录提供单机单副本的 Kubernetes 部署清单，作为 Docker Compose 之外的集群化选项。
-当前 TTS 推理受「单 Worker 串行 + 单 GPU」硬约束限制（见 `AGENTS.md` §3 硬约束 #4），
+当前 TTS 推理受「单 Worker 串行 + 单 GPU」硬约束限制（见 `AGENTS.md` §3 硬约束 #4；AGENTS.md 为本地维护、不随仓库分发，本行已内联该约束），
 因此默认 `replicas: 1`。多副本水平扩展需先解除该约束并解决多卡调度（SRE 评估 §1.4）。
 
 > ⚠️ **不要水平扩容**：`replicas > 1` 时每个 Pod 各自加载 ~27G 权重并独占一张 GPU，

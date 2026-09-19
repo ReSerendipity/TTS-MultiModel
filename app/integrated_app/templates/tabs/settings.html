@@ -262,7 +262,9 @@
                         {{ "general_settings"|t(lang) }}
                     </div>
                     <div class="card-body" id="section-general-body">
-                        <div id="settings-general">
+                        <!-- 外层 card 已经是 #settings-general 锚点（目录链接 + main.js 都指它），
+                             这里再挂一次会让 getElementById 拿到错的节点。 -->
+                        <div>
                             <div class="srow">
                                 <div class="sinfo">
                                     <div class="sname">{{ "auto_save"|t(lang) }}</div>
@@ -720,113 +722,6 @@
         }
     }
 
-    window.saveAdvancedParams = function() {
-        var retryBadcase = document.getElementById('settings-retry-badcase');
-        var retryMaxTimes = document.getElementById('settings-retry-max-times');
-        var retryRatioThreshold = document.getElementById('settings-retry-ratio-threshold');
-        var targetLufs = document.getElementById('settings-target-lufs');
-        var idleTimeout = document.getElementById('settings-idle-timeout');
-        var trimSilence = document.getElementById('settings-trim-silence-vad');
-
-        var payload = {
-            max_len: 3000,
-            split_max_chars: 200,
-            retry_badcase: retryBadcase ? retryBadcase.checked : true,
-            retry_badcase_max_times: retryMaxTimes ? parseInt(retryMaxTimes.value, 10) : 3,
-            retry_badcase_ratio_threshold: retryRatioThreshold ? parseFloat(retryRatioThreshold.value) : 6,
-            target_lufs: targetLufs ? parseFloat(targetLufs.value) : -16,
-            idle_timeout: idleTimeout ? parseInt(idleTimeout.value, 10) : 300,
-            trim_silence_vad: trimSilence ? trimSilence.checked : true,
-        };
-
-        var btn = document.getElementById('settings-save-advanced-btn');
-        if (btn) btn.disabled = true;
-
-        fetch('/api/system/advanced_params', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).then(function(res) { return res.json(); }).then(function(data) {
-            if (btn) btn.disabled = false;
-            if (data.status === 'ok') {
-                invalidateCache('advanced');
-                if (window.Toast) Toast.show(t('save_success'), 'success');
-            } else {
-                if (window.Toast) Toast.show(t('save_failed') + ': ' + (data.message || t('unknown_error')), 'error');
-            }
-        }).catch(function(err) {
-            if (btn) btn.disabled = false;
-            if (window.Toast) Toast.show(t('save_failed') + ': ' + err.message, 'error');
-        });
-    };
-
-    window.saveGenerationDefaults = function() {
-        var sampleRateEl = document.getElementById('settings-default-sample-rate');
-        var speedEl = document.getElementById('settings-default-speed');
-        var seedEl = document.getElementById('settings-default-seed');
-        var silenceEl = document.getElementById('settings-script-studio-silence');
-
-        var payload = {
-            default_sample_rate: sampleRateEl ? parseInt(sampleRateEl.value, 10) : 24000,
-            default_speed: speedEl ? parseFloat(speedEl.value) : 1.0,
-            default_seed: seedEl ? parseInt(seedEl.value, 10) : 42,
-            script_studio_silence_secs: silenceEl ? parseFloat(silenceEl.value) : 0.4,
-        };
-
-        var btn = document.getElementById('settings-save-generation-btn');
-        if (btn) btn.disabled = true;
-
-        fetch('/api/system/generation_defaults', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).then(function(res) { return res.json(); }).then(function(data) {
-            if (btn) btn.disabled = false;
-            if (data.status === 'ok') {
-                invalidateCache('defaults');
-                if (window.Toast) Toast.show(t('save_success'), 'success');
-            } else {
-                if (window.Toast) Toast.show(t('save_failed') + ': ' + (data.message || t('unknown_error')), 'error');
-            }
-        }).catch(function(err) {
-            if (btn) btn.disabled = false;
-            if (window.Toast) Toast.show(t('save_failed') + ': ' + err.message, 'error');
-        });
-    };
-
-    window.saveGeneralSettings = function() {
-        var autoSaveEl = document.getElementById('settings-auto-save');
-        var autoPlayEl = document.getElementById('settings-auto-play');
-        var notifEl = document.getElementById('settings-notifications');
-        var formatEl = document.getElementById('settings-output-format');
-
-        var payload = {
-            auto_save: autoSaveEl ? autoSaveEl.checked : true,
-            auto_play: autoPlayEl ? autoPlayEl.checked : false,
-            notifications: notifEl ? notifEl.checked : true,
-            output_format: formatEl ? formatEl.value : 'wav',
-        };
-
-        var btn = document.getElementById('settings-save-general-btn');
-        if (btn) btn.disabled = true;
-
-        fetch('/api/system/general_settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).then(function(res) { return res.json(); }).then(function(data) {
-            if (btn) btn.disabled = false;
-            if (data.status === 'ok') {
-                invalidateCache('settings');
-                if (window.Toast) Toast.show(t('save_success'), 'success');
-            } else {
-                if (window.Toast) Toast.show(t('save_failed') + ': ' + (data.message || t('unknown_error')), 'error');
-            }
-        }).catch(function(err) {
-            if (btn) btn.disabled = false;
-            if (window.Toast) Toast.show(t('save_failed') + ': ' + err.message, 'error');
-        });
-    };
 
     // Unified save: save all settings sections in parallel
     window.saveAllSettings = function() {

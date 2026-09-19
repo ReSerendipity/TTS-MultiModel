@@ -328,6 +328,11 @@ function activateSidebarTabFn(btnOrTabId) {
     }
 
     var tabId = (typeof btnOrTabId === 'string') ? btnOrTabId : btnOrTabId.getAttribute('data-tab');
+    // 记录"当前真正显示的是哪一页"，供引擎切换后判断要不要重新拉模板
+    // （本函数只做高亮，内容是按钮上的 hx-get 拉的 —— 程序化调用它不会换内容）
+    if (tabId) {
+        window.__ACTIVE_TAB_ID__ = tabId;
+    }
     document.querySelectorAll('.sidebar-item').forEach(function(s) {
         s.classList.toggle('active', s.getAttribute('data-tab') === tabId);
         s.setAttribute('aria-selected', s.getAttribute('data-tab') === tabId ? 'true' : 'false');
@@ -351,12 +356,32 @@ function activateSidebarTabFn(btnOrTabId) {
     closeSidebar();
 }
 
+// 程序化跳转：activateTab 只改高亮，页面内容是侧栏按钮上的 hx-get 拉的，
+// 所以非点击的调用必须补一次真 click，否则会出现「高亮说在 A 页、屏幕上还是 B 页」
+// （引擎切换与命令面板导航都踩过这个坑，GOTCHAS #131）。
+function gotoSidebarTab(btnOrTabId) {
+    var item = (typeof btnOrTabId === 'string')
+        ? document.querySelector('.sidebar-item[data-tab="' + btnOrTabId + '"]')
+        : btnOrTabId;
+    if (!item) {
+        // 找不到就别静默什么都不做——那正是本函数要消灭的那类失败
+        console.warn('[sidebar] gotoTab 目标不存在，未做任何跳转:', btnOrTabId);
+        return;
+    }
+    if (item.getAttribute('hx-get')) {
+        item.click();
+    } else {
+        activateSidebarTabFn(item);
+    }
+}
+
 // Expose module API via TTSApp namespace
 TTSApp.sidebar = {
     toggle: toggleSidebar,
     close: closeSidebar,
     toggleCollapse: toggleSidebarCollapse,
-    activateTab: activateSidebarTabFn
+    activateTab: activateSidebarTabFn,
+    gotoTab: gotoSidebarTab
 };
 
 // Reset scroll position when HTMX content swap completes

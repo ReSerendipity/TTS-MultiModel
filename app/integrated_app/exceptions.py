@@ -193,6 +193,20 @@ class GenerationError(TTSError):
         super().__init__(message, code="GENERATION_ERROR", status_code=500)
 
 
+class GenerationCancelledError(GenerationError):
+    """用户主动取消生成。
+
+    WHY 需要独立类型：取消是**正常操作**，但此前它以 ``GenerationError("生成已取消")``
+    的形式抛出，被上层两个 ``except Exception`` 记成 ERROR 日志、并按失败计入生成统计
+    —— 正常点击「取消」的用户会往错误面和成功率指标里灌噪声（本项目有基于 ERROR
+    的告警与自动重载链路，误报会直接触发它们）。
+
+    继承 :class:`GenerationError` 是为了不破坏所有既有的 ``except GenerationError``
+    与 ``tts_error_handler`` 语义；HTTP 状态码与文案保持不变，变的只有日志级别与
+    失败归因。
+    """
+
+
 class OOMRetryExhaustedError(RuntimeError):
     """显存不足且降级重试全部耗尽（运维稳定性评估 P1-4）。
 

@@ -50,7 +50,7 @@
                 </div>
                 <div id="persona-empty-title" style="font-size:15px;font-weight:600;color:var(--t1);margin-bottom:6px">{{ "no_custom_voice"|t(lang) }}</div>
                 <div id="persona-empty-desc" style="font-size:12px;color:var(--t2);margin-bottom:16px">{{ "clone_to_create"|t(lang) }}</div>
-                <button id="persona-empty-action" class="btn btn-p btn-sm" onclick="TTSApp.sidebar.activateTab('voice_clone')">{{ "go_clone"|t(lang) }}</button>
+                <button id="persona-empty-action" class="btn btn-p btn-sm" onclick="TTSApp.sidebar.gotoTab('voice_clone')">{{ "go_clone"|t(lang) }}</button>
             </div>
         </div>
 
@@ -324,7 +324,7 @@
                 if (descEl) descEl.textContent = '{{ "clone_to_create"|t(lang) }}';
                 if (actionEl) {
                     actionEl.textContent = '{{ "go_clone"|t(lang) }}';
-                    actionEl.setAttribute('onclick', "TTSApp.sidebar.activateTab('voice_clone')");
+                    actionEl.setAttribute('onclick', "TTSApp.sidebar.gotoTab('voice_clone')");
                 }
             }
         }
@@ -427,7 +427,7 @@
                 showPlaying();
                 setupEndListeners(audio);
             }).catch(function(err) {
-                if (statusEl) statusEl.innerHTML = '<div class="tts-error-block">{{ "play_failed"|t(lang) }}: ' + escapeHtml(name) + '</div>';
+                if (statusEl) statusEl.innerHTML = '<div class="tts-error-block" role="alert">{{ "play_failed"|t(lang) }}: ' + escapeHtml(name) + '</div>';
                 restoreBtn();
             });
         }
@@ -446,7 +446,7 @@
         } else {
             audio.src = audioSrc2;
             audio.play().catch(function(){
-                document.getElementById('persona-delete-status').innerHTML = '<div class="tts-error-block">{{ "play_failed"|t(lang) }}: ' + escapeHtml(name) + '</div>';
+                document.getElementById('persona-delete-status').innerHTML = '<div class="tts-error-block" role="alert">{{ "play_failed"|t(lang) }}: ' + escapeHtml(name) + '</div>';
             });
         }
         document.getElementById('persona-delete-status').innerHTML = '<div class="tts-success-block">{{ "playing"|t(lang) }}: ' + escapeHtml(name) + '</div>';
@@ -483,22 +483,31 @@
     window.confirmDeletePersona = function(name) {
         var modal = document.querySelector('.custom-modal');
         if (modal) modal.remove();
-        // CSRF double-submit：原生 fetch 不受 base.html 的 htmx:configRequest 影响，
-        // 必须手动从 csrf_token cookie 读取 token 注入 X-CSRF-Token 头，否则中间件返回 403。
-        fetch('/api/persona/' + encodeURIComponent(name), {
-            method: 'DELETE',
-            headers: { 'X-CSRF-Token': window.getCsrfToken ? window.getCsrfToken() : '' }
-        })
-            .then(function(r){ return r.json(); })
-            .then(function(data){
-                if (data.status === 'ok') {
-                    document.getElementById('persona-delete-status').innerHTML = '<div class="tts-success-block">' + escapeHtml(data.message) + '</div>';
+        // DELETE 是「不安全方法」，CSRF 中间件要求带 X-CSRF-Token 头；本文件里其余写操作
+        // 都走 htmx（base.html 会自动注入），只有这一处手写 fetch，漏了头就是 403。
+        var delHeaders = { 'Accept': 'application/json' };
+        var delCsrf = window.getCsrfToken ? window.getCsrfToken() : '';
+        if (delCsrf) delHeaders['X-CSRF-Token'] = delCsrf;
+        fetch('/api/persona/' + encodeURIComponent(name), { method: 'DELETE', headers: delHeaders })
+            .then(function(r){
+                return r.json()
+                    .catch(function(){ return {}; })
+                    .then(function(data){ return { ok: r.ok, status: r.status, data: data }; });
+            })
+            .then(function(res){
+                var data = res.data || {};
+                var el = document.getElementById('persona-delete-status');
+                if (res.ok && data.status === 'ok') {
+                    el.innerHTML = '<div class="tts-success-block">' + escapeHtml(data.message || '') + '</div>';
                     refreshPersonaList();
-                } else {
-                    document.getElementById('persona-delete-status').innerHTML = '<div class="tts-error-block">' + escapeHtml(data.message) + '</div>';
+                    return;
                 }
+                // 中间件返回的是给开发者看的英文码，终端用户要的是"下一步做什么"
+                var msg = data.message || data.detail || ('HTTP ' + res.status);
+                if (res.status === 403) msg += '（页面令牌已失效，刷新页面后重试即可）';
+                el.innerHTML = '<div class="tts-error-block" role="alert">' + escapeHtml(msg) + '</div>';
             }).catch(function(err){
-                document.getElementById('persona-delete-status').innerHTML = '<div class="tts-error-block">' + escapeHtml(String(err)) + '</div>';
+                document.getElementById('persona-delete-status').innerHTML = '<div class="tts-error-block" role="alert">' + escapeHtml(String(err)) + '</div>';
             });
     };
 

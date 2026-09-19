@@ -67,6 +67,17 @@ _WATERMARK_STRENGTH = 0.062  # 嵌入强度（水印信号幅度）
 _WATERMARK_FREQ_LOW = 16000  # 嵌入频率下限（Hz）
 _WATERMARK_FREQ_HIGH = 20000  # 嵌入频率上限（Hz）
 _WATERMARK_FRAME_SIZE = 2048  # FFT 帧大小
+
+#: 能容纳 16–20kHz 水印频带的最低采样率。
+#: 频点数 = ``int(20000*2048/sr) - int(16000*2048/sr)``，sr=32000 时两项都是 1024
+#: → 频点数为 0，故实际需要 sr 明显高于 40000；取 40000 作判定线。
+_WATERMARK_MIN_SR: int = 40000
+
+#: 低采样率音频嵌水印前的上采样目标率（与 VoxCPM2 原生输出一致）。
+#: WHY 上采样而不是下移频带：IndexTTS 2.5/2.0 输出 22050Hz，其奈奎斯特 11025Hz
+#: 低于水印频带，嵌入会被直接跳过（产物无溯源标识）。上采样到 48kHz 后再嵌入，
+#: 既复用同一套频带/载荷格式（检测端无需分叉），也不改变音频内容与时长。
+_WATERMARK_UPSAMPLE_SR: int = 48000
 _WATERMARK_REPEAT = 4  # 水印重复次数以增强鲁棒性
 
 #: 水印秘密密钥路径（P1-4a）。32 字节随机密钥，0600 权限，首次运行自动生成。
@@ -843,6 +854,32 @@ def _log_watermark_failure(detail: str, severity: str, outcome: str) -> None:
         logger.debug(f"[WATERMARK] 审计事件写入失败: {e}")
 
 
+def _upsample_for_watermark(audio: np.ndarray, sample_rate: int, target_sr: int) -> tuple[np.ndarray, int]:
+    """把低于水印频带要求的音频上采样到 ``target_sr``。
+
+    只做整数比多相重采样（不改变内容、不改变时长），目的是让 16–20kHz 频带
+    落进奈奎斯特之内，从而给 22.05kHz 输出的引擎也能嵌入溯源水印。
+
+    Args:
+        audio: 输入波形（任意 dtype；多声道会先折单声道）。
+        sample_rate: 原采样率（Hz）。
+        target_sr: 目标采样率（Hz），须高于 ``sample_rate``。
+
+    Returns:
+        tuple[np.ndarray, int]: ``(float32 单声道波形, target_sr)``。
+    """
+    from math import gcd
+
+    from scipy.signal import resample_poly
+
+    x: np.ndarray = np.asarray(audio, dtype=np.float32)
+    if x.ndim > 1:
+        x = x.mean(axis=1).astype(np.float32)
+    g: int = gcd(int(sample_rate), int(target_sr)) or 1
+    out: np.ndarray = resample_poly(x, int(target_sr) // g, int(sample_rate) // g)
+    return np.asarray(out, dtype=np.float32), int(target_sr)
+
+
 def watermark_audio(
     audio: np.ndarray,
     sample_rate: int,
@@ -869,9 +906,14 @@ def watermark_audio(
         failure_mode: 失败策略覆盖（"provenance"/"block"）；None 读 config。
 
     Returns:
-        (处理后的音频, 元数据字典) 元组。元数据包含 watermarked（是否嵌入）、
+        (处理后的音频, 元数据字典) 元数据包含 watermarked（是否嵌入）、
         snr_db（信噪比）、source_id、content_hash 等字段；失败路径额外带
         watermark_failed / failure_strategy / failure_reason。
+
+        **低采样率输入会被上采样**：``sample_rate < 40000`` 时先重采样到 48kHz
+        再嵌入（否则 16–20kHz 频带超出奈奎斯特、水印会被整条跳过），此时元数据带
+        ``sample_rate_in`` / ``sample_rate_out``，调用方**必须**用 ``sample_rate_out``
+        写盘或序列化，否则播放时长会被拉长。
 
     Raises:
         WatermarkEmbedError: failure_mode=block 且重试后仍失败时抛出。
@@ -894,12 +936,26 @@ def watermark_audio(
 
     mode = _resolve_failure_mode(failure_mode)
 
+    # 低采样率（IndexTTS 2.5/2.0 输出 22050Hz）容不下 16–20kHz 水印频带，先上采样再嵌入。
+    # 采样率变化经 metadata["sample_rate_out"] 回报，写盘/序列化方必须改用它，否则会拿
+    # 原采样率去写上采样后的数据 → 播放时长被拉长（22050→48000 约 2.17 倍）。
+    sr_eff: int = int(sample_rate)
+    audio_eff: np.ndarray = audio
+    upsampled: bool = False
+    if 0 < sr_eff < _WATERMARK_MIN_SR:
+        try:
+            audio_eff, sr_eff = _upsample_for_watermark(audio, sr_eff, _WATERMARK_UPSAMPLE_SR)
+            upsampled = True
+            logger.debug(f"水印前上采样 {sample_rate}Hz → {sr_eff}Hz，以容纳 16-20kHz 频带")
+        except Exception as up_exc:  # noqa: BLE001 — 上采样失败退回原始采样率，交给既有失败策略
+            logger.warning(f"水印前上采样失败（{up_exc}），按原采样率 {sr_eff}Hz 尝试嵌入")
+
     # P0：3 级失败策略——首次嵌入 + 重试 1 次
     last_error: str | None = None
     result: Any = None
     for _attempt in (1, 2):
         try:
-            watermarked, result = embed_watermark(audio, sample_rate, source_id=source_id, strength=strength)
+            watermarked, result = embed_watermark(audio_eff, sr_eff, source_id=source_id, strength=strength)
             if result.success:
                 break
             last_error = result.message
@@ -912,6 +968,10 @@ def watermark_audio(
             "watermarked": True,
             "snr_db": round(result.snr_db, 1),
         }
+        if upsampled:
+            # 写盘方据此改用新采样率，否则时长会被拉长
+            metadata["sample_rate_in"] = int(sample_rate)
+            metadata["sample_rate_out"] = sr_eff
         if result.payload:
             metadata["source_id"] = result.payload.source_id
             metadata["content_hash"] = result.payload.content_hash
@@ -923,7 +983,7 @@ def watermark_audio(
             sec_cfg = get_config().pydantic_config.security
             if getattr(sec_cfg, "ai_audio_prefix_enabled", False):
                 prefix_ms = getattr(sec_cfg, "ai_audio_prefix_ms", 200)
-                watermarked = prepend_ai_indicator_tone(watermarked, sample_rate, duration_ms=prefix_ms)
+                watermarked = prepend_ai_indicator_tone(watermarked, sr_eff, duration_ms=prefix_ms)
                 metadata["ai_prefix"] = True
         except Exception as e:
             logger.debug(f"AI 标识提示音跳过（配置读取失败）: {e}")

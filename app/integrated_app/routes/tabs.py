@@ -33,7 +33,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from ..config import _DIALECTS, build_lang_options, get_config
+from ..config import _DIALECTS, build_lang_options, get_config, get_engine_text_limit
 from ..history_db import get_history_db
 from ..i18n import get_lang, register_i18n_filters, t
 from ..model_registry import registry
@@ -114,14 +114,19 @@ def _common_context(request: Request, tab_name: str = "") -> dict[str, Any]:
         logger.debug("读取 split_max_chars 配置失败，使用默认值 200: %s", exc)
         split_chars = 200
 
+    # WHY 走 config.get_engine_text_limit：这些数字以前只用于"显示"，路由按全局
+    # MAX_TEXT_LENGTH(10000) 校验，导致计数器标红却能提交。现在两侧共用同一函数。
     if tab_name in _VOXCPM2_TABS:
-        engine_max_chars = 8192
-    elif tab_name in _INDEXTTS2_TABS or tab_name in _INDEXTTS20_TABS:
-        engine_max_chars = 3072
+        engine_key: str | None = "voxcpm2"
+    elif tab_name in _INDEXTTS2_TABS:
+        engine_key = "indextts2"
+    elif tab_name in _INDEXTTS20_TABS:
+        engine_key = "indextts20"
     elif tab_name in _GENERIC_ENGINE_TABS:
-        engine_max_chars = 4096
+        engine_key = "generic"
     else:
-        engine_max_chars = 8192 if registry.current_engine == "voxcpm2" else 3072
+        engine_key = registry.current_engine
+    engine_max_chars = get_engine_text_limit(engine_key)
 
     return {
         "request": request,
