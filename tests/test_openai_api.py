@@ -19,6 +19,7 @@ from integrated_app.openai_api import (
     _VOICE_PERSONA_MAP,
     BatchGenerationManager,
     BatchSpeechRequest,
+    BatchStatus,
     OpenAICompatibleRouter,
     SpeechRequest,
     TaskCancelManager,
@@ -381,3 +382,70 @@ class TestRouterStaticMethods:
         engine.infer.return_value = "/tmp/out.wav"
         result = OpenAICompatibleRouter._generate_indextts2(engine, body)
         assert result == "/tmp/out.wav"
+
+
+class TestBatchTerminalLifecycle:
+    """终态批次的状态码语义与记录回收。
+
+    旧实现把"任务不存在"和"任务已完成"合并成同一个 404（detail 还写着「不存在或已
+    完成」），可紧随其后的 GET 仍能查到该任务 —— 等于对存在的资源谎称不存在，客户端
+    也无法区分该重试还是该放弃；而管理器里早已实现的 ``cleanup_batch()`` 没有任何
+    HTTP 入口，终态批次只能等进程重启才回收。
+    """
+
+    @staticmethod
+    def _put_batch(batch_id: str, status):
+        """直接写入一条批次记录，避免后台任务把状态改回非终态造成抖动。"""
+        import time
+
+        mgr = openai_router._batch_manager
+        with mgr._lock:
+            mgr._batches[batch_id] = {
+                "status": status,
+                "total": 1,
+                "completed": 1 if status is BatchStatus.COMPLETED else 0,
+                "failed": 0,
+                "results": ["x.wav"],
+                "params": {},
+                "created_at": time.time(),
+                "started_at": time.time(),
+                "finished_at": time.time(),
+            }
+        return batch_id
+
+    def test_cancel_missing_batch_is_404(self, openai_client):
+        resp = openai_client.delete("/v1/audio/speech/batch/no-such-batch")
+        assert resp.status_code == 404
+        assert "不存在" in resp.json()["detail"]
+
+    @pytest.mark.parametrize(
+        "terminal_status",
+        [BatchStatus.COMPLETED, BatchStatus.FAILED, BatchStatus.PARTIAL, BatchStatus.CANCELLED],
+    )
+    def test_cancel_terminal_batch_is_409_with_pointer(self, openai_client, terminal_status):
+        from integrated_app.openai_api import _TERMINAL_BATCH_STATUS
+
+        assert terminal_status.value in _TERMINAL_BATCH_STATUS, "终态集合必须覆盖全部结束状态"
+        bid = self._put_batch("batch-terminal", terminal_status)
+        resp = openai_client.delete(f"/v1/audio/speech/batch/{bid}")
+        assert resp.status_code == 409
+        detail = resp.json()["detail"]
+        assert "无法取消" in detail and "/data" in detail
+        # 资源确实还在（旧实现正是在这里返回 404 撒谎）
+        assert openai_client.get(f"/v1/audio/speech/batch/{bid}").status_code == 200
+
+    def test_cleanup_endpoint_reclaims_record(self, openai_client):
+        bid = self._put_batch("batch-cleanup", BatchStatus.COMPLETED)
+        resp = openai_client.delete(f"/v1/audio/speech/batch/{bid}/data")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "deleted"
+        assert openai_client.get(f"/v1/audio/speech/batch/{bid}").status_code == 404
+        assert openai_client.delete(f"/v1/audio/speech/batch/{bid}/data").status_code == 404
+
+    def test_running_batch_cancel_still_succeeds(self, openai_client):
+        bid = self._put_batch("batch-running", BatchStatus.IN_PROGRESS)
+        # 未进入终态的批次还要在取消管理器里注册过，cancel_task 才会真的返回 True
+        openai_router._batch_manager._cancel_manager.register(bid)
+        resp = openai_client.delete(f"/v1/audio/speech/batch/{bid}")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "cancelled"

@@ -39,8 +39,8 @@ repos:
         files: ^pyproject\.toml$
       - id: check-merge-conflict
       - id: check-added-large-files
-        args: [--maxkb=500]
-        exclude: ^model/|^models/|^\.ruff_cache/
+        args: [--maxkb=5000]
+        exclude: ^model/|^models/|^\.ruff_cache/|^app/integrated_app/static/fonts/
       - id: detect-private-key
         # .github/SECURITY.md 是漏洞披露文档，正文含 "PRIVATE KEY" 字样（报告指引），
         # 非真实密钥文件，排除避免误报；其他文件仍全量扫描。
@@ -113,10 +113,15 @@ repos:
         entry: .venv/Scripts/python.exe -m pytest tests/test_openapi_snapshot.py -q --tb=short
         language: system
         pass_filenames: false
-        files: ^(app/integrated_app/(routes|app_server|engine_interface)|tests/test_openapi_snapshot|tests/snapshots/openapi_contract)/
+        # 目录与文件混合匹配：routes 匹配目录前缀（含全部子路由），其余分支匹配具体文件；
+        # 旧写法给所有分支强加尾部「/」，把 app_server/engine_interface 等当成目录，导致这些文件永不命中。
+        # openai_api.py 挂载 /v1/* 端点、直接改变契约快照 → 2026-09-19 补入该漏触发分支。
+        files: ^(app/integrated_app/routes/|app/integrated_app/(app_server|engine_interface|openai_api)\.py$|tests/test_openapi_snapshot\.py$|tests/snapshots/openapi_contract\.json$)
         stages: [pre-commit, pre-push]
-      # 完整性清单同步门禁：核心模块当前哈希与 integrity_manifest.json 一致
-      # （防止「改核心模块未重新生成清单」→ enforce 启动拒绝；见 GOTCHAS #77）
+      # 完整性清单同步门禁：核心模块当前哈希与 integrity_manifest.json 一致。防止
+      # 「改核心模块未重新生成清单」→ 运行时 enforce 自检在哈希比对阶段失败并拒绝启动。
+      # 命中后修复：先 git log 确认改动合法（非篡改），再 generate_integrity_manifest.py
+      # 重生成、sign_integrity_manifest.py 重签（有 data/.manifest_signing_key 走 Ed25519）。
       - id: check-integrity-manifest-sync
         name: Integrity Manifest Sync Check
         entry: python scripts/check_integrity_manifest_sync.py

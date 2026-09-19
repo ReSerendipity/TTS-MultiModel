@@ -516,9 +516,11 @@ def load_indextts2(
             raise FileNotFoundError(f"{label} 模型文件不存在: {model_path}\n请运行: python {download_script} 下载模型")
 
         # Step 1: VRAM/RAM check
-        from ..model_registry import ENGINE_VRAM_REQUIREMENTS
+        from ..model_registry import estimate_engine_vram_need_gb
 
-        needed_vram_gb: float = ENGINE_VRAM_REQUIREMENTS.get(engine_name, 6.0)
+        # 需求与切换预检/热待机同源（权重基线 × 安全裕度），否则三处日志数字
+        # 互相矛盾：预检放行 9.0GB、加载器却按 6.0GB 判不足。
+        needed_vram_gb: float = estimate_engine_vram_need_gb(engine_name)
         status_text: str = "正在检查系统资源..."
         if progress_callback is not None:
             with contextlib.suppress(Exception):
@@ -528,11 +530,31 @@ def load_indextts2(
         if backend != GPUBackend.CPU:
             try:
                 mem_info: Any = GPUBackendManager.get_memory_info()
-                free_gb: float = mem_info[3] / (1024**3)
-                logger.info(f"[IndexTTS2] VRAM 检查: 需要 {needed_vram_gb}GB, 可用 {free_gb:.2f}GB")
+                # 可用量取 total - max(allocated, reserved)：reserved 是缓存分配器
+                # 已向驱动圈走的块，新张量只能从 total - reserved 里要，比原先
+                # 只减 allocated 更接近真实可用。
+                usable_bytes: int = max(0, mem_info[0] - max(mem_info[1], mem_info[2]))
+                free_gb: float = usable_bytes / (1024**3)
+                logger.info(f"[IndexTTS2] VRAM 检查: 需要 {needed_vram_gb:.2f}GB, 可用 {free_gb:.2f}GB")
 
                 if free_gb < needed_vram_gb:
-                    logger.warning(f"[IndexTTS2] 显存不足 ({free_gb:.2f}GB < {needed_vram_gb}GB)，将尝试使用 CPU 模式")
+                    # M-R8: 原先这里只打一句"将尝试使用 CPU 模式"就继续加载，
+                    # 但 _build_engine 从不传 device，IndexTTS2Engine 会自动选中
+                    # cuda —— 日志说了却没做，结果把两个引擎的量一起压进显存
+                    # （实测 12.10GB 落在 11.94GB 卡上）。显存不足必须硬失败。
+                    raise InsufficientVRAMError(
+                        f"显存不足，无法加载 {label}：需要约 {needed_vram_gb:.2f}GB，"
+                        f"实际可用约 {free_gb:.2f}GB。可尝试："
+                        "① 关闭其他占用显存的程序（游戏/硬件加速的浏览器/残留的 python 进程）；"
+                        "② 若日志同时出现「[模型卸载] …疑似仍有强引用未释放」，说明旧引擎没真正卸载，"
+                        "重启服务即可恢复；"
+                        "③ 确认已启用 bf16（fp32 需要约两倍显存）；"
+                        "④ 最后才调低 config.yaml 的 models.vram_safety_margin_gb"
+                        "（会增加推理期显存溢出风险）。"
+                        "已加载的引擎将自动回滚，不会丢失当前可用状态。"
+                    )
+            except InsufficientVRAMError:
+                raise
             except Exception as mem_err:
                 logger.debug(f"[IndexTTS2] 显存查询失败（跳过预检）: {mem_err}")
 
@@ -588,7 +610,9 @@ def load_indextts2(
             from ..model_optimizer import warmup_indextts2
 
             def _idx_warmup_progress(msg: str) -> None:
-                logger.info(f"[IndexTTS2-Warmup] {msg}")
+                # warmup_indextts2 内部的 _report 已经以 INFO 打印过同一条消息，
+                # 这里再打一次会让每条预热日志成对出现，降为 debug 只留排查用。
+                logger.debug(f"[IndexTTS2-Warmup] {msg}")
 
             warmup_indextts2(new_engine, progress_callback=_idx_warmup_progress)
         except Exception as idx_warmup_err:
@@ -610,6 +634,12 @@ def load_indextts2(
                 monitor.set_model_status("ready")
         except Exception as e:
             logger.debug(f"[IndexTTS2] VRAM 记录失败: {e}")
+    except TTSError:
+        # TTSError（含 InsufficientVRAMError）是调用方必须知道的硬失败：下面那个
+        # except Exception 会把它压成一条进度文本，switch_engine 就收不到异常、
+        # 不会回滚，用户最终停在"一个引擎都没有"的状态且日志上看不出失败原因。
+        # 原样抛出 —— 锁仍在 finally 中释放，由上层决定回滚与 HTTP 状态码映射。
+        raise
     except (FileNotFoundError, PermissionError, OSError) as fs_err:
         logger.error(f"[IndexTTS2] 文件系统错误: {fs_err}")
         with contextlib.suppress(Exception):

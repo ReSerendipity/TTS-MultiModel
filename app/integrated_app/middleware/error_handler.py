@@ -48,7 +48,7 @@ except ImportError:  # pragma: no cover - 仅新版 FastAPI 走此分支
         from pydantic import ValidationError as _FastAPIValidationError
     except ImportError:  # pragma: no cover - Pydantic 是 FastAPI 硬依赖
         _FastAPIValidationError = Exception
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..exceptions import TTSError
@@ -274,7 +274,74 @@ async def _tts_error_handler(request: Request, exc: TTSError) -> JSONResponse:
         )
 
 
-async def _validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+#: Pydantic 校验类型 → 中文短描述（HTML 分支专用；JSON 分支保留原始结构给 API 客户端）。
+_VALIDATION_MSG_ZH: dict[str, str] = {
+    "float_parsing": "需要是数字",
+    "int_parsing": "需要是整数",
+    "missing": "缺少该字段",
+    "greater_than_equal": "数值低于允许下限",
+    "less_than_equal": "数值超过允许上限",
+    "greater_than": "数值需大于下限",
+    "less_than": "数值需小于上限",
+    "string_too_long": "文本过长",
+    "json_invalid": "不是合法的 JSON",
+}
+
+
+def _wants_html_fragment(request: Request) -> bool:
+    """判断该请求期望 HTML 片段而非 JSON。
+
+    WHY: 生成类端点由 htmx 表单提交驱动，结果区用 innerHTML 直接替换。此前
+    参数校验失败（如 cfg 传了非数字）一律返回 JSON，于是用户会在结果区看到
+    一段原始 ``{"detail":[{"type":"float_parsing"…`` —— 既不可读也无可操作按钮。
+
+    判据只认两个明确信号，避免把 API 客户端（含 /v1 OpenAI 兼容层）带进 HTML：
+    htmx 显式头 ``HX-Request: true``，或浏览器导航式 ``Accept: text/html``
+    （且未同时声明 ``application/json``）。
+    """
+    if (request.headers.get("hx-request") or "").strip().lower() == "true":
+        return True
+    accept: str = (request.headers.get("accept") or "").lower()
+    return "text/html" in accept and "application/json" not in accept
+
+
+def _validation_html_message(errors: list[dict[str, Any]]) -> str:
+    """把字段级校验错误拼成一句用户能看懂的中文提示（最多列 3 个字段）。"""
+    parts: list[str] = []
+    for err in errors[:3]:
+        field: str = str(err.get("field", ""))
+        # loc 形如 "body.cfg"，对用户只保留字段名
+        field = field.split(".")[-1] or "参数"
+        zh: str = _VALIDATION_MSG_ZH.get(str(err.get("type", "")), "")
+        parts.append(f"{field}：{zh}" if zh else f"{field}：{err.get('message', '取值不合法')}")
+    if len(errors) > 3:
+        parts.append(f"另有 {len(errors) - 3} 项参数不合法")
+    return "提交的内容有误 —— " + "；".join(parts)
+
+
+def _validation_html_or_none(request: Request, errors: list[dict[str, Any]]) -> Response | None:
+    """htmx/浏览器表单请求返回友好 HTML 片段，其余（API/JSON 客户端）返回 ``None``。
+
+    渲染过程中任何异常都返回 ``None`` 让调用方回落 JSON —— 错误响应本身绝不能
+    因为渲染失败而变成 500 或空响应。
+    """
+    if not _wants_html_fragment(request):
+        return None
+    try:
+        from ..routes.generate.utils import _error_html
+
+        return _error_html(
+            request,
+            _validation_html_message(errors),
+            error_type="validation",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    except Exception as html_exc:  # noqa: BLE001 — 渲染失败回落 JSON，不吞掉原始错误
+        logger.debug("校验错误的 HTML 片段渲染失败，回退 JSON: %s", html_exc)
+        return None
+
+
+async def _validation_error_handler(request: Request, exc: RequestValidationError) -> Response:
     """Pydantic RequestValidationError 处理器。
 
     Args:
@@ -282,12 +349,17 @@ async def _validation_error_handler(request: Request, exc: RequestValidationErro
         exc: Pydantic 验证异常。
 
     Returns:
-        422 Unprocessable Entity JSONResponse，含字段级错误列表。
+        htmx/浏览器表单请求 → 422 + HTML 错误片段（与生成端点同一套模板，
+            带「重试」按钮与 toast）；其余（API/JSON 客户端）→ 422 JSONResponse，
+            含字段级错误列表。
     """
     try:
         request_id = _get_request_id(request)
         logger.warning("Validation error request_id=%s exc=%s", request_id, exc)
         errors = _parse_validation_errors(exc)
+        html_resp: Response | None = _validation_html_or_none(request, errors)
+        if html_resp is not None:
+            return html_resp
         return _build_error_response(
             code="VALIDATION_ERROR",
             message="请求参数验证失败",
@@ -303,7 +375,7 @@ async def _validation_error_handler(request: Request, exc: RequestValidationErro
         )
 
 
-async def _fastapi_validation_error_handler(request: Request, exc: _FastAPIValidationError) -> JSONResponse:
+async def _fastapi_validation_error_handler(request: Request, exc: _FastAPIValidationError) -> Response:
     """FastAPI 表单级 ValidationError 处理器（部分版本路径与 RequestValidationError 不同）。
 
     Args:
@@ -334,6 +406,12 @@ async def _fastapi_validation_error_handler(request: Request, exc: _FastAPIValid
             detail: Any = parsed
         except (AttributeError, TypeError, ValueError):
             detail = str(exc)
+        html_errors: list[dict[str, Any]] = (
+            detail if isinstance(detail, list) else [{"field": "参数", "message": str(exc), "type": "fallback"}]
+        )
+        html_resp: Response | None = _validation_html_or_none(request, html_errors)
+        if html_resp is not None:
+            return html_resp
         return _build_error_response(
             code="VALIDATION_ERROR",
             message="请求参数验证失败",

@@ -43,7 +43,7 @@ var Reprocess = (function() {
                     errMsg = (window.I18N && window.I18N['csrf_error']) || '安全验证失败，请刷新页面后重试';
                 }
                 if (statusEl) {
-                    statusEl.innerHTML = '<div class="tts-error-block"><div class="error-message">' + errMsg + '</div></div>';
+                    statusEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-message">' + errMsg + '</div></div>';
                 }
                 if (window.Toast) Toast.show(errMsg, 'error');
                 throw new Error(errMsg);
@@ -66,6 +66,7 @@ var Reprocess = (function() {
                 statusEl.innerHTML = '';
                 var errBlock = document.createElement('div');
                 errBlock.className = 'tts-error-block';
+                errBlock.setAttribute('role', 'alert');
                 var errMsg = document.createElement('div');
                 errMsg.className = 'error-message';
                 errMsg.textContent = err.message;

@@ -19,6 +19,7 @@
 
 import contextlib
 import os
+import platform
 import tempfile
 
 import pytest
@@ -37,11 +38,27 @@ try:
 except ImportError:
     NUMPY_AVAILABLE = False
 
+# 基线 PNG 由 CI 的 ubuntu-latest 生成入库（见 .github/workflows/e2e.yml），阈值只有 1%。
+# Chromium 在不同 OS 上的字体回退与 antialiasing 不同，实测在 Windows 上同一页面会差
+# 10–25%，于是本地跑必然「全红」——这种红不含任何信息，只会让人学会忽略这条门禁。
+# 因此非基线平台默认 skip（CI 仍然真正执行）；需要在本机看结果时用
+#   TTS_VISUAL_FORCE=1 pytest tests/e2e/test_visual_regression.py
+_VISUAL_BASELINE_PLATFORM = "Linux"
+_local_platform = platform.system()
+_force_visual = os.environ.get("TTS_VISUAL_FORCE", "").strip() in ("1", "true", "True")
+
 pytestmark = [
     pytest.mark.e2e,
     pytest.mark.skipif(
         not PLAYWRIGHT_AVAILABLE,
         reason="Playwright not installed. Install with: pip install playwright && playwright install",
+    ),
+    pytest.mark.skipif(
+        not _force_visual and _local_platform != _VISUAL_BASELINE_PLATFORM,
+        reason=(
+            f"视觉回归基线由 {_VISUAL_BASELINE_PLATFORM} CI 生成，{_local_platform} 上字体渲染差异"
+            "必然超过 1% 阈值；CI 仍会执行。本机确需执行请设 TTS_VISUAL_FORCE=1"
+        ),
     ),
 ]
 

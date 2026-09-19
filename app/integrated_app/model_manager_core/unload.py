@@ -37,21 +37,23 @@ def unload_model() -> None:
     Unload the current model (VoxCPM2 or IndexTTS2) and aggressively release VRAM.
 
     卸载顺序与显存同步逻辑：
-        1. 获取 ``_model_lock``（with 语句保证即使抛异常也能释放）。
-        2. 将 ``registry.voxcpm_model`` / ``registry.voxcpm_asr`` 置空并
-           ``del`` 旧引用（触发 Python 引用计数回收）。
-        3. 对 ``registry.indextts2_engine`` 若存在则调用其
-           ``engine.unload()`` 方法，释放 IndexTTS2 内部分配的 GPU 缓冲区与
-           CUDA 句柄（这也是 M-R3 回滚时不能仅恢复引用的根本原因）。
-        4. 清空 ``_persona_embedding_cache``，消除模型权重对音色嵌入的
-           间接引用。
-        5. 调用 :func:`free_gpu_memory` 执行分层清理：
-           ``gc.collect()`` → ``torch.cuda.empty_cache()`` →
+        1. 记录 ``allocated`` 基线，供第 6 步核对本次是否真正回收。
+        2. 获取 ``_model_lock``（with 语句保证即使抛异常也能释放）。
+        3. 调用 ``registry.clear_voxcpm()`` 一次性清空 VoxCPM 全部槽位
+           （模型 / ASR / enhancer / 引擎门面实例）。
+        4. 对 ``registry.indextts2_engine`` 若存在则先 ``clear_indextts2()``
+           摘除引用再调用其 ``unload()`` 方法，释放 IndexTTS2 内部分配的 GPU
+           缓冲区与 CUDA 句柄（这也是 M-R3 回滚时不能仅恢复引用的根本原因）。
+        5. 清空 ``_persona_embedding_cache``，并调用 :func:`free_gpu_memory`
+           执行分层清理：``gc.collect()`` → ``torch.cuda.empty_cache()`` →
            ``torch.cuda.ipc_collect()``。
-        6. 若为 CUDA 后端，``torch.cuda.synchronize()`` 等待 GPU 流中
-           所有排队的释放操作真正完成，避免后续 ``_wait_vram_freed``
-           轮询误判（用 ``contextlib.suppress`` 容错，防止驱动异常中断卸载）。
-        7. 记录卸载耗时，超过 ``_UNLOAD_SLOW_THRESHOLD_SECONDS`` 时告警。
+        6. ``torch.cuda.synchronize()`` 等待 GPU 流中所有排队的释放操作真正
+           完成，避免后续 ``_wait_vram_freed`` 轮询误判（用 ``contextlib.suppress``
+           容错，防止驱动异常中断卸载）。
+        7. 对比基线报告"本次实际回收 N GB"；回收量明显低于该引擎基线时告警
+           —— 这意味着还有别的强引用没断（``empty_cache()`` 无法回收仍被引用的
+           显存，此时日志必须说实话，否则后续加载会在超额订阅的状态上继续叠加）。
+        8. 记录卸载耗时，超过 ``_UNLOAD_SLOW_THRESHOLD_SECONDS`` 时告警。
 
     异常处理（try/finally 保证）：
         a) IndexTTS2.unload() 单个异常不中断整体卸载流程（仅 warning 日志）。
@@ -66,28 +68,42 @@ def unload_model() -> None:
     # 模型卸载时重置显存泄漏检测基线，避免卸载后显存跳变导致误报
     get_health_monitor().reset_vram_baseline()
 
+    from ..gpu_backend import GPUBackend, GPUBackendManager
+    from ..model_registry import ENGINE_VRAM_REQUIREMENTS
+
+    backend: GPUBackend = GPUBackendManager.detect_backend()
+    gpu_device: Any = _state.get_gpu_device()
+    is_gpu: bool = backend != GPUBackend.CPU and gpu_device is not None
+
+    # 步骤 1：卸载前基线（GB 口径与日志保持一致）
+    allocated_before: int = 0
+    if is_gpu:
+        with contextlib.suppress(Exception):
+            allocated_before = GPUBackendManager.memory_allocated(gpu_device)
+
+    # 卸载前的引擎名：用于查该引擎的显存基线，判断回收量是否合理
+    unloaded_engine: str | None = registry.current_engine
+
     try:
         with _model_lock:
-            # Unload VoxCPM2 model
-            old_model: Any = registry.voxcpm_model
-            old_asr: Any = registry.voxcpm_asr
-            registry.voxcpm_model = None
-            registry.voxcpm_asr = None
-            if old_model is not None:
-                del old_model
-            if old_asr is not None:
-                del old_asr
+            # Unload VoxCPM2：clear_voxcpm() 同时处理 voxcpm_enhancer_model 与
+            # _voxcpm2_engine_instance，逐个手工置空容易漏掉这两个槽位。
+            registry.clear_voxcpm()
 
             # Unload IndexTTS2 engine
             old_engine: Any = registry.indextts2_engine
-            registry.indextts2_engine = None
+            registry.clear_indextts2()
             if old_engine is not None:
                 try:
                     old_engine.unload()
                 except Exception as e:
                     logger.warning(f"IndexTTS2 卸载失败: {e}")
+                # 局部引用必须在 free_gpu_memory() 之前消失，否则它和
+                # _snapshot_engine_state 曾犯的错误同类（见该函数 M-R8 注释）。
+                del old_engine
 
             # Unload 通用新式引擎（generic_tts_engine 等）
+            # get_all_engine_instances() 返回的是快照副本，可安全边遍历边 clear。
             for gname, ginst in registry.get_all_engine_instances().items():
                 if ginst is not None:
                     try:
@@ -102,17 +118,25 @@ def unload_model() -> None:
             free_gpu_memory()
 
             # Log post-cleanup VRAM status
-            from ..gpu_backend import GPUBackend, GPUBackendManager
-
-            backend: GPUBackend = GPUBackendManager.detect_backend()
-            if backend != GPUBackend.CPU:
+            if is_gpu:
                 with contextlib.suppress(Exception):
-                    GPUBackendManager.synchronize()
-                device: Any = _state.get_gpu_device()
-                if device is not None:
-                    allocated: int = GPUBackendManager.memory_allocated(device)
-                    reserved: int = GPUBackendManager.memory_reserved(device)
-                    logger.info(f"释放后显存: 已分配 {allocated / 1024**3:.2f}GB, 保留 {reserved / 1024**3:.2f}GB")
+                    GPUBackendManager.synchronize(gpu_device)
+                allocated_after: int = GPUBackendManager.memory_allocated(gpu_device)
+                reserved: int = GPUBackendManager.memory_reserved(gpu_device)
+                freed_gb: float = max(0, allocated_before - allocated_after) / 1024**3
+                logger.info(
+                    f"释放后显存: 已分配 {allocated_after / 1024**3:.2f}GB, "
+                    f"保留 {reserved / 1024**3:.2f}GB（本次回收 {freed_gb:.2f}GB）"
+                )
+
+                expected_gb: float = ENGINE_VRAM_REQUIREMENTS.get(unloaded_engine or "", 0.0)
+                if expected_gb and freed_gb < expected_gb * 0.5:
+                    logger.warning(
+                        f"[模型卸载] {unloaded_engine} 期望回收约 {expected_gb:.1f}GB，"
+                        f"实际仅回收 {freed_gb:.2f}GB（仍残留 {allocated_after / 1024**3:.2f}GB）；"
+                        "疑似仍有强引用未释放，empty_cache 无法回收被引用的显存。"
+                        "此时继续加载新引擎会超额订阅，请先排查引用点。"
+                    )
     except Exception as unload_err:
         logger.error(f"[模型卸载] 卸载过程异常: {unload_err}")
         with contextlib.suppress(Exception):

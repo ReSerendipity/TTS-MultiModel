@@ -66,8 +66,12 @@ jobs:
           python scripts/check_declared_capabilities.py
 
       - name: Integrity manifest sync gate (security)
-        # 防止「核心模块代码已改、完整性清单未重新生成」→ enforce 启动拒绝
-        # （docs/agents/GOTCHAS.md #77）。判据与本地 pre-commit 钩子同源。
+        # 防止「核心模块代码已改、完整性清单未重新生成」：改动 app/integrated_app/ 下
+        # 任一 _CORE_MODULES 文件后若未同步 security/integrity_manifest.json，运行时
+        # enforce 自检会在哈希比对阶段失败并拒绝启动（RuntimeError，例「校验通过 13/16」）。
+        # 本门禁在提交/推送/CI 阶段提前拦截，判据与本地 pre-commit 钩子同源。命中后修复：
+        # 先 git log 确认改动合法（非篡改），再 generate_integrity_manifest.py 重生成、
+        # sign_integrity_manifest.py 重签（有 data/.manifest_signing_key 走 Ed25519）。
         run: |
           python scripts/check_integrity_manifest_sync.py
 
@@ -82,7 +86,12 @@ jobs:
   #（原内联实现见 git 历史；迁移记录 docs/reports/mypy-ratchet-组织级门禁迁移_20260903.md）
   typecheck:
     name: Typecheck (mypy ratchet)
-    uses: ReSerendipity/.github/.github/workflows/python-quality-baseline.yml@main
+    # 钉定到 commit SHA（供应链加固：防上游 @main 漂移引入不可控的门禁变更）。
+    # 升级口径（何时/由谁解钉）：仅在本仓需要 org 模板的新功能或安全修复时才解钉，
+    # 由本仓维护者手动核对 ReSerendipity/.github@main 目标 commit 后替换下方 SHA，
+    # 并本地跑 `python scripts/check_spec_refs.py` + YAML 解析（如 `python -c "import yaml;yaml.safe_load(open('.github/workflows/ci.yml'))"`，有 actionlint 时一并跑）校验；
+    # 不自动跟随 main。SHA 解析于 2026-09-18（当时 main HEAD=2c0c5ab，提交日期 2026-09-14）。
+    uses: ReSerendipity/.github/.github/workflows/python-quality-baseline.yml@2c0c5abbe2acdb8efb793482b5c79411ed34bde6
     with:
       package: app/integrated_app
       include_tests: false

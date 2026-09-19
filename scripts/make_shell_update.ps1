@@ -62,6 +62,10 @@ $exclude = @(
     'node_modules\*', '.venv\*', 'dist\*', 'build\*', 'desktop\*',
     'docs\*', 'tests\*', 'scripts\*', 'baselines\*', 'benchmarks\*', 'demo\*',
     'examples\*', 'perf\*', 'personas\*', 'reference_repos\*', 'screenshots\*', '_archive\*',
+    # 防泄漏：AI 工具元数据目录（含本机私有记忆/规格，绝不入库/入包）
+    '.workbuddy*', '.workbuddy-ai*', '.trae*', '.cursor*', '.claude*', '.aider*', '.codeium*', '.windsurf*', '.continue*', '.cline*', '.ci*',
+    # 防泄漏：应用层密钥与运行时状态（不随增量包下发，避免覆盖用户本地配置/泄露私钥）
+    '*.pem', '.server_port', 'general_settings.json',
     '.git\*', '.github\*', '.gitignore', '.pre-commit-config.yaml', '.githooks\*',
     'coverage.xml', '.coverage', '.ruff_cache\*', '.mypy_cache\*', '*.egg-info\*', '.pytest_cache\*'
 )

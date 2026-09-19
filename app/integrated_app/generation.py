@@ -122,6 +122,8 @@ def save_audio(wav: np.ndarray, sr: int, prefix: str = "audio", format: str = "w
                 enable=True,
                 source_id=WATERMARK_SOURCE_ID,
             )
+            # 低采样率输入会被上采样后再嵌水印，写盘必须跟随新采样率
+            sr = int(wm_meta.get("sample_rate_out") or sr)
             if not wm_meta.get("watermarked"):
                 logger.debug("水印嵌入失败: %s", file_path)
         except Exception as wm_exc:
@@ -918,6 +920,8 @@ def _save_wav_compatible(
             source_id=WATERMARK_SOURCE_ID,
             output_path=out_path,
         )
+        # 低采样率输入会被上采样后再嵌水印，写盘必须跟随新采样率
+        sample_rate = int(wm_meta.get("sample_rate_out") or sample_rate)
         if wm_meta.get("watermarked"):
             logger.debug(
                 "水印嵌入成功: source=%s, snr=%.1fdB, hash=%s",

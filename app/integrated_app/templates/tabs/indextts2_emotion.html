@@ -8,6 +8,7 @@
         <!-- ============ Form Column (65%) ============ -->
         <div class="col-form">
             <form id="it2e-form" hx-post="/api/generate/indextts2" hx-target="#it2e-result" hx-swap="innerHTML" hx-indicator="#it2e-spinner" hx-encoding="multipart/form-data" x-data="{ it2eMode: 'same' }">
+                <input type="hidden" name="expected_engine" value="indextts2">
                 <input type="hidden" id="it2e-emotion-mode" value="same">
 
                 <!-- Card: 模式选择 -->

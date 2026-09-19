@@ -170,9 +170,10 @@
           category: '导航',
           icon: p.icon,
           action: function() {
-            // 通过侧边栏激活标签页
+            // 通过侧边栏激活标签页。必须用 gotoTab（内部补一次真 click）：
+            // activateTab 只改高亮，内容不会被拉取（GOTCHAS #131）。
             if (window.TTSApp && window.TTSApp.sidebar) {
-              window.TTSApp.sidebar.activateTab(p.tab);
+              window.TTSApp.sidebar.gotoTab(p.tab);
             }
           }
         });
@@ -270,7 +271,10 @@
         category: '模型',
         icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
         action: function() {
-          fetch('/api/model/unload', { method: 'POST' })
+          var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+          var headers = {};
+          if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+          fetch('/api/model/unload', { method: 'POST', headers: headers })
             .then(function(r) { return r.json(); }).then(function(d) {
               if (window.TTSApp && window.TTSApp.toast) {
                 window.TTSApp.toast.show(d.message || '模型已卸载', 'info');

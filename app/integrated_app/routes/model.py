@@ -74,6 +74,7 @@ from ..model_manager import (
 )
 from ..model_registry import registry
 from ..persona_manager import get_total_persona_count
+from .system import log_operation
 
 router = APIRouter(prefix="/api/model", tags=["model"])
 
@@ -281,6 +282,7 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
                         safe_msg = _SENSITIVE_PATH_PATTERN.sub("[PATH]", last_msg)
                         return JSONResponse({"status": "error", "message": safe_msg, "engine": engine})
                     _notify_load(last_msg, status="completed")
+                    log_operation("model", f"{engine} 加载完成")
                     return JSONResponse({"status": "ok", "message": last_msg, "engine": engine})
                 _notify_load("加载失败：无状态返回", status="failed", error="no status")
                 return JSONResponse({"status": "error", "message": "Model load returned no status"})
@@ -342,6 +344,7 @@ async def unload_model_endpoint(request: Request) -> Response:
         log_audit("model_unload", outcome="attempt")
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, unload_model)
+        log_operation("model", "已卸载当前引擎，显存已释放")
         return JSONResponse({"status": "ok", "message": "Model unloaded, VRAM released"})
     except TTSError:
         raise
@@ -452,6 +455,7 @@ async def switch_engine_endpoint(request: Request, engine: str = Form(...)) -> R
             "engine": registry.current_engine,
         }
         event_bus.notify()
+        log_operation("model", f"已切换到 {registry.current_engine}")
         return JSONResponse({"status": "ok", "message": final_status, "engine": registry.current_engine})
     except (EngineSwitchError, InsufficientVRAMError, TTSError):
         raise

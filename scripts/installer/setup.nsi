@@ -5,7 +5,7 @@ Unicode true
 !include "LogicLib.nsh"
 
 Name "TTSMultiModel 桌面版"
-OutFile "TTSMultiModel-Setup-v2.2.1.exe"
+OutFile "TTSMultiModel-Setup-v2.2.2.exe"
 InstallDir "$LOCALAPPDATA\Programs\TTSMultiModel"
 InstallDirRegKey HKCU "Software\TTSMultiModel" "InstallDir"
 RequestExecutionLevel user
@@ -13,7 +13,7 @@ SetCompressor /SOLID lzma
 CRCCheck on
 BrandingText "TTSMultiModel"
 
-!define APP_VERSION "2.2.1"
+!define APP_VERSION "2.2.2"
 !define DATA_PREFIX "TTSMultiModel-Data.7z"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\TTSMultiModel"
 !define APP_ICON "${__FILEDIR__}\..\..\desktop\src-tauri\icons\icon.ico"
@@ -85,6 +85,10 @@ Section "TTSMultiModel 桌面版" SEC_APP
   SetOutPath "$INSTDIR\app"
   File "pyproject.toml"
 
+  ; 清理 runtime 内指向开发机的 editable .pth 残留（2026-09-18）：
+  ; indextts 已实体捆绑进 site-packages，该 .pth 无需保留（且会暴露开发机路径）
+  Delete "$INSTDIR\runtime\Lib\site-packages\_editable_impl_indextts.pth"
+
 
 
   ; 校验主程序存在
@@ -120,7 +124,7 @@ Section "TTSMultiModel 桌面版" SEC_APP
 SectionEnd
 
 ; ---------- 版本信息 ----------
-VIProductVersion "2.2.1.0"
+VIProductVersion "2.2.2.0"
 VIAddVersionKey "ProductName" "TTSMultiModel 桌面版"
 VIAddVersionKey "LegalCopyright" "Copyright (C) 2026 TTSMultiModel"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"

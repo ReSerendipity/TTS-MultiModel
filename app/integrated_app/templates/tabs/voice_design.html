@@ -612,7 +612,7 @@
             });
         }).catch(function(err) {
             if (spinnerEl) spinnerEl.style.display = 'none';
-            if (resultEl) resultEl.innerHTML = '<div class="tts-error-block"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + err.message + '</div></div>';
+            if (resultEl) resultEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + err.message + '</div></div>';
             if (window.Toast) Toast.show(err.message, 'error');
         });
     };
@@ -626,7 +626,7 @@
         var personaName = form.querySelector('select[name=persona_name]').value;
 
         if (!text.trim()) {
-            document.getElementById('vd-status').innerHTML = '<div class="tts-error-block"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">{{ "text_empty"|t(lang) }}</div></div>';
+            document.getElementById('vd-status').innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">{{ "text_empty"|t(lang) }}</div></div>';
             return;
         }
 
@@ -672,7 +672,7 @@
                 if (response.status === 403) {
                     errMsg = (window.I18N && window.I18N['csrf_error']) || '安全验证失败，请刷新页面后重试';
                 }
-                statusEl.innerHTML = '<div class="tts-error-block"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + errMsg + '</div></div>';
+                statusEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + errMsg + '</div></div>';
                 if (window.Toast) Toast.show(errMsg, 'error');
                 return;
             }
@@ -748,6 +748,7 @@
                             var errData = JSON.parse(currentData);
                             var errBlock = document.createElement('div');
                             errBlock.className = 'tts-error-block';
+                            errBlock.setAttribute('role', 'alert');
                             var errTitle = document.createElement('div');
                             errTitle.className = 'error-title';
                             errTitle.textContent = '{{ "gen_failed"|t(lang) }}';
@@ -759,7 +760,7 @@
                             statusEl.innerHTML = '';
                             statusEl.appendChild(errBlock);
                         } catch (e) {
-                            statusEl.innerHTML = '<div class="tts-error-block"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">{{ "unknown_error"|t(lang) }}</div></div>';
+                            statusEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">{{ "unknown_error"|t(lang) }}</div></div>';
                         }
                         return;
                 }
@@ -801,6 +802,7 @@
         } catch (err) {
             var errBlock = document.createElement('div');
             errBlock.className = 'tts-error-block';
+            errBlock.setAttribute('role', 'alert');
             var errTitle = document.createElement('div');
             errTitle.className = 'error-title';
             errTitle.textContent = '{{ "gen_failed"|t(lang) }}';

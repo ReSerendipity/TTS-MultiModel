@@ -1,4 +1,5 @@
-<div class="tts-error-block" data-error-type="{{ error_type|default('general') }}">
+{# role=alert：这块是 htmx 直接 innerHTML 换进页面的，没有活区声明的话读屏软件不会播报任何失败信息 #}
+<div class="tts-error-block" role="alert" data-error-type="{{ error_type|default('general') }}">
   <div class="error-title">{{ (title_key or 'gen_failed')|t(lang|default('zh-CN')) }}</div>
   <div class="error-message">{{ error_message }}</div>
   <div class="tts-error-actions">
@@ -7,7 +8,7 @@
       {{ "load_now"|t(lang|default('zh-CN')) }}
     </button>
     {% endif %}
-    <button type="button" class="tts-btn tts-btn-retry" onclick="this.closest('.tts-error-block').querySelector('.retry-btn')?.click(); if(window._retryLastGeneration) window._retryLastGeneration();">
+    <button type="button" class="tts-btn tts-btn-retry" onclick="window.ttsRetryGeneration(this)">
       {{ "retry"|t(lang|default('zh-CN')) }}
     </button>
   </div>

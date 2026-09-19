@@ -212,6 +212,37 @@ def warmup_model(
         return False
 
 
+def _find_warmup_reference() -> str | None:
+    """为 IndexTTS2 预热挑一个真实可用的说话人参考音频。
+
+    WHY: IndexTTS2 没有内置默认音色 —— ``synthesize()`` 会用
+    ``os.path.exists(spk_audio_prompt)`` 校验参考音频，空串必然判 False 并抛
+    ``FileNotFoundError``。所以此前硬编码 ``spk_audio_prompt=""`` 的预热从来没有
+    真正跑过一次推理，既没有预热效果，也失去了"提前暴露显存过载"的作用。
+
+    这里从 ``personas/`` 取第一个存在的非空 wav（只读，不写任何用户数据）；
+    一个都没有时返回 ``None``，让调用方明确跳过预热而不是抛一堆异常。
+
+    Returns:
+        str | None: 参考音频绝对路径；无可用音色时返回 ``None``。
+    """
+    try:
+        from .persona_manager import PERSONA_DIR
+
+        if not os.path.isdir(PERSONA_DIR):
+            return None
+        for name in sorted(os.listdir(PERSONA_DIR)):
+            if not name.lower().endswith(".wav"):
+                continue
+            candidate: str = os.path.join(PERSONA_DIR, name)
+            # 44 字节 = 裸 WAV 头，小于等于它说明文件是空的
+            if os.path.isfile(candidate) and os.path.getsize(candidate) > 44:
+                return candidate
+    except Exception as e:  # noqa: BLE001 - 预热选材失败只应跳过预热
+        logger.debug(f"[ModelOpt] 查找预热参考音频失败（将跳过预热）: {e}")
+    return None
+
+
 def warmup_indextts2(
     engine: Any,
     progress_callback: Callable[[str], None] | None = None,
@@ -236,13 +267,21 @@ def warmup_indextts2(
             with contextlib.suppress(Exception):
                 progress_callback(msg)
 
-    _report("正在预热 IndexTTS2 模型...")
+    ref_audio: str | None = _find_warmup_reference()
+    if not ref_audio:
+        _report("personas/ 下没有可用的参考音频，跳过预热（不影响后续使用）")
+        return False
+
+    _report(f"正在预热 IndexTTS2 模型（参考音频: {os.path.basename(ref_audio)}）...")
     start_time = time.time()
+    warmup_output_path: str | None = None
 
     try:
-        wav, sr = engine.synthesize(
-            text="你好",
-            spk_audio_prompt="",
+        # IndexTTS2Engine.synthesize() 的对外契约是三元组
+        # ``(sample_rate, wav, output_path)``；这里只取前两值做有效性判断。
+        sr, wav, warmup_output_path = engine.synthesize(
+            text=_WARMUP_TEXT_ZH,
+            spk_audio_prompt=ref_audio,
             lang="ZH",
             seed=42,
         )
@@ -254,6 +293,12 @@ def warmup_indextts2(
         elapsed = time.time() - start_time
         logger.warning(f"[IndexTTS2-Warmup] 预热异常: {type(e).__name__}: {e}（{elapsed:.1f}秒）")
         return False
+    finally:
+        # synthesize() 只在失败路径自删临时文件；预热产物不对外使用，成功路径
+        # 留下的这个 wav 必须由这里回收，否则每次切换引擎都会攒一个孤儿文件。
+        if warmup_output_path:
+            with contextlib.suppress(OSError):
+                os.unlink(warmup_output_path)
 
     return False
 

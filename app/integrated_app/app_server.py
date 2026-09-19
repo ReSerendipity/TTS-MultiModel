@@ -32,6 +32,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, Response
 from fastapi.concurrency import run_in_threadpool
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -751,6 +752,13 @@ def create_app() -> FastAPI:
     # --- 异常处理器：注册顺序不敏感，按 Exception 子类匹配 ---
     app.add_exception_handler(TTSError, tts_error_handler)
     app.add_exception_handler(ValidationError, validation_error_handler)
+    # 表单/查询参数类型错（如 cfg="abc"）抛的是 RequestValidationError，它是
+    # pydantic ValidationError 的**兄弟类**而非子类，上面那行不会命中 —— 缺这条
+    # 注册时会退回 FastAPI 默认处理器，把 {"detail":[{"type":"float_parsing"…
+    # 原样吐给 htmx 表单，被 innerHTML 直接换进结果区给用户看。
+    # 注册时会报 arg-type（Starlette stub 对 exc 形参不变，上面两行同样如此）；
+    # 这里显式 ignore 以免 mypy 棘轮基线被这条新增注册顶高。
+    app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, generic_error_handler)
 
     # --- 中间件注册顺序（重要！先注册的先处理请求）---

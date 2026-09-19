@@ -61,7 +61,7 @@
                 </div>
                 <div id="history-empty-title" style="font-size:15px;font-weight:600;color:var(--t1);margin-bottom:6px">{{ "no_records"|t(lang) }}</div>
                 <div id="history-empty-desc" style="font-size:12px;color:var(--t2);margin-bottom:16px">{{ "records_auto_show"|t(lang) }}</div>
-                <button id="history-empty-action" class="btn btn-p btn-sm" onclick="TTSApp.sidebar.activateTab('voice_design')">{{ "start_first"|t(lang) }}</button>
+                <button id="history-empty-action" class="btn btn-p btn-sm" onclick="TTSApp.sidebar.gotoTab('voice_design')">{{ "start_first"|t(lang) }}</button>
             </div>
         </div>
 
@@ -335,7 +335,7 @@
             if (descEl) descEl.textContent = '{{ "records_auto_show"|t(lang) }}';
             if (actionEl) {
                 actionEl.textContent = '{{ "start_first"|t(lang) }}';
-                actionEl.setAttribute('onclick', "TTSApp.sidebar.activateTab('voice_design')");
+                actionEl.setAttribute('onclick', "TTSApp.sidebar.gotoTab('voice_design')");
             }
         }
     }
@@ -803,9 +803,12 @@
         var ids = [];
         selected.forEach(function(cb) { ids.push(parseInt(cb.getAttribute('data-history-id'), 10)); });
 
+        var showHeaders = { 'Content-Type': 'application/json' };
+        var showCsrf = window.getCsrfToken ? window.getCsrfToken() : '';
+        if (showCsrf) showHeaders['X-CSRF-Token'] = showCsrf;
         fetch('/api/history/show', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: showHeaders,
             body: JSON.stringify({ ids: ids })
         })
         .then(function(r){ return r.json(); })
@@ -828,9 +831,12 @@
 
     window.showAllHistory = function() {
         if (!confirm('{{ "confirm_show_all"|t(lang, default="确定要恢复显示所有被隐藏的记录吗？") }}')) return;
+        var showAllHeaders = { 'Content-Type': 'application/json' };
+        var showAllCsrf = window.getCsrfToken ? window.getCsrfToken() : '';
+        if (showAllCsrf) showAllHeaders['X-CSRF-Token'] = showAllCsrf;
         fetch('/api/history/show_all', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: showAllHeaders
         })
         .then(function(r){ return r.json(); })
         .then(function(data){

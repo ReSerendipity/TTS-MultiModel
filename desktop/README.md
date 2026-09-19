@@ -1,4 +1,4 @@
-﻿# TTSMultiModel Desktop（Tauri v2 桌面壳）
+# TTSMultiModel Desktop（Tauri v2 桌面壳）
 
 TTS MultiModel 语音合成工具的桌面壳：Tauri v2 外壳 + 侧载 Python 运行时 + WebView2，
 将原有的「浏览器 + 本地 FastAPI」形态封装为原生桌面应用（托盘、通知、拖拽、

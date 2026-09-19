@@ -1,6 +1,6 @@
 """前后端一致性守卫（对应 docs/reports/前后端功能一致性检查报告_20260904.md §7）。
 
-六个守卫分别拦截报告中不同层面的静默失效：
+十条守卫分别拦截报告中不同层面的静默失效：
 
 1. ``test_all_hx_attributes_point_at_registered_routes`` —— URL 层（htmx）：
    模板中所有 hx-get/hx-post/hx-put/hx-delete 目标必须已注册（现有
@@ -23,6 +23,24 @@
    WHY 单列：生成结果有 htmx 与 SSE 两条渲染路径，后者手动 innerHTML 注入、
    **不派发任何 htmx 事件**，挂在 htmx 监听上的接线逻辑它必然拿不到——流式
    分支因此漏掉「显示后处理区 / 回填保存表单文件名」，静默失效（GOTCHAS #91）。
+7. ``test_unsafe_manual_fetches_carry_csrf_token`` —— CSRF 头层：
+   模板与 static/js 里所有以 POST/PUT/PATCH/DELETE 发的**手写 fetch** 必须能拿到
+   ``X-CSRF-Token``。WHY 单列：htmx 请求由 base.html 的 ``htmx:configRequest`` 统一
+   注入，手写 fetch 没有这层便利；漏掉就是「按钮点了没反应」+ 403，且中间件回的是
+   给开发者看的英文码。本次一次查出 4 处活路径（音色删除、历史恢复显示×2、命令面板
+   卸载模型）与 3 处未接线的设置保存函数（GOTCHAS #130）。
+8. ``test_sidebar_tabs_post_to_their_own_engine`` + ``test_programmatic_tab_jumps_use_goto_tab``
+   —— 引擎归属层：每个侧栏功能页的表单必须打到**自己那个引擎**的生成端点，且
+   程序化跳转必须用会真正拉内容的 ``gotoTab``。WHY 单列：真机上出现过「切到
+   IndexTTS 2.5 后屏幕上还是 VoxCPM2 的表单」，点生成 → 400，而模板与后端各自都
+   是对的 —— 错在"高亮与内容分家"这一层，静态扫描 + 调用点约束一起才封死（#131）。
+9. ``test_inline_scripts_parse_as_javascript`` —— 语法层：模板里的每个内联
+   ``<script>`` 必须能被 ``node --check`` 解析（Jinja 先占位化）。一处语法错会让
+   整页 JS 静默全废 —— 没有错误块、没有进度条，用户只会看到"点了没反应"。
+10. ``test_inline_event_handlers_are_defined`` —— 死按钮层：``onclick="foo()"`` 里的
+    ``foo`` 必须真的在前端某处定义过。属性里调不存在的函数**不报错**，只在按下那一刻
+    静默无反应，日志与常规测试都看不见（本次抓出「重试」按钮，#133）。已知欠债走
+    ``_KNOWN_DEAD_HANDLERS`` 显式记账，并有 ``test_known_dead_handlers_list_only_shrinks`` 防膨胀。
 
 维护约定（参 KNOWN_GOTCHAS #36）：这些守卫都做过变异测试——
 把任一模板的端点/字段/URL 故意改错，对应测试必须变红；否则说明断言写成了
@@ -32,6 +50,9 @@
 """
 
 import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -50,6 +71,21 @@ def _registered(client) -> set[str]:
     return set(client.get("/openapi.json").json()["paths"])
 
 
+def _path_is_served(client, url: str) -> bool:
+    """openapi 之外的第二仲裁：这条路后端到底接不接得住。
+
+    WHY 需要：``include_in_schema=False`` 的路由（``/api/system/logs-compat``、
+    ``routes/pages.py`` 的 4 条）**注册且可访问，却不在 schema 里**；而 ``app.routes``
+    也拿不全（路由是 lifespan 里按 ``hasattr(mod,'router')`` 挂进来的 ``_IncludedRouter``，
+    顶层只有 26 条、下钻不到子路由）。用 ``OPTIONS`` 探：命中路由但方法不允许 → 405，
+    路径不存在 → 404，且不会触发任何 handler 副作用。
+    """
+    try:
+        return client.options(url).status_code != 404
+    except Exception:  # noqa: BLE001 — 探测失败就当"未能证实存在"，交回原判定
+        return False
+
+
 # ---------------------------------------------------------------------------
 # 守卫 1：URL 层
 # ---------------------------------------------------------------------------
@@ -64,8 +100,9 @@ def test_all_hx_attributes_point_at_registered_routes(client):
     for tpl in sorted(_TPL_DIR.rglob("*.html")):
         for method, target in pattern.findall(tpl.read_text(encoding="utf-8")):
             checked += 1
-            if target not in registered and target not in _KNOWN_UNIMPLEMENTED_ENDPOINTS:
-                offenders.append(f"{tpl.name} hx-{method} -> {target}")
+            if target in registered or target in _KNOWN_UNIMPLEMENTED_ENDPOINTS or _path_is_served(client, target):
+                continue
+            offenders.append(f"{tpl.name} hx-{method} -> {target}")
     assert checked > 0, "未找到任何 hx-* 引用，断言可能已失效"
     assert offenders == [], f"模板引用了未注册的端点：{offenders}"
 
@@ -258,11 +295,19 @@ def test_frontend_url_literals_point_at_registered_routes(client):
                 if _FE_ASSET_SUFFIX_RE.search(url):
                     continue
                 checked += 1
-                if not _frontend_url_is_registered(url, registered, matchers):
-                    offenders.append(f"{rel}:{lineno} -> {url}")
+                if _frontend_url_is_registered(url, registered, matchers) or _path_is_served(client, url):
+                    continue
+                offenders.append(f"{rel}:{lineno} -> {url}")
 
     assert checked >= 50, f"仅扫描到 {checked} 个前端 URL 字面量，断言可能已失效"
     assert offenders == [], f"前端引用了后端未注册的路径：{offenders}"
+
+
+def test_off_schema_route_oracle_is_not_vacuous(client):
+    """OPTIONS 兜底必须"只放行真存在的路由"，否则它会变成新的永真豁免。"""
+    assert _path_is_served(client, "/api/system/logs-compat") is True  # 注册但不在 schema
+    assert _path_is_served(client, "/api/no-such-route-anywhere") is False
+    assert "/api/system/logs-compat" not in _registered(client), "它确实不在 openapi 里，所以才需要兜底"
 
 
 def test_url_literal_guard_is_not_vacuous():
@@ -325,6 +370,358 @@ def test_streaming_templates_use_shared_result_wiring():
 
 
 # ---------------------------------------------------------------------------
+# 守卫 7：手写 fetch 的非安全方法必须带 X-CSRF-Token
+# ---------------------------------------------------------------------------
+
+#: 匹配 ``fetch( ... )``，允许一层嵌套括号（URL 里常有 encodeURIComponent(...)）
+_FETCH_CALL_RE = re.compile(r"fetch\(\s*(?:[^()]|\([^()]*\))*\)", re.S)
+_UNSAFE_METHOD_RE = re.compile(r"method\s*:\s*['\"](POST|PUT|PATCH|DELETE)['\"]", re.I)
+_HEADERS_IDENT_RE = re.compile(r"headers\s*:\s*([A-Za-z_$][\w$]*)\s*[,}]")
+_HEADERS_CALL_RE = re.compile(r"headers\s*:\s*([A-Za-z_$][\w$]*)\s*\(")
+_CSRF_TOKEN_RE = re.compile(r"""['"]X-CSRF-Token['"]""")
+#: 判定"这个 headers 变量有没有塞 token"时向前看的行数（同一函数体内的赋值）
+_CSRF_LOOKBACK_LINES = 60
+
+
+def _csrf_findings_in(text: str) -> list[tuple[int, str]]:
+    """找出「非安全方法的 fetch 拿不到 X-CSRF-Token」的位置。
+
+    CSRF 中间件（``middleware/csrf.py``）对 GET/HEAD/OPTIONS 之外的方法一律要求
+    cookie + header 双提交，缺 header 直接 403。htmx 请求由 ``base.html`` 的
+    ``htmx:configRequest`` 统一注入，所以只有**手写 fetch** 会漏 —— 漏了就是
+    「按钮点了没反应」，且失败信息是给开发者看的英文码。
+    """
+    lines = text.splitlines()
+    findings: list[tuple[int, str]] = []
+    for match in _FETCH_CALL_RE.finditer(text):
+        call = match.group(0)
+        if not _UNSAFE_METHOD_RE.search(call):
+            continue
+        if _CSRF_TOKEN_RE.search(call):
+            continue
+        lineno = text[: match.start()].count("\n") + 1
+        helper = _HEADERS_CALL_RE.search(call)
+        if helper:
+            # headers 由本文件的某个函数造出来：顺着函数定义查它有没有注入 token
+            fn_name = helper.group(1)
+            body = re.search(rf"function\s+{re.escape(fn_name)}\s*\((?:[^()]|\([^()]*\))*\)\s*\{{", text)
+            if body and _CSRF_TOKEN_RE.search(text[body.start() : body.start() + 600]):
+                continue
+            findings.append((lineno, f"headers 由 {fn_name}() 构造，但该函数没有注入 X-CSRF-Token"))
+            continue
+        ident = _HEADERS_IDENT_RE.search(call)
+        if ident:
+            start = max(0, lineno - 1 - _CSRF_LOOKBACK_LINES)
+            context = "\n".join(lines[start:lineno])
+            name = ident.group(1)
+            if _CSRF_TOKEN_RE.search(context) and re.search(rf"\b{re.escape(name)}\b\s*=", context):
+                continue
+            findings.append((lineno, f"headers 变量 {name} 在上方 {_CSRF_LOOKBACK_LINES} 行内没有注入 X-CSRF-Token"))
+        else:
+            findings.append((lineno, "fetch 调用完全没有 headers"))
+    return findings
+
+
+def test_unsafe_manual_fetches_carry_csrf_token():
+    """模板与 static/js 里每个非安全方法的手写 fetch 都必须带 CSRF 头。"""
+    targets = sorted(_TPL_DIR.rglob("*.html")) + sorted((_APP / "static" / "js").rglob("*.js"))
+    offenders: list[str] = []
+    checked = 0
+    for path in targets:
+        rel = path.relative_to(_APP).as_posix()
+        if "vendor" in rel:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for match in _FETCH_CALL_RE.finditer(text):
+            if not _UNSAFE_METHOD_RE.search(match.group(0)):
+                continue
+            checked += 1
+        for lineno, reason in _csrf_findings_in(text):
+            offenders.append(f"{rel}:{lineno} {reason}")
+
+    assert checked >= 20, f"仅扫到 {checked} 处非安全 fetch，扫描规则可能已失配"
+    assert offenders == [], (
+        f"以下手写 fetch 用 POST/PUT/PATCH/DELETE 但拿不到 X-CSRF-Token，点击会被 CSRF 中间件 403 拦掉：{offenders}"
+    )
+
+
+def test_csrf_fetch_guard_is_not_vacuous():
+    """变异自证：三种真实形态必须分别判负/判正。"""
+    assert _csrf_findings_in("fetch('/api/x', { method: 'DELETE' })"), "完全没 headers 必须判负"
+    assert _csrf_findings_in("fetch('/api/x', { method: 'POST', headers: { 'Content-Type': 'application/json' } })")
+    assert _csrf_findings_in(
+        "var h = { 'Content-Type': 'application/json' };\nfetch('/api/x', { method: 'POST', headers: h })"
+    )
+    # 合规：调用里直接写、或在上文给变量注入过
+    assert not _csrf_findings_in("fetch('/api/x', { method: 'POST', headers: { 'X-CSRF-Token': t } })")
+    assert not _csrf_findings_in(
+        "var h = { 'Content-Type': 'application/json' };\n"
+        "if (t) h['X-CSRF-Token'] = t;\n"
+        "fetch('/api/x', { method: 'POST', headers: h })"
+    )
+    # GET 不受 CSRF 约束，不得报
+    assert not _csrf_findings_in("fetch('/api/x', { method: 'GET' })")
+    # headers 由 helper 构造：helper 里没注入就判负，注入了才判正
+    assert _csrf_findings_in(
+        "function h() { return { 'Content-Type': 'application/json' }; }\n"
+        "fetch('/api/x', { method: 'POST', headers: h() })"
+    )
+    assert not _csrf_findings_in(
+        "function h() { var o = {}; o['X-CSRF-Token'] = t; return o; }\n"
+        "fetch('/api/x', { method: 'POST', headers: h() })"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 守卫 8：每个侧栏功能页的表单，必须打到自己那个引擎的生成端点
+# ---------------------------------------------------------------------------
+
+#: 侧栏项 → 该引擎专属的生成端点前缀。工具页（data-model="all"）不在此列，
+#: 它们没有引擎绑定的生成表单。indextts2 与 indextts20 共用同一个生成端点，
+#: 靠请求里的版本参数区分，所以两个 model 允许同一前缀。
+_TAB_ENGINE_PREFIXES: dict[str, tuple[str, ...]] = {
+    "voxcpm2": ("/api/generate/voxcpm",),
+    "indextts2": ("/api/generate/indextts2",),
+    "indextts20": ("/api/generate/indextts2",),
+}
+_SIDEBAR_ITEM_RE = re.compile(r"<button\b[^>]*class=\"[^\"]*sidebar-item[^\"]*\"[^>]*>", re.S)
+_HX_POST_RE = re.compile(r'hx-post="(/api/generate/[^"{]+)"')
+
+
+def _attr(tag: str, name: str) -> str | None:
+    m = re.search(rf'{name}="([^"]+)"', tag)
+    return m.group(1) if m else None
+
+
+def _tab_engine_offenders(tab: str, model: str, tpl_html: str) -> tuple[int, list[str]]:
+    """返回 (该页里的生成表单数, 打错引擎的违例)。"""
+    endpoints = _HX_POST_RE.findall(tpl_html)
+    bad = [
+        f"{tab}: 表单打到 {e}，但该页属于 {model}" for e in endpoints if not e.startswith(_TAB_ENGINE_PREFIXES[model])
+    ]
+    return len(endpoints), bad
+
+
+#: 唯一合法的 activateTab 形态：作为 onclick 处理器、参数是按钮自身（此时 htmx 的
+#: click 触发器会真的拉内容）。传 tab 名或从 JS 里调 = 只挪高亮，必须改用 gotoTab。
+_LEGAL_ACTIVATE_RE = re.compile(r"\.activateTab\(\s*this\s*\)")
+_ANY_ACTIVATE_RE = re.compile(r"\.activateTab\(")
+
+
+def _illegal_activate_tab_calls(text: str) -> list[int]:
+    """列出「只改高亮不改内容」的 activateTab 调用行号。"""
+    bad: list[int] = []
+    for m in _ANY_ACTIVATE_RE.finditer(text):
+        if _LEGAL_ACTIVATE_RE.match(text, m.start()):
+            continue
+        bad.append(text[: m.start()].count("\n") + 1)
+    return bad
+
+
+def test_sidebar_tabs_post_to_their_own_engine():
+    """「3 引擎 × 各功能页」矩阵的静态面：模板本身必须接线正确。
+
+    WHY 单列：真机上出现过「侧栏说在 IndexTTS 2.5、屏幕上还是 VoxCPM2 的表单」，
+    根因在 JS（#131）；但另一半风险是**模板本身**把 A 引擎的页面接到了 B 引擎的
+    端点 —— 那种错在哪个引擎下点都是错的，且不会有任何报错。本守卫把整张矩阵
+    一次钉死。
+    """
+    base = (_TPL_DIR / "base.html").read_text(encoding="utf-8")
+    # 模板文件名与 tab 名并不一一对应（lora → tabs/lora_manager.html），
+    # 用后端那份权威映射解析，别在这里猜文件名。
+    from integrated_app.routes.tabs import _TAB_TEMPLATES
+
+    offenders: list[str] = []
+    checked = 0
+    for tag in _SIDEBAR_ITEM_RE.findall(base):
+        tab = _attr(tag, "data-tab")
+        model = _attr(tag, "data-model")
+        if not tab or model not in _TAB_ENGINE_PREFIXES:
+            continue
+        rel = _TAB_TEMPLATES.get(tab)
+        if not rel:
+            offenders.append(f"{tab}: 侧栏有这一项，但后端 _TAB_TEMPLATES 里没有登记")
+            continue
+        tpl = _TPL_DIR / rel
+        if not tpl.is_file():
+            offenders.append(f"{tab}: 登记的模板 {rel} 不存在")
+            continue
+        n, bad = _tab_engine_offenders(tab, model, tpl.read_text(encoding="utf-8"))
+        checked += n
+        offenders += bad
+
+    assert checked >= 6, f"只核对到 {checked} 个生成表单，扫描规则可能已失配"
+    assert offenders == [], f"功能页与引擎端点不匹配：{offenders}"
+
+
+def test_programmatic_tab_jumps_use_goto_tab():
+    """非点击的跳转必须走 ``gotoTab``（内部补 click），不能用只改高亮的 ``activateTab``。
+
+    WHY：``activateTab`` 只改样式，内容靠按钮的 ``hx-get`` 在被点击时拉；引擎切换、
+    命令面板、以及空状态里的「去克隆/去设计」按钮都曾用它做过程序化跳转，结果是高亮
+    与内容分家（GOTCHAS #131）。唯一合法形态是 ``onclick="...activateTab(this)"``。
+    """
+    offenders: list[str] = []
+    scanned = 0
+    targets = sorted((_APP / "static" / "js").rglob("*.js")) + sorted(_TPL_DIR.rglob("*.html"))
+    for path in targets:
+        rel = path.relative_to(_APP).as_posix()
+        if "vendor" in rel or rel.endswith(".min.js") or rel.endswith("js/sidebar.js"):
+            continue  # sidebar.js 是定义与导出处
+        text = path.read_text(encoding="utf-8", errors="replace")
+        scanned += 1
+        offenders += [f"{rel}:{line}" for line in _illegal_activate_tab_calls(text)]
+
+    assert scanned >= 30, f"只扫了 {scanned} 个前端文件，扫描范围可能已失效"
+    assert offenders == [], f"以下调用只改侧栏高亮、不会拉页面内容，应改用 TTSApp.sidebar.gotoTab()：{offenders}"
+
+
+def test_sidebar_engine_matrix_guard_is_not_vacuous():
+    """变异自证：同一张模板换到别的引擎名下必须判负。"""
+    voxcpm_tpl = (_TPL_DIR / "tabs" / "voice_clone.html").read_text(encoding="utf-8")
+    # 正确接线：VoxCPM2 的页面打 voxcpm 端点
+    assert _tab_engine_offenders("voice_clone", "voxcpm2", voxcpm_tpl)[0] >= 1
+    # 同一个模板挂到 indextts2 名下 = 接线错，必须判负
+    n, bad = _tab_engine_offenders("voice_clone", "indextts2", voxcpm_tpl)
+    assert n >= 1 and bad, "把 voxcpm 页面算到 indextts2 名下必须被抓出"
+    # 端点被改成别的引擎的页面，即使在正确名下也要判负
+    mutated = voxcpm_tpl.replace('hx-post="/api/generate/voxcpm_clone"', 'hx-post="/api/generate/indextts2"', 1)
+    assert mutated != voxcpm_tpl, "变异样本没生效"
+    assert _tab_engine_offenders("voice_clone", "voxcpm2", mutated)[1]
+    # activateTab 检测的自证：只有 activateTab(this) 合法
+    assert _illegal_activate_tab_calls("x.TTSApp.sidebar.activateTab(btn);") == [1]
+    assert _illegal_activate_tab_calls("x.TTSApp.sidebar.activateTab('voice_design');") == [1]
+    assert _illegal_activate_tab_calls('onclick="TTSApp.sidebar.activateTab(this)"') == []
+    assert _illegal_activate_tab_calls("x.TTSApp.sidebar.gotoTab('voice_design');") == []
+
+
+# ---------------------------------------------------------------------------
+# 守卫 9：模板内联 <script> 必须能被 JS 解析器接受
+# ---------------------------------------------------------------------------
+
+_INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", re.S | re.I)
+
+
+def _js_probe(block: str) -> str:
+    """把 Jinja 占位化后再交给解析器：``{{ … }}`` → 字符串字面量，``{% … %}`` → 删除。"""
+    return re.sub(r"\{%.*?%\}", "", re.sub(r"\{\{.*?\}\}", '"X"', block, flags=re.S), flags=re.S)
+
+
+def test_inline_scripts_parse_as_javascript():
+    """内联脚本一处语法错，整页 JS 静默全废（没有报错块、没有进度条，只有"点了没反应"）。
+
+    用 ``node --check`` 做纯语法校验，不执行任何脚本、不联网、不起服务。
+    """
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("本机没有 node，无法做 JS 语法校验")
+
+    checked = 0
+    failures: list[str] = []
+    for path in sorted(_TPL_DIR.rglob("*.html")):
+        for idx, block in enumerate(_INLINE_SCRIPT_RE.findall(path.read_text(encoding="utf-8", errors="replace"))):
+            checked += 1
+            with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as tmp:
+                tmp.write(_js_probe(block))
+                tmp_path = Path(tmp.name)
+            try:
+                proc = subprocess.run([node, "--check", str(tmp_path)], capture_output=True, text=True)
+                if proc.returncode != 0:
+                    first = next((ln for ln in proc.stderr.splitlines() if ln.strip()), "")
+                    failures.append(f"{path.name} 内联块#{idx}: {first[:160]}")
+            finally:
+                tmp_path.unlink(missing_ok=True)
+
+    assert checked >= 25, f"只扫到 {checked} 个内联脚本块，正则可能已失配"
+    assert failures == [], f"模板内联 JS 语法不通过：{failures}"
+
+
+def test_js_probe_placeholder_transform_is_safe():
+    """变异自证：真语法错必须被这个探针抓到，Jinja 本身不得造成误报。"""
+    assert _js_probe('var a = {{ "label"|t(lang) }};').strip() == 'var a = "X";'
+    assert _js_probe("{% if x %}var a = 1;{% endif %}").strip() == "var a = 1;"
+    broken = _js_probe("function f( { return 1; }")
+    assert broken == "function f( { return 1; }", "探针不该'修好'真正的语法错"
+
+
+# ---------------------------------------------------------------------------
+# 守卫 10：内联事件属性里调用的顶层函数必须有定义（防"按钮点了是死的"）
+# ---------------------------------------------------------------------------
+
+_ON_ATTR_RE = re.compile(r"""\bon(?:click|change|submit|input|keyup|keydown|blur|focus)\s*=\s*"([^"]*)""", re.S)
+_TOP_CALL_RE = re.compile(r"(?<![.\w])(?:window\.)?([A-Za-z_$][\w$]*)\s*\(")
+#: 内联事件里合法的浏览器全局，不算"未定义的页面函数"
+_JS_GLOBAL_IN_ATTR: frozenset[str] = frozenset(
+    {"confirm", "alert", "parseFloat", "parseInt", "isNaN", "if", "return", "void", "typeof", "new", "event"}
+)
+#: 已知「按钮存在但功能没实现」的欠债（同 _KNOWN_UNIMPLEMENTED_ENDPOINTS 的约定：
+#: 显式记账而不是让整条断言失效）。登记前提：在 GOTCHAS 里留痕；实现了就必须从这里删掉
+#: （test_known_dead_handlers_list_only_shrinks 会盯着）。
+#: 2026-09-19：refreshHealthLogs / filterHealthLogs 已接上 /api/system/logs-compat（#133）。
+_KNOWN_DEAD_HANDLERS: frozenset[str] = frozenset()
+
+
+def _frontend_defined_names() -> set[str]:
+    """收集前端里"定义过"的顶层函数名（window.X=、function X(、const X = function/()）。"""
+    files = sorted(_TPL_DIR.rglob("*.html")) + sorted((_APP / "static" / "js").rglob("*.js"))
+    blob = "\n".join(f.read_text(encoding="utf-8", errors="replace") for f in files)
+    names: set[str] = set(re.findall(r"window\.([A-Za-z_$][\w$]*)\s*=", blob))
+    names |= set(re.findall(r"\bfunction\s+([A-Za-z_$][\w$]*)\s*\(", blob))
+    names |= set(re.findall(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:function|\(|async)", blob))
+    return names
+
+
+def _dead_inline_handlers(html: str, defined: set[str]) -> set[str]:
+    """返回这段模板里「onclick 等属性调了、但全前端没定义」的顶层函数名。"""
+    dead: set[str] = set()
+    for attr in _ON_ATTR_RE.findall(html):
+        for call in _TOP_CALL_RE.finditer(attr):
+            name = call.group(1)
+            if name not in defined and name not in _JS_GLOBAL_IN_ATTR:
+                dead.add(name)
+    return dead
+
+
+def test_inline_event_handlers_are_defined():
+    """``onclick="foo()"`` 里的 foo 必须在某处真的定义了。
+
+    WHY：属性里调一个不存在的函数**不会报错**（只在触发那一刻静默无反应），所以
+    "按钮画出来了、点了什么都没发生"这种缺陷既不进日志也不进测试。本次就是靠这条
+    抓出重试按钮调的 ``_retryLastGeneration`` 从未存在（GOTCHAS #133）。
+    """
+    defined = _frontend_defined_names()
+    offenders: dict[str, list[str]] = {}
+    attrs_scanned = 0
+    for path in sorted(_TPL_DIR.rglob("*.html")):
+        html = path.read_text(encoding="utf-8", errors="replace")
+        attrs_scanned += len(_ON_ATTR_RE.findall(html))
+        for name in sorted(_dead_inline_handlers(html, defined) - _KNOWN_DEAD_HANDLERS):
+            offenders.setdefault(name, []).append(path.name)
+
+    assert defined, "一个顶层函数都没解析出来，说明扫描规则失效"
+    assert attrs_scanned >= 100, f"只扫到 {attrs_scanned} 个内联事件属性，正则可能已失配"
+    assert offenders == {}, f"内联事件属性调用了不存在的函数（按钮是死的）：{offenders}"
+
+
+def test_known_dead_handlers_list_only_shrinks():
+    """欠债清单里每个名字必须仍然"确实没定义"，且不得新增。"""
+    defined = _frontend_defined_names()
+    implemented = sorted(n for n in _KNOWN_DEAD_HANDLERS if n in defined)
+    assert implemented == [], f"这些处理器已经实现了，应从 _KNOWN_DEAD_HANDLERS 移除：{implemented}"
+
+
+def test_dead_handler_guard_is_not_vacuous():
+    """变异自证：调一个不存在的函数必须判负，调存在的必须判正。"""
+    defined = _frontend_defined_names() | {"realHandler"}
+    assert _dead_inline_handlers('<button onclick="realHandler()">', defined) == set()
+    assert _dead_inline_handlers('<button onclick="window.realHandler()">', defined) == set()
+    assert _dead_inline_handlers('<button onclick="nopeHandler(1)">', defined) == {"nopeHandler"}
+    # 方法调用与浏览器全局不得误报
+    assert _dead_inline_handlers('<button onclick="document.getElementById(1).focus()">', defined) == set()
+    assert _dead_inline_handlers('<button onclick="return confirm(1)">', defined) == set()
+
+
+# ---------------------------------------------------------------------------
 # 欠债清单防膨胀
 # ---------------------------------------------------------------------------
 
@@ -343,6 +740,11 @@ def test_known_debt_list_only_shrinks(client):
         "test_form_fields_accepted_by_target_endpoints",
         "test_range_and_file_controls_have_name",
         "test_streaming_templates_use_shared_result_wiring",
+        "test_unsafe_manual_fetches_carry_csrf_token",
+        "test_sidebar_tabs_post_to_their_own_engine",
+        "test_programmatic_tab_jumps_use_goto_tab",
+        "test_inline_scripts_parse_as_javascript",
+        "test_inline_event_handlers_are_defined",
     ],
 )
 def test_guards_are_registered_and_not_todo(guard):

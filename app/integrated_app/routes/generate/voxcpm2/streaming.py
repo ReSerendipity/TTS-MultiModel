@@ -359,8 +359,8 @@ async def streaming_sse_generation(
     instruction: str = Form(""),
     persona_name: str = Form(""),
     lang: str = Form("Auto"),
-    cfg_value: float = Form(2.0),
-    inference_timesteps: int = Form(10),
+    cfg_value: float = Form(2.0, ge=0.1, le=10),
+    inference_timesteps: int = Form(10, ge=1, le=200),
     denoise: str = Form("true"),
 ) -> StreamingResponse:
     """VoxCPM2 SSE 流式生成路由（逐段推送音频 + 进度）。
@@ -548,8 +548,8 @@ async def streaming_generation(
     text: str = Form(""),
     ref_audio_path: str = Form(""),
     persona_name: str = Form(""),
-    cfg_value: float = Form(2.0),
-    inference_timesteps: int = Form(10),
+    cfg_value: float = Form(2.0, ge=0.1, le=10),
+    inference_timesteps: int = Form(10, ge=1, le=200),
     denoise: str = Form("true"),
     seed: int = Form(-1),
 ) -> HTMLResponse:
@@ -699,8 +699,8 @@ async def streaming_audio_generation(
     request: Request,
     text: str = Form(""),
     persona_name: str = Form(""),
-    cfg_value: float = Form(2.0),
-    inference_timesteps: int = Form(10),
+    cfg_value: float = Form(2.0, ge=0.1, le=10),
+    inference_timesteps: int = Form(10, ge=1, le=200),
     denoise: str = Form("true"),
 ) -> HTMLResponse:
     """VoxCPM2 流式音频路由（分段生成 + 自动播放 HTML）。

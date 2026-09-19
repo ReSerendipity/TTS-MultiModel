@@ -62,6 +62,7 @@ window.openHealthPanel = function() {
     healthTriggerElement = document.activeElement;
     overlay.classList.add('visible');
     fetchHealthData();
+    window.refreshHealthLogs();
     if (window._healthPollTimer) clearInterval(window._healthPollTimer);
     window._healthPollTimer = setInterval(fetchHealthData, 30000);
     var firstFocusable = overlay.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
@@ -82,6 +83,67 @@ window.closeHealthPanel = function(e) {
         healthTriggerElement.focus();
         healthTriggerElement = null;
     }
+};
+
+/* ===== 操作日志区 =====
+ * 这块 UI（列表容器 + 刷新按钮 + 4 个筛选按钮）早就画好了，但从来没有接上数据源，
+ * 于是刷新与筛选全是死按钮（GOTCHAS #133）。数据源是 GET /api/system/logs-compat。
+ * 注意 filter_type 走的是操作日志 type 的**精确匹配**，而「配置」按钮对应的 type
+ * 叫 config_update —— 这层映射只能放在前端，传 'config' 永远查不到东西。 */
+var LOG_TYPE_BY_FILTER = { all: 'all', generation: 'generation', model: 'model', config: 'config_update' };
+var BADGE_CLASS_BY_TYPE = { generation: 'generation', model: 'model', config_update: 'config' };
+var _healthLogFilter = 'all';
+
+function _escLogText(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+function _renderHealthLogs(logs) {
+    var list = document.getElementById('health-log-list');
+    if (!list) return;
+    if (!logs.length) {
+        list.innerHTML = '<div class="health-empty-logs">'
+            + _escLogText((window.I18N && window.I18N['no_logs']) || '暂无日志') + '</div>';
+        return;
+    }
+    list.innerHTML = logs.map(function (e) {
+        var d = new Date(e.timestamp || 0);
+        var stamp = _pad2(d.getHours()) + ':' + _pad2(d.getMinutes()) + ':' + _pad2(d.getSeconds());
+        var badge = BADGE_CLASS_BY_TYPE[e.type] || '';
+        var detail = e.details && Object.keys(e.details).length ? ' · ' + _escLogText(JSON.stringify(e.details)) : '';
+        return '<div class="health-log-entry"><span class="health-log-time">' + stamp + '</span>'
+            + '<span class="health-log-type ' + badge + '">' + _escLogText(e.type) + '</span>'
+            + '<span class="health-log-message">' + _escLogText(e.message) + detail + '</span></div>';
+    }).join('');
+}
+
+window.refreshHealthLogs = function () {
+    var list = document.getElementById('health-log-list');
+    if (!list) return;
+    var url = '/api/system/logs-compat?limit=200&filter_type='
+        + encodeURIComponent(LOG_TYPE_BY_FILTER[_healthLogFilter] || 'all');
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+        .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .then(function (d) { _renderHealthLogs(d.logs || []); })
+        .catch(function (err) {
+            list.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-message">日志读取失败：'
+                + _escLogText(err && err.message ? err.message : err) + '</div></div>';
+        });
+};
+
+window.filterHealthLogs = function (type, btn) {
+    _healthLogFilter = type;
+    document.querySelectorAll('#health-log-filter .health-log-filter-btn').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+    });
+    window.refreshHealthLogs();
 };
 
 function fetchHealthData() {

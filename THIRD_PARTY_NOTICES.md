@@ -43,6 +43,25 @@ TTS_MultiModel 项目代码采用 [Apache License 2.0](LICENSE)。
 
 - 常见许可：Apache-2.0 / BSD 类，以包内 LICENSE 与 SOURCE 说明为准
 
+## 字体（`app/integrated_app/static/fonts/`）
+
+随发行包再分发的字体全部为 **SIL Open Font License 1.1**（OFL 允许再分发，条件是不得单独售卖字体本身、
+须保留版权声明与授权全文、改名需另行申请保留字体名）。
+
+| 字体 | 许可 | 上游 | 落地方式 |
+|---|---|---|---|
+| Inter（`InterVariable*.woff2`） | OFL 1.1 | rsms/inter | 直接入库，`static/css/variables.css` 声明 |
+| Noto Sans SC / Noto Serif SC | OFL 1.1 | google/fonts | `scripts/fetch_title_fonts.py --apply` |
+| ZCOOL XiaoWei / QingKe HuangYou / KuaiLe | OFL 1.1 | google/fonts（站酷） | 同上 |
+| Ma Shan Zheng / Long Cang / Zhi Mang Xing / Liu Jian Mao Cao | OFL 1.1 | google/fonts（中文书法类） | 同上 |
+| Playfair Display / Cinzel / Great Vibes / Pacifico / Dancing Script | OFL 1.1 | google/fonts | 同上 |
+
+- 每个家族的完整文件清单（文件名 + 来源 URL + unicode-range）由 `--resolve` 写在
+  `static/fonts/manifest.json`；OFL 授权全文随各上游仓库的 `OFL.txt` 提供，打包发行时应一并放入
+  `static/fonts/licenses/`（缺该目录视为发布阻断项）。
+- 之所以自托管：CSP 的 `style-src`/`font-src` 只允许 `'self'`，外链 Google Fonts 会被浏览器静默拦掉。
+- 注意 `Zhi Mang Xing`（志莽行书）上游只提供 TTF，无 woff2 子集，单文件约 3.9 MB。
+
 ---
 
 *疑问或遗漏请通过 Issues 反馈。*

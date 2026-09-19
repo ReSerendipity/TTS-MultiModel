@@ -1,3 +1,20 @@
+# =============================================================================
+# ⚰️ RETIRED · 内容级墓碑（content-level tombstone）— 2026-09-18 加装
+# 本脚本是旧的钩子启用方式：它会把 core.hooksPath 切向 scripts/git-hooks（该目录
+# 在本仓并不存在），一旦运行会静默禁用现役的整套 .githooks/ 钩子链（commit-msg
+# DCO 校验 / pre-commit / pre-push 预检）。自 2026-09-16 起，本仓统一用 hooksPath：
+#     git config core.hooksPath .githooks      （或运行 ./.githooks/install.sh）
+# 墓碑目的：让“已退役”随文件本身生效——运行会立即打印 RETIRED 并以非零码退出，
+# 不再劫持 hooksPath。下方保留退役前原始逻辑（逐字存档，因 exit 1 永不执行）。
+# 见 AGENTS.md「钩子复现」条 与 docs/agents/REVISION_LOG.md v1.45。
+# =============================================================================
+Write-Host "RETIRED: scripts/install-hooks.ps1 is retired."
+Write-Host "RETIRED: use git config core.hooksPath .githooks  (or run ./.githooks/install.sh)"
+Write-Host "         Running this script would have hijacked core.hooksPath to a non-existent dir."
+exit 1
+
+<# ARCHIVED — 以下为退役前原始逻辑，逐字保留于块注释中（永不执行，且不参与解析）。
+# ---- 上面的 exit 1 已终止脚本；块注释确保旧代码即便被误读也不会劫持 hooksPath ----
 # Install git hooks for this repo (Windows PowerShell)
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/install-hooks.ps1
 # 通过 core.hooksPath 指向 scripts/git-hooks/，避免手工拷贝到 .git/hooks
@@ -48,3 +65,4 @@ git config core.hooksPath "scripts/git-hooks"
 
 Write-Host "✅ git hooks installed: $hooksDir (core.hooksPath = scripts/git-hooks)"
 Write-Host "   下次 git push 前会自动跑本地快检（ruff/format/compileall/UTF-8）"
+#>

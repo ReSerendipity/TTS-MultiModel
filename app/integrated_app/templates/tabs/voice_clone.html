@@ -395,7 +395,7 @@
         if (!text.trim()) {
             var resultEl = document.getElementById('vc-result');
             if (resultEl) {
-                resultEl.innerHTML = '<div class="tts-error-block"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">{{ "text_empty"|t(lang) }}</div></div>';
+                resultEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">{{ "text_empty"|t(lang) }}</div></div>';
             }
             return;
         }
@@ -457,7 +457,7 @@
                 if (response.status === 403) {
                     errMsg = (window.I18N && window.I18N['csrf_error']) || 'CSRF error';
                 }
-                statusEl.innerHTML = '<div class="tts-error-block"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + errMsg + '</div></div>';
+                statusEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + errMsg + '</div></div>';
                 return;
             }
 
@@ -521,7 +521,7 @@
                     case 'error':
                         try {
                             var err = JSON.parse(currentData);
-                            statusEl.innerHTML = '<div class="tts-error-block"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + (err.message || err.error || 'Unknown error') + '</div></div>';
+                            statusEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + (err.message || err.error || 'Unknown error') + '</div></div>';
                         } catch(e) {}
                         break;
                 }
@@ -567,7 +567,7 @@
             }
             processEvent();
         } catch (err) {
-            statusEl.innerHTML = '<div class="tts-error-block"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + err.message + '</div></div>';
+            statusEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + err.message + '</div></div>';
             if (window.Toast) Toast.show(err.message, 'error');
         }
     }
