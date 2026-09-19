@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-## [2.2.2](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.1...v2.2.2) (2026-09-16)
+## [2.2.2] - 2026-09-16（未发布：v2.2.2 tag 已撤销，无 GitHub Release、无便携分卷资产）
 
 ### Features
 

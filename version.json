@@ -2,5 +2,5 @@
   "version": "2.2.2",
   "release_date": "2026-09-16",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.2.2 桌面分发补全：修复 Tauri 壳 updater pubkey 双重 base64 错误、同步桌面壳版本与完整性清单，重新打包桌面 2.2.2 增量更新与完整分卷资产"
+  "changelog": "2.2.2（未发布）桌面分发补全：修复 Tauri 壳 updater pubkey 双重 base64 错误、同步桌面壳版本与完整性清单；尚无便携分卷与增量包资产，安装器/分卷发布需先过 release-gate"
 }
