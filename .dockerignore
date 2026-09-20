@@ -21,6 +21,8 @@ docs
 demo
 *.md
 !README.md
+!NOTICE
+!THIRD_PARTY_NOTICES.md
 
 # ---- 本地运行态（不应烤入镜像）----
 logs

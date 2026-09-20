@@ -1,0 +1,69 @@
+﻿# TTS_MultiModel GPG 签名 Release 工作流（家族简化版）
+#
+# 对 Release 产物做 GPG 分离签名，供进阶用户验证未被篡改。
+#
+# 前提（仓库 Settings > Secrets and variables > Actions）:
+#   - GPG_PRIVATE_KEY: ASCII-armored 私钥
+#   - GPG_PASSPHRASE:  私钥口令
+# 私钥未配置时本工作流以 notice 跳过（不算失败）。
+
+name: GPG-Signed Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要签名的 Release tag（留空取最新 Release）"
+        required: false
+        default: ""
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  sign-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Skip when GPG secrets are not configured
+        if: env.GPG_PRIVATE_KEY == ''
+        run: echo "::notice::GPG_PRIVATE_KEY not configured - nothing to do"
+
+      - name: Download release assets
+        if: env.GPG_PRIVATE_KEY != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          TAG="$RELEASE_TAG"
+          [ -z "$TAG" ] && TAG="$INPUT_TAG"
+          [ -z "$TAG" ] && TAG=$(gh release list --limit 1 --json tagName -q .[0].tagName)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          gh release download "$TAG" --dir assets/
+
+      - name: Generate SHA256SUMS and sign
+        if: env.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          cd assets/
+          sha256sum * > SHA256SUMS.txt
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --output SHA256SUMS.gpg --detach-sign SHA256SUMS.txt <<< "$GPG_PASSPHRASE"
+          gpg --verify SHA256SUMS.gpg SHA256SUMS.txt
+
+      - name: Upload signature
+        if: env.GPG_PRIVATE_KEY != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.download.outputs.tag }}" assets/SHA256SUMS.txt assets/SHA256SUMS.gpg --clobber
+          echo "SHA256SUMS uploaded"
