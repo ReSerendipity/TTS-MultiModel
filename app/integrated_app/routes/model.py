@@ -101,14 +101,21 @@ def _safe_error_message(exc: Exception, max_length: int = _ERROR_MESSAGE_MAX_LEN
     if exc is None:
         return "未知错误"
 
+    def _redact(msg: str) -> str:
+        # 先脱敏再截断：截断可能把路径切成半截，反而留下更难识别的残片。
+        return _SENSITIVE_PATH_PATTERN.sub("[PATH]", msg)
+
+    # 以下四条分支历史上直接返回未脱敏的 str(exc)，而这几个类恰恰是最常把
+    # 文件路径写进消息的（模型加载/切换/显存报错都带 model/ 下的绝对或相对路径）。
+    # S-R6 的脱敏只覆盖了 OSError 与兜底分支，等于漏了最容易泄的一类。
     if isinstance(exc, InsufficientVRAMError):
-        return f"显存不足：{str(exc)[:max_length]}"
+        return f"显存不足：{_redact(str(exc))[:max_length]}"
     if isinstance(exc, EngineSwitchError):
-        return f"引擎切换失败：{str(exc)[:max_length]}"
+        return f"引擎切换失败：{_redact(str(exc))[:max_length]}"
     if isinstance(exc, ModelLoadError):
-        return f"模型加载失败：{str(exc)[:max_length]}"
+        return f"模型加载失败：{_redact(str(exc))[:max_length]}"
     if isinstance(exc, TTSError):
-        return str(exc)[:max_length]
+        return _redact(str(exc))[:max_length]
     if isinstance(exc, FileNotFoundError):
         return "文件不存在或已被删除"
     if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
@@ -116,10 +123,9 @@ def _safe_error_message(exc: Exception, max_length: int = _ERROR_MESSAGE_MAX_LEN
     if isinstance(exc, PermissionError):
         return "权限不足，无法访问所需资源"
     if isinstance(exc, OSError):
-        msg = _SENSITIVE_PATH_PATTERN.sub("[PATH]", str(exc))
-        return f"系统错误：{msg[:max_length]}"
+        return f"系统错误：{_redact(str(exc))[:max_length]}"
 
-    msg = _SENSITIVE_PATH_PATTERN.sub("[PATH]", str(exc))
+    msg = _redact(str(exc))
     if len(msg) > max_length:
         msg = msg[:max_length] + "..."
     return msg
