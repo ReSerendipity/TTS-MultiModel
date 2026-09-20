@@ -164,6 +164,27 @@ _VOICE_PERSONA_MAP: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
+# 音色存在性判定
+# ---------------------------------------------------------------------------
+
+
+def _persona_wav_exists(name: str) -> bool:
+    """`name` 对应的音色 wav 是否真的在 PERSONA_DIR 之内。
+
+    旧写法是 `os.path.exists(os.path.join(PERSONA_DIR, f"{voice}.wav"))`，把请求体里的
+    `voice` 原样拼进路径：`../../..` 形式可以拿这条端点当**文件存在性探针**
+    （存在则继续合成、不存在才 400，响应差异即信息）。
+    这里只做目录归属判定，不做字符白名单——后者会误伤早期登记、名字里带空格或
+    全角字符的音色；遍历由 containment 挡住即可。
+    """
+    from .persona_manager import PERSONA_DIR
+
+    root = os.path.realpath(PERSONA_DIR)
+    candidate = os.path.realpath(os.path.join(root, f"{name}.wav"))
+    return candidate.startswith(root + os.sep) and os.path.isfile(candidate)
+
+
+# ---------------------------------------------------------------------------
 # 音频格式转换辅助
 # ---------------------------------------------------------------------------
 
@@ -809,11 +830,9 @@ class OpenAICompatibleRouter:
 
             engine_name = _MODEL_ENGINE_MAP.get(body.model, "voxcpm2")
             if engine_name == "voxcpm2" and body.voice and body.voice not in _VOICE_PERSONA_MAP:
-                import os as _os
+                from .persona_manager import get_persona_consent_state
 
-                from .persona_manager import PERSONA_DIR, get_persona_consent_state
-
-                if not _os.path.exists(_os.path.join(PERSONA_DIR, f"{body.voice}.wav")):
+                if not _persona_wav_exists(body.voice):
                     raise HTTPException(
                         status_code=400,
                         detail=(
@@ -982,11 +1001,9 @@ class OpenAICompatibleRouter:
                 )
             _engine_name = _MODEL_ENGINE_MAP.get(body.model, "voxcpm2")
             if _engine_name == "voxcpm2" and body.voice and body.voice not in _VOICE_PERSONA_MAP:
-                import os as _os
+                from .persona_manager import get_persona_consent_state
 
-                from .persona_manager import PERSONA_DIR, get_persona_consent_state
-
-                if not _os.path.exists(_os.path.join(PERSONA_DIR, f"{body.voice}.wav")):
+                if not _persona_wav_exists(body.voice):
                     raise HTTPException(
                         status_code=400,
                         detail=(
