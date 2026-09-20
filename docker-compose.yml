@@ -64,6 +64,11 @@ services:
         limits:
           memory: 16G
           cpus: "4.0"
+          # 与下方顶层 pids_limit 同值：Compose v2 把顶层 pids_limit 归一到本键，
+          # 两处并存且值不同即报 "can't set distinct values on 'pids_limit' and
+          # 'deploy.resources.limits.pids'"，使 Docker Smoke 的「Compose file
+          # validity」自 2026-09-11 起每次红。同值写法则两种形式都受保护。
+          pids: 512
         # 注：Compose 规范不支持 limits.devices —— GPU 只能经 reservations.devices
         # 声明（见上），limits 仅接受 cpus/memory/pids。此前把 devices 写在 limits
         # 下会被 `docker compose config -q` 判为 schema 非法
