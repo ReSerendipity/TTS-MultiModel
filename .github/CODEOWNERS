@@ -1,0 +1,27 @@
+# ============================================================
+# CODEOWNERS — 代码审查负责人机制
+# 安全相关代码指定专人审查，确保任何改动都经过安全把关。
+# 格式：<路径> <审查者>（GitHub 用户名或团队）
+# ============================================================
+
+# 全局默认 — 所有 PR 默认指派
+* @ReSerendipity
+
+# 安全核心模块 — 所有改动必须由安全负责人审查
+app/security/ @ReSerendipity
+app/auth/ @ReSerendipity
+app/csrf* @ReSerendipity
+
+# 密钥与配置
+.env* @ReSerendipity
+config/ @ReSerendipity
+
+# 安全策略与审查流程
+SECURITY.md @ReSerendipity
+SECURITY_MATRIX.md @ReSerendipity
+.github/workflows/ @ReSerendipity
+.github/CODEOWNERS @ReSerendipity
+
+# 构建与发布
+scripts/build* @ReSerendipity
+scripts/assemble* @ReSerendipity
