@@ -74,6 +74,17 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
+      # 锁集交叉约束（上界 / ==X.* 型冲突，check_pin_floors 的下界检查抓不到）：
+      # 只在依赖清单变更时跑 —— 它会按需查 PyPI requires_dist，不做无谓联网。
+      # 判据见 issue #97：#87 曾把 mpmath/antlr4/tokenizers 顶到违反 sympy/hydra/
+      # transformers 自身约束的位置，便携包解析当场不可行。
+      - id: check-pin-crossconflicts
+        name: Pin Cross-Constraint Consistency Check
+        entry: python scripts/check_pin_crossconflicts.py
+        language: system
+        pass_filenames: false
+        files: ^(requirements\.txt|requirements-lock\.txt|launcher/requirements-small\.txt|pyproject\.toml)$
+        stages: [pre-commit, pre-push]
       # P1 安全修复：禁止提交包含 PRIVATE KEY 标记的 .env 或其他文件
       - id: forbid-private-key-in-env
         name: Forbid PRIVATE KEY in .env files
