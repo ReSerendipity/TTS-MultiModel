@@ -89,6 +89,7 @@ root_allowlist:
   - install.sh
   - perf
   - pyproject.toml
+  - release-signing-public-key.asc
   - requirements-lock.txt
   - requirements.txt
   - scripts

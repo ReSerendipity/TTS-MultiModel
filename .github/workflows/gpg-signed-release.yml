@@ -35,6 +35,7 @@ jobs:
         run: echo "::notice::GPG_PRIVATE_KEY not configured - nothing to do"
 
       - name: Download release assets
+        id: download
         if: env.GPG_PRIVATE_KEY != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -44,8 +45,13 @@ jobs:
           TAG="$RELEASE_TAG"
           [ -z "$TAG" ] && TAG="$INPUT_TAG"
           [ -z "$TAG" ] && TAG=$(gh release list --limit 1 --json tagName -q .[0].tagName)
+          [ -n "$TAG" ] || { echo "::error::no release found to sign"; exit 1; }
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          gh release download "$TAG" --dir assets/
+          mkdir -p assets/
+          if ! gh release download "$TAG" --dir assets/; then
+            echo "::error::Release '$TAG' has no downloadable assets to sign"
+            exit 1
+          fi
 
       - name: Generate SHA256SUMS and sign
         if: env.GPG_PRIVATE_KEY != ''
