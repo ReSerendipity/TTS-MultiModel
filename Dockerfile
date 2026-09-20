@@ -62,11 +62,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && python3.12 -m ensurepip --upgrade \
     && groupadd -r ttsuser \
-    && useradd -r -g ttsuser -d /app -s /sbin/nologin ttsuser
+    && useradd -r -g ttsuser -m -d /home/ttsuser -s /sbin/nologin ttsuser
 
 WORKDIR /app
 
 # Copy installed Python packages from the builder stage.
+# 建用户时必须给真实 home（-m -d /home/ttsuser）：ttsuser 的 home 若是 /app，
+# Python 的 user-site 就成了 /app/.local/...，而这里把 pip --user 的产物放到
+# /home/ttsuser/.local —— 包装上了却永远不在 sys.path 上（容器起不来的根因之一）。
 COPY --from=builder /root/.local /home/ttsuser/.local
 
 # Copy the built wheel and install it so package metadata is available.
@@ -83,6 +86,13 @@ RUN chown -R ttsuser:ttsuser /home/ttsuser/.local /app
 
 USER ttsuser
 ENV PATH=/home/ttsuser/.local/bin:$PATH
+# 让 `import integrated_app` 命中 /app/app 的源码而非只读 site-packages：
+# app_server._PROJECT_ROOT = dirname(dirname(__file__ 所在包)) 只有从 /app/app 导入时
+# 才等于 /app，而 /app/data、/app/outputs、/app/logs 是 compose 与冒烟用例挂的可写卷。
+# 走 site-packages 会把工程根算进只读镜像层 —— CSRF 密钥等运行态文件写不进去
+# （旧代码对此只 warning 后静默关防护，现改为拒绝启动，故必须先修导入路径）。
+# wheel 仍保留安装：提供包元数据（版本号）与 ~/.local/bin 入口。
+ENV PYTHONPATH=/app/app
 
 EXPOSE 7869
 
