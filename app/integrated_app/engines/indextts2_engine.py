@@ -471,7 +471,9 @@ class IndexTTS2Engine(TTSEngine):
 
         if problematic_files:
             raise EngineLoadError(
-                f"IndexTTS 2.5 模型文件不可读: {problematic_files}\n"
+                # 同上：变体名必须取自 self.version_str，2.0 报"2.5 模型文件不可读"会把人
+                # 引去下载错的权重目录（model/IndexTTS-2.0 vs IndexTTS-2.5）。
+                f"IndexTTS {self.version_str} 模型文件不可读: {problematic_files}\n"
                 f"请运行: python scripts/download_indextts2.py 下载模型，"
                 f"或检查目录权限。",
                 engine=self._engine_name,
@@ -917,7 +919,10 @@ class IndexTTS2Engine(TTSEngine):
                 with contextlib.suppress(OSError):
                     os.unlink(output_path)
             raise GenerationError(
-                f"IndexTTS 2.5 合成失败: {type(e).__name__}: {e}",
+                # 2.5 与 2.0 共用这个类，报错必须点名**当前实例**的变体：
+                # 原先硬编码 "IndexTTS 2.5"，于是在 2.0 上失败时文案指向另一个引擎
+                # （2026-09-21 真机跑冒烟时亲眼看到 indextts20 报 "IndexTTS 2.5 合成失败"）。
+                f"IndexTTS {self.version_str} 合成失败: {type(e).__name__}: {e}",
                 engine=self._engine_name,
             ) from e
 

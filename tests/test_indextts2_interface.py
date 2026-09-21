@@ -174,3 +174,25 @@ class TestDurationControlGuard:
         assert exc.value.field == "duration_scale"
         assert str(exc.value).startswith("IndexTTS 2.0 ")
         eng.tts.infer.assert_not_called()
+
+    @pytest.mark.parametrize("version", ["2.5", "2.0"])
+    def test_generation_failure_names_the_running_variant(self, tmp_path, version):
+        """推理内部抛异常时，GenerationError 的文案必须点名**当前实例**的变体。
+
+        WHY：2.5 与 2.0 共用 IndexTTS2Engine，原先文案硬编码 "IndexTTS 2.5"，
+        2026-09-21 真机跑冒烟时在 indextts20 上报出 "IndexTTS 2.5 合成失败"，
+        同一函数里的加载错误也曾说 "IndexTTS 2.5 模型文件不可读 + 请跑
+        download_indextts2.py"，会把人引去下载另一套权重目录。
+        """
+        from integrated_app.exceptions import GenerationError
+
+        eng = self._bare_engine(version, supports_duration=True)
+        eng.tts.infer.side_effect = RuntimeError("CUDA error: device-side assert triggered")
+        with pytest.raises(GenerationError) as exc:
+            eng.infer(
+                text="你好",
+                spk_audio_prompt=self._ref_audio(tmp_path),
+                output_path=str(tmp_path / "out.wav"),
+            )
+        assert str(exc.value).startswith(f"IndexTTS {version} 合成失败"), str(exc.value)
+        assert f"IndexTTS {'2.0' if version == '2.5' else '2.5'}" not in str(exc.value)
