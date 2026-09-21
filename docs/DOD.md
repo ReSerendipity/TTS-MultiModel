@@ -149,7 +149,11 @@
     用服务所在解释器 import `indextts.infer_v2` / `infer_v2_5`，失败即硬停并点名
     `transformers>=4.52.1,<4.53`），2.0 走 `/api/generate/indextts2` + `expected_engine` 真合成并
     从 `data-audio-filename` 回取 `/api/audio/<file>` 校验 RIFF，另加一条版本门负向
-    （加载 2.0 却声明 `indextts2` 必须被点名拒绝）。**本机真机跑通**（RTX 5070 Ti，见本轮记录）。
+    （加载 2.0 却声明 `indextts2` 必须被点名拒绝）。
+    **本机真机逐步验到**：`engine_imports` / `csrf_ticket` / `synth_tts-1`（310,470 B RIFF）/
+    `switch_indextts2` / `openai_tts1hd_contract`（400）/ `synth_indextts2`（298,746 B RIFF）
+    全部 OK；`switch_indextts20` OK，但其后的 `synth_indextts20` **没跑通**，
+    撞在下面那条 CUDA 缺陷上（冒烟如实报 FAIL，没有粉饰成跳过）。
     过程中还修掉一个潜伏缺陷：脚本所有 POST 都不带 CSRF 双提交票，而 `/v1/audio/speech`
     并不在豁免路径里 —— 不带就 403 `CSRF_MISSING`，也就是说这条冒烟只要真跑就会红。
     更要紧的一条：**它从没真跑过**。`gpu-smoke.yml` 三次 schedule run（09-07 / 09-14 / 09-21）
@@ -161,6 +165,17 @@
     **仍未消掉**：runner 不存在 → IndexTTS 2.5/2.0 的真推理与"两个 IndexTTS 变体的导入"在 CI 上
     依然零覆盖，只有本机能验；要让这条变成 CI 事实，需要注册一台带 `gpu` 标签的
     self-hosted runner 并配 `REPO_ADMIN_TOKEN`（归所有者）。
+  * **本机真机跑冒烟时撞出一个未定级的运行时缺陷（发版前值得看一眼）**：同一进程里
+    **第二次切换引擎之后**的那次合成会 `CUDA error: device-side assert triggered`。
+    复现序列（RTX 5070 Ti 12,227 MiB，transformers 4.52.1）：
+    voxcpm2 自动加载 → `synth_tts-1` 成功（310,470 B）→ 切 indextts2 → 2.5 合成成功（298,746 B）
+    → 切 indextts20 → **2.0 合成报 device-side assert**（HTTP 400 的错误块里）。
+    两个对照实验排除了我先前的猜想：(a) 冷切换不是原因 —— 直接以 indextts2 启动、或
+    voxcpm2→indextts2 冷切之后首次合成都成功（386,796 B / 290,944 B）；(b) 参考音频
+    `examples/reference_speaker.wav` 不是原因 —— 同一个文件在冷启动路径下能出真音频。
+    开 `CUDA_LAUNCH_BLOCKING=1` 后断言仍落在**第二次切换之后**那一步，说明不是异步错位归因。
+    现状：只复现到"第二次切换"这一层，未定位到具体 kernel；冒烟现在会**如实报 FAIL**
+    （不是静默跳过），所以一旦 runner 上线，这条会被 CI 抓住。归所有者定是否 v2.2.2 拦路。
   * **仍未覆盖**：桌面安装包链路（staging → data 7z → NSIS）**无任何 workflow 调用**、本机也无从安装
     （`scripts/installer/` 只有一个 4.3 MB `Setup.exe`、无同目录分卷），所以 `unpack_desktop.ps1`
     新加的许可/字体落地核对只过了语法层，`release_gate.ps1` 的第 ⑥ 步也只在发版/dispatch 时跑；
