@@ -2,8 +2,8 @@
 
 日期：2026-09-21（同日按 CI 真实输出 + api.osv.dev 复核修订过一次）
 适用：`main` @ PR #100 之后　责任人：仓库所有者
-状态：**GitHub 上 20 条 open 告警 = 10 个公告 × 2 份清单**（`requirements-lock.txt`、
-`launcher/requirements-small.txt` 各计一次）。但**扫描器视角的下界代价比这个大**：
+状态：**GitHub 上那 20 条 open 告警（10 个公告 × 2 份清单）已于 2026-09-21 全部按 §5 的映射逐条
+dismiss 完毕**（`requirements-lock.txt`、`launcher/requirements-small.txt` 各计一次）。但**扫描器视角的下界代价比这个大**：
 transformers 4.52.x 实际带 **16 个公告**，其中 8 个只有 PYSEC 号、没有 GHSA 记录 ——
 Dependabot 只跟 GHSA，所以那 8 条**根本不开单**，只有 pip-audit（OSV 全源）看得见。
 也就是说："把 20 条 dismiss 完" ≠ "4.52.x 的风险登记完"。本文 §1 是完整的 16+2 行。
@@ -199,15 +199,23 @@ Dockerfile:38  RUN python3.12 -m pip install --no-cache-dir --user -r requiremen
    pip-audit 侧没有到期机制（它不支持 expiration），所以 A1–A16 的 16 个号靠本文 + 人守 ——
    2026-12-31 之前要么按条件 1 抬版本消掉，要么把这份表带着做一次显式再确认。
 
-## 5. 需要仓库所有者点头的动作（枚举已查成真值，命令可直接跑）
+## 5. 告警 dismiss 的执行记录与 API 实测（2026-09-21 已全部做完）
 
-GitHub 安全页的 20 条 dismiss 属**共享状态写操作**，我没有代做。原先说"`dismissed_reason`
-的取值我要现查"—— 已查，两个独立来源一致：
+**状态：下表 20 条（告警号 3–22）已全部按逐条绑定理由 dismiss 完毕**，`?state=open` 现在返回 0 条
+（列表里另有一条 #2 是早先就存在的 glib 告警，不属本批）。原先写"属共享状态写操作，我没代做" ——
+本轮经所有者明确授权后代做，并在试跑 1 条确认语义后才批量。
 
-- REST 文档（`docs.github.com/en/rest/dependabot/alerts`）：`state` ∈ `dismissed` / `open`；
-  `dismissed_reason` ∈ **`fix_started` / `inaccurate` / `no_bandwidth` / `not_used` / `tolerable_risk`**；
-  没有独立的 `comment` 字段，注释走 **`dismissed_comment`**。
-- GraphQL 内省（权威，不依赖文档是否过期）：
+三条**只有实测才知道**的 API 事实（下次别照着 GitHub 文档页直接抄）：
+
+1. 动词是 **`PATCH`**，不是文档页写的 `PUT` —— `PUT` 对存在的告警号回 `404 Not Found`
+   （GET 同一号是 200，很容易误判成权限问题）。
+2. `dismissed_comment` **上限 280 字符**，超长直接 `422 Invalid request`。所以 comment 只能做
+   **引用**（"§1 A1（CVE-…）：<一句话判据>；复点 §4；账本在 security.yml / .trivyignore.yaml"），
+   完整推理留在本文。
+3. 已 dismiss 的号**不能再 PATCH 成 dismissed**（`409 Alert N is already dismissed`）。要改文案得先
+   `state=open` 再 `state=dismissed` 走一遍 —— 本轮那条试跑号（#4，comment 只有 "trial"）就是这么补的。
+
+`dismissed_reason` 枚举两源一致（REST 文档 + GraphQL 内省，后者不依赖文档时效）：
 
 ```bash
 gh api graphql -f query='{ __type(name: "DismissReason") { kind enumValues { name } } }'
@@ -216,7 +224,7 @@ gh api graphql -f query='{ __type(name: "DismissReason") { kind enumValues { nam
 
 **告警号 ↔ §1 行的对应（`gh api .../dependabot/alerts?state=open` 实测 20 条 = 10 个公告 × 2 份清单）**：
 
-| 告警号 | 公告 | 对应 §1 | 建议 `dismissed_reason` | 一句话理由（写进 `dismissed_comment`） |
+| 告警号 | 公告 | 对应 §1 | 已用 `dismissed_reason` | 写进 `dismissed_comment` 的一句话理由 |
 |---|---|---|---|---|
 | 4、14 | CVE-2025-5197 | A1 | `not_used` | `convert_tf_weight_name_to_pt_weight_name` 在本仓 0 命中，不做 TF→PT 权重名转换 |
 | 5、15 | CVE-2025-6638 | A3 | `not_used` | 不加载 Marian 模型，`remove_language_code` 走不到 |
@@ -229,17 +237,21 @@ gh api graphql -f query='{ __type(name: "DismissReason") { kind enumValues { nam
 | 3、13 | CVE-2025-4565 | P1 | `tolerable_risk` | 服务端不解析网络来的 protobuf/JSON wire；待 §7b 复算后抬到 4.25.8 自然消除 |
 | 8、18 | CVE-2026-0994 | P2 | `tolerable_risk` | 同 P1，修复线 5.29.6 |
 
-跑法（**先只跑 1 条确认语义，再批量**）：
+实际执行用的命令形状（本轮 20 条就是这么打的；`--input` 走 JSON 文件，中文 comment 才不会碰
+Windows 的 GBK 编码坑）：
 
 ```bash
-# 单条试跑（先读后写，确认字段语义与返回）
-gh api repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/4 \
-  --method PUT \
-  -f state=dismissed \
-  -f dismissed_reason=not_used \
-  -f dismissed_comment='本仓可达性判定见 docs/SECURITY_DEPENDABOT_TRIAGE.md §1 A1（convert_tf_weight_name_to_pt_weight_name 零命中）；复点条件 §4-1。'
+# 单条
+printf '%s' '{"state":"dismissed","dismissed_reason":"not_used","dismissed_comment":"§1 A1（CVE-2025-5197）：… ≤280 字"}' > body.json
+gh api -X PATCH repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/4 --input body.json
 
-# 确认无误后再按上表批量（号与 reason 逐条对，别用同一个值一把梭）
+# 回滚某一条（改判或复点时要用）
+gh api -X PATCH repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/4 -f state=open
+
+# 核对台账：应为 0 / 应为 21（含早先那条 glib #2）
+gh api 'repos/ReSerendipity/TTS_MultiModel/dependabot/alerts?state=open&per_page=100' --jq '.|length'
+gh api 'repos/ReSerendipity/TTS_MultiModel/dependabot/alerts?state=dismissed&per_page=100' \
+  --jq '.[] | "\(.number)\t\(.security_advisory.cve_id)\t\(.dismissed_reason)\t\(.dismissed_comment[0:14])"'
 ```
 
 两点别忘：
