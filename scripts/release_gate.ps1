@@ -1,11 +1,13 @@
 ﻿#Requires -Version 5.1
-# scripts/release_gate.ps1 — 发布门禁五步（任务书阶段四 / 报告2 §4.1）
+# scripts/release_gate.ps1 — 发布门禁六步（任务书阶段四 / 报告2 §4.1 + 桌面链路补口）
 #
 #  ① 构建（build_portable_bundle 等价脚本）
 #  ② 拆包验证：清单条目完整、分卷校验、公钥验签 PASS（diag VERIFY=True）
 #  ③ 负向断言：包内无 .watermark_key / 私钥 / 注释残留
 #  ④ 篡改模拟：改任一模块 1 字节 → 哈希与清单不一致 → enforce 拒绝启动
 #  ⑤ 冒烟启动：便携 python 真实启动自检，Ed25519 验签 PASS（diag selfcheck/VERIFY）
+#  ⑥ 桌面链路负载：跑 assemble_release_staging，核对发给用户的那份目录里
+#     许可三件套 / fonts.local.css / woff2 与 OFL 计数都在，且无密钥与权重
 #
 # 用法：
 #   # fixture 模式（本地快验，默认）：
@@ -216,15 +218,64 @@ if ($tamperRejected) {
     }
 }
 
+# ---------- ⑥ 桌面链路负载（staging 目录里到底有什么） ----------
+# 桌面安装包走 assemble_release_staging → data 7z → NSIS，与 ① 的便携包链路各持一份
+# 白名单：THIRD_PARTY_NOTICES.md 曾两次不在表上、SECURITY.md 迁走后旧路径静默失效（#134）。
+# 这条只要几秒（app/ 走硬链接），把"会发给用户的那份目录"钉死。
+Write-Step '⑥ 桌面链路负载（assemble_release_staging）'
+$stagingDir = Join-Path $WorkDir 'desktop-staging'
+$stubDir = Join-Path $WorkDir 'desktop-stub'
+New-Item -ItemType Directory -Path $stubDir -Force | Out-Null
+# 壳二进制不进 git（CI 干净检出没有），这里用桩文件：staging 只负责把它拷进包
+$shellExe = Join-Path $stubDir 'TTSMultiModel.exe'
+Set-Content -LiteralPath $shellExe -Value 'stub-shell-for-gate' -Encoding ascii
+$staged = $true
+try {
+    & (Join-Path $PSScriptRoot 'assemble_release_staging.ps1') -Version $Version -ShellExe $shellExe -OutDir $stagingDir | Out-Host
+} catch {
+    $staged = $false
+    Write-Host ("  staging 失败：{0}" -f $_.Exception.Message.Split([Environment]::NewLine)[0]) -ForegroundColor Red
+}
+Assert-Step $staged 'desktop-staging-runs' ''
+
+$need = @(
+    'TTSMultiModel.exe', 'start_portable.py', 'config.yaml', 'version.json', 'start.bat',
+    'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md', 'README.md',
+    'app\integrated_app\static\css\fonts.local.css',
+    'app\integrated_app\templates\base.html',
+    'app\integrated_app\security\manifest_signing_public_key.pem'
+)
+$missing = @($need | Where-Object { -not (Test-Path -LiteralPath (Join-Path $stagingDir $_)) })
+$fontDir = Join-Path $stagingDir 'app\integrated_app\static\fonts'
+$woff2 = @(Get-ChildItem -LiteralPath $fontDir -Filter '*.woff2' -File -ErrorAction SilentlyContinue)
+$ofl = @(Get-ChildItem -LiteralPath (Join-Path $fontDir 'licenses') -Filter '*.txt' -File -ErrorAction SilentlyContinue)
+# 禁区：密钥/证书/权重/测试与文档不得进桌面包
+$denyLeaves = @('.watermark_key', '.csrf_secret', '.pii_key', '.integrity_hmac_secret', '.manifest_signing_key',
+    'key.pem', 'cert.pem', '.env', '.server_port', 'config.yaml.bak')
+$leaked = @()
+$allStaged = @(Get-ChildItem -LiteralPath $stagingDir -Recurse -Force -File -ErrorAction SilentlyContinue)
+foreach ($f in $allStaged) {
+    if ($denyLeaves -contains $f.Name) { $leaked += $f.Name }
+}
+$weights = @($allStaged | Where-Object { $_.Extension -in '.safetensors', '.bin', '.pt', '.onnx' })
+$payloadBad = @()
+if ($missing.Count) { $payloadBad += "缺 $($missing -join ', ')" }
+if ($woff2.Count -lt 700) { $payloadBad += "woff2 仅 $($woff2.Count) 个（期望 ≥700）" }
+if ($ofl.Count -lt 12) { $payloadBad += "字体许可文本仅 $($ofl.Count) 份（期望 ≥12）" }
+if ($leaked.Count) { $payloadBad += "禁区文件混入：$(($leaked | Select-Object -Unique) -join ', ')" }
+if ($weights.Count) { $payloadBad += "未提供 -ModelDir 却有 $($weights.Count) 个权重文件混入" }
+Write-Host ("  staging 共 {0} 个文件；woff2 {1} / 许可 {2} / 排除项命中 {3}" -f $allStaged.Count, $woff2.Count, $ofl.Count, $leaked.Count) -ForegroundColor DarkGray
+Assert-Step ($payloadBad.Count -eq 0) 'desktop-payload' ($payloadBad -join '；')
+
 # ---------- 汇总 ----------
 Write-Host ''
 Write-Host '==============================================' -ForegroundColor Cyan
 if ($failures.Count -eq 0) {
-    Write-Host (" 发布门禁五步：全部通过（{0}）" -f ($steps -join ' / ')) -ForegroundColor Green
+    Write-Host (" 发布门禁六步：全部通过（{0}）" -f ($steps -join ' / ')) -ForegroundColor Green
     Write-Host '==============================================' -ForegroundColor Green
     exit 0
 } else {
-    Write-Host (" 发布门禁五步：失败 {0} 项（{1}）" -f $failures.Count, ($failures -join ' / ')) -ForegroundColor Red
+    Write-Host (" 发布门禁六步：失败 {0} 项（{1}）" -f $failures.Count, ($failures -join ' / ')) -ForegroundColor Red
     Write-Host '==============================================' -ForegroundColor Red
     exit 1
 }

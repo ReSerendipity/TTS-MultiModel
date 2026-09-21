@@ -6,6 +6,9 @@
 #   3) 验证只读根 fs 生效（/app 写失败）且挂载卷可写（/app/outputs 写成功）
 #   4) 验证鉴权安全网（无 token→401，Bearer→200）与 SIGTERM 优雅退出（非 137）
 #   5) docker compose config 语法/合并校验 + k8s 清单静态校验（守护 P0-1 挂载面回归）
+#   6) 验证镜像真的带着许可文本（LICENSE/NOTICE/THIRD_PARTY_NOTICES.md）与自托管
+#      标题字体（fonts.local.css + ≥700 woff2 + ≥12 份 OFL）—— .dockerignore 用的是
+#      根级通配 + `!` 例外行，少一条就静默少发（GOTCHAS #134）
 name: Docker Smoke (boot + read-only + probes)
 
 on:
@@ -60,6 +63,25 @@ jobs:
           push: false
           load: true
           tags: ${{ env.IMAGE }}
+
+      # 镜像里到底有没有许可文本与自托管字体。.dockerignore 的 `*.md` 只匹配根级
+      # （Go 的 `*` 不跨 `/`），靠 `!` 例外行点名；漏一条就静默少发 —— 随包的 OFL
+      # 标题字体要求许可文本与分发件同交付（GOTCHAS #134）。
+      - name: Image carries license texts and self-hosted fonts
+        run: |
+          docker run --rm --entrypoint sh "$IMAGE" -c '
+            for f in LICENSE NOTICE README.md THIRD_PARTY_NOTICES.md; do
+              test -f "/app/$f" || { echo "镜像缺 /app/$f（.dockerignore 例外行被删了？）"; exit 1; }
+            done
+            css=/app/app/integrated_app/static/css/fonts.local.css
+            test -f "$css" || { echo "缺 $css（标题字体 CSS 没进镜像）"; exit 1; }
+            fdir=/app/app/integrated_app/static/fonts
+            n=$(ls "$fdir"/*.woff2 2>/dev/null | wc -l)
+            [ "$n" -ge 700 ] || { echo "woff2 只有 $n 个（期望 >=700）"; exit 1; }
+            l=$(ls "$fdir"/licenses/*.txt 2>/dev/null | wc -l)
+            [ "$l" -ge 12 ] || { echo "字体许可文本只有 $l 份（期望 >=12）"; exit 1; }
+            echo "镜像负载 OK: 许可文本齐 / woff2=$n / OFL=$l"
+          '
 
       - name: Compose file validity (syntax + merge)
         run: docker compose -f docker-compose.yml config -q

@@ -69,7 +69,7 @@
 | 5 | 故意制造 6 类误操作：空文本 / 超上限文本 / 未勾授权 / 传 `.txt` / 传内容是文本但命名 `.wav` / 音色未加载就点生成 | 每类都是**红色错误块 + 可读中文 + 有「立即加载」或「重试」按钮**，结果区绝不出现 `{"detail":[{...` 这类原始 JSON 或 `Traceback`/绝对路径。**并且要验按钮做事**：点「重试」必须看到一次新的提交（Network 里有新请求或表单被重新提交），点「立即加载」必须看到加载遮罩 —— 只确认"按钮存在"不算通过（GOTCHAS #133） |
 | 6 | 长文本生成到一半点「取消」 | 立即停下并给出取消态提示；**取消后再生成一次能正常排队**（不是卡住/需刷新）；`logs/app.log` 里取消**不应**出现 ERROR 级记录 |
 | 7 | 用 Tab/回车走完三个工作台，并开一次屏幕阅读器（NVDA/VoiceOver） | 全键盘可完成"选音色→输入→生成→播放"；遮罩朗读出阶段变化（`role="status" aria-live`） |
-| 8 | 断网后重启服务并打开首屏 | 页面正常渲染（外部字体被 CSP 拦或加载失败都不应阻塞），仅样式退化，无空白页 |
+| 8 | 断网后重启服务并打开首屏 | 页面正常渲染（外部字体被 CSP 拦或加载失败都不应阻塞），仅样式退化，无空白页。**已可机器化**：`python scripts/check_offline_first_paint.py` 掐掉所有非本机请求后核对（见 §5.2）；真拔网线仍建议顺手做一次，但不再是大头 |
 | 9 | 连续切换 6 次后查 `/api/system/health` 与 `nvidia-smi` | 空闲显存回到切换前水平（±0.5GB），无单调递增趋势（长时泄漏哨兵） |
 | 10 | `curl` 直连 `/v1/audio/speech`（不带 Cookie/授权声明） | 返回机器可读 JSON 错误（**不是** HTML 片段）—— 验证错误渲染分流没把 API 客户端带进 HTML 分支 |
 
@@ -80,8 +80,10 @@
 
 | 命令 | 覆盖清单项 | 通过判据 |
 |---|---|---|
-| `pytest tests/test_a11y_static.py tests/test_fe_be_consistency.py -q` | 4/5/7 的结构面 | 五条可感知性守卫 + **十条**前后端一致性守卫全绿：图标按钮有名称 / 模板无外链资源 / id 不重复 / 对话框有名称 / 播报通道带 `aria-live`；URL 与字段与 name 三层 / 生成后接线 / **手写 fetch 带 `X-CSRF-Token`**（#130）/ **功能页表单与引擎归属 + 程序化跳转必须用 `gotoTab`**（#131）/ **内联 JS 过 `node --check`** / **`onclick` 调的函数必须存在（防死按钮）**（#133）。每条都带变异自证 |
+| `pytest tests/test_a11y_static.py tests/test_fe_be_consistency.py -q` | 4/5/7 的结构面 | 七条可感知性守卫 + **十一条**前后端一致性守卫全绿：图标按钮有名称 / 模板无外链资源 / id 不重复 / 对话框有名称 / 播报通道带 `aria-live` / 客户端拼的错误块也要 `role="alert"` / **正文栈不得含随包标题字体**；URL 与字段与 name 三层 / 生成后接线 / **手写 fetch 带 `X-CSRF-Token`**（#130）/ **功能页表单与引擎归属 + 程序化跳转必须用 `gotoTab`**（#131）/ **内联 JS 过 `node --check`** / **`onclick` 调的函数必须存在（防死按钮）**（#133）/ **共用换页容器的触发器必须带 `hx-sync`**（#136）。每条都带变异自证 |
 | `python scripts/check_font_menu_availability.py`（需服务在跑） | 4 的字体面 | 菜单每条的"可用/未安装"结论与同浏览器实测一致，且加载期 0 条 CSP 报错。2026-09-19 起字体已自托管（776 文件 / 25.5 MB + 14 份 OFL 全文），实测 **14/14 可用** |
+| `python scripts/check_offline_first_paint.py`（需服务在跑） | 8 的断网面 | 浏览器里掐掉**所有非本机请求**（localhost 放行）后：出网尝试 0 次、可见标签 >0、内容区有正文、无未渲染 Jinja/未翻译键、Console 零 error。2026-09-20 实测：放行 95 次本机请求、**0 次出网尝试**、12 个可见标签、`vd-form` 在位 → 通过。口径注意：它证明"根本不尝试出网"，不覆盖 DNS/代理层失败 |
+| `python scripts/check_tab_switch_race.py`（需服务在跑） | 侧栏换页竞态 | 给第一个 `/tab/` 请求注入 1.5s 延迟、350 ms 后点第二个，要求**末态落在最后点的那一页**（结构签名比对，不看像素）。修前 **6/6 组被旧响应盖回先点那页**，带 `hx-sync="#tab-content:queue last"` 后 **0/6** → 通过（#136）。必须用 async Playwright：sync 的 route handler 会把请求串行化，测出来是假阴性 |
 | `python scripts/make_watermark_ab.py` + 人耳 | 3 的水印面 | 生成同源 A/B 与量化表（落在 `docs/reports/watermark_ab/`，**该目录被 `.gitignore` 忽略**，属可重生成的本地产物）；**能否听出 B 仍需人耳**，脚本只保证差异唯一 |
 
 - 最近一次执行：2026-09-19，v2.2.2 工作树。机器侧佐证：全量 `pytest`（含 e2e、服务在线，
@@ -94,7 +96,26 @@
   第 5 项的"按钮要做事"已真机验过：400 错误块带 `role="alert"` + 「立即加载」「重试」两个按钮，
   点重试 XHR 计数 +1 且错误块重新渲染（此前该按钮调的是从未定义的函数，纯死键，#133），
   第 9 项 6 轮切换实测空闲显存回到切换前水平（spread 416MB，无单调递增）。
-  **仍需人工：第 7 项真开一次屏幕阅读器、第 8 项断网首屏。**
+  **仍需人工：第 7 项真开一次屏幕阅读器。**（第 8 项断网首屏已于 2026-09-20 转为机器判定，见 §5.2）
+- 2026-09-20 本轮补记（分发产物与前端竞态，`ci/pin-floors-and-csrf-hardfail`）：
+  * **门禁**：非 e2e **2064 passed / 35 skipped / 0 failed，2m06s，覆盖率 51.95%**；
+    `tests/e2e`（服务在线）**68 passed / 5 skipped，5m48s**；mypy **103 = 基线**；
+    ruff check 全通过、`ruff format --check` 355 文件已格式化；完整性清单 **16/16 一致**；
+    无硬编码路径 exit 0；`test_portable_bundle.ps1` **49 条断言全通过**。
+  * **对产物复验**（不是开发树）：`test_portable_bundle.ps1 -KeepArtifacts` 解包后从产物起服务，
+    字体菜单 **14/14 可用**、页×引擎矩阵 **12/12 通过**；产物内含
+    `LICENSE 11,515 B / NOTICE 1,419 B / THIRD_PARTY_NOTICES.md 3,280 B / SECURITY.md 7,579 B`
+    与 777 woff2 + 1 ttf + 14 份 OFL（`fonts/` 30 MB，`app/` 36 MB）。
+  * **抓到的静默漏发**：`SECURITY.md` 迁到 `.github/` 后便携包白名单仍写根路径，`Test-Path`
+    不过就跳过 → 整个版本没进包且构建全绿。两条链路的白名单循环改为**缺项即 throw**，
+    并新增 `tests/test_packaging_manifest.py`（25 条断言，含 4 条变异自证）常驻把关（#134）。
+  * **新修的用户可见缺陷**：侧栏换页竞态 —— 注入 1.5s 慢响应后，**修前 6/6 组末态被先点那一页
+    占住**（用户在错的页面上点生成 → 400），带 `hx-sync="#tab-content:queue last"` 后 **0/6**（#136）。
+  * **仍未覆盖**：`docker build` 本机 daemon 未起（CI 的 `docker-smoke.yml` 会真构建，镜像结论
+    目前是 `.dockerignore` 静态复演）；桌面安装包链路（staging → data 7z → NSIS）**无任何 workflow
+    调用**、本机也无从安装（`scripts/installer/` 只有一个 4.3 MB `Setup.exe`、无同目录分卷），
+    所以 `unpack_desktop.ps1` 新加的许可/字体落地核对只过了语法层；htmx 1.9.10 在队列换页时
+    自抛的一次 `insertBefore` TypeError（末态正确）未清，需另案升级 vendored 库。
 
 ## 6. 安全 & 隐私
 

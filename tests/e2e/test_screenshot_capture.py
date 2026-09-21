@@ -34,9 +34,12 @@ pytestmark = [
 
 BASE_URL = os.environ.get("TTS_SERVER_URL", "http://127.0.0.1:7869")
 
-# Output directory: docs/screenshots/
+# 输出目录用 docs/screenshots/_local/ 而不是 docs/screenshots/ 本身：后者被 .gitignore
+# 的 `docs/screenshots/*` 忽略，但 README 引用的那 6 张是当年 `git add -f` 强推入库的，
+# 直接写进根目录会让每次跑 L6 都悄悄覆盖已发布的 README 截图（GOTCHAS #135）。
+# 要换 README 配图：从 _local/ 里挑，拷到 docs/screenshots/ 再 `git add -f`。
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUTPUT_DIR = os.path.join(ROOT, "docs", "screenshots")
+OUTPUT_DIR = os.path.join(ROOT, "docs", "screenshots", "_local")
 DARK_DIR = os.path.join(OUTPUT_DIR, "dark")
 
 TABS = [
