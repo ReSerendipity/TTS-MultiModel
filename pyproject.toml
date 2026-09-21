@@ -55,7 +55,15 @@ dependencies = [
     "torch>=2.5.1",
     "torchvision>=0.20.1",
     "torchaudio>=2.5.1",
-    # 版本策略：VoxCPM2 / IndexTTS2 的 tokenizer 与 modeling 需要较新 transformers API。
+    # ⚠ 这条下界与引擎可用性互斥，取舍交仓库所有者，别顺手改（证据见
+    # docs/SECURITY_DEPENDABOT_TRIAGE.md §2）：2026-09-21 实测 4.57.6 下 VoxCPM2 正常
+    # （合成 243,164 B / RMS 5360）但 IndexTTS 2.5 与 2.0 的 infer_v2_5 / infer_v2 直接
+    # ImportError；4.52.1 + tokenizers 0.21.0 下三引擎真推理全通（2.5：214,040 B / RMS 6176；
+    # 2.0：205,124 B / RMS 6926）。但把下界改回 4.52.x 会让 pip-audit 与 Trivy 两道 CI
+    # 安全门禁同时变红（扫到 4.52.4 的"4.53 已修"CVE），所以这里暂留 >=4.57：
+    # 门禁绿，代价是按本声明装环境的人两个引擎起不来。出路二选一——
+    #   1) 下界改回 >=4.52.1,<4.53，并给两道门禁加逐条带理由的豁免；
+    #   2) 先让 IndexTTS 侧适配 transformers >=4.53（上游放开精确 pin 或改 vendored 拷贝）。
     "transformers>=4.57.0",
     "tokenizers>=0.19.0",
     # === AI 生态 ===

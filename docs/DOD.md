@@ -96,9 +96,11 @@
   第 5 项的"按钮要做事"已真机验过：400 错误块带 `role="alert"` + 「立即加载」「重试」两个按钮，
   点重试 XHR 计数 +1 且错误块重新渲染（此前该按钮调的是从未定义的函数，纯死键，#133），
   第 9 项 6 轮切换实测空闲显存回到切换前水平（spread 416MB，无单调递增）。
-  **仍需人工：第 7 项真开一次屏幕阅读器。**（第 8 项断网首屏已于 2026-09-20 转为机器判定，见 §5.2）
+  **人工项已全部走完**：第 7 项屏幕阅读器由仓库所有者于 **2026-09-21 实机判定通过**
+  （NVDA/VoiceOver 走"选音色→输入→生成→播放"，遮罩阶段变化有朗读）；第 8 项断网首屏已于
+  2026-09-20 转为机器判定（`scripts/check_offline_first_paint.py`，见 §5.2）。
 - 2026-09-21 本轮补记（分发产物与前端竞态，`fix/tab-race-and-dist-payload`，基线 = `origin/main` e104809）：
-  * **门禁**：非 e2e **2078 passed / 35 skipped / 0 failed，2m24s，覆盖率 52.04%**；
+  * **门禁**：非 e2e **2078 passed / 35 skipped / 0 failed，2m33s，覆盖率 52.11%**；
     `tests/e2e`（服务在线）**68 passed / 5 skipped**；mypy **103 = 基线**；
     ruff check 全通过、`ruff format --check` 359 文件已格式化；完整性清单 **16/16 一致**；
     无硬编码路径 exit 0；`test_portable_bundle.ps1` **49 条断言全通过**；
@@ -113,11 +115,32 @@
     并新增 `tests/test_packaging_manifest.py`（25 条断言，含 4 条变异自证）常驻把关（#134）。
   * **新修的用户可见缺陷**：侧栏换页竞态 —— 注入 1.5s 慢响应后，**修前 6/6 组末态被先点那一页
     占住**（用户在错的页面上点生成 → 400），带 `hx-sync="#tab-content:queue last"` 后 **0/6**（#136）。
-  * **仍未覆盖**：`docker build` 本机 daemon 未起（CI 的 `docker-smoke.yml` 会真构建，镜像结论
-    目前是 `.dockerignore` 静态复演）；桌面安装包链路（staging → data 7z → NSIS）**无任何 workflow
-    调用**、本机也无从安装（`scripts/installer/` 只有一个 4.3 MB `Setup.exe`、无同目录分卷），
-    所以 `unpack_desktop.ps1` 新加的许可/字体落地核对只过了语法层；htmx 1.9.10 在队列换页时
-    自抛的一次 `insertBefore` TypeError（末态正确）未清，需另案升级 vendored 库。
+  * **依赖锁集自洽性**（比告警更要紧）：两份 lock 当时自相矛盾 —— `tokenizers==0.23.2` 同时违反
+    `transformers 4.52.1` 要的 `<0.22` 与 `indextts` 要的 `==0.21.0`；`antlr4-python3-runtime` 4.13.2
+    违反 hydra/omegaconf 的 `==4.9.*`；`mpmath` 1.4.1 违反 sympy 的 `<1.4`。后果不是 CI 红，而是
+    **按 lock 装环境的人拿到破图**，开发机能跑只是因为比 lock 早（本机 30/73 条与 lock 不一致）。
+    三行改到合法且与已验证环境一致后 `check_pin_crossconflicts.py` 从 **exit 1 → exit 0**（95 包
+    冲突 0、未核验 0），并接进 `ci.yml` 每次 PR 跑 —— 它原先只挂在 pre-commit 的 `files:` 条件上，
+    已经坏在 main 上的锁集它永远看不见。
+  * **transformers 上界被实测钉死**：4.57.6 下 VoxCPM2 正常（243,164 B / RMS 5360）但
+    **IndexTTS 2.5 / 2.0 双双 `infer_v2_5` / `infer_v2` 导入失败**；回到 4.52.1 + tokenizers 0.21.0
+    后三引擎真推理全通（2.5：214,040 B / RMS 6176；2.0：205,124 B / RMS 6926；VoxCPM2：230,148 B /
+    RMS 4615；每次卸载显存回到 ~3.5 GB）。故 `pyproject`/`requirements.txt` 里那句
+    `transformers>=4.57.0`（9-14 搭在一条只讲 gpu-smoke 的提交里进来的）站不住，但改回 4.52.x 会让
+    pip-audit 与 Trivy 两道 CI 安全门禁同时变红（扫到 4.52.4 的"4.53 已修"CVE）——**下界与引擎可用性
+    互斥**，本轮只落地无争议部分（锁集合法化 + 检查器接进 CI + 报错文案），下界原样保留并在
+    `pyproject.toml` 里写清两条出路，岔口交所有者；
+    引擎加载失败时的报错也不再断言"PyPI 无 indextts 包"，改为带上底层 ImportError 与版本不匹配提示。
+    20 条 Dependabot 告警因此**没有一条能靠现在就升级消掉**，分诊见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`。
+  * **已知缺口**：CI 冒烟 `scripts/gpu_smoke_minimal.py` 只覆盖 voxcpm2 + indextts2（走 OpenAI 口，
+    而 `tts-1` / `tts-1-hd` 两个模型名里没有 IndexTTS **2.0** 的位置）；2.0 的真推理今天人工验过，
+    要接进冒烟需改用 `/api/generate/indextts2` 形态并在 GPU runner 上复验，另案。
+  * **仍未覆盖**：桌面安装包链路（staging → data 7z → NSIS）**无任何 workflow 调用**、本机也无从安装
+    （`scripts/installer/` 只有一个 4.3 MB `Setup.exe`、无同目录分卷），所以 `unpack_desktop.ps1`
+    新加的许可/字体落地核对只过了语法层，`release_gate.ps1` 的第 ⑥ 步也只在发版/dispatch 时跑；
+    htmx 1.9.10 在队列换页时自抛的一次 `insertBefore` TypeError（末态正确）未清，需另案升级 vendored 库。
+    （原先记的"`docker build` 未实跑"已消掉：PR #100 的 `Boot hardened container & probe` 里，
+    新加的"镜像内许可文本 + 字体计数"步骤在真构建产物上结论 success。）
 
 ## 6. 安全 & 隐私
 

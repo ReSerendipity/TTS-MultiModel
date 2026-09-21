@@ -65,6 +65,16 @@ jobs:
           pip install pyyaml
           python scripts/check_declared_capabilities.py
 
+      - name: Pin cross-constraint gate (锁集自洽)
+        # 锁文件内部必须互相满足：A==x 声明 requires B<2，而锁里 B==2.3 就是破图 ——
+        # 用户 `pip install -r requirements-lock.txt` 装出来的是坏环境，`pip check` 才报。
+        # 这类问题以前只有 pre-commit 的 `files:` 触发（改动 lock 才跑），所以已经坏在
+        # main 上的锁集没人看得见（2026-09-21 实测：transformers==4.52.1 要 tokenizers<0.22
+        # 而锁里是 0.23.2，另有 antlr4/mpmath 两处）。这里每次 PR 都跑，漂移当场红。
+        run: |
+          pip install packaging
+          python scripts/check_pin_crossconflicts.py
+
       - name: Integrity manifest sync gate (security)
         # 防止「核心模块代码已改、完整性清单未重新生成」：改动 app/integrated_app/ 下
         # 任一 _CORE_MODULES 文件后若未同步 security/integrity_manifest.json，运行时
