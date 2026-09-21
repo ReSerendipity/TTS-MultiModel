@@ -3,7 +3,9 @@
 三条守卫堵的是同一类事故：**声明与实际装配长期不一致，而 CI 一片绿**。
 
 D1 ``test_lock_pins_satisfy_declared_specifiers`` —— `requirements.txt` / `pyproject.toml`
-   的每个 `==`/`>=`/`<` 约束，必须被 `requirements-lock.txt` 里对应的那条钉版满足。
+   的每个 `==`/`>=`/`<` 约束，必须被**两份钉版集**（`requirements-lock.txt` 与
+   `launcher/requirements-small.txt`）里对应的那条钉版满足。查两份是因为 Dependabot 抬依赖
+   时只动钉版文件、不动声明（#88 就是那个形状）。
    WHY：这类"下界棘轮"检查在仓库里是**缺位**的 —— PR #98 的
    `scripts/check_pin_crossconflicts.py` 只管"锁内部 A==x 与 B==y 互相约束"，
    它自己的 docstring 就写着"下界检查器一条都抓不到"。于是发生过：
@@ -46,6 +48,7 @@ except ImportError:  # pragma: no cover - packaging 是 setuptools 的依赖，C
 
 _ROOT = Path(__file__).resolve().parents[1]
 _LOCK = _ROOT / "requirements-lock.txt"
+_SMALL = _ROOT / "launcher" / "requirements-small.txt"
 _REQ = _ROOT / "requirements.txt"
 _PYPROJECT = _ROOT / "pyproject.toml"
 _TRIAGE = _ROOT / "docs" / "SECURITY_DEPENDABOT_TRIAGE.md"
@@ -111,18 +114,31 @@ def _violations(pins: dict[str, str], decl: dict[str, list[str]]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# D1 声明 ↔ 锁
+# D1 声明 ↔ 两份钉版集
 # ---------------------------------------------------------------------------
 
 
 def test_lock_pins_satisfy_declared_specifiers():
-    """锁文件里每条被声明过的包，其钉版必须落在声明的区间内。"""
-    pins = _pins(_LOCK)
+    """两份钉版集（全量锁 + 启动器小清单）里每条被声明过的包，其钉版必须落在声明区间内。
+
+    为什么连 `launcher/requirements-small.txt` 一起查：Dependabot 抬依赖时**只改这两份钉版文件、
+    不碰声明**，所以"锁与声明矛盾"可以在声明完全没动的情况下被制造出来。PR #88
+    （transformers 4.52.1→5.17.0）就是这个形状 —— 它在 CI 红，但红在 `check_pin_crossconflicts.py`
+    的"钉版包自身元数据互相冲突"这一路；本地若只查 `requirements-lock.txt` 对声明的关系，
+    小清单那半边的漂移没人看。
+    """
     decl = _declared_specifiers()
-    checked = [n for n in decl if n in pins]
-    assert len(checked) >= 20, f"只能对上 {len(checked)} 个包，解析可能失效（锁 {len(pins)} 条 / 声明 {len(decl)} 条）"
-    bad = _violations(pins, decl)
-    assert not bad, f"锁与声明互相矛盾（按声明装环境与按锁装环境是两个不同的东西）：{bad}"
+    problems: list[str] = []
+    total_checked = 0
+    for manifest in (_LOCK, _SMALL):
+        pins = _pins(manifest)
+        checked = [n for n in decl if n in pins]
+        total_checked += len(checked)
+        bad = _violations(pins, decl)
+        for v in bad:
+            problems.append(f"{manifest.name}: {v}")
+    assert total_checked >= 20, f"只对上 {total_checked} 个包，解析可能失效（声明 {len(decl)} 条）"
+    assert not problems, f"钉版集与声明互相矛盾（按声明装环境与按钉版装环境是两个不同的东西）：{problems}"
 
 
 def test_d1_guard_is_not_vacuous():
@@ -131,6 +147,14 @@ def test_d1_guard_is_not_vacuous():
     assert tf is not None, "锁里没有 transformers，样本失效"
     assert _violations(pins, {"transformers": [">=4.52.1,<4.53"]}) == []
     assert _violations(pins, {"transformers": [">=4.57.0"]}), "声明抬到 4.57 时必须报错，否则守卫空转"
+
+    # 第二份钉版集必须真的在检查范围内，而不是挂在循环里凑数：
+    # 小清单与锁共享 92 个包，能对上声明的也应 ≥20，且 #88 那个形状要能被抓到。
+    small = _pins(_SMALL)
+    decl = _declared_specifiers()
+    assert len([n for n in decl if n in small]) >= 20, f"小清单只对上 {len([n for n in decl if n in small])} 个声明包"
+    bumped = dict(small, transformers="5.17.0", tokenizers="0.23.1")
+    assert _violations(bumped, decl), "把小清单里的 transformers 抬到 5.17.0 必须报错（Dependabot #88 的形状）"
 
 
 # ---------------------------------------------------------------------------
