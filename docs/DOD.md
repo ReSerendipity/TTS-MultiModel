@@ -141,7 +141,9 @@
     同一步还暴露出**镜像装 4.52.4 而锁钉 4.52.1**（`Dockerfile:33/38` 按声明装而非按锁装），
     已作为已知缺口记在分诊文档 §3b，本轮未动 Dockerfile。
     引擎加载失败时的报错也不再断言"PyPI 无 indextts 包"，改为带上底层 ImportError 与版本不匹配提示。
-    20 条 Dependabot 告警因此**没有一条能靠现在就升级消掉**，分诊见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`；
+    20 条 Dependabot 告警因此**没有一条能靠现在就升级消掉**，已于 2026-09-21 经所有者授权
+    按 §5 映射逐条 dismiss（每条 `dismissed_comment` 自带绑定理由，open 现为 0 条），
+    分诊见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`；
     且那 20 条只覆盖有 GHSA 记录的 10 个公告，**8 条 PYSEC-only 的 Dependabot 从不开单**。
   * **GPU 冒烟覆盖面（本轮补齐 2.0，并发现"每周兜底"其实从没跑过）**：
     `scripts/gpu_smoke_minimal.py` 原先只覆盖 voxcpm2 + indextts2 —— `tts-1` / `tts-1-hd` 两个
