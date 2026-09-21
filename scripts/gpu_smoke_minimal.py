@@ -4,14 +4,14 @@
 在 self-hosted GPU runner 上，对**真实加载**的 TTS 引擎各跑一条最短合成，
 校验返回的是真实音频字节（非空、合法 WAV/RIFF），并上报显存峰值。
 
-覆盖三个引擎（+ 两条负向）：
-  - voxcpm2   (OpenAI model "tts-1")         — 服务启动自动加载（TTS_AUTO_LOAD_MODEL=1）
-  - indextts2 (OpenAI model "tts-1-hd")      — 经 POST /api/model/switch 切换后加载
-  - indextts20（IndexTTS 2.0）               — OpenAI 口没有它的位置，只能走
-    POST /api/generate/indextts2 + expected_engine=indextts20，再从响应里的
-    data-audio-filename 回取 /api/audio/<file>
-  - 开机第一步的引擎模块导入探针（transformers 版本一错就地硬失败）
-  - 版本门负向：加载 2.0 却声明 indextts2 的页面必须被点名拒绝，不许静默代打
+覆盖三个引擎（+ 一条契约 + 一条负向）：
+  - voxcpm2   (OpenAI model "tts-1")         — 服务启动自动加载（TTS_AUTO_LOAD_MODEL=1），真合成
+  - indextts2 (IndexTTS 2.5)                 — /api/model/switch 加载后走 /api/generate 真合成
+  - indextts20（IndexTTS 2.0）               — 同上（expected_engine=indextts20）；OpenAI 口没有它的位置
+  - engine_imports（第 0 步）                — 引擎推理模块导入探针，transformers 一错就地硬失败
+  - openai_tts1hd_contract                   — model=tts-1-hd 必须回 400 并指明改走哪条口
+    （本端点按 P0-1 不传说话人参考，而 IndexTTS 必需它；2026-09-21 首次真跑时它回的是 500）
+  - version_gate_refuses_mismatch（末步）    — 加载 2.0 却声明 indextts2 必须被点名拒绝，不许静默代打
 
 用法：
     python scripts/gpu_smoke_minimal.py \
@@ -137,16 +137,85 @@ def _csrf_headers(base: str) -> tuple[dict, str]:
     return {"Cookie": f"csrf_token={token}", "X-CSRF-Token": token}, ""
 
 
+def _status_loaded(sb: dict, engine: str) -> bool:
+    """`/api/model/status` 的判据：当前引擎是 engine 且已 loaded。
+
+    WHY 两条 key 都认：这个端点返回的是 `loaded` / `current_engine`，而 `/readyz` 返回的是
+    `model_loaded`。原脚本第 3 步拿 `model_loaded` 去判 `/api/model/status`，那个 key 在
+    响应里根本不存在 → 谓词恒 False，切换其实成功了也会报"not ready"。这条作业从来没在
+    CI 上真跑过（gpu-smoke job 三次全 skipped），所以缺陷一直隐身。
+    """
+    if not isinstance(sb, dict):
+        return False
+    if sb.get("current_engine") != engine:
+        return False
+    return bool(sb.get("loaded") or sb.get("model_loaded"))
+
+
 def _switch_engine(base: str, engine: str, headers: dict, timeout_s: int = 420) -> tuple[bool, str]:
-    """POST /api/model/switch 并轮询 /api/model/status 直到该引擎真加载完。"""
-    _post_form(f"{base}/api/model/switch", {"engine": engine}, 30, headers=headers)
+    """POST /api/model/switch 并轮询 /api/model/status 直到该引擎真加载完。
+
+    切换在服务端串行执行，可能远超客户端超时 —— 那不算失败，以 status 为准。
+    """
+    st, _ = _post_form(f"{base}/api/model/switch", {"engine": engine}, 30, headers=headers)
     deadline = time.time() + timeout_s
+    polls = 0
     while time.time() < deadline:
-        st, sb = _get(f"{base}/api/model/status", 15)
-        if st == 200 and isinstance(sb, dict) and sb.get("current_engine") == engine and sb.get("model_loaded"):
-            return True, "switched + loaded"
+        polls += 1
+        st2, sb = _get(f"{base}/api/model/status", 15)
+        if _status_loaded(sb, engine):
+            vram = sb.get("vram_used_mb", "?")
+            return True, f"loaded（{polls} 次轮询，切换 POST 客户端状态 {st}，vram={vram} MiB）"
         time.sleep(4)
-    return False, f"{engine} 在 {timeout_s}s 内没到 loaded"
+    return False, f"{engine} 在 {timeout_s}s 内没到 loaded（{polls} 次轮询，切换 POST 客户端状态 {st}）"
+
+
+_REF_WAV = os.path.join(ROOT, "examples", "reference_speaker.wav")
+
+
+def _gen_and_check(
+    base: str,
+    headers: dict,
+    engine_id: str,
+    text: str,
+    expect_mismatch: str | None = None,
+) -> tuple[bool, str]:
+    """POST /api/generate/indextts2 真合成，再从 data-audio-filename 回取音频验 RIFF。
+
+    IndexTTS 2.5 与 2.0 共用这个端点，靠 `expected_engine` 区分；OpenAI 兼容口
+    只有 tts-1 / tts-1-hd 两个模型名，2.0 在其中没有位置（而 tts-1-hd 按 P0-1
+    压根不给说话人参考，见 openai_api.py 的 400 契约），所以真合成只能走这条形态。
+
+    `expect_mismatch` 非空时表示这是一次**负向**请求：页面声明的引擎与实际加载不一致，
+    必须被点名拒绝（无音频 + 文案含"但当前加载的是"），不许静默拿当前引擎的结果代打。
+    """
+    fields = {
+        "text": text,
+        "lang": "Auto",
+        "seed": "0",
+        "has_consent": "true",
+        "expected_engine": expect_mismatch or engine_id,
+    }
+    files: dict = {}
+    if os.path.exists(_REF_WAV):
+        with open(_REF_WAV, "rb") as f:
+            files = {"ref_audio": ("reference_speaker.wav", f.read(), "audio/wav")}
+    st, html = _post_form(f"{base}/api/generate/indextts2", fields, 900, files=files, headers=headers)
+
+    if expect_mismatch:
+        refused = "data-audio-filename" not in (html or "") and "但当前加载的是" in (html or "")
+        detail = f"HTTP {st}，期望被拒绝（声明 {expect_mismatch} vs 加载 {engine_id}）" + (
+            "" if refused else f"，响应片段={(html or '')[:200]!r}"
+        )
+        return refused, detail
+
+    m = re.search(r'data-audio-filename="([^"]+)"', html or "")
+    if not m:
+        return False, f"HTTP {st}，响应里没有 data-audio-filename；片段={(html or '')[:200]!r}"
+    a_st, a_raw = _get(f"{base}/api/audio/{m.group(1)}", 60, parse=False)
+    audio = a_raw if isinstance(a_raw, bytes) else b""
+    ok = st == 200 and a_st == 200 and len(audio) > 44 and _is_wav(audio)
+    return ok, f"HTTP {st} → /api/audio/{m.group(1)} HTTP {a_st} bytes={len(audio)} wav={_is_wav(audio)}"
 
 
 def _probe_engine_imports() -> tuple[str, dict]:
@@ -250,21 +319,33 @@ def main() -> int:
     switched = False
     for _ in range(200):
         st2, sb = _get(f"{base}/api/model/status", 10, parse=True)
-        if st2 == 200 and isinstance(sb, dict) and sb.get("current_engine") == "indextts2" and sb.get("model_loaded"):
+        if _status_loaded(sb, "indextts2"):
             switched = True
             break
         time.sleep(3)
     if not step("switch_indextts2", switched, "switched + loaded" if switched else f"switch HTTP {st}, not ready"):
         return _finish(report, args.output)
 
-    # 4) indextts2 (tts-1-hd)
-    st, raw = _speech(base, "tts-1-hd", 600, headers)
-    ok = st == 200 and len(raw) > 44 and _is_wav(raw)
-    if not step("synth_tts-1-hd", ok, f"HTTP {st} bytes={len(raw)} wav={_is_wav(raw)}"):
+    # 4) indextts2 的真实覆盖走 /api/generate/indextts2（见下），这里只钉 OpenAI 口的契约：
+    #    model=tts-1-hd 必须给 **400 + 可操作说明**，不能是 500 "音频生成失败"。
+    #    （2026-09-21 首次真跑发现：本端点按 P0-1 不传说话人参考，而 IndexTTS 必需它，
+    #     于是这个模型口 500 是必然 —— 以前没人看见是因为这条冒烟从没在 CI 真跑过。）
+    st, raw = _speech(base, "tts-1-hd", 120, headers)
+    body = (raw or b"").decode("utf-8", "replace")
+    contract_ok = st == 400 and "参考音频" in body and "/api/generate/indextts2" in body
+    if not step(
+        "openai_tts1hd_contract",
+        contract_ok,
+        f"HTTP {st} bytes={len(raw)} body={body[:150]!r}",
+    ):
         return _finish(report, args.output)
 
-    # 5) indextts20（IndexTTS 2.0）—— OpenAI 口只有 tts-1 / tts-1-hd 两个模型名，
-    #    2.0 在其中没有位置，所以这一格只能走 /api/generate/indextts2 + expected_engine。
+    # 4b) indextts2 (IndexTTS 2.5) 真合成 —— 与 2.0 同一形态，验的是"能出真音频"本身
+    ok25, why25 = _gen_and_check(base, headers, "indextts2", "这是一条 IndexTTS 2.5 的冒烟音频。")
+    if not step("synth_indextts2", ok25, why25):
+        return _finish(report, args.output)
+
+    # 5) indextts20（IndexTTS 2.0）
     indextts_present = not probe.get("indextts", "").startswith("ModuleNotFoundError") and "error" not in probe
     if not indextts_present:
         step("synth_indextts20", True, "SKIP：本机没有 indextts，交给装了它的 runner")
@@ -276,47 +357,20 @@ def main() -> int:
     if not step("switch_indextts20", switched20, why):
         return _finish(report, args.output)
 
-    fields = {
-        "text": "这是一条 IndexTTS 2.0 的冒烟音频。",
-        "lang": "Auto",
-        "seed": "0",
-        "has_consent": "true",
-        "expected_engine": "indextts20",
-    }
-    ref = os.path.join(ROOT, "examples", "reference_speaker.wav")
-    files = {}
-    if os.path.exists(ref):
-        with open(ref, "rb") as f:
-            files = {"ref_audio": ("reference_speaker.wav", f.read(), "audio/wav")}
-    st, html = _post_form(f"{base}/api/generate/indextts2", fields, 900, files=files, headers=headers)
-    m = re.search(r'data-audio-filename="([^"]+)"', html or "")
-    audio = b""
-    if m:
-        a_st, a_raw = _get(f"{base}/api/audio/{m.group(1)}", 60, parse=False)
-        audio = a_raw if isinstance(a_raw, bytes) else b""
-        got = a_st == 200 and len(audio) > 44 and _is_wav(audio)
-    else:
-        got = False
-    detail = (
-        f"HTTP {st} 音频文件={m.group(1) if m else '（响应里没有 data-audio-filename）'} "
-        f"bytes={len(audio)} wav={_is_wav(audio) if audio else False}"
-    )
-    if not got and html:
-        detail += f" 响应片段={html[:200]!r}"
-    step("synth_indextts20", st == 200 and got, detail)
-    if not got:
+    ok20, why20 = _gen_and_check(base, headers, "indextts20", "这是一条 IndexTTS 2.0 的冒烟音频。")
+    if not step("synth_indextts20", ok20, why20):
         return _finish(report, args.output)
 
     # 6) 版本门负向：当前加载 2.0，页面却声明 indextts2 → 必须被点名拒绝，
-    #    不能静默拿 2.0 的结果当 2.5 返回（GOTCHAS #130 那一类）。
-    bad_fields = dict(fields, expected_engine="indextts2")
-    st2, html2 = _post_form(f"{base}/api/generate/indextts2", bad_fields, 300, files=files, headers=headers)
-    refused = st2 == 200 and "data-audio-filename" not in (html2 or "") and "但当前加载的是" in (html2 or "")
-    step(
-        "version_gate_refuses_mismatch",
-        refused,
-        f"HTTP {st2}，无音频且点名两边={refused}" if refused else f"HTTP {st2} 未按预期拒绝：{(html2 or '')[:200]!r}",
+    #    不许静默拿 2.0 的结果当 2.5 返回（GOTCHAS #130 那一类）。
+    refused, why_neg = _gen_and_check(
+        base,
+        headers,
+        "indextts20",
+        "这一条不应该被合成。",
+        expect_mismatch="indextts2",
     )
+    step("version_gate_refuses_mismatch", refused, why_neg)
 
     report["passed"] = True
     return _finish(report, args.output)

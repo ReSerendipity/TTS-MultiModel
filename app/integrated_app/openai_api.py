@@ -865,6 +865,24 @@ class OpenAICompatibleRouter:
                     detail="模型未加载，请先加载模型",
                 )
 
+            if engine_name == "indextts2":
+                # 2026-09-21 实测：本端点走 IndexTTS 时 `spk_audio_prompt` 恒为空（P0-1 刻意
+                # 不给参考音频通道），而引擎**必须**有说话人参考，于是 engine.infer 抛
+                # "说话人参考音频缺失" → 上层收敛成 500 "音频生成失败"。也就是说
+                # `model=tts-1-hd` 从来没成功过 —— GPU 冒烟第 4 步首次真跑就撞出来了
+                # （此前该作业在 CI 里从未执行，见 docs/SECURITY_DEPENDABOT_TRIAGE.md §2）。
+                # 这里不擅自定"默认说话人"策略（那等于替用户选一条音色并绕过授权语义），
+                # 只把这条结构性不支持从 500 改成 400，并指明可操作的出路。
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "OpenAI 兼容端点不提供说话人参考音频通道（P0-1），而 IndexTTS 2.5/2.0 "
+                        "必需该参考，因此 model=tts-1-hd 在此端点不可用。请改用 "
+                        "POST /api/generate/indextts2（表单带 ref_audio 与 has_consent），"
+                        "或改用 model=tts-1（VoxCPM2，走 voice 预设音色或已授权的 persona 名）。"
+                    ),
+                )
+
             # 如果请求的引擎与当前引擎不同，提示切换
             if registry.current_engine != engine_name:
                 raise HTTPException(
