@@ -18,10 +18,31 @@ ENV PYTHONUNBUFFERED=1
 # README 推荐版本统一，消除"测的是 3.12、发的是 3.10"漂移。
 # Ubuntu 22.04 官方源无 3.12，经 deadsnakes PPA 提供（torch/funasr 等全量依赖均有 cp312 wheel）。
 # --no-install-recommends：不拉 idle/lib2to3 等推荐包，减小体积与 CVE 面。
+# 索引就绪守卫：apt-get update 对「某个索引没抓下来」只打一行
+#   W: Some index files failed to download. They have been ignored, or old ones used instead.
+# 然后 **返回 0**。deadsnakes 的 PPA 一抖，这一步就静默带着半套索引往下走，真正的报错落在
+# 下一行、且长得完全不像网络问题：E: Unable to locate package python3.12。
+# 2026-09-21 实测（docker-build.yml run 35598902698 / 35599696780 红，35607107888 绿）：
+#   红的两次日志里有 Ign:7 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 Packages，
+#   绿的那次同一行是 Get:7 ... Packages [44.3 kB]。同一条 update-alternatives: error:
+#   alternative path /usr/share/man/man7/bash-builtins.7.gz 在绿色 run 里也出现 → 它是
+#   apt-get upgrade 期间的良性噪声，不是构建失败的原因（先前误把它当根因，已推翻）。
+# 所以：把「PPA 索引里真查得到 python3.12」当作继续装的前置条件，取不到就重试，
+# 5 轮仍取不到就地硬停说清原因——不带着半套索引继续构建。
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common git git-lfs ffmpeg ca-certificates \
     && add-apt-repository -y ppa:deadsnakes/ppa \
-    && apt-get update && apt-get install -y --no-install-recommends \
+    && for i in 1 2 3 4 5; do \
+         apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30; \
+         if apt-cache show python3.12 >/dev/null 2>&1; then break; fi; \
+         if [ "$i" = 5 ]; then \
+           echo "E: deadsnakes 索引重试 5 轮仍查不到 python3.12 —— 是 PPA 侧或网络故障，不是本仓依赖声明问题。" >&2; \
+           echo "   可手工核对：curl -sI https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu/dists/jammy/main/binary-amd64/Packages.gz" >&2; \
+           exit 1; \
+         fi; \
+         echo "W: deadsnakes 索引未就绪，15s 后第 $((i+1)) 轮重试" >&2; sleep 15; \
+       done \
+    && apt-get install -y --no-install-recommends \
     python3.12 python3.12-venv \
     && rm -rf /var/lib/apt/lists/* \
     && python3.12 -m ensurepip --upgrade
@@ -57,7 +78,16 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common ca-certificates ffmpeg \
     && add-apt-repository -y ppa:deadsnakes/ppa \
-    && apt-get update && apt-get upgrade -y \
+    && for i in 1 2 3 4 5; do \
+         apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30; \
+         if apt-cache show python3.12 >/dev/null 2>&1; then break; fi; \
+         if [ "$i" = 5 ]; then \
+           echo "E: deadsnakes 索引重试 5 轮仍查不到 python3.12（原因与修法见 builder 阶段同一段守卫的注释）。" >&2; \
+           exit 1; \
+         fi; \
+         echo "W: deadsnakes 索引未就绪，15s 后第 $((i+1)) 轮重试" >&2; sleep 15; \
+       done \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends python3.12 python3.12-venv \
     && rm -rf /var/lib/apt/lists/* \
     && python3.12 -m ensurepip --upgrade \
