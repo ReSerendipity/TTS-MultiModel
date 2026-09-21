@@ -55,7 +55,14 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          # 20 -> 24：jsdom 30.x 自己声明的 engines.node 是
+          # "^22.22.2 || ^24.15.0 || >=26.0.0"，20 不在支持矩阵里；钉在 20 上
+          # Dependabot 的 jsdom bump 必然红在运行时内部（#93 实测：
+          # undici/lib/web/cache/cachestorage.js:20 ->
+          # TypeError: webidl.util.markAsUncloneable is not a function，
+          # 该 Node API 在 20 上不存在）。抬到 24 后本机 Node 24.18 实测
+          # 现版本 jsdom 24.1.3 与 30.1.0 均 smoke 8/0 + wiring 10/0。
+          node-version: "24"
 
       - name: Install jsdom
         working-directory: tests
