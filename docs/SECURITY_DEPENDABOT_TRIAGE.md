@@ -16,7 +16,7 @@
 | A6 | CVE-2026-4372 | transformers | high | 5.3.0 | 同上 | 远程代码执行类：需要加载不可信仓库且 `trust_remote_code=True`。本仓权重是本地目录 + 人工核验 + SHA-256（`LOCAL_RULES.md` 禁区流程）；唯一从 Hub 取物的是 `security/content_safety.py` 的 CLIP `AutoTokenizer.from_pretrained(model_name, revision=…)`（固定 revision、非攻击者可控） | 关闭理由：不接受用户指定模型源；保留复点 |
 | A7 | CVE-2026-5241 | transformers | high | 5.5.0 | 同上 | LightGlue 等模型初始化路径 —— 本仓不加载该类模型 | 关闭理由：未使用组件 |
 | A8 | CVE-2026-9856 | transformers | high | 5.10.0 | 同上 | `save_pretrained` 经 chat template 造成任意文件写：**全仓无 `save_pretrained` 调用**（音色保存写的是我们自己的目录） | 关闭理由：代码路径不存在 |
-| P1 | CVE-2025-4565 | protobuf | high | 4.25.8 | `descript-audiotools 0.7.2` 要 `>=3.9.2,<3.20`；`modelscope` 的 audio extra 要 `>=3.19.0,<3.21.0` | protobuf 在本仓只被 tensorboard / tensorboardX / modelscope / descript-audiotools 间接使用，服务端**不解析任何来自网络的 protobuf/JSON wire 数据**（`grep google.protobuf app/` 零命中） | 关闭理由：无攻击面；要真修得换掉 descript-audiotools/modelscope 的锁上界 |
+| P1 | CVE-2025-4565 | protobuf | high | 4.25.8 | **上界来源未证实**（见 §3a） | protobuf 在本仓只被 tensorboard / tensorboardX / modelscope / descript-audiotools 间接使用，服务端**不解析任何来自网络的 protobuf/JSON wire 数据**（`grep google.protobuf app/` 零命中） | 关闭理由：无攻击面；真修需先做一次 pip-compile 复算确认可解上界 |
 | P2 | CVE-2026-0994 | protobuf | high | 5.29.6 | 同上（且跨两个大版本） | 同 P1 | 同 P1 |
 
 一句话：**10 个公告里没有一个能靠"升个版"现在就消掉** —— 4 个 ReDoS 被 IndexTTS 引擎的精确 pin 挡住，
@@ -76,6 +76,21 @@ transformers 4.52.1 + tokenizers 0.21.0（引擎元数据要求的组合，最�
 `.github/workflows/ci.yml` 的 lint job，每次 PR 与 push 都跑；改完检查器输出：
 `校验 PyPI 版本 95 个，冲突 0，未核验 0 → PASS`。
 
+## 3a. protobuf 那条上界我**没有**证实（纠正一次过早的结论）
+
+本文第一版把 P1/P2 的阻断者写成"被 `descript-audiotools<3.20` 与 `modelscope<3.21` 挡住"。
+那两条约束来自**本机开发环境**的包元数据，而核查后发现它们撑不起这个结论：
+
+- `descript-audiotools` 与 `tensorboardX` **都不在 `requirements-lock.txt`（95 条钉版）里** —— 它们是开发机
+  多装出来的东西，不是发版解析图的一部分；
+- 锁里确有的 `modelscope==1.40.1`，其 `protobuf<3.21.0,>=3.19.0` **只挂在 `nlp` / `all` extra 上**，
+  而 `requirements.txt:8` 写的是 `modelscope>=1.9.0`（**没有请求任何 extra**）；
+- 但锁里 `protobuf==3.19.6` 恰好落在那条约束的**下界**上，所以解析图里很可能确实带进了某个 extra
+  （或经 `funasr==1.4.15` 间接引入 —— 它自身元数据里没有 protobuf 直接约束）。
+
+结论：**"被谁挡住"目前只能标为未证实**，确切断链要靠一次 `pip-compile` 复算（属于 §B1 的 relock 工作，
+需要访问索引、拉几百 MB 依赖）。在它做完之前，P1/P2 的处置只写"无攻击面"，不写"被上游挡住"。
+
 ## 4. 复点条件（满足其一就重新评估对应告警）
 
 1. IndexTTS 官方放开 `transformers` 精确 pin → 立刻可关 A1–A4（4.53+），届时再判 5.x 的 A5–A8。
@@ -100,3 +115,17 @@ gh api repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/22 \
 `dismissed_reason` + 注释里引用本文对应行号），**先跑 1 条确认语义再批量**。
 每条注释必须自带绑定理由（哪条代码路径不存在 / 被哪个上游上界挡住 / 复点条件），
 不接受"误报"三个字了事。
+
+## 6. 开发环境一致性核对（`pip check` 16 条，2026-09-21）
+
+`python -m pip check` 在本机报 16 条，逐条分类后**没有一条影响发版产物**：
+
+| 类别 | 条数 | 内容 | 判定 |
+|---|---|---|---|
+| `indextts 2.0.0` 声明但没装的包 | 4 | cython、ffmpeg-python、keras、opencv-python | 不影响：三引擎真推理今天全部跑通（2.5 出 214,040 B / RMS 6176；2.0 出 205,124 B / RMS 6926；VoxCPM2 出 230,148 B / RMS 4615）→ 这几项是它打包元数据里的构建/训练期依赖，推理路径不需要 |
+| `indextts 2.0.0` 声明版本与实装不符 | 11 | numpy 2.2.6→2.5.2、torch 2.8.*→2.13.0+cu132、torchaudio 2.8.*→2.11.0、pandas 2.3.2→3.0.5、librosa 0.10.2.post1→1.0.0、modelscope 1.27.0→1.39.1、safetensors 0.5.2→0.8.0、numba、matplotlib、cn2an、json5 | 同上：本机是"整套比 indextts 声明更新"的环境，实测可用。注意**别据此抬 `transformers` 上界**（§2 已证 4.57 会把两个引擎打死） |
+| 与发版无关的额外包 | 1 | `tensorboardX 2.6.5` 要 `protobuf>=3.20`，实装 3.19.6 | 不影响产物：`tensorboardX` 不在 `requirements-lock.txt` 里，只是开发机多装的 |
+
+顺带说清两件事：`requirements-lock.txt` 是 `pip-compile --no-annotate` 的产物（95 条钉版），
+本机实装与它有 **30/73 条**可对比项不一致，且锁里没有 `descript-audiotools`/`tensorboardX`
+一类开发机依赖 —— 所以"锁 vs 开发机"的差**不等于**锁错，但它同时说明**这份锁从没被真装验证过**（见 §B1 建议）。
