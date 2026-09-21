@@ -6,10 +6,13 @@
 - `CSRFMiddleware.__init__`：拿到空 `secret_key` 直接 `ValueError`，
   防止别的装配点把这道防护悄悄关掉。
 
-对应 PR #81 里那条一直没能进 main 的内容（`app_server.py:818-819` 的静默降级至今还在）。
+对应 PR #81 提过、一直没进 main 的那半边（`app_server.py` 里"回退到无签名模式"的静默降级）。
+#81 的另一半（把 transformers 下界抬到 4.53）已被实测推翻并按 #103 回退到 4.52.1。
 """
 
 from __future__ import annotations
+
+import os
 
 import pytest
 
@@ -55,3 +58,38 @@ class TestCsrfSecretHardFail:
         """防空转：只有"正常路径仍然可装配"成立，上一条拒绝才有意义。"""
         mw = CSRFMiddleware(_noop_app(), secret_key="x" * 48)  # type: ignore[arg-type]
         assert mw._secret_key == "x" * 48
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Windows 的 st_mode 不表达 POSIX 权限位")
+class TestCsrfSecretFileMode:
+    """CodeQL #1（py/clear-text-storage-sensitive-data）对应的真加固那半边。
+
+    抑制注释只解释"为什么必须落盘"；"落下来只能是主人可读"这件事由这里守着。
+    """
+
+    def test_generated_secret_file_is_owner_only(self, tmp_path) -> None:
+        decoy = tmp_path / "decoy"  # 反空验证：这台机器上普通文件的默认权限确实带着 other 位
+        decoy.write_text("x", encoding="utf-8")
+        assert decoy.stat().st_mode & 0o077, "默认权限已经是 0600，这条断言在该文件系统上没有区分度"
+
+        path = tmp_path / ".csrf_secret"
+        _load_or_create_csrf_secret(str(path))
+        assert path.stat().st_mode & 0o077 == 0, f"密钥文件带着 group/other 权限位：{oct(path.stat().st_mode)}"
+
+    def test_preexisting_broad_mode_is_tightened_without_losing_the_secret(self, tmp_path) -> None:
+        """老版本（0644）建出来的密钥：读出来的值必须原样保留，权限必须被收紧。"""
+        path = tmp_path / ".csrf_secret"
+        path.write_text("k" * 48, encoding="utf-8")
+        os.chmod(str(path), 0o644)
+        assert path.stat().st_mode & 0o077
+
+        assert _load_or_create_csrf_secret(str(path)) == "k" * 48
+        assert path.stat().st_mode & 0o077 == 0, f"没收紧：{oct(path.stat().st_mode)}"
+
+    def test_empty_preexisting_file_is_rewritten_not_fatal(self, tmp_path) -> None:
+        """空文件走的是 O_TRUNC 分支：不能因为用了 O_EXCL 而把"启动"变成"文件已存在"失败。"""
+        path = tmp_path / ".csrf_secret"
+        path.write_text("", encoding="utf-8")
+        os.chmod(str(path), 0o666)
+        secret = _load_or_create_csrf_secret(str(path))
+        assert secret and path.stat().st_mode & 0o077 == 0

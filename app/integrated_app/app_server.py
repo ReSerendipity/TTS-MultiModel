@@ -733,17 +733,60 @@ def _load_or_create_csrf_secret(path: str) -> str:
     """
     import secrets as _secrets
 
+    def _tighten_mode(target: str) -> None:
+        """把已存在的密钥文件收紧到 0600（POSIX 语义下才有意义）。
+
+        只在"确实带着 group/other 位"时才动手，并且**收紧失败不升级为启动失败**：
+        exFAT/FAT 这类按挂载参数定权限的文件系统，chmod 可能成功但模式不变、或直接抛错。
+        那种环境下拒绝启动不会让密钥更安全，只会把本机用户的 app 变成起不来 ——
+        与"只读根 fs 导致密钥取不出来"那种**功能前置条件**不同，这里失败的可行动作是
+        "把 data/ 挪到支持 POSIX 权限的卷"，不是"别跑了"。
+        """
+        if os.name != "posix":
+            # Windows 的访问控制不在 st_mode 里（只能表达只读位，普通文件恒为 0o666），
+            # 在这里判"带着 other 位"会每次启动误报一条永远收不掉的 warning。
+            # 密钥目录在用户自己的 AppData/data 下，继承的是该用户的 ACL。
+            return
+        try:
+            if os.stat(target).st_mode & 0o077 == 0:
+                return
+            os.chmod(target, 0o600)
+            still = os.stat(target).st_mode & 0o077
+            if still:
+                logger.warning(
+                    "[create_app] CSRF 密钥文件权限仍是 %o（该文件系统不支持 POSIX 权限？）。"
+                    "密钥只用于本地 CSRF HMAC 绑定；如需收紧请把 data/ 放到支持权限位的卷上。",
+                    0o600 | still,
+                )
+        except OSError as exc:
+            logger.warning(
+                "[create_app] 无法收紧 CSRF 密钥文件权限（%s: %s）——继续启动，"
+                "但请把 data/ 目录权限作为部署项检查一次。",
+                type(exc).__name__,
+                exc,
+            )
+
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         secret = ""
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:
                 secret = f.read().strip()
+            _tighten_mode(path)
         if not secret:
             secret = _secrets.token_urlsafe(48)  # nosec B311 - 密码学安全随机源，非伪随机
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(secret)
-            logger.info("[create_app] 已生成新的 CSRF HMAC 密钥: %s", path)
+            # 0o600 在建文件那一刻就生效（umask 只会往上减位，加不出 group/other 权限），
+            # 不留"先按 0644 建出来、再改权限"的窗口。
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                # 文件若已存在（上一版留了个空的），open 的 mode 参数会被忽略，
+                # 所以趁 O_TRUNC 之后、写密钥之前按路径再收紧一次。
+                # （不用 os.fchmod：它在 Windows 上不存在，会让启动直接 AttributeError。）
+                _tighten_mode(path)
+                # 明文落盘是设计前提：密钥要跨进程存活，否则每次重启都把已打开的页面变成 403。
+                # 风险面只剩"同机其他用户读得到"，由上面的 0600 + 权限测试收口（论证全文见 PR #109）。
+                f.write(secret)  # codeql[py/clear-text-storage-sensitive-data] ignore -- 见上一行
+            logger.info("[create_app] 已生成新的 CSRF HMAC 密钥: %s（权限 0600）", path)
         return secret
     except OSError as exc:
         raise RuntimeError(
