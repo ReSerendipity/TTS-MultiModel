@@ -199,21 +199,54 @@ Dockerfile:38  RUN python3.12 -m pip install --no-cache-dir --user -r requiremen
    pip-audit 侧没有到期机制（它不支持 expiration），所以 A1–A16 的 16 个号靠本文 + 人守 ——
    2026-12-31 之前要么按条件 1 抬版本消掉，要么把这份表带着做一次显式再确认。
 
-## 5. 需要仓库所有者点头的动作
+## 5. 需要仓库所有者点头的动作（枚举已查成真值，命令可直接跑）
 
-GitHub 安全页的 20 条 dismiss 属**共享状态写操作**，我没有代做，也没有在这份文档里写死
-`dismissed_reason` 的取值 —— 那个枚举我该现查而不是照记忆写。执行前先取真值：
+GitHub 安全页的 20 条 dismiss 属**共享状态写操作**，我没有代做。原先说"`dismissed_reason`
+的取值我要现查"—— 已查，两个独立来源一致：
+
+- REST 文档（`docs.github.com/en/rest/dependabot/alerts`）：`state` ∈ `dismissed` / `open`；
+  `dismissed_reason` ∈ **`fix_started` / `inaccurate` / `no_bandwidth` / `not_used` / `tolerable_risk`**；
+  没有独立的 `comment` 字段，注释走 **`dismissed_comment`**。
+- GraphQL 内省（权威，不依赖文档是否过期）：
 
 ```bash
-# 看某条告警现在的状态与字段名（读操作，不改状态）
-gh api repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/22 \
-  -q '{state, dismiss_reason, advisory: .security_advisory.cve_id}'
+gh api graphql -f query='{ __type(name: "DismissReason") { kind enumValues { name } } }'
+# → ENUM: FIX_STARTED, NO_BANDWIDTH, TOLERABLE_RISK, INACCURATE, NOT_USED
 ```
 
-拿到合法枚举后，按 §1 表里"建议处置"一列逐条 PATCH（`state=dismissed` + 对应的
-`dismissed_reason` + 注释里引用本文对应行号），**先跑 1 条确认语义再批量**。
-每条注释必须自带绑定理由（哪条代码路径不存在 / 被哪个上游上界挡住 / 复点条件），
-不接受"误报"三个字了事。
+**告警号 ↔ §1 行的对应（`gh api .../dependabot/alerts?state=open` 实测 20 条 = 10 个公告 × 2 份清单）**：
+
+| 告警号 | 公告 | 对应 §1 | 建议 `dismissed_reason` | 一句话理由（写进 `dismissed_comment`） |
+|---|---|---|---|---|
+| 4、14 | CVE-2025-5197 | A1 | `not_used` | `convert_tf_weight_name_to_pt_weight_name` 在本仓 0 命中，不做 TF→PT 权重名转换 |
+| 5、15 | CVE-2025-6638 | A3 | `not_used` | 不加载 Marian 模型，`remove_language_code` 走不到 |
+| 6、16 | CVE-2025-6051 | A2 | `not_used` | 不用 transformers 的 normalizer，文本前处理在引擎自带前端里 |
+| 7、17 | CVE-2025-6921 | A4 | `not_used` | `AdamWeightDecay` 是训练期优化器，本服务不训练 |
+| 9、19 | CVE-2026-1839 | A5 | `not_used` | 全仓无 `from transformers import Trainer`；自己的 `LoRATrainer` 不继承它 |
+| 10、20 | CVE-2026-4372 | A6 | `tolerable_risk` | 需要加载别人给的 `config.json`；权重走 `model/` 本地目录 + 人工确认 + SHA-256 |
+| 11、21 | CVE-2026-5241 | A7 | `tolerable_risk` | 本仓只加载 TTS 语音模型，无 LightGlue 一类视觉模型 |
+| 12、22 | CVE-2026-9856 | A8 | `not_used` | 全仓 0 处 `save_pretrained`；音色保存走自己的目录写入 |
+| 3、13 | CVE-2025-4565 | P1 | `tolerable_risk` | 服务端不解析网络来的 protobuf/JSON wire；待 §7b 复算后抬到 4.25.8 自然消除 |
+| 8、18 | CVE-2026-0994 | P2 | `tolerable_risk` | 同 P1，修复线 5.29.6 |
+
+跑法（**先只跑 1 条确认语义，再批量**）：
+
+```bash
+# 单条试跑（先读后写，确认字段语义与返回）
+gh api repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/4 \
+  --method PUT \
+  -f state=dismissed \
+  -f dismissed_reason=not_used \
+  -f dismissed_comment='本仓可达性判定见 docs/SECURITY_DEPENDABOT_TRIAGE.md §1 A1（convert_tf_weight_name_to_pt_weight_name 零命中）；复点条件 §4-1。'
+
+# 确认无误后再按上表批量（号与 reason 逐条对，别用同一个值一把梭）
+```
+
+两点别忘：
+1. **`not_used` / `tolerable_risk` 要按上表分开设**，全用 `inaccurate` 会把"我们确实带着这些公告"
+   这件事从台账上抹掉 —— 这 16 条的账本在 pip-audit 豁免清单与本文 §1，不在告警页。
+2. 关掉这 20 条 **不等于登记完成**：A9–A16 那 8 条只有 PYSEC 号、没有 GHSA 记录，
+   Dependabot 从不开单（上面的告警列表里确实没有它们）。别以"告警清零"当验收口径。
 
 ## 6. 开发环境一致性核对（`pip check` 16 条，2026-09-21）
 
