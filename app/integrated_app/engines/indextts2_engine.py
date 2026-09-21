@@ -92,10 +92,12 @@
 """
 
 import contextlib
+import functools
 import gc
 import logging
 import os
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -142,6 +144,30 @@ def _save_pcm_wav_soundfile(path: str, wav: Any, sampling_rate: int) -> None:
         if arr.shape[1] == 1:
             arr = arr[:, 0]
     sf.write(path, arr, int(sampling_rate), subtype="PCM_16")
+
+
+# ---------------------------------------------------------------------------
+# 推理串行锁：IndexTTS 的推理**不可重入**
+# ---------------------------------------------------------------------------
+# WHY：预热（model_optimizer.warmup_indextts2）是从后台加载线程直接调 infer 的，
+# 绕开了用户侧那把 per-engine asyncio.Semaphore（routes/generate/utils.py）。
+# 2026-09-21 真机实测：预热开始 2 秒后插入一条用户合成请求，两个请求同时进
+# 同一个模型 → `CUDA error: device-side assert triggered`，并且**整个 CUDA context
+# 被毒化**，之后同进程内所有推理（含回切时的重新加载）全部连带失败。
+# 用户侧那把信号量管不到预热，所以在引擎这一层补一把按注册名分组的 RLock：
+# 任何调用方（队列、SSE、预热、OpenAI 口）都串行，锁在 infer 之外不可见。
+_INFER_LOCKS: dict[str, threading.RLock] = {}
+_INFER_LOCKS_GUARD = threading.Lock()
+
+
+def _engine_infer_lock(key: str) -> threading.RLock:
+    """取该引擎实例的推理串行锁（首次访问时线程安全地创建）。"""
+    with _INFER_LOCKS_GUARD:
+        lock = _INFER_LOCKS.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _INFER_LOCKS[key] = lock
+        return lock
 
 
 class IndexTTS2Engine(TTSEngine):
@@ -631,7 +657,13 @@ class IndexTTS2Engine(TTSEngine):
         except Exception as e:
             logger.debug(f"[IndexTTS2] 获取显存信息失败: {e}")
 
-    def infer(
+    @property
+    def _serial_infer_lock(self) -> threading.RLock:
+        """本实例（按注册名分组，2.5 与 2.0 各一把）的推理串行锁。"""
+        key = str(getattr(self, "_engine_name", "") or self.version_str)
+        return _engine_infer_lock(key)
+
+    def _infer_impl(
         self,
         text: str,
         spk_audio_prompt: str,
@@ -925,6 +957,16 @@ class IndexTTS2Engine(TTSEngine):
                 f"IndexTTS {self.version_str} 合成失败: {type(e).__name__}: {e}",
                 engine=self._engine_name,
             ) from e
+
+    @functools.wraps(_infer_impl)
+    def infer(self, *args: Any, **kwargs: Any) -> tuple[int, "np.ndarray", str]:  # noqa: ANN401
+        """对外入口：整次推理持有该引擎的串行锁。
+
+        用 ``functools.wraps`` 保住原签名 —— 接口测试是拿
+        ``inspect.signature(IndexTTS2Engine.infer)`` 检参数表的。
+        """
+        with self._serial_infer_lock:
+            return self._infer_impl(*args, **kwargs)
 
     def synthesize(
         self,

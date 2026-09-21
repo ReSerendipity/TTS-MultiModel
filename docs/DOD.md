@@ -165,17 +165,35 @@
     **仍未消掉**：runner 不存在 → IndexTTS 2.5/2.0 的真推理与"两个 IndexTTS 变体的导入"在 CI 上
     依然零覆盖，只有本机能验；要让这条变成 CI 事实，需要注册一台带 `gpu` 标签的
     self-hosted runner 并配 `REPO_ADMIN_TOKEN`（归所有者）。
-  * **本机真机跑冒烟时撞出一个未定级的运行时缺陷（发版前值得看一眼）**：同一进程里
-    **第二次切换引擎之后**的那次合成会 `CUDA error: device-side assert triggered`。
-    复现序列（RTX 5070 Ti 12,227 MiB，transformers 4.52.1）：
-    voxcpm2 自动加载 → `synth_tts-1` 成功（310,470 B）→ 切 indextts2 → 2.5 合成成功（298,746 B）
-    → 切 indextts20 → **2.0 合成报 device-side assert**（HTTP 400 的错误块里）。
-    两个对照实验排除了我先前的猜想：(a) 冷切换不是原因 —— 直接以 indextts2 启动、或
-    voxcpm2→indextts2 冷切之后首次合成都成功（386,796 B / 290,944 B）；(b) 参考音频
-    `examples/reference_speaker.wav` 不是原因 —— 同一个文件在冷启动路径下能出真音频。
-    开 `CUDA_LAUNCH_BLOCKING=1` 后断言仍落在**第二次切换之后**那一步，说明不是异步错位归因。
-    现状：只复现到"第二次切换"这一层，未定位到具体 kernel；冒烟现在会**如实报 FAIL**
-    （不是静默跳过），所以一旦 runner 上线，这条会被 CI 抓住。归所有者定是否 v2.2.2 拦路。
+  * **真机跑冒烟时定位并修掉一个 CUDA 崩溃（原以为是"第二次切换"，其实是预热抢占）**：
+    症状 `CUDA error: device-side assert triggered`，且**整个 CUDA context 被毒化** ——
+    之后同进程所有推理连带失败，连切换的回滚重载都报 503。服务端时间线是决定性证据：
+    `21:05:57 [req=bg-model-startup-load] 开始合成 text='你好'`（预热）→
+    `21:05:59 [req=f663d3ae…] 开始合成`（用户请求）→ `21:06:01` **两条一起** assert。
+    根因：预热走 `model_optimizer.warmup_indextts2`，从后台加载线程**直接调 `engine.infer`**，
+    绕开了用户侧那把 per-engine `asyncio.Semaphore(1)`（`routes/generate/utils.py:439`），
+    而 IndexTTS 推理不可重入。"第二次切换才挂"是巧合 —— 切换必然触发预热，而 `loaded`
+    状态早于预热完成，脚本/用户就是会在预热那 2~5 秒里把请求挤进去。
+    （先前记的三个"嫌疑"全被证伪：冷切换、参考音频素材、异步错位归因都排除过。）
+    修法：在引擎这一层加按注册名分组的 `threading.RLock`（`_engine_infer_lock`），`infer`
+    变成持锁薄包装并用 `functools.wraps` 保住签名（接口测试仍按 14 个参数检查），
+    于是队列 / SSE / 预热 / OpenAI 口任何入口都被串行化。
+    **真机验证**：① 原并发条件（预热进行中就压请求）从必崩变成 2.5 = 336,642 B、
+    2.0 = 239,674 B，且与串行跑出来的**字节数完全一致**（锁只串行化，不改结果）；
+    ② 完整冒烟 10 格全绿：`engine_imports` → `ready` → `csrf_ticket` → voxcpm2 321,962 B →
+    切 2.5 → `openai_tts1hd_contract` 400 → 2.5 = 386,796 B → 切 2.0 → 2.0 = 402,400 B →
+    版本门负向按预期拒绝；结束显存回落 2,666 MiB。
+  * **镜像构建今天起在 CI 上确定性失败（与本仓改动无关的基础设施故障，未修）**：
+    `Dockerfile` 的 `apt-get install` 层报
+    `update-alternatives: error: alternative path /usr/share/man/man7/bash-builtins.7.gz doesn't exist`
+    → buildx 失败，`Build & Scan Image` 与 `Boot hardened container & probe` 两个作业同时红。
+    判据链：main 上 11:07 的同类构建还是 **success**（`41f5a12`/`1b29d0f`），12:19 与 12:28 两次
+    PR 构建红在**同一步**，且**各重试一次仍然一模一样** → 不是瞬时网络、也不是本 PR 引入
+    （本 PR 没碰 `Dockerfile`，失败发生在我的探针步骤之前）。jammy 已进入归档期，
+    疑点是 `software-properties-common` 一条依赖链带进来的 man-db/manpages 组合。
+    **我没有改 Dockerfile**：本机没有 docker daemon，任何 apt/dpkg 层的规避手法（
+    `path-exclude=/usr/share/man/*` 之类）在我这儿都是盲改，而它会改变发版镜像的内容 ——
+    要改就该在能真构建的环境里改并验，不该靠 CI 试错。交所有者定谁来做。
   * **仍未覆盖**：桌面安装包链路（staging → data 7z → NSIS）**无任何 workflow 调用**、本机也无从安装
     （`scripts/installer/` 只有一个 4.3 MB `Setup.exe`、无同目录分卷），所以 `unpack_desktop.ps1`
     新加的许可/字体落地核对只过了语法层，`release_gate.ps1` 的第 ⑥ 步也只在发版/dispatch 时跑；
