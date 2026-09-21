@@ -1,44 +1,80 @@
 # 依赖漏洞告警分诊（Dependabot alerts triage）
 
-日期：2026-09-21　适用：`main` @ PR #100 之后　责任人：仓库所有者
-状态：**20 条 open 告警 = 10 个公告 × 2 份清单**（`requirements-lock.txt`、
-`launcher/requirements-small.txt` 各计一次）。本文只谈"能不能修 / 该不该修 / 谁挡住"。
+日期：2026-09-21（同日按 CI 真实输出 + api.osv.dev 复核修订过一次）
+适用：`main` @ PR #100 之后　责任人：仓库所有者
+状态：**GitHub 上 20 条 open 告警 = 10 个公告 × 2 份清单**（`requirements-lock.txt`、
+`launcher/requirements-small.txt` 各计一次）。但**扫描器视角的下界代价比这个大**：
+transformers 4.52.x 实际带 **16 个公告**，其中 8 个只有 PYSEC 号、没有 GHSA 记录 ——
+Dependabot 只跟 GHSA，所以那 8 条**根本不开单**，只有 pip-audit（OSV 全源）看得见。
+也就是说："把 20 条 dismiss 完" ≠ "4.52.x 的风险登记完"。本文 §1 是完整的 16+2 行。
+号与来源全部绑定证据（§1a），不凭记忆。
 
 ## 1. 结论速览
 
-| # | CVE | 包 | 严重度 | 修复版本 | 谁挡住它 | 本仓可达性 | 建议处置 |
+A1–A8 有 GHSA 记录（= Dependabot 那 16 条告警的来源）；A9–A16 是 PYSEC-only 的 ZDI 系列
+（Dependabot 不开单，pip-audit 会红）。P1/P2 与 transformers 无关。
+
+| # | CVE | PYSEC / GHSA | 严重度 | 修复版本 | 具体代码路径 | 本仓可达性判据 | 处置 |
 |---|---|---|---|---|---|---|---|
-| A1 | CVE-2025-5197 | transformers | medium | 4.53.0 | `indextts==…`钉 `transformers==4.52.1` | tokenizer 正则 ReDoS，且仅 Marian/部分 tokenizer；我们走 GPT2/CLIP 路径，输入是本机用户自己键入的文本 | 关闭理由：本机自用 + 代码路径不涉及；待引擎适配后随版本升级自然消除 |
-| A2 | CVE-2025-6051 | transformers | medium | 4.53.0 | 同上 | 同 A1 | 同 A1 |
-| A3 | CVE-2025-6638 | transformers | medium | 4.53.0 | 同上 | MarianTokenizer —— 本仓不加载 Marian 模型 | 同 A1 |
-| A4 | CVE-2025-6921 | transformers | medium | 4.53.0 | 同上 | AdaLight tokenizer 正则 —— 未使用 | 同 A1 |
-| A5 | CVE-2026-1839 | transformers | medium | 5.0.0rc3 | 引擎钉 4.52.1（且 5.x 是大版本破坏性升级） | `Trainer` 代码执行：**全仓无 HF `Trainer` 用法**（`training/trainer.py` 里的 `LoRATrainer` 是我们自己的类，`grep from transformers import Trainer` 零命中） | 关闭理由：代码路径不存在 |
-| A6 | CVE-2026-4372 | transformers | high | 5.3.0 | 同上 | 远程代码执行类：需要加载不可信仓库且 `trust_remote_code=True`。本仓权重是本地目录 + 人工核验 + SHA-256（`LOCAL_RULES.md` 禁区流程）；唯一从 Hub 取物的是 `security/content_safety.py` 的 CLIP `AutoTokenizer.from_pretrained(model_name, revision=…)`（固定 revision、非攻击者可控） | 关闭理由：不接受用户指定模型源；保留复点 |
-| A7 | CVE-2026-5241 | transformers | high | 5.5.0 | 同上 | LightGlue 等模型初始化路径 —— 本仓不加载该类模型 | 关闭理由：未使用组件 |
-| A8 | CVE-2026-9856 | transformers | high | 5.10.0 | 同上 | `save_pretrained` 经 chat template 造成任意文件写：**全仓无 `save_pretrained` 调用**（音色保存写的是我们自己的目录） | 关闭理由：代码路径不存在 |
-| P1 | CVE-2025-4565 | protobuf | high | 4.25.8 | **上界来源未证实**（见 §3a） | protobuf 在本仓只被 tensorboard / tensorboardX / modelscope / descript-audiotools 间接使用，服务端**不解析任何来自网络的 protobuf/JSON wire 数据**（`grep google.protobuf app/` 零命中） | 关闭理由：无攻击面；真修需先做一次 pip-compile 复算确认可解上界 |
-| P2 | CVE-2026-0994 | protobuf | high | 5.29.6 | 同上（且跨两个大版本） | 同 P1 | 同 P1 |
+| A1 | CVE-2025-5197 | PYSEC-2026-1983 / GHSA-9356-575x-2w9m | MODERATE | 4.53.0 | `convert_tf_weight_name_to_pt_weight_name()` 正则灾难性回溯 | `grep -rl convert_tf_weight_name_to_pt_weight_name app/ scripts/` → **0 命中**；本仓不做 TF→PT 权重名转换 | 已接受风险（pip-audit 豁免） |
+| A2 | CVE-2025-6051 | PYSEC-2026-1988 / GHSA-rcv9-qm8p-9p6j | MODERATE | 4.53.0 | `EnglishNormalizer.normalize_numbers()` 正则 | 同法 **0 命中**（`normalize_numbers` / `EnglishNormalizer` 各 0）；文本前处理走 voxcpm / indextts 自带前端，不用 transformers normalizer | 已接受风险 |
+| A3 | CVE-2025-6638 | PYSEC-2026-1981 / GHSA-59p9-h35m-wg4g | MODERATE | 4.53.0 | `MarianTokenizer.remove_language_code()` 正则 | `grep Marian app/ scripts/` → **0 命中**，本仓不加载 Marian 模型 | 已接受风险 |
+| A4 | CVE-2025-6921 | PYSEC-2026-1980 / GHSA-4w7r-h757-3r74 | MODERATE | 4.53.0 | `AdamWeightDecay._do_use_weight_decay()` 处理用户可控正则 | **0 命中**；且是**训练期**优化器，本仓不发训练（`training/` 由 AST 门禁隔离） | 已接受风险 |
+| A5 | CVE-2026-1839 | PYSEC-2026-2288 / GHSA-69w3-r845-3855 | MODERATE（AV:L/UI:R） | 5.0.0rc3 | `Trainer._load_rng_state()` 调 `torch.load()` 未带 `weights_only=True` | `grep "from transformers import Trainer"` → **0 命中**；`training/trainer.py` 的 `LoRATrainer` 是我们自己的类，不继承 HF `Trainer` | 已接受风险 |
+| A6 | CVE-2026-4372 | PYSEC-2026-2289 / GHSA-29pf-2h5f-8g72 | **HIGH** | 5.3.0 | 恶意 `config.json` 里 `_attn_implementation_internal` 指向攻击者仓库，`AutoModelForCausalLM.from_pretrained()` 加载时 RCE | 前提是**加载别人给的模型目录**。本仓权重全部来自 `model/` 本地目录，入库前人工确认 + SHA-256 复验（`LOCAL_RULES.md` 禁区流程）；唯一从 Hub 取物的是 `security/content_safety.py` 里固定 revision 的 CLIP tokenizer，模型名不接受用户输入 | 已接受风险；Trivy 侧另需 `.trivyignore.yaml` |
+| A7 | CVE-2026-5241 | PYSEC-2026-2290 / GHSA-fgcw-684q-jj6r | **HIGH**（AV:N） | 5.5.0 | LightGlue 模型加载路径 `trust_remote_code` 失效 → 初始化期任意代码执行 | 本仓只加载 TTS 语音模型（voxcpm / indextts / funasr / zipenhancer），无视觉匹配模型；`grep LightGlue` → 0 | 已接受风险；Trivy 侧同上 |
+| A8 | CVE-2026-9856 | PYSEC-2026-3929 / GHSA-xrqw-3rrv-vx5w | **HIGH**（AV:N） | 5.10.0 | `save_pretrained()` 经 chat template 造成路径穿越任意文件写 | `grep -rn save_pretrained app/ scripts/` → **0 命中**；音色保存写的是我们自己的目录 | 已接受风险；Trivy 侧同上 |
+| A9 | CVE-2025-14920 | PYSEC-2025-211 / 无 GHSA | 未评（CVSS3.0 `AV:L/…/UI:R/C:H/I:H/A:H`） | **无** | Perceiver 原始 checkpoint 反序列化 | ZDI 系列，入口都是**人工执行权重转换器**：`grep -riE "convert_[a-z_]*original_checkpoint|PerceiverModel" app/ scripts/` → **0 命中** | 已接受风险（Dependabot 不开单） |
+| A10 | CVE-2025-14921 | PYSEC-2025-212 / 无 GHSA | 同上 | **无** | Transformer-XL 原始 checkpoint 反序列化 | 同 A9（`TransformerXL` 0 命中） | 同 A9 |
+| A11 | CVE-2025-14924 | PYSEC-2025-213 / 无 GHSA | 同上 | **无** | megatron_gpt2 反序列化 | 同 A9（`megatron` 0 命中） | 同 A9 |
+| A12 | CVE-2025-14926 | PYSEC-2025-214 / 无 GHSA | 同上 | **无** | SEW `convert_config` 代码注入 | 同 A9（`SEWModel` 0 命中） | 同 A9 |
+| A13 | CVE-2025-14927 | PYSEC-2025-215 / 无 GHSA | 同上 | **无** | SEW-D `convert_config` 代码注入 | 同 A9（`SEWD` 0 命中） | 同 A9 |
+| A14 | CVE-2025-14928 | PYSEC-2025-216 / 无 GHSA | 同上 | **无** | HuBERT `convert_config` 代码注入 | 同 A9（`HuBERT` 0 命中）；ASR 侧走 funasr 自有权重格式 | 同 A9 |
+| A15 | CVE-2025-14929 | PYSEC-2025-217 / 无 GHSA | 同上 | **无** | X-CLIP checkpoint 转换反序列化 | 同 A9（`XCLIP` 0 命中）；CLIP 在本仓只做安全判定、且用 `AutoTokenizer` 不换 checkpoint | 同 A9 |
+| A16 | CVE-2025-14930 | PYSEC-2025-218 / 无 GHSA | 同上 | **无** | GLM4 反序列化 | 同 A9；本仓无 LLM 对话模型 | 同 A9 |
+| P1 | CVE-2025-4565 | — | high | 4.25.8 | protobuf wire 解析 | **上界来源未证实**（§3a）；服务端 `grep google.protobuf app/` 零命中，无网络输入面 | 待 §3a 复算后再定 |
+| P2 | CVE-2026-0994 | — | high | 5.29.6 | 同 P1 | 同 P1 | 同 P1 |
 
-一句话：**10 个公告里没有一个能靠"升个版"现在就消掉** —— 4 个 ReDoS 被 IndexTTS 引擎的精确 pin 挡住，
-4 个需要 transformers 5.x（大版本），2 个需要 protobuf 越过 `descript-audiotools<3.20` /
-`modelscope<3.21` 两道上游上界。
+一句话：**16 个 transformers 公告里没有一个能靠"升个版"现在就消掉** —— A1–A4 要 4.53（被
+IndexTTS 的精确 pin 挡住，§2），A5–A8 要 5.x 大版本，A9–A16 **上游根本没有修复版本**，
+只能在 5.x 之后才可能出现。P1/P2 另说。
 
-## 1a. 两道扫描器的豁免号是从哪来的（2026-09-21 实测日志，不凭记忆）
+## 1a. 两道扫描器的豁免号是从哪来的（本轮实测，不凭记忆）
 
-下界回到 4.52.x 后，两道门禁会各自报一批号。**两边的 id 命名体系不同**：Trivy 用 CVE，
-pip-audit 用 PYSEC。下列号全部取自 PR #101 那一次 CI 的真实输出，不是推测：
+下界回到 4.52.x 后，两道门禁各自报一批号，**口径不同所以数量差 5 倍**：
 
-| 来源 | 号 | 报的版本 | 修复版本 | 对应本文 §1 |
-|---|---|---|---|---|
-| `docker-build.yml` Trivy（job 106215347457，`Total: 6 (HIGH: 6)`，同一包在两处 site-packages 各计一次） | CVE-2026-4372 | transformers 4.52.4 | 5.3.0 | A6 |
-| 同上 | CVE-2026-5241 | transformers 4.52.4 | 5.5.0 | A7 |
-| 同上 | CVE-2026-9856 | transformers 4.52.4 | 5.10.0 | A8 |
-| `security.yml` pip-audit（job 106215347173） | PYSEC-2025-216、PYSEC-2026-198、PYSEC-2026-228、PYSEC-2026-229、PYSEC-2026-392 | transformers 4.52.4 | 见 §1 | A5–A8 组 |
+| 门禁 | 过滤条件 | 看到的号 | 条数 |
+|---|---|---|---|
+| `docker-build.yml` / `docker-publish.yml` 的 Trivy | `severity: CRITICAL,HIGH` + `ignore-unfixed: true` | CVE-2026-4372 / 5241 / 9856（A6/A7/A8，唯一"HIGH 且有修复版本"的三条；同一包在 root 与 ttsuser 两处 site-packages 各计一次，所以 `Total: 6`） | 3 |
+| `security.yml` 的 pip-audit | 无 severity、无 unfixed 过滤（它也没这两个开关） | §1 表 A1–A16 的全部 PYSEC 号 | 16 |
 
-落到的地方：`.trivyignore.yaml`（3 条 CVE，**每条带 `expiration: 2026-12-31`**，到期自动重新变红）
-与 `security.yml` 里 pip-audit 的 5 个 `--ignore-vuln`。
-`tests/test_dependency_consistency.py::test_accepted_risk_registers_stay_in_sync` 会双向核对：
-豁免文件里的 id 必须能在本文档找到、必须有 expiration，反之新出现的号不会被静音。
+run 35575129704 job 106255145288（pip-audit，"Found 22 known vulnerabilities, ignored 1"）
+与 run 35575129698 job 106255144801（Trivy）是这两行的出处；A9–A16 的 CVE↔PYSEC 对应、
+A1–A4 的"具体函数"列取自 `POST api.osv.dev/v1/query`
+（`{"package":{"name":"transformers","ecosystem":"PyPI"},"version":"4.52.4"}`）：
+返回 24 条记录，按 CVE 去重后 16 个公告 —— 4.52.1 与 4.52.4 的集合**实测完全一致**。
+
+**两次自己踩出来的纠正，留在这里当反例：**
+
+1. 上一版这里写的 5 个 PYSEC 号有 **4 个是假的**：`PYSEC-2026-198 / 228 / 229 / 392` 是把真号
+   `…1980 / …2288 / …2290 / …3929` 从中间截断了。pip-audit 按**全号精确匹配**，所以那次
+   `--ignore-vuln` 5 条里只豁免掉 1 条，CI 照红（"ignored 1"）。教训：号要从结构化输出里取，
+   不能从表格里目抄 —— 表格列宽会把号截断。
+2. Trivy 的豁免我原先写成 `ignorefile: ".trivyignore.yaml"`，而 trivy-action v0.36.0 的合法输入
+   叫 **`trivyignores`**（没有 `ignorefile`）。写错**不会**报错，只出一条
+   `Unexpected input(s) 'ignorefile'` 警告然后照常变红 —— 也就是"以为豁免了"。
+   同理 `.trivyignore.yaml` 的 schema 是 `package: {name, version}`（`version` 单数、字符串），
+   我原先写的 `versions: [...]` 不生效。这两条现在由 `tests/test_dependency_consistency.py`
+   的 D4 守卫钉住（输入名与 schema 键各断言一次），不再靠下一次 CI 才发现。
+
+另外两个由"版本绑死"暴露出来的事实，一并记清：
+
+3. **镜像里装的是 4.52.4，锁里钉的是 4.52.1** —— 见 §3b。`.trivyignore.yaml` 因此把
+   `package.version` 绑在 **4.52.4**（被扫的那个产物），哪天解析结果变了豁免自动失效、门禁变红。
+4. GitHub 的 20 条 Dependabot 告警只覆盖 A1–A8 + P1/P2（GHSA 有记录的那 10 个），
+   **A9–A16 那 8 条 PYSEC-only 的永远不会开单**。所以 §5 那批 dismiss 做完也不代表登记完成，
+   pip-audit 那 16 条豁免才是完整账本。
+
 
 ## 2. 本次实测证据（为什么明知有告警还是不升）
 
@@ -110,14 +146,43 @@ transformers 4.52.1 + tokenizers 0.21.0（引擎元数据要求的组合，最�
 结论：**"被谁挡住"目前只能标为未证实**，确切断链要靠一次 `pip-compile` 复算（属于 §B1 的 relock 工作，
 需要访问索引、拉几百 MB 依赖）。在它做完之前，P1/P2 的处置只写"无攻击面"，不写"被上游挡住"。
 
+## 3b. 顺手发现的一个已知缺口：镜像与便携包装的不是同一个 transformers 版本
+
+本轮为了核对 Trivy 报的版本读了一遍 `Dockerfile`：
+
+```
+Dockerfile:33  COPY pyproject.toml requirements.txt ./
+Dockerfile:38  RUN python3.12 -m pip install --no-cache-dir --user -r requirements.txt
+```
+
+装的是**声明** `requirements.txt`（`transformers>=4.52.1,<4.53`），解析结果是 **4.52.4**；
+而 `requirements-lock.txt` 钉的是 **4.52.1**（便携包 / 桌面包按锁装）。CI 的镜像扫描输出了
+`transformers-4.52.4.dist-info`，两边对不上，是被扫描的产物自己说的。
+
+后果分两层：
+1. **安全口径**：镜像里那 3 条 HIGH 的修复版本都在 5.x，4.52.1 与 4.52.4 的公告集合
+   实测相同（§1a 的 OSV 查询两个版本都跑过），所以**豁免结论不受影响**；
+2. **可复现性**：同一份代码经两条分发路径装出两个不同的 transformers 补丁号，
+   "锁已验证"这件事对容器部署形态并不成立 —— 与 §6 末尾"这份锁从没被真装验证过"是同一类问题。
+
+本轮**没有**改 `Dockerfile`（改成装锁会连带改变镜像里全部 90+ 个包的版本，属于 §B1 relock
+之后才能做的动作），只是把 `.trivyignore.yaml` 的 `package.version` 绑在镜像真实版本上，
+让"哪天版本变了 → 豁免失效 → 门禁变红"这条链路保持有效。
+
 ## 4. 复点条件（满足其一就重新评估对应告警）
 
-1. IndexTTS 官方放开 `transformers` 精确 pin → 立刻可关 A1–A4（4.53+），届时再判 5.x 的 A5–A8。
-2. `descript-audiotools` / `modelscope` 放开 `protobuf<3.20 / <3.21` → 可关 P1–P2。
-3. 若本服务将来**监听非本机地址**或**接受用户指定模型名/HF 仓库**，A6/A8/P1/P2 的
+1. IndexTTS 官方放开 `transformers` 精确 pin（或我们改 vendored 拷贝适配）→ 抬到 4.53+ 立刻
+   可关 A1–A4；抬到 5.10+ 则 A1–A8 一次全消。**A9–A16 只能等它们各自出修复版本**
+   （OSV 现在给的是"无修复版本"，所以只要停在 4.52.x，这 8 条就会一直在 pip-audit 里红着）。
+2. protobuf 的 P1/P2：先做 §3a 那次 `pip-compile` 复算确认真正的阻断者，再谈放开哪道上界；
+   本文第一版写的"被 `descript-audiotools<3.20` / `modelscope<3.21` 挡住"**尚未证实**。
+3. 若本服务将来**监听非本机地址**或**接受用户指定模型名/HF 仓库**，A6/A7/A8/A9–A16/P1/P2 的
    "无攻击面"前提立即失效，必须重判。当前证据：`config.yaml host: "127.0.0.1"`、
    `run_server(ip="127.0.0.1")`。
-4. 若 `vllm_backend.py`（现在无人引用，其 `trust_remote_code` 默认 True）被接进入口，A6 立即升为必修。
+4. 若 `vllm_backend.py`（现在无人引用，其 `trust_remote_code` 默认 True）被接进入口，A6/A7 立即升为必修。
+5. **到期复审**：`.trivyignore.yaml` 三条的 `expiration` 都是 2026-12-31，到期那一步自动变红；
+   pip-audit 侧没有到期机制（它不支持 expiration），所以 A1–A16 的 16 个号靠本文 + 人守 ——
+   2026-12-31 之前要么按条件 1 抬版本消掉，要么把这份表带着做一次显式再确认。
 
 ## 5. 需要仓库所有者点头的动作
 

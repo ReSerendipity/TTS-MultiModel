@@ -60,9 +60,13 @@ dependencies = [
     # `indextts.infer_v2_5` / `infer_v2` 导入失败（两个引擎直接起不来，VoxCPM2 正常），
     # 而 4.52.1 + tokenizers 0.21.0 下三引擎真推理全通（2.5：214,040 B / RMS 6176；
     # 2.0：205,124 B / RMS 6926；VoxCPM2：230,148 B / RMS 4615）。
-    # 代价：4.52.x 带着几个"要 5.x 才修"的 transformers 公告。已按"已接受风险"逐条登记在
-    # docs/SECURITY_DEPENDABOT_TRIAGE.md，并在 pip-audit（security.yml）与 Trivy
-    # （.trivyignore.yaml）里绑理由豁免——**新出现的公告仍会让门禁变红**。
+    # 代价（2026-09-21 按 api.osv.dev 实测，不是估算）：4.52.x 带 **16 个** transformers 公告
+    # —— A1–A4 要 4.53（被上面的引擎 pin 挡住）、A5–A8 要 5.x 大版本、A9–A16 这 8 条
+    # **上游根本没有修复版本**。已按"已接受风险"逐条登记理由与可达性判据在
+    # docs/SECURITY_DEPENDABOT_TRIAGE.md §1，并在 pip-audit（security.yml，16 个 PYSEC 号）
+    # 与 Trivy（.trivyignore.yaml，只剩 3 条，因为那两步带 severity:CRITICAL,HIGH +
+    # ignore-unfixed:true 过滤）里绑理由豁免——**新出现的公告仍会让门禁变红**。
+    # 注意 pip-audit 没有到期机制，这 16 条靠文档 §4 的 2026-12-31 复审约定守着。
     # 抬这个上界之前必须先确认 IndexTTS 侧已适配。
     # tests/test_dependency_consistency.py 会核对：本声明与 requirements-lock.txt 的钉版互相满足。
     "transformers>=4.52.1,<4.53",

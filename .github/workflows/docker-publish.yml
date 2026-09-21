@@ -98,7 +98,8 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           # 与 docker-build.yml 用同一份已接受风险清单（每条带理由与 expiration）
-          ignorefile: ".trivyignore.yaml"
+          # 输入名 trivyignores：trivy-action v0.36.0 不认 ignorefile（只会警告后忽略）
+          trivyignores: ".trivyignore.yaml"
           format: table
           # 只跑漏洞扫描：secret/misconfig 扫描对 25GB 镜像是纯多余开销，会拖长导出与解包时间
           scanners: vuln

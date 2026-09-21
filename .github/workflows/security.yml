@@ -32,16 +32,40 @@ jobs:
       - name: Scan dependencies for known vulnerabilities
         run: |
           # 已接受风险：transformers 4.52.x 被引擎元数据钉死（4.57.6 实测让 IndexTTS
-          # 2.0/2.5 的 infer_v2 / infer_v2_5 导入失败），这几条公告的可达性逐条判定见
-          # docs/SECURITY_DEPENDABOT_TRIAGE.md §1，镜像侧同源豁免见 .trivyignore.yaml。
-          # 只豁免这 5 个号；**任何新出现的公告仍会让本步变红**。
-          # 号取自 run 35561594150 job 106215347173 的实际输出（transformers 4.52.4）。
+          # 2.0/2.5 的 infer_v2 / infer_v2_5 直接 ImportError，回 4.52.1 三引擎才通，
+          # A/B 数字见 docs/SECURITY_DEPENDABOT_TRIAGE.md §2）。下面 16 个号 = OSV 对
+          # transformers 4.52.1 与 4.52.4 返回的**全部**公告（两边集合实测一致），
+          # 逐条理由与本仓可达性判定见 docs/SECURITY_DEPENDABOT_TRIAGE.md §1（A1–A16），
+          # 镜像侧同源豁免见 .trivyignore.yaml（那边只剩 3 条，因为带
+          # severity: CRITICAL,HIGH + ignore-unfixed: true 过滤，口径差异写在同一节）。
+          #
+          # 三条约束，别绕过：
+          #   1. 只豁免这 16 个号；**任何新出现的公告仍会让本步变红**；
+          #   2. 号必须绑定证据：取自 run 35575129704 job 106255145288 的真实表格
+          #      （transformers 4.52.4），并与 api.osv.dev 的查询结果逐条对齐 ——
+          #      上一版这里写的是 5 个号，其中 4 个是把长号截断出来的假号
+          #      （PYSEC-2026-198 / 228 / 229 / 392 其实是 …1980 / …2288 / …2290 / …3929
+          #      的前缀），pip-audit 按全号精确匹配，所以那次只豁免掉 1 条。
+          #   3. pip-audit 没有 expiration 机制，到期复审靠人：本批豁免的复审截止
+          #      2026-12-31，触发条件写在分诊文档 §4；D3/D4 测试保证"工作流里的号集合
+          #      == 分诊文档表里的号集合"，加一条豁免就必须同时在文档里加一行理由。
           pip-audit -r requirements.txt --desc \
+            --ignore-vuln PYSEC-2025-211 \
+            --ignore-vuln PYSEC-2025-212 \
+            --ignore-vuln PYSEC-2025-213 \
+            --ignore-vuln PYSEC-2025-214 \
+            --ignore-vuln PYSEC-2025-215 \
             --ignore-vuln PYSEC-2025-216 \
-            --ignore-vuln PYSEC-2026-198 \
-            --ignore-vuln PYSEC-2026-228 \
-            --ignore-vuln PYSEC-2026-229 \
-            --ignore-vuln PYSEC-2026-392
+            --ignore-vuln PYSEC-2025-217 \
+            --ignore-vuln PYSEC-2025-218 \
+            --ignore-vuln PYSEC-2026-1980 \
+            --ignore-vuln PYSEC-2026-1981 \
+            --ignore-vuln PYSEC-2026-1983 \
+            --ignore-vuln PYSEC-2026-1988 \
+            --ignore-vuln PYSEC-2026-2288 \
+            --ignore-vuln PYSEC-2026-2289 \
+            --ignore-vuln PYSEC-2026-2290 \
+            --ignore-vuln PYSEC-2026-3929
           # 2026-08-16 本地评估 0 已知漏洞，解锁为门禁；依赖升级由 dependabot 自动跟进
 
   bandit:
