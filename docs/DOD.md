@@ -126,7 +126,10 @@
     **IndexTTS 2.5 / 2.0 双双 `infer_v2_5` / `infer_v2` 导入失败**；回到 4.52.1 + tokenizers 0.21.0
     后三引擎真推理全通（2.5：214,040 B / RMS 6176；2.0：205,124 B / RMS 6926；VoxCPM2：230,148 B /
     RMS 4615；每次卸载显存回到 ~3.5 GB）。故 `pyproject`/`requirements.txt` 里那句
-    `transformers>=4.57.0`（9-14 搭在一条 gpu-smoke 提交里进来的）改回 `>=4.52.1,<4.53` 并写明证据；
+    `transformers>=4.57.0`（9-14 搭在一条只讲 gpu-smoke 的提交里进来的）站不住，但改回 4.52.x 会让
+    pip-audit 与 Trivy 两道 CI 安全门禁同时变红（扫到 4.52.4 的"4.53 已修"CVE）——**下界与引擎可用性
+    互斥**，本轮只落地无争议部分（锁集合法化 + 检查器接进 CI + 报错文案），下界原样保留并在
+    `pyproject.toml` 里写清两条出路，岔口交所有者；
     引擎加载失败时的报错也不再断言"PyPI 无 indextts 包"，改为带上底层 ImportError 与版本不匹配提示。
     20 条 Dependabot 告警因此**没有一条能靠现在就升级消掉**，分诊见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`。
   * **已知缺口**：CI 冒烟 `scripts/gpu_smoke_minimal.py` 只覆盖 voxcpm2 + indextts2（走 OpenAI 口，
