@@ -53,7 +53,7 @@ jobs:
       #   - 非 fork 内 PR 共享仓库级缓存；fork PR 无法读缓存时走无基线降级路径。
       - name: Restore benchmark storage cache
         id: bench-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: output/benchmarks
           key: benchmark-storage-${{ github.ref }}-${{ github.sha }}
