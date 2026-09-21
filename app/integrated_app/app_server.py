@@ -713,6 +713,89 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("[lifespan] Shutdown 阶段完成")
 
 
+def _load_or_create_csrf_secret(path: str) -> str:
+    """读出 CSRF HMAC 密钥；文件不存在/为空则生成并落盘。**任何失败都硬停**。
+
+    WHY：这里原先是 `except OSError: logger.warning("回退到无签名模式")` —— 密钥文件读不出来
+    （目录只读、磁盘满、权限被改）时服务照样起、照样接请求，只是 CSRF token 从此没有 HMAC 绑定，
+    而日志里只留一行 warning。这等于把安全机制的失效变成可忽略的噪音，与"前置条件不满足要
+    硬失败并给出可操作建议"的口径相反（同一形状的静默降级在 #132、OpenAI 口 500 上都复现过）。
+    启动期失败是可接受的：它比"跑着跑着保护没了"好发现得多，也修得起。
+
+    Args:
+        path: `data/.csrf_secret` 的绝对路径。
+
+    Returns:
+        非空的 HMAC 密钥字符串。
+
+    Raises:
+        RuntimeError: 目录/文件不可读写，或读出来的内容为空 —— 消息里带可操作的排查方向。
+    """
+    import secrets as _secrets
+
+    def _tighten_mode(target: str) -> None:
+        """把已存在的密钥文件收紧到 0600（POSIX 语义下才有意义）。
+
+        只在"确实带着 group/other 位"时才动手，并且**收紧失败不升级为启动失败**：
+        exFAT/FAT 这类按挂载参数定权限的文件系统，chmod 可能成功但模式不变、或直接抛错。
+        那种环境下拒绝启动不会让密钥更安全，只会把本机用户的 app 变成起不来 ——
+        与"只读根 fs 导致密钥取不出来"那种**功能前置条件**不同，这里失败的可行动作是
+        "把 data/ 挪到支持 POSIX 权限的卷"，不是"别跑了"。
+        """
+        if os.name != "posix":
+            # Windows 的访问控制不在 st_mode 里（只能表达只读位，普通文件恒为 0o666），
+            # 在这里判"带着 other 位"会每次启动误报一条永远收不掉的 warning。
+            # 密钥目录在用户自己的 AppData/data 下，继承的是该用户的 ACL。
+            return
+        try:
+            if os.stat(target).st_mode & 0o077 == 0:
+                return
+            os.chmod(target, 0o600)
+            still = os.stat(target).st_mode & 0o077
+            if still:
+                logger.warning(
+                    "[create_app] CSRF 密钥文件权限仍是 %o（该文件系统不支持 POSIX 权限？）。"
+                    "密钥只用于本地 CSRF HMAC 绑定；如需收紧请把 data/ 放到支持权限位的卷上。",
+                    0o600 | still,
+                )
+        except OSError as exc:
+            logger.warning(
+                "[create_app] 无法收紧 CSRF 密钥文件权限（%s: %s）——继续启动，"
+                "但请把 data/ 目录权限作为部署项检查一次。",
+                type(exc).__name__,
+                exc,
+            )
+
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        secret = ""
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                secret = f.read().strip()
+            _tighten_mode(path)
+        if not secret:
+            secret = _secrets.token_urlsafe(48)  # nosec B311 - 密码学安全随机源，非伪随机
+            # 0o600 在建文件那一刻就生效（umask 只会往上减位，加不出 group/other 权限），
+            # 不留"先按 0644 建出来、再改权限"的窗口。
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                # 文件若已存在（上一版留了个空的），open 的 mode 参数会被忽略，
+                # 所以趁 O_TRUNC 之后、写密钥之前按路径再收紧一次。
+                # （不用 os.fchmod：它在 Windows 上不存在，会让启动直接 AttributeError。）
+                _tighten_mode(path)
+                # 明文落盘是设计前提：密钥要跨进程存活，否则每次重启都把已打开的页面变成 403。
+                # 风险面只剩"同机其他用户读得到"，由上面的 0600 + 权限测试收口（论证全文见 PR #109）。
+                f.write(secret)  # codeql[py/clear-text-storage-sensitive-data] ignore -- 见上一行
+            logger.info("[create_app] 已生成新的 CSRF HMAC 密钥: %s（权限 0600）", path)
+        return secret
+    except OSError as exc:
+        raise RuntimeError(
+            f"CSRF HMAC 密钥不可用（{type(exc).__name__}: {exc}），拒绝以「无签名模式」启动。"
+            f"请检查 {path} 所在目录是否存在、可写、磁盘未满；"
+            "容器/桌面部署需把 data/ 挂成可写卷（只读根 fs 时 data 走 volume，见 docker-compose.yml）。"
+        ) from exc
+
+
 def create_app() -> FastAPI:
     """创建并返回配置完整的 FastAPI 应用实例。
 
@@ -800,25 +883,8 @@ def create_app() -> FastAPI:
     )
 
     # P2 安全修复：CSRF Cookie HMAC 签名 — 首次启动自动生成持久化密钥
-    # 启用后 CSRF token cookie 将携带 HMAC-SHA256 签名，防止 XSS 注入伪造
-    import secrets as _secrets
-
     csrf_secret_path = os.path.join(_PROJECT_ROOT, "data", ".csrf_secret")
-    csrf_secret = ""  # nosec B105 - 占位初始化，随后立即被 secrets.token_urlsafe(48) 覆盖为强随机值
-    try:
-        os.makedirs(os.path.dirname(csrf_secret_path), exist_ok=True)
-        if os.path.exists(csrf_secret_path):
-            with open(csrf_secret_path, encoding="utf-8") as f:
-                csrf_secret = f.read().strip()
-        if not csrf_secret:
-            csrf_secret = _secrets.token_urlsafe(48)
-            with open(csrf_secret_path, "w", encoding="utf-8") as f:
-                f.write(csrf_secret)
-            logger.info("[create_app] 已生成新的 CSRF HMAC 密钥: %s", csrf_secret_path)
-    except OSError as csrf_err:
-        logger.warning("[create_app] CSRF 密钥初始化失败，回退到无签名模式: %s", csrf_err)
-
-    app.add_middleware(CSRFMiddleware, secret_key=csrf_secret)
+    app.add_middleware(CSRFMiddleware, secret_key=_load_or_create_csrf_secret(csrf_secret_path))
 
     api_auth = get_config().api_auth_dict
     app.add_middleware(
