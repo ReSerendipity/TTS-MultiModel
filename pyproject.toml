@@ -55,9 +55,13 @@ dependencies = [
     "torch>=2.5.1",
     "torchvision>=0.20.1",
     "torchaudio>=2.5.1",
-    # 版本策略：VoxCPM2 / IndexTTS2 的 tokenizer 与 modeling 需要较新 transformers API。
-    "transformers>=4.57.0",
-    "tokenizers>=0.19.0",
+    # 版本策略：上界是实测钉出来的，不是保守猜测。IndexTTS 2.0/2.5 的发行元数据要求
+    # transformers==4.52.1 + tokenizers==0.21.0；2026-09-21 在 4.57.6 下实测
+    # `indextts.infer_v2_5` / `infer_v2` 导入失败（两个引擎直接起不来，VoxCPM2 正常），
+    # 而 4.52.1 下三引擎真推理全通（IndexTTS 2.5 出 2.23s 音频 RMS 6176、
+    # VoxCPM2 出 243KB 音频 RMS 5360）。抬这个上界之前必须先确认 IndexTTS 侧已适配。
+    "transformers>=4.52.1,<4.53",
+    "tokenizers>=0.21.0,<0.22",
     # === AI 生态 ===
     "funasr>=1.0.0",
     "modelscope>=1.9.0",
