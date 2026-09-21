@@ -116,14 +116,34 @@ class TestProgressManagerPublicInterface:
         assert "100%" in html
         assert "生成完成" in html
 
-    def test_progress_html_too_early(self):
-        """No HTML output before any progress."""
-        from integrated_app.progress import ProgressManager
+    def test_progress_html_too_early(self, monkeypatch):
+        """启动 <0.5s 不出进度条（防闪屏）—— 时钟由测试提供，不赌机器快慢。
 
-        pm = ProgressManager()
+        原写法直接读墙上时钟：runner 卡过 0.5 秒就会拿到 8% 的进度条而误报
+        （2026-09-21 在 macos / Python 3.12 上红过一次，下一轮又自己绿了）。
+        顺手把**越过阈值后应该出条**的另一半也钉住——原测试完全没覆盖那个方向。
+        """
+        from integrated_app import progress as progress_mod
+
+        clock = {"now": 1_700_000_000.0}
+
+        class _FakeTime:
+            @staticmethod
+            def time() -> float:
+                return clock["now"]
+
+            @staticmethod
+            def sleep(seconds: float) -> None:
+                clock["now"] += seconds
+
+        monkeypatch.setattr(progress_mod, "time", _FakeTime)
+
+        pm = progress_mod.ProgressManager()
         pm.start(total_segments=1, phase="刚开始")
-        html = pm.get_progress_html()
-        assert html == ""
+        assert pm.get_progress_html() == "", "启动瞬间出进度条会闪屏"
+
+        clock["now"] += progress_mod.ProgressManager._EARLY_DISPLAY_THRESHOLD_SECONDS + 0.1
+        assert "tts-progress-bar" in pm.get_progress_html(), "越过 0.5s 阈值后应当开始出条"
 
     def test_format_duration(self):
         """Duration formatting (internal implementation verified manually)."""
