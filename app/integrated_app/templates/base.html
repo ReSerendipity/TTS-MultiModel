@@ -102,25 +102,33 @@
             </div>
 
             <nav class="sidebar-nav" aria-label="{{ "main_navigation"|t(lang) }}" role="tablist">
+                {# 每个入口都带 hx-sync="#tab-content:queue last"：这些按钮全部换同一个
+                   #tab-content，快速连点时两个请求同时在飞、按下图响应到达的先后顺序互相覆盖。
+                   实测（history→settings 连点）：htmx 在已被前一次换掉的节点上 insertBefore 抛
+                   TypeError，结果**整次点击被吞掉**——高亮与内容都停在先点的那个，用户只会觉得
+                   "点了没反应"，接着就在错的页面上点生成（→ 400，见 #131）。
+                   queue last = 排队、最后一点的赢。不用 replace：它会 abort 在飞的请求，
+                   而 htmx 在 logAllErrors 默认开着时对每次 abort 都往 Console 记一条 error
+                   （replace 方案实测 20 轮连点报 40 条），把排错现场弄脏。 #}
                 <div class="sidebar-nav-section" data-section-model="voxcpm2" data-engine-name="VoxCPM2">
                     <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "core_section"|t(lang) }}</span></div>
                     <!-- VoxCPM2 核心功能 -->
                     <button class="sidebar-item" data-tab="voice_design" data-model="voxcpm2"
-                            hx-get="/tab/voice_design?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/voice_design?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_voice_design'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0Z"/></svg>
                         <span class="sidebar-label-text">{{ "tab_voice_design" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="voice_clone" data-model="voxcpm2"
-                            hx-get="/tab/voice_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/voice_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_voice_clone'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         <span class="sidebar-label-text">{{ "tab_voice_clone" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="ultimate_clone" data-model="voxcpm2"
-                            hx-get="/tab/ultimate_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/ultimate_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_ultimate_clone'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="M12 15 7 10l2-2a22 22 0 0 1 4-3 22 22 0 0 1 9-3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
@@ -131,14 +139,14 @@
                     <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "advanced_section"|t(lang) }}</span></div>
                     <!-- VoxCPM2 高级功能 -->
                     <button class="sidebar-item" data-tab="script" data-model="voxcpm2"
-                            hx-get="/tab/script?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/script?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_script'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
                         <span class="sidebar-label-text">{{ "tab_script" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="prompt_continue" data-model="voxcpm2"
-                            hx-get="/tab/prompt_continue?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/prompt_continue?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_prompt_continue'|t(lang) }}"
                             role="tab" aria-selected="false" aria-controls="tab-content">
@@ -146,7 +154,7 @@
                         <span class="sidebar-label-text">{{ "tab_prompt_continue" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="lora" data-model="voxcpm2"
-                            hx-get="/tab/lora?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/lora?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_lora'|t(lang) }}"
                             role="tab" aria-selected="false" aria-controls="tab-content">
@@ -154,7 +162,7 @@
                         <span class="sidebar-label-text">{{ "tab_lora" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="lora_training" data-model="voxcpm2"
-                            hx-get="/tab/lora_training?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/lora_training?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_lora_training'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
@@ -164,21 +172,21 @@
                 <div class="sidebar-nav-section" data-section-model="indextts2" data-engine-name="IndexTTS 2.x">
                     <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "indextts2_section"|t(lang) }}</span></div>
                     <button class="sidebar-item" data-tab="indextts2_clone" data-model="indextts2"
-                            hx-get="/tab/indextts2_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/indextts2_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_indextts2_clone'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/><path d="M8 22h8"/></svg>
                         <span class="sidebar-label-text">{{ "tab_indextts2_clone" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="indextts2_emotion" data-model="indextts2"
-                            hx-get="/tab/indextts2_emotion?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/indextts2_emotion?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_indextts2_emotion'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
                         <span class="sidebar-label-text">{{ "tab_indextts2_emotion" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="indextts2_duration" data-model="indextts2"
-                            hx-get="/tab/indextts2_duration?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/indextts2_duration?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_indextts2_duration'|t(lang) }}"
                             role="tab" aria-selected="false" aria-controls="tab-content">
@@ -189,14 +197,14 @@
                 <div class="sidebar-nav-section" data-section-model="indextts20" data-engine-name="IndexTTS 2.0">
                     <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "indextts20_section"|t(lang) }}</span></div>
                     <button class="sidebar-item" data-tab="indextts20_clone" data-model="indextts20"
-                            hx-get="/tab/indextts20_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/indextts20_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_indextts20_clone'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/><path d="M8 22h8"/></svg>
                         <span class="sidebar-label-text">{{ "tab_indextts20_clone" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="indextts20_emotion" data-model="indextts20"
-                            hx-get="/tab/indextts20_emotion?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/indextts20_emotion?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_indextts20_emotion'|t(lang) }}"
                             role="tab" aria-selected="false" aria-controls="tab-content">
@@ -208,14 +216,14 @@
                     <div class="sidebar-nav-label">{{ "tools_section" | t(lang) }}</div>
                     <!-- 通用菜单 — 全部整合到"工具"区域 -->
                     <button class="sidebar-item" data-tab="settings" data-model="all"
-                            hx-get="/tab/settings?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/settings?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_settings'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                         <span class="sidebar-label-text">{{ "tab_settings" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="history" data-model="all"
-                            hx-get="/tab/history?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/history?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_history'|t(lang) }}"
                             role="tab" aria-selected="false" aria-controls="tab-content">
@@ -223,7 +231,7 @@
                         <span class="sidebar-label-text">{{ "tab_history" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="persona" data-model="all"
-                            hx-get="/tab/persona?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/persona?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_persona'|t(lang) }}"
                             role="tab" aria-selected="false" aria-controls="tab-content">
@@ -231,7 +239,7 @@
                         <span class="sidebar-label-text">{{ "tab_persona" | t(lang) }}</span>
                     </button>
                     <button class="sidebar-item" data-tab="help" data-model="all"
-                            hx-get="/tab/help?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            hx-get="/tab/help?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
                             onclick="TTSApp.sidebar.activateTab(this)"
                             title="{{ 'tab_help'|t(lang) }}">
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>

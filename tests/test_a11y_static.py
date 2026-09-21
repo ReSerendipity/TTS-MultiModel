@@ -1,6 +1,6 @@
 """可感知性（a11y + 静默失效）静态守卫 —— 纯扫模板源码，不需要浏览器。
 
-五条守卫各自拦截一类「用户看不见任何提示就失败」的成因：
+七条守卫各自拦截一类「用户看不见任何提示就失败」的成因：
 
 A1 图标按钮没有可读名称。只塞 <svg> 又不写 aria-label 的按钮，读屏软件只能念出
    「按钮」，键盘用户 Tab 过去完全不知道它是干什么的。
@@ -14,6 +14,8 @@ A5 进度与错误播报通道。排队横幅 / 加载遮罩 / toast / 错误块
    否则「生成失败」这条信息对读屏用户是完全静默的——只有眼睛能看见。
 A6 客户端自己拼的错误块同样要 role="alert"。A5 只覆盖服务端 partial，而真机上大量
    失败路径是 JS 用 innerHTML/createElement 手拼的精简块（GOTCHAS #133 的第二面）。
+A7 正文字体栈不得引用随包标题字体。那 14 个家族自托管后在所有平台必然可用，进正文栈
+   就等于悄悄换掉全站正文（Windows 盖过微软雅黑、非 Windows 偏离 L6 基线）。
 
 维护约定（同 test_fe_be_consistency.py）：每条守卫配一个 ``*_is_not_vacuous`` 变异自证，
 把违例样本喂给同一个判定函数必须判红；否则说明断言已经写成永真。
@@ -346,3 +348,51 @@ def test_client_error_block_guard_is_not_vacuous():
     assert client_error_block_findings("el.className = 'tts-error-block';\nel.textContent = 'x';")
     assert not client_error_block_findings('<div class="tts-error-block" role="alert">a</div>')
     assert not client_error_block_findings("el.className = 'tts-error-block';\nel.setAttribute('role', 'alert');")
+
+
+# ---------------------------------------------------------------------------
+# A7 正文栈 vs 随包标题字体
+# ---------------------------------------------------------------------------
+
+_VARIABLES_CSS = _APP / "static" / "css" / "variables.css"
+_FONTS_CSS = _APP / "static" / "css" / "fonts.local.css"
+
+
+def _stack_collisions(stack_decl: str, bundled: set[str]) -> list[str]:
+    """正文字体栈里与随包标题字体撞车的家族名。"""
+    return [f.strip().strip("'\"") for f in stack_decl.split(",") if f.strip().strip("'\"") in bundled]
+
+
+def _body_stack_decl() -> str:
+    m = re.search(r"--font-sans:\s*([^;]+);", _VARIABLES_CSS.read_text(encoding="utf-8"))
+    assert m, "variables.css 里找不到 --font-sans 声明，解析规则已失效"
+    return m.group(1)
+
+
+def _bundled_title_families() -> set[str]:
+    families = set(re.findall(r"font-family:\s*'([^']+)'", _FONTS_CSS.read_text(encoding="utf-8")))
+    assert len(families) >= 12, f"只解析到 {len(families)} 个随包字体家族，扫描已失效"
+    return families
+
+
+def test_body_font_stack_excludes_bundled_title_faces():
+    """正文栈不得引用随包标题字体家族。
+
+    WHY：那 14 个家族现在由 ``fonts.local.css`` 以 @font-face 随包，**在所有平台都必然可用**。
+    正文栈里一旦写进它们（历史上 'Noto Sans SC' 就在那里，当时因为 Google Fonts 被 CSP 挡掉
+    而一直是死的），自托管之后它立刻变成活的：Windows 上盖过 Microsoft YaHei、非 Windows 上
+    偏离 CI 生成的 L6 视觉基线——等于在"修字体静默失效"同一批改动里顺手改了全站正文。
+    标题想用思源黑体走「切换标题字体」菜单，不经过 ``--font-sans``。
+    """
+    collisions = _stack_collisions(_body_stack_decl(), _bundled_title_families())
+    assert collisions == [], (
+        f"--font-sans 引用了随包标题字体 {collisions}：这会让全站正文换字体并偏离 L6 基线；"
+        "标题用字体菜单选，不要放进正文栈"
+    )
+
+
+def test_body_font_stack_guard_is_not_vacuous():
+    bundled = _bundled_title_families()
+    assert "Noto Sans SC" in bundled, "随包字体集里没有 Noto Sans SC，样本失效"
+    assert _stack_collisions("'Inter', 'Noto Sans SC', sans-serif", bundled) == ["Noto Sans SC"]
+    assert _stack_collisions(_body_stack_decl(), bundled) == []

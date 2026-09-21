@@ -403,7 +403,11 @@
     --duration-skeleton: 1800ms;
 
     /* Font families */
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    /* 正文栈刻意不含随包标题字体（fonts.local.css 的 14 个家族，含 'Noto Sans SC'）。
+       那些 @font-face 现在在所有平台都可用，一旦进正文栈：Windows 上会盖过 Microsoft YaHei、
+       非 Windows 上会偏离既有 L6 视觉基线。要用思源黑体写标题，走「切换标题字体」菜单。
+       守卫：tests/test_a11y_static.py::test_body_font_stack_excludes_bundled_title_faces */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
     --font-display: var(--font-sans);
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 

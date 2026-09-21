@@ -17,8 +17,10 @@ Run like::
     # Then in another terminal
     .\\WPy64-312101\\python\\python.exe -m pytest tests/e2e/test_screenshot_capture_extended.py -v
 
-Output directory: ``docs/screenshots/`` (light) and ``docs/screenshots/dark/`` (dark),
-suffixed with the interactive-state identifier so baseline and extended files never
+Output directory: ``docs/screenshots/_local/`` (light) and
+``docs/screenshots/_local/dark/`` (dark) — a gitignored subdir, so a local L6 run never
+overwrites the six tracked screenshots that ``README.md`` embeds (GOTCHAS #135).
+Suffixed with the interactive-state identifier so baseline and extended files never
 collide (e.g. ``voxcpm2_01_voice_design_savedtab_adv_open_light_viewport.png``).
 """
 
@@ -47,7 +49,8 @@ pytestmark = [
 BASE_URL = os.environ.get("TTS_SERVER_URL", "http://127.0.0.1:7869")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUTPUT_DIR = os.path.join(ROOT, "docs", "screenshots")
+# 见 test_screenshot_capture.py 同名常量：写 _local/ 才不会覆盖 README 引用的入库截图（GOTCHAS #135）
+OUTPUT_DIR = os.path.join(ROOT, "docs", "screenshots", "_local")
 DARK_DIR = os.path.join(OUTPUT_DIR, "dark")
 
 VIEWPORT = {"width": 1366, "height": 900}

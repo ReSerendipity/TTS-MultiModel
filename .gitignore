@@ -412,6 +412,8 @@ pretrained_models/
 pytest_tmp/
 .workbuddy/
 .workbuddy-ai/
+# 同族工具在 2026-09-20 生成的 92MB 封面草稿目录，未纳入版本库；只忽略，不删本地内容
+.workbuddy_tts_cover/
 
 # --- auto-tidy: 运行时产物自动补齐 (auto) ---
 logs/

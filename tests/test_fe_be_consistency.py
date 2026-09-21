@@ -1,6 +1,6 @@
 """前后端一致性守卫（对应 docs/reports/前后端功能一致性检查报告_20260904.md §7）。
 
-十条守卫分别拦截报告中不同层面的静默失效：
+十一条守卫分别拦截报告中不同层面的静默失效：
 
 1. ``test_all_hx_attributes_point_at_registered_routes`` —— URL 层（htmx）：
    模板中所有 hx-get/hx-post/hx-put/hx-delete 目标必须已注册（现有
@@ -41,6 +41,10 @@
     ``foo`` 必须真的在前端某处定义过。属性里调不存在的函数**不报错**，只在按下那一刻
     静默无反应，日志与常规测试都看不见（本次抓出「重试」按钮，#133）。已知欠债走
     ``_KNOWN_DEAD_HANDLERS`` 显式记账，并有 ``test_known_dead_handlers_list_only_shrinks`` 防膨胀。
+11. ``test_shared_swap_triggers_declare_hx_sync`` —— 并发换页层：共用同一个 ``hx-target``
+    的触发器必须带 ``hx-sync``。htmx 不会因"用户又点了一下"作废前一个请求，两个响应按到达
+    顺序互相覆盖；真机连点实测会把后一次点击整吞掉（高亮与内容停在先点的那项 → 在错页面
+    点生成 → 400），并在失效节点上抛 ``insertBefore`` TypeError。
 
 维护约定（参 KNOWN_GOTCHAS #36）：这些守卫都做过变异测试——
 把任一模板的端点/字段/URL 故意改错，对应测试必须变红；否则说明断言写成了
@@ -722,6 +726,64 @@ def test_dead_handler_guard_is_not_vacuous():
 
 
 # ---------------------------------------------------------------------------
+# 守卫 11：共用同一个换页容器的 htmx 触发器必须声明 hx-sync
+# ---------------------------------------------------------------------------
+
+_HX_TRIGGER_TAG_RE = re.compile(r"<[a-zA-Z][^>]*?hx-(?:get|post|put|delete)=\"[^\"]*\"[^>]*>", re.S)
+
+
+def _hx_target(tag: str) -> str | None:
+    m = re.search(r'hx-target="([^"]+)"', tag)
+    return m.group(1) if m else None
+
+
+def _unsynced_shared_target(html: str) -> tuple[int, list[str]]:
+    """返回 (带 hx-target 的触发器数, 其中"目标被多处共用却没写 hx-sync"的标签)。"""
+    tags = _HX_TRIGGER_TAG_RE.findall(html)
+    with_target = [(t, _hx_target(t)) for t in tags]
+    counts: dict[str, int] = {}
+    for _, tgt in with_target:
+        if tgt:
+            counts[tgt] = counts.get(tgt, 0) + 1
+    offenders = []
+    for tag, tgt in with_target:
+        if tgt and counts[tgt] >= 2 and "hx-sync" not in tag:
+            label = re.search(r'data-tab="([^"]+)"', tag)
+            offenders.append(label.group(1) if label else tag[:70].replace("\n", " "))
+    return len(with_target), offenders
+
+
+def test_shared_swap_triggers_declare_hx_sync():
+    """同一个 ``hx-target`` 被 ≥2 个触发器共用时，每个触发器都要写 ``hx-sync``。
+
+    WHY：htmx 不会因为"用户又点了一下"就作废前一个请求，两个响应按下图到达的先后顺序
+    先后覆盖同一个容器。真机实测（history→settings 连点）：htmx 在已被换掉的节点上
+    ``insertBefore`` 抛 TypeError，**整次点击被吞**——高亮与内容都停在先点的那项，
+    用户只看到"点了没反应"，接着就在错的页面上点生成（→ 400，与 #131 同一族）。
+    侧栏 16 个入口全部 ``hx-target="#tab-content"``，故统一带 ``hx-sync="#tab-content:replace"``。
+    """
+    total_all: int = 0
+    offenders_all: list[str] = []
+    for path in sorted(_TPL_DIR.rglob("*.html")):
+        html = path.read_text(encoding="utf-8", errors="replace")
+        total, offenders = _unsynced_shared_target(html)
+        total_all += total
+        offenders_all += [f"{path.relative_to(_TPL_DIR).as_posix()}: {o}" for o in offenders]
+
+    assert total_all >= 12, f"只扫到 {total_all} 个带 hx-target 的 htmx 触发器，正则可能已失配"
+    assert offenders_all == [], f"这些触发器共用同一个换页容器却没有 hx-sync，快速连点会互相覆盖：{offenders_all}"
+
+
+def test_shared_swap_trigger_guard_is_not_vacuous():
+    """变异自证：把 base.html 的 hx-sync 全删掉，守卫必须立刻判负。"""
+    html = (_TPL_DIR / "base.html").read_text(encoding="utf-8", errors="replace")
+    total, clean = _unsynced_shared_target(html)
+    assert total >= 12 and clean == [], f"样本前提不成立：total={total} offenders={clean}"
+    _, stripped = _unsynced_shared_target(re.sub(r""" hx-sync="[^"]*\"""", "", html))
+    assert len(stripped) >= 12, f"删掉 hx-sync 后只报出 {len(stripped)} 项——断言抓不住这个缺陷"
+
+
+# ---------------------------------------------------------------------------
 # 欠债清单防膨胀
 # ---------------------------------------------------------------------------
 
@@ -745,6 +807,7 @@ def test_known_debt_list_only_shrinks(client):
         "test_programmatic_tab_jumps_use_goto_tab",
         "test_inline_scripts_parse_as_javascript",
         "test_inline_event_handlers_are_defined",
+        "test_shared_swap_triggers_declare_hx_sync",
     ],
 )
 def test_guards_are_registered_and_not_todo(guard):
