@@ -258,6 +258,29 @@ class TestOpenAIRouterEndpoints:
         )
         assert resp.status_code == 503
 
+    def test_create_speech_tts1hd_is_not_served_here(self, openai_client, monkeypatch):
+        """model=tts-1-hd 必须回 **400 + 出路**，不能是 500 "音频生成失败"。
+
+        2026-09-21 首次真跑 GPU 冒烟时它是 500：本端点按 P0-1 不传说话人参考音频
+        （``spk_audio_prompt=""``），而 IndexTTS 必需该参考，engine.infer 抛
+        "说话人参考音频缺失" 被上层收敛成 500。修法不是猜一个默认音色（那是替用户
+        选音色并绕过授权语义），而是把这条结构性不支持如实标成 400 并指出可走的口。
+        """
+        from integrated_app.model_registry import registry
+
+        # `model_loaded` 是只读派生属性（看 _voxcpm_model / _indextts2_engine / _engines），
+        # 所以喂 _engines 而不是硬设 model_loaded。
+        monkeypatch.setattr(registry, "_engines", {"indextts2": object()}, raising=False)
+        resp = openai_client.post(
+            "/v1/audio/speech",
+            json={"input": "hello", "model": "tts-1-hd", "voice": "alloy"},
+        )
+        assert resp.status_code == 400, resp.text
+        detail = resp.json()["detail"]
+        assert "参考音频" in detail and "/api/generate/indextts2" in detail, detail
+        # 出路要真的可用：tts-1（VoxCPM2）这条口不能也被同一条 400 挡掉
+        assert "tts-1（" in detail or "model=tts-1" in detail, detail
+
     def test_create_speech_invalid_model(self, openai_client):
         """POST /v1/audio/speech with invalid model should return 422."""
         resp = openai_client.post(

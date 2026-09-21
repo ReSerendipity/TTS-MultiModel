@@ -3,6 +3,7 @@
 覆盖目标模块: app/integrated_app/engines/indextts2_engine.py
 """
 
+import contextlib
 import inspect
 
 import pytest
@@ -174,3 +175,72 @@ class TestDurationControlGuard:
         assert exc.value.field == "duration_scale"
         assert str(exc.value).startswith("IndexTTS 2.0 ")
         eng.tts.infer.assert_not_called()
+
+    # ── 以下两条挂在 TestDurationControlGuard 是因为要复用它的 _bare_engine / _ref_audio
+    # 两个桩（单独成类会把 fixture 甩在后面）；语义与时长无关：一条管并发串行，一条管报错文案。
+    def test_infer_serializes_concurrent_callers(self, tmp_path):
+        """同一实例上的并发 infer 必须串行 —— 这是预热与用户请求抢占的真机故障守卫。
+
+        WHY：预热（model_optimizer.warmup_indextts2）从后台线程直接调 `engine.infer`，
+        绕开了用户侧的 per-engine asyncio.Semaphore(1)。2026-09-21 真机实测：预热开始 2 秒后
+        插入一条用户合成，两条并发进同一个 IndexTTS 模型 → `CUDA error: device-side assert
+        triggered`，整个 CUDA context 被毒化，之后同进程所有推理连带失败。
+        引擎层的 RLock 是"任何入口都串行"的兜底，所以这里直接压并发，不测上游用了哪把锁。
+        """
+        import threading
+        import time
+        from unittest.mock import MagicMock
+
+        eng = self._bare_engine("2.5", supports_duration=True)
+        live: list[int] = []
+        seen: list[int] = []
+        guard = threading.Lock()
+
+        def _fake_infer(*args: object, **kwargs: object) -> tuple:
+            with guard:
+                live.append(1)
+                seen.append(len(live))
+            time.sleep(0.2)
+            with guard:
+                live.pop()
+            return (22050, MagicMock())
+
+        eng.tts.infer.side_effect = _fake_infer
+
+        def _call(i: int) -> None:
+            with contextlib.suppress(Exception):  # 后续步骤缺 stub 不重要，看重叠没有
+                eng.infer(
+                    text=f"并发第 {i} 条",
+                    spk_audio_prompt=self._ref_audio(tmp_path),
+                    output_path=str(tmp_path / f"out{i}.wav"),
+                )
+
+        threads = [threading.Thread(target=_call, args=(i,)) for i in range(3)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30)
+        assert seen, "一次都没进到模型层，说明桩没接上（本守卫会空转）"
+        assert max(seen) == 1, f"并发进入了模型层 {max(seen)} 次 —— device-side assert 的形状回来了"
+
+    @pytest.mark.parametrize("version", ["2.5", "2.0"])
+    def test_generation_failure_names_the_running_variant(self, tmp_path, version):
+        """推理内部抛异常时，GenerationError 的文案必须点名**当前实例**的变体。
+
+        WHY：2.5 与 2.0 共用 IndexTTS2Engine，原先文案硬编码 "IndexTTS 2.5"，
+        2026-09-21 真机跑冒烟时在 indextts20 上报出 "IndexTTS 2.5 合成失败"，
+        同一函数里的加载错误也曾说 "IndexTTS 2.5 模型文件不可读 + 请跑
+        download_indextts2.py"，会把人引去下载另一套权重目录。
+        """
+        from integrated_app.exceptions import GenerationError
+
+        eng = self._bare_engine(version, supports_duration=True)
+        eng.tts.infer.side_effect = RuntimeError("CUDA error: device-side assert triggered")
+        with pytest.raises(GenerationError) as exc:
+            eng.infer(
+                text="你好",
+                spk_audio_prompt=self._ref_audio(tmp_path),
+                output_path=str(tmp_path / "out.wav"),
+            )
+        assert str(exc.value).startswith(f"IndexTTS {version} 合成失败"), str(exc.value)
+        assert f"IndexTTS {'2.0' if version == '2.5' else '2.5'}" not in str(exc.value)

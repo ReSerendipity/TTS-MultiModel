@@ -143,9 +143,57 @@
     引擎加载失败时的报错也不再断言"PyPI 无 indextts 包"，改为带上底层 ImportError 与版本不匹配提示。
     20 条 Dependabot 告警因此**没有一条能靠现在就升级消掉**，分诊见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`；
     且那 20 条只覆盖有 GHSA 记录的 10 个公告，**8 条 PYSEC-only 的 Dependabot 从不开单**。
-  * **已知缺口**：CI 冒烟 `scripts/gpu_smoke_minimal.py` 只覆盖 voxcpm2 + indextts2（走 OpenAI 口，
-    而 `tts-1` / `tts-1-hd` 两个模型名里没有 IndexTTS **2.0** 的位置）；2.0 的真推理今天人工验过，
-    要接进冒烟需改用 `/api/generate/indextts2` 形态并在 GPU runner 上复验，另案。
+  * **GPU 冒烟覆盖面（本轮补齐 2.0，并发现"每周兜底"其实从没跑过）**：
+    `scripts/gpu_smoke_minimal.py` 原先只覆盖 voxcpm2 + indextts2 —— `tts-1` / `tts-1-hd` 两个
+    OpenAI 模型名里没有 IndexTTS **2.0** 的位置。现在第 0 步是引擎导入探针（`engine_imports`，
+    用服务所在解释器 import `indextts.infer_v2` / `infer_v2_5`，失败即硬停并点名
+    `transformers>=4.52.1,<4.53`），2.0 走 `/api/generate/indextts2` + `expected_engine` 真合成并
+    从 `data-audio-filename` 回取 `/api/audio/<file>` 校验 RIFF，另加一条版本门负向
+    （加载 2.0 却声明 `indextts2` 必须被点名拒绝）。
+    **本机真机逐步验到**：`engine_imports` / `csrf_ticket` / `synth_tts-1`（310,470 B RIFF）/
+    `switch_indextts2` / `openai_tts1hd_contract`（400）/ `synth_indextts2`（298,746 B RIFF）
+    全部 OK；`switch_indextts20` OK，但其后的 `synth_indextts20` **没跑通**，
+    撞在下面那条 CUDA 缺陷上（冒烟如实报 FAIL，没有粉饰成跳过）。
+    过程中还修掉一个潜伏缺陷：脚本所有 POST 都不带 CSRF 双提交票，而 `/v1/audio/speech`
+    并不在豁免路径里 —— 不带就 403 `CSRF_MISSING`，也就是说这条冒烟只要真跑就会红。
+    更要紧的一条：**它从没真跑过**。`gpu-smoke.yml` 三次 schedule run（09-07 / 09-14 / 09-21）
+    的 `gpu-smoke` job 全是 `skipped`，run 顶层却是 success —— secret 里根本没有
+    `REPO_ADMIN_TOKEN`，且仓库**零个注册 runner**。本轮把跳过改成 `::warning` + 写进 job summary，
+    并把每天真能跑的引擎导入兜底放到 `docker-smoke.yml`（CPU 托管 runner，只 import 不推理），
+    同时给它的触发器补上 `requirements.txt` / `requirements-lock.txt` / `pyproject.toml`
+    （以前依赖区间被改坏时这个作业压根不会触发）。
+    **仍未消掉**：runner 不存在 → IndexTTS 2.5/2.0 的真推理与"两个 IndexTTS 变体的导入"在 CI 上
+    依然零覆盖，只有本机能验；要让这条变成 CI 事实，需要注册一台带 `gpu` 标签的
+    self-hosted runner 并配 `REPO_ADMIN_TOKEN`（归所有者）。
+  * **真机跑冒烟时定位并修掉一个 CUDA 崩溃（原以为是"第二次切换"，其实是预热抢占）**：
+    症状 `CUDA error: device-side assert triggered`，且**整个 CUDA context 被毒化** ——
+    之后同进程所有推理连带失败，连切换的回滚重载都报 503。服务端时间线是决定性证据：
+    `21:05:57 [req=bg-model-startup-load] 开始合成 text='你好'`（预热）→
+    `21:05:59 [req=f663d3ae…] 开始合成`（用户请求）→ `21:06:01` **两条一起** assert。
+    根因：预热走 `model_optimizer.warmup_indextts2`，从后台加载线程**直接调 `engine.infer`**，
+    绕开了用户侧那把 per-engine `asyncio.Semaphore(1)`（`routes/generate/utils.py:439`），
+    而 IndexTTS 推理不可重入。"第二次切换才挂"是巧合 —— 切换必然触发预热，而 `loaded`
+    状态早于预热完成，脚本/用户就是会在预热那 2~5 秒里把请求挤进去。
+    （先前记的三个"嫌疑"全被证伪：冷切换、参考音频素材、异步错位归因都排除过。）
+    修法：在引擎这一层加按注册名分组的 `threading.RLock`（`_engine_infer_lock`），`infer`
+    变成持锁薄包装并用 `functools.wraps` 保住签名（接口测试仍按 14 个参数检查），
+    于是队列 / SSE / 预热 / OpenAI 口任何入口都被串行化。
+    **真机验证**：① 原并发条件（预热进行中就压请求）从必崩变成 2.5 = 336,642 B、
+    2.0 = 239,674 B，且与串行跑出来的**字节数完全一致**（锁只串行化，不改结果）；
+    ② 完整冒烟 10 格全绿：`engine_imports` → `ready` → `csrf_ticket` → voxcpm2 321,962 B →
+    切 2.5 → `openai_tts1hd_contract` 400 → 2.5 = 386,796 B → 切 2.0 → 2.0 = 402,400 B →
+    版本门负向按预期拒绝；结束显存回落 2,666 MiB。
+  * **镜像构建今天起在 CI 上确定性失败（与本仓改动无关的基础设施故障，未修）**：
+    `Dockerfile` 的 `apt-get install` 层报
+    `update-alternatives: error: alternative path /usr/share/man/man7/bash-builtins.7.gz doesn't exist`
+    → buildx 失败，`Build & Scan Image` 与 `Boot hardened container & probe` 两个作业同时红。
+    判据链：main 上 11:07 的同类构建还是 **success**（`41f5a12`/`1b29d0f`），12:19 与 12:28 两次
+    PR 构建红在**同一步**，且**各重试一次仍然一模一样** → 不是瞬时网络、也不是本 PR 引入
+    （本 PR 没碰 `Dockerfile`，失败发生在我的探针步骤之前）。jammy 已进入归档期，
+    疑点是 `software-properties-common` 一条依赖链带进来的 man-db/manpages 组合。
+    **我没有改 Dockerfile**：本机没有 docker daemon，任何 apt/dpkg 层的规避手法（
+    `path-exclude=/usr/share/man/*` 之类）在我这儿都是盲改，而它会改变发版镜像的内容 ——
+    要改就该在能真构建的环境里改并验，不该靠 CI 试错。交所有者定谁来做。
   * **仍未覆盖**：桌面安装包链路（staging → data 7z → NSIS）**无任何 workflow 调用**、本机也无从安装
     （`scripts/installer/` 只有一个 4.3 MB `Setup.exe`、无同目录分卷），所以 `unpack_desktop.ps1`
     新加的许可/字体落地核对只过了语法层，`release_gate.ps1` 的第 ⑥ 步也只在发版/dispatch 时跑；

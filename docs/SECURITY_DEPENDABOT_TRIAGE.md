@@ -104,10 +104,23 @@ transformers 4.52.1 + tokenizers 0.21.0（引擎元数据要求的组合，最�
    也不含 `indextts`，镜像里只有 vendored 的 VoxCPM2（`app/integrated_app/vendor/voxcpm`）。
    所以"下界≥4.57 会弄坏容器里的两个 IndexTTS"这个说法是**错的**——真实情况是容器部署形态
    只有 1 个引擎可用。受影响的是"源码安装 + 自带 indextts"的环境（正是 `GPU Smoke` 那条路径）。
-2. **唯一能抓到这类运行时断裂的 CI 作业是每周一次、跑在 self-hosted GPU runner 上的
-   `GPU Smoke (real inference, self-hosted)`**：最近一次记录是 2026-09-14 success
-   （正好是那条错误下界进 main 的当天），此后没有新 run。也就是说：这类问题在 CI 上的
-   暴露延迟是以"周"计的，且依赖 runner 在线。
+2. **过去说"唯一能抓这类运行时断裂的是每周一次的 GPU Smoke"，这句话高估了它**：
+   `gpu-smoke.yml` 至今只有 3 次 schedule run（2026-09-07 / 09-14 / 09-21），
+   **三次的 `gpu-smoke` job 全部是 `skipped`**，而 run 顶层显示 success。原因有两道，各自独立成立：
+   仓库 secrets 里只有 `MANIFEST_SIGNING_KEY_B64`，**`REPO_ADMIN_TOKEN` 从没配过**（precheck 拿不到
+   runner 状态就直接判 `available=false`）；且 `GET /actions/runners` 返回**零个注册 runner**。
+   也就是说这份"每周兜底"的暴露延迟不是以周计，而是**无穷大 —— 它一次都没跑过**，
+   原先的 `::notice` 又让跳过长得像通过。本轮把两处都改了：precheck 的跳过改为
+   `::warning` + 写进 job summary（见 `ci/engine-import-and-indextts20-smoke`），
+   并把引擎导入探针前移成 `gpu_smoke_minimal.py` 的第 0 步（`engine_imports`），
+   让"哪天 runner 在线了"这件事一开机就给结论；真正每天都能跑的兜底改由
+   `docker-smoke.yml` 的 Engine import probe 承担（GitHub 托管 CPU runner，只需 import 不需 GPU），
+   同时给它的触发器补上 `requirements.txt` / `requirements-lock.txt` / `pyproject.toml`
+   —— 以前依赖区间被改坏时这个作业根本不会跑。
+   仍要如实说：容器镜像里**没有 indextts**（`.dockerignore` 排除 `reference_repos/`，
+   `requirements.txt` 也不含它），所以 docker 那步只钉得住 vendored VoxCPM2 的导入链；
+   IndexTTS 2.5 / 2.0 的导入只有 runner 在线时才覆盖得到。受影响最大的场景是
+   "源码安装 + 自带 indextts" 的用户。
 
 > 复现这套对比时的坑（已记 GOTCHAS #137）：本服务的端口被占时会**自动顺延到下一个端口**，
 > 而沙箱里"停掉后台命令"只杀外层 shell、不杀 `python` 子进程。结果是新起的干净服务落在 7870，
