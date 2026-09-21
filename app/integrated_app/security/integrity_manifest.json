@@ -2,7 +2,7 @@
   "description": "TTS_MultiModel 核心模块完整性清单 (自动生成)",
   "algorithm": "sha256",
   "files": {
-    "app_server.py": "80c2d6b4fc43dbc2533aecc0c8d3a9f900e6227b89f652d24f46229cd96594e1",
+    "app_server.py": "3fd3da65e912f95ee98723423e6bdd5edcee38e982563e8a4e47be64ae7b50e4",
     "config.py": "7ca9e3bbe7e178aecb9e0a31f2e3255d7bc071a95fd5ffc8b5f070ec0f3b7fdc",
     "config_models.py": "0416b85efe41611b0d267ddd715ee006703566e51a6f50b21dc75d42f87bd1f8",
     "engine_interface.py": "8976ee71d43b3407ac0e06d91a956e900bab86b667448254b52c02329a5cdb05",
@@ -11,7 +11,7 @@
     "history_db.py": "6b86eb108d99ee69226a0ae53f7d8a05bf6916264a402fc7a7940b07b1d227fc",
     "i18n.py": "27e004a6c5dd4c8e5b5c3751e67ebe8dd37e1c49857ac47fd7ee9c9e7c92bb38",
     "auth.py": "df933a3b6a5ee2daa28a8156431fd80b8edf13882a44922983157b2bf2212aa4",
-    "middleware/csrf.py": "946dbcf4b21e87cc59a0e7db6517d677691797222af58231c9758af131e62cc6",
+    "middleware/csrf.py": "f25c5bcb9ef3fc575cca8642d529438d5b03cbe0a225aa21ef9d8a41af004c95",
     "middleware/error_handler.py": "173d104e6edcc57650b0baaf6681b21fc17a3274808a5bc18e10a14aa22a2a47",
     "middleware/rate_limit.py": "9fe4beb2e8cada5d6b5404e0d028b2155013dde55fe03463324235d07824fe60",
     "middleware/request_id.py": "b0196972a30e77cc80497e12ef0e668964a62191835981d2f77ac4c92590d335",

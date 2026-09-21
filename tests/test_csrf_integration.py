@@ -5,12 +5,16 @@ from app.integrated_app.middleware.csrf import CSRFMiddleware
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+# 空 secret_key 现在装配期就报错（见 tests/test_csrf_secret_hardfail.py），
+# 所以这里必须给一把真密钥：本文件测的是 double-submit 行为，不是密钥缺失。
+_TEST_CSRF_SECRET = "test-only-csrf-hmac-secret-0123456789abcdef"
+
 
 @pytest.fixture
 def csrf_app():
     """Create a test app with CSRF middleware."""
     app = FastAPI()
-    app.add_middleware(CSRFMiddleware)
+    app.add_middleware(CSRFMiddleware, secret_key=_TEST_CSRF_SECRET)
 
     @app.get("/api/data")
     async def get_data():
@@ -101,7 +105,7 @@ class TestDownstreamErrorIsNotDisguisedAsCsrf:
     @staticmethod
     def _app_with_boom():
         app = FastAPI()
-        app.add_middleware(CSRFMiddleware)
+        app.add_middleware(CSRFMiddleware, secret_key=_TEST_CSRF_SECRET)
 
         @app.post("/boom")
         async def boom():
@@ -109,14 +113,29 @@ class TestDownstreamErrorIsNotDisguisedAsCsrf:
 
         return app
 
+    @staticmethod
+    def _valid_token(client) -> str:
+        """取一枚中间件自己签发的 token。
+
+        配了 secret_key 之后 token 带 HMAC 签名，随便填的 "x" 会被判
+        CSRF_INVALID —— 这两个用例要测的是"下游异常不被伪装成 403"，
+        所以得先过掉 CSRF 这一关。GET 是安全方法，会在响应里 Set-Cookie。
+        """
+        resp = client.get("/boom")
+        tok = resp.cookies.get("csrf_token", "")
+        assert tok, "没拿到 csrf_token cookie，本用例的前置就不成立"
+        return tok
+
     def test_downstream_exception_propagates_instead_of_403(self):
         client = TestClient(self._app_with_boom())  # raise_server_exceptions=True（默认）
+        tok = self._valid_token(client)
         with pytest.raises(ZeroDivisionError):
-            client.post("/boom", headers={"Cookie": "csrf_token=x", "X-CSRF-Token": "x"})
+            client.post("/boom", headers={"Cookie": f"csrf_token={tok}", "X-CSRF-Token": tok})
 
     def test_response_is_500_and_never_mentions_csrf(self):
         client = TestClient(self._app_with_boom(), raise_server_exceptions=False)
-        resp = client.post("/boom", headers={"Cookie": "csrf_token=x", "X-CSRF-Token": "x"})
+        tok = self._valid_token(client)
+        resp = client.post("/boom", headers={"Cookie": f"csrf_token={tok}", "X-CSRF-Token": tok})
         assert resp.status_code == 500, f"下游异常应归 5xx，实际 {resp.status_code}: {resp.text[:120]}"
         assert "CSRF" not in resp.text
 

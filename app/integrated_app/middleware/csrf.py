@@ -154,6 +154,14 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             header_name: 读取 Header 的名称，默认 ``"X-CSRF-Token"``。
         """
         super().__init__(app)
+        if not secret_key:
+            # 兜底：不签名就不算装上了这道防护。正常路径由
+            # app_server._load_or_create_csrf_secret 保证非空；这里拦住"别处 new 一个空密钥"
+            # 的回潮（历史上 data/ 只读时会 warning 后继续跑，见 tests/test_csrf_secret_hardfail.py）。
+            raise ValueError(
+                "CSRFMiddleware 需要非空 secret_key：空值会让 CSRF token 失去 HMAC 绑定，"
+                "等于静默关掉这道防护。请检查 data/.csrf_secret 是否可读可写。"
+            )
         self._secret_key: str = secret_key
         self._cookie_name: str = cookie_name
         # 内部统一使用小写进行 header 查找（HTTP headers 大小写不敏感）
