@@ -23,6 +23,23 @@
 4 个需要 transformers 5.x（大版本），2 个需要 protobuf 越过 `descript-audiotools<3.20` /
 `modelscope<3.21` 两道上游上界。
 
+## 1a. 两道扫描器的豁免号是从哪来的（2026-09-21 实测日志，不凭记忆）
+
+下界回到 4.52.x 后，两道门禁会各自报一批号。**两边的 id 命名体系不同**：Trivy 用 CVE，
+pip-audit 用 PYSEC。下列号全部取自 PR #101 那一次 CI 的真实输出，不是推测：
+
+| 来源 | 号 | 报的版本 | 修复版本 | 对应本文 §1 |
+|---|---|---|---|---|
+| `docker-build.yml` Trivy（job 106215347457，`Total: 6 (HIGH: 6)`，同一包在两处 site-packages 各计一次） | CVE-2026-4372 | transformers 4.52.4 | 5.3.0 | A6 |
+| 同上 | CVE-2026-5241 | transformers 4.52.4 | 5.5.0 | A7 |
+| 同上 | CVE-2026-9856 | transformers 4.52.4 | 5.10.0 | A8 |
+| `security.yml` pip-audit（job 106215347173） | PYSEC-2025-216、PYSEC-2026-198、PYSEC-2026-228、PYSEC-2026-229、PYSEC-2026-392 | transformers 4.52.4 | 见 §1 | A5–A8 组 |
+
+落到的地方：`.trivyignore.yaml`（3 条 CVE，**每条带 `expiration: 2026-12-31`**，到期自动重新变红）
+与 `security.yml` 里 pip-audit 的 5 个 `--ignore-vuln`。
+`tests/test_dependency_consistency.py::test_accepted_risk_registers_stay_in_sync` 会双向核对：
+豁免文件里的 id 必须能在本文档找到、必须有 expiration，反之新出现的号不会被静音。
+
 ## 2. 本次实测证据（为什么明知有告警还是不升）
 
 ```
@@ -40,19 +57,21 @@ transformers 4.52.1 + tokenizers 0.21.0（引擎元数据要求的组合，最�
 
 即"升到 4.57 就能顺手关掉 4 条 ReDoS"这条路，代价是**产品两个引擎直接不可用**。
 
-**这里有一个必须所有者拍的岔口**（PR #101 实测撞上的）：把声明下界改回 4.52.x 会让
-`transformers 4.52.4` 进入解析结果，于是 CI 的两道安全门禁同时变红 ——
-`Dependency Vulnerability Scan (pip-audit)`（PYSEC-2025-216、PYSEC-2026-198/228/229/392）与
-`docker-build.yml` 的 Trivy 扫描步骤（镜像构建本身成功）。反过来，留着 `>=4.57.0` 门禁是绿的，
-但任何人按 `pyproject`/`requirements.txt` 装环境，IndexTTS 两个引擎都起不来。
-也就是说**当前 main 的"安全门禁绿"是踩在引擎跑不起来的版本声明上的**。
+**岔口已于 2026-09-21 定为出路 1 并落地**：`requirements.txt` / `pyproject.toml` 的下界回到
+`transformers>=4.52.1,<4.53`（`tokenizers>=0.21.0,<0.22`），同时给两道安全门禁加**逐条带理由**的
+豁免（号与理由见 §1a；到期即重新变红）。原先那种"留着 `>=4.57.0` 让门禁显示绿色"的状态，
+本质是**扫描器的颜色盖住了引擎装不起来这件事**。
 
-两条出路，本 PR 只做了无争议的那半（锁集合法性 + 检查器接线），下界原样留着并加注释指向本文：
+两点必须一起记清，免得下次又据此误判：
 
-1. 下界改回 `>=4.52.1,<4.53`（运行时正确），同时给 pip-audit / Trivy 加**逐条带理由**的豁免
-   （理由引用 §1 表的可达性判定与 §4 的复点条件）；
-2. 或者先让 IndexTTS 侧适配 transformers ≥4.53（上游放开精确 pin，或我们改 vendored 拷贝），
-   再自然抬下界、告警一并消掉。
+1. **Docker 路径本来就没有 IndexTTS**：`.dockerignore` 排除 `reference_repos/`，`requirements.txt`
+   也不含 `indextts`，镜像里只有 vendored 的 VoxCPM2（`app/integrated_app/vendor/voxcpm`）。
+   所以"下界≥4.57 会弄坏容器里的两个 IndexTTS"这个说法是**错的**——真实情况是容器部署形态
+   只有 1 个引擎可用。受影响的是"源码安装 + 自带 indextts"的环境（正是 `GPU Smoke` 那条路径）。
+2. **唯一能抓到这类运行时断裂的 CI 作业是每周一次、跑在 self-hosted GPU runner 上的
+   `GPU Smoke (real inference, self-hosted)`**：最近一次记录是 2026-09-14 success
+   （正好是那条错误下界进 main 的当天），此后没有新 run。也就是说：这类问题在 CI 上的
+   暴露延迟是以"周"计的，且依赖 runner 在线。
 
 > 复现这套对比时的坑（已记 GOTCHAS #137）：本服务的端口被占时会**自动顺延到下一个端口**，
 > 而沙箱里"停掉后台命令"只杀外层 shell、不杀 `python` 子进程。结果是新起的干净服务落在 7870，

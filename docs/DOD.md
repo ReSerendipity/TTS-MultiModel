@@ -128,8 +128,12 @@
     RMS 4615；每次卸载显存回到 ~3.5 GB）。故 `pyproject`/`requirements.txt` 里那句
     `transformers>=4.57.0`（9-14 搭在一条只讲 gpu-smoke 的提交里进来的）站不住，但改回 4.52.x 会让
     pip-audit 与 Trivy 两道 CI 安全门禁同时变红（扫到 4.52.4 的"4.53 已修"CVE）——**下界与引擎可用性
-    互斥**，本轮只落地无争议部分（锁集合法化 + 检查器接进 CI + 报错文案），下界原样保留并在
-    `pyproject.toml` 里写清两条出路，岔口交所有者；
+    互斥**，2026-09-21 定为**出路①并落地**：下界回到 `>=4.52.1,<4.53`（`tokenizers>=0.21.0,<0.22`），
+    两道扫描器改成**逐条带理由 + 带 expiration 的已接受风险豁免**（号取自 CI 真实输出，见
+    `docs/SECURITY_DEPENDABOT_TRIAGE.md` §1a；`.trivyignore.yaml` 三条 CVE 于 2026-12-31 到期，
+    到期自动重新变红），并新增 `tests/test_dependency_consistency.py`（8 条）核对"声明 ↔ 锁 ↔
+    豁免清单"三者不互相漂移 —— 这正是原先缺位的那类"下界棘轮"，也是这条错误下界能在 main 上
+    存活一周没人发现的原因；
     引擎加载失败时的报错也不再断言"PyPI 无 indextts 包"，改为带上底层 ImportError 与版本不匹配提示。
     20 条 Dependabot 告警因此**没有一条能靠现在就升级消掉**，分诊见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`。
   * **已知缺口**：CI 冒烟 `scripts/gpu_smoke_minimal.py` 只覆盖 voxcpm2 + indextts2（走 OpenAI 口，

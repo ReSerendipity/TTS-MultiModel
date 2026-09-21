@@ -31,7 +31,17 @@ jobs:
 
       - name: Scan dependencies for known vulnerabilities
         run: |
-          pip-audit -r requirements.txt --desc
+          # 已接受风险：transformers 4.52.x 被引擎元数据钉死（4.57.6 实测让 IndexTTS
+          # 2.0/2.5 的 infer_v2 / infer_v2_5 导入失败），这几条公告的可达性逐条判定见
+          # docs/SECURITY_DEPENDABOT_TRIAGE.md §1，镜像侧同源豁免见 .trivyignore.yaml。
+          # 只豁免这 5 个号；**任何新出现的公告仍会让本步变红**。
+          # 号取自 run 35561594150 job 106215347173 的实际输出（transformers 4.52.4）。
+          pip-audit -r requirements.txt --desc \
+            --ignore-vuln PYSEC-2025-216 \
+            --ignore-vuln PYSEC-2026-198 \
+            --ignore-vuln PYSEC-2026-228 \
+            --ignore-vuln PYSEC-2026-229 \
+            --ignore-vuln PYSEC-2026-392
           # 2026-08-16 本地评估 0 已知漏洞，解锁为门禁；依赖升级由 dependabot 自动跟进
 
   bandit:

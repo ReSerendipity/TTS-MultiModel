@@ -63,6 +63,10 @@ jobs:
           exit-code: "1"
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
+          # 已接受风险清单（每条带理由与 expiration，到期自动重新变红）：
+          # transformers 4.52.x 被引擎元数据钉死，见 .trivyignore.yaml 与
+          # docs/SECURITY_DEPENDABOT_TRIAGE.md
+          ignorefile: ".trivyignore.yaml"
           # 只跑漏洞扫描：secret/misconfig 对 25GB 镜像是纯多余开销，会拖长导出与解包时间
           scanners: vuln
           # 本项目镜像约 25GB 展开，Trivy 默认 5m 内部超时会在分析阶段被

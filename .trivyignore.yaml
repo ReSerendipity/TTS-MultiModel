@@ -1,0 +1,39 @@
+# Trivy 忽略清单 —— 只用于"已接受风险"的镜像漏洞豁免。
+#
+# 为什么存在：本产品的运行环境被引擎真实约束钉在 transformers 4.52.x
+# （IndexTTS 2.0/2.5 的发行元数据要求 transformers==4.52.1；实测 4.57.6 下
+# indextts.infer_v2 / infer_v2_5 直接 ImportError，见 docs/SECURITY_DEPENDABOT_TRIAGE.md §2）。
+# 4.52.x 因此带着下面这几条"要 5.x 才修"的公告。它们已在分诊文档里逐条判定为
+# **本仓不可达**（无 HF Trainer / 无 save_pretrained / 不接受用户指定模型源 / 只绑 127.0.0.1）。
+#
+# 规则：这里只允许登记分诊文档 §1 表里已有条目的 id；每条必须给 expiration（到期即重新变红，
+# 逼一次复审），并在上方注释里写清"为什么不可达"。新出现的公告**不在这里**，会照常红。
+# tests/test_dependency_consistency.py 会核对：本文件里的 id 与分诊文档、pip-audit 豁免集不脱节。
+vulnerabilities:
+  # CVE-2026-4372：transformers 远程代码执行类，触发前提是加载攻击者可控的仓库代码
+  # （trust_remote_code 或远程 model 指向）。本仓权重全部来自 model/ 本地目录，
+  # 经人工确认 + SHA-256 复验后才入库（LOCAL_RULES 禁区流程）；镜像内无远程模型入口。
+  - id: CVE-2026-4372
+    package:
+      name: transformers
+      versions:
+        - "4.52.4"
+    expiration: "2026-12-31T00:00:00+00:00"
+
+  # CVE-2026-5241：模型初始化期的任意代码执行，载体是 LightGlue 一类视觉匹配模型。
+  # 本仓只加载 TTS 语音模型（voxcpm / indextts / funasr / zipenhancer），无该代码路径。
+  - id: CVE-2026-5241
+    package:
+      name: transformers
+      versions:
+        - "4.52.4"
+    expiration: "2026-12-31T00:00:00+00:00"
+
+  # CVE-2026-9856：save_pretrained 经 chat template 造成任意文件写。
+  # 全仓无 save_pretrained 调用（grep 证据见分诊文档 §1 A8），音色保存走我们自己的目录写入。
+  - id: CVE-2026-9856
+    package:
+      name: transformers
+      versions:
+        - "4.52.4"
+    expiration: "2026-12-31T00:00:00+00:00"
