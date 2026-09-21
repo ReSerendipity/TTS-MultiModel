@@ -49,7 +49,12 @@ jobs:
           GH_TOKEN: ${{ secrets.REPO_ADMIN_TOKEN }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::notice::REPO_ADMIN_TOKEN secret not configured - cannot query runner status, skipping smoke"
+            # 以前这里是 ::notice::，整个 run 以"success"收场 —— 而真推理 job 一次都没跑过
+            # （本仓 2026-09-21 实测：3 次 schedule run 全部 gpu-smoke=skipped，
+            # 且 REPO_ADMIN_TOKEN 这个 secret 从未配置）。跳过必须显眼，不能长得像通过。
+            echo "::warning::REPO_ADMIN_TOKEN 未配置 → 无法查询 runner 在线状态，本次 GPU 真机冒烟**没有跑**。真推理覆盖率为 0，别把本 run 当验收依据。"
+            echo "### GPU 真机冒烟未执行" >> "$GITHUB_STEP_SUMMARY"
+            echo "原因：secret \`REPO_ADMIN_TOKEN\` 未配置，无法判断有没有在线的 \`gpu\` self-hosted runner。" >> "$GITHUB_STEP_SUMMARY"
             echo "available=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -60,7 +65,9 @@ jobs:
           if [ "${COUNT}" -gt 0 ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::no online self-hosted runner with label 'gpu'; weekly smoke skipped"
+            echo "::warning::没有在线的 self-hosted \`gpu\` runner → 本次 GPU 真机冒烟**没有跑**，真推理覆盖率为 0（别把本 run 的 green 当验收依据）。"
+            echo "### GPU 真机冒烟未执行" >> "$GITHUB_STEP_SUMMARY"
+            echo "原因：仓库里没有在线且带 \`gpu\` 标签的 self-hosted runner（注册数见上一步输出）。" >> "$GITHUB_STEP_SUMMARY"
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 

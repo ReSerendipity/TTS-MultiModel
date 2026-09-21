@@ -143,9 +143,24 @@
     引擎加载失败时的报错也不再断言"PyPI 无 indextts 包"，改为带上底层 ImportError 与版本不匹配提示。
     20 条 Dependabot 告警因此**没有一条能靠现在就升级消掉**，分诊见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`；
     且那 20 条只覆盖有 GHSA 记录的 10 个公告，**8 条 PYSEC-only 的 Dependabot 从不开单**。
-  * **已知缺口**：CI 冒烟 `scripts/gpu_smoke_minimal.py` 只覆盖 voxcpm2 + indextts2（走 OpenAI 口，
-    而 `tts-1` / `tts-1-hd` 两个模型名里没有 IndexTTS **2.0** 的位置）；2.0 的真推理今天人工验过，
-    要接进冒烟需改用 `/api/generate/indextts2` 形态并在 GPU runner 上复验，另案。
+  * **GPU 冒烟覆盖面（本轮补齐 2.0，并发现"每周兜底"其实从没跑过）**：
+    `scripts/gpu_smoke_minimal.py` 原先只覆盖 voxcpm2 + indextts2 —— `tts-1` / `tts-1-hd` 两个
+    OpenAI 模型名里没有 IndexTTS **2.0** 的位置。现在第 0 步是引擎导入探针（`engine_imports`，
+    用服务所在解释器 import `indextts.infer_v2` / `infer_v2_5`，失败即硬停并点名
+    `transformers>=4.52.1,<4.53`），2.0 走 `/api/generate/indextts2` + `expected_engine` 真合成并
+    从 `data-audio-filename` 回取 `/api/audio/<file>` 校验 RIFF，另加一条版本门负向
+    （加载 2.0 却声明 `indextts2` 必须被点名拒绝）。**本机真机跑通**（RTX 5070 Ti，见本轮记录）。
+    过程中还修掉一个潜伏缺陷：脚本所有 POST 都不带 CSRF 双提交票，而 `/v1/audio/speech`
+    并不在豁免路径里 —— 不带就 403 `CSRF_MISSING`，也就是说这条冒烟只要真跑就会红。
+    更要紧的一条：**它从没真跑过**。`gpu-smoke.yml` 三次 schedule run（09-07 / 09-14 / 09-21）
+    的 `gpu-smoke` job 全是 `skipped`，run 顶层却是 success —— secret 里根本没有
+    `REPO_ADMIN_TOKEN`，且仓库**零个注册 runner**。本轮把跳过改成 `::warning` + 写进 job summary，
+    并把每天真能跑的引擎导入兜底放到 `docker-smoke.yml`（CPU 托管 runner，只 import 不推理），
+    同时给它的触发器补上 `requirements.txt` / `requirements-lock.txt` / `pyproject.toml`
+    （以前依赖区间被改坏时这个作业压根不会触发）。
+    **仍未消掉**：runner 不存在 → IndexTTS 2.5/2.0 的真推理与"两个 IndexTTS 变体的导入"在 CI 上
+    依然零覆盖，只有本机能验；要让这条变成 CI 事实，需要注册一台带 `gpu` 标签的
+    self-hosted runner 并配 `REPO_ADMIN_TOKEN`（归所有者）。
   * **仍未覆盖**：桌面安装包链路（staging → data 7z → NSIS）**无任何 workflow 调用**、本机也无从安装
     （`scripts/installer/` 只有一个 4.3 MB `Setup.exe`、无同目录分卷），所以 `unpack_desktop.ps1`
     新加的许可/字体落地核对只过了语法层，`release_gate.ps1` 的第 ⑥ 步也只在发版/dispatch 时跑；

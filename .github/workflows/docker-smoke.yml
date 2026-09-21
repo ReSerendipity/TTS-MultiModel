@@ -20,6 +20,12 @@ on:
       - "deploy/kubernetes/**"
       - ".dockerignore"
       - ".github/workflows/docker-smoke.yml"
+      # 2026-09-21 补：镜像里的 Python 依赖就是这三份文件决定的，而"引擎推理模块导入失败"
+      # 这类断裂恰好由依赖区间变化引起（transformers 抬到 4.57 那次）。以前触发器不含它们，
+      # 于是本作业对最该拦的那类改动**根本不会跑** —— 引擎导入探针这一步也就形同虚设。
+      - "requirements.txt"
+      - "requirements-lock.txt"
+      - "pyproject.toml"
   push:
     branches: [main]
     paths:
@@ -27,6 +33,9 @@ on:
       - "docker-compose.yml"
       - "deploy/kubernetes/**"
       - ".dockerignore"
+      - "requirements.txt"
+      - "requirements-lock.txt"
+      - "pyproject.toml"
   schedule:
     - cron: "30 3 * * 1" # 每周一 03:30 UTC，与 gpu-smoke（03:00）错峰；捕捉 base 镜像漂移
 
@@ -145,6 +154,42 @@ jobs:
           echo "::error::ping 未在 180s 内 200（容器日志见 artifact）"
           docker logs --tail 200 tts-smoke
           exit 1
+
+      - name: Engine import probe inside the image
+        # 此前这一步不存在，而引擎模块在容器里**从没被导入过**：注册表是懒加载
+        # （model_registry.py 里 `from .engines.voxcpm2.engine import VoxCPM2Engine` 在函数内），
+        # 冒烟又用 TTS_AUTO_LOAD_MODEL=0 启动 → "依赖被改坏导致引擎导入失败"这类断裂
+        # 在 CI 上完全隐身（2026-09-21 实测：transformers 4.57.6 下 indextts 的
+        # infer_v2 / infer_v2_5 直接 ImportError，而全部门禁绿）。
+        # 只 import 不推理：CPU runner 无 GPU 属预期，真合成归 gpu-smoke.yml。
+        # 边界要如实说：镜像里**没有** indextts（.dockerignore 排除 reference_repos/，
+        # requirements.txt 也不含它），所以这里钉得住的只有 vendored VoxCPM2 那一条链；
+        # IndexTTS 2.5 / 2.0 的导入由 gpu-smoke.yml 的 engine_imports 步骤覆盖（每周一次）。
+        run: |
+          docker exec -i tts-smoke python3.12 - <<'PY'
+          import importlib
+          import sys
+          import transformers
+
+          print("transformers", transformers.__version__)
+          mods = [
+              "integrated_app.vendor.voxcpm",
+              "integrated_app.engines.voxcpm2.engine",
+          ]
+          bad = []
+          for m in mods:
+              try:
+                  importlib.import_module(m)
+                  print("OK  ", m)
+              except Exception as exc:  # noqa: BLE001
+                  bad.append((m, type(exc).__name__, str(exc)[:200]))
+                  print("FAIL", m, type(exc).__name__, str(exc)[:200])
+          if bad:
+              print("::error::镜像内的引擎模块导入失败 —— 检查 pyproject/requirements.txt 的 "
+                    "transformers 与 tokenizers 区间（引擎要求 4.52.x，见 "
+                    "docs/SECURITY_DEPENDABOT_TRIAGE.md §2）")
+              sys.exit(1)
+          PY
 
       - name: Probe readiness semantics (/readyz must be 503 without model)
         run: |
