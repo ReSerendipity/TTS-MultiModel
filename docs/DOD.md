@@ -97,11 +97,13 @@
   点重试 XHR 计数 +1 且错误块重新渲染（此前该按钮调的是从未定义的函数，纯死键，#133），
   第 9 项 6 轮切换实测空闲显存回到切换前水平（spread 416MB，无单调递增）。
   **仍需人工：第 7 项真开一次屏幕阅读器。**（第 8 项断网首屏已于 2026-09-20 转为机器判定，见 §5.2）
-- 2026-09-20 本轮补记（分发产物与前端竞态，`ci/pin-floors-and-csrf-hardfail`）：
-  * **门禁**：非 e2e **2064 passed / 35 skipped / 0 failed，2m06s，覆盖率 51.95%**；
-    `tests/e2e`（服务在线）**68 passed / 5 skipped，5m48s**；mypy **103 = 基线**；
-    ruff check 全通过、`ruff format --check` 355 文件已格式化；完整性清单 **16/16 一致**；
-    无硬编码路径 exit 0；`test_portable_bundle.ps1` **49 条断言全通过**。
+- 2026-09-21 本轮补记（分发产物与前端竞态，`fix/tab-race-and-dist-payload`，基线 = `origin/main` e104809）：
+  * **门禁**：非 e2e **2078 passed / 35 skipped / 0 failed，2m24s，覆盖率 52.04%**；
+    `tests/e2e`（服务在线）**68 passed / 5 skipped**；mypy **103 = 基线**；
+    ruff check 全通过、`ruff format --check` 359 文件已格式化；完整性清单 **16/16 一致**；
+    无硬编码路径 exit 0；`test_portable_bundle.ps1` **49 条断言全通过**；
+    `release_gate.ps1` **六步全部 PASS**（新增第 ⑥ 步真跑 `assemble_release_staging`：
+    staging 1069 文件 / woff2 777 / OFL 14 / 禁区命中 0）。
   * **对产物复验**（不是开发树）：`test_portable_bundle.ps1 -KeepArtifacts` 解包后从产物起服务，
     字体菜单 **14/14 可用**、页×引擎矩阵 **12/12 通过**；产物内含
     `LICENSE 11,515 B / NOTICE 1,419 B / THIRD_PARTY_NOTICES.md 3,280 B / SECURITY.md 7,579 B`
