@@ -127,11 +127,22 @@
     后三引擎真推理全通（2.5：214,040 B / RMS 6176；2.0：205,124 B / RMS 6926；VoxCPM2：230,148 B /
     RMS 4615；每次卸载显存回到 ~3.5 GB）。故 `pyproject`/`requirements.txt` 里那句
     `transformers>=4.57.0`（9-14 搭在一条只讲 gpu-smoke 的提交里进来的）站不住，但改回 4.52.x 会让
-    pip-audit 与 Trivy 两道 CI 安全门禁同时变红（扫到 4.52.4 的"4.53 已修"CVE）——**下界与引擎可用性
-    互斥**，本轮只落地无争议部分（锁集合法化 + 检查器接进 CI + 报错文案），下界原样保留并在
-    `pyproject.toml` 里写清两条出路，岔口交所有者；
+    pip-audit 与 Trivy 两道 CI 安全门禁同时变红（4.52.x 实带 **16 个**公告：4 条要 4.53、4 条要
+    5.x 大版本、8 条**上游根本没有修复版本**）——**下界与引擎可用性
+    互斥**，2026-09-21 定为**出路①并落地**：下界回到 `>=4.52.1,<4.53`（`tokenizers>=0.21.0,<0.22`），
+    两道扫描器改成**逐条带理由的已接受风险豁免**（号取自 CI 真实输出 + api.osv.dev 复核，见
+    `docs/SECURITY_DEPENDABOT_TRIAGE.md` §1/§1a；pip-audit 侧 16 个 PYSEC 号，Trivy 侧因那两步带
+    `severity:CRITICAL,HIGH` + `ignore-unfixed:true` 只剩 3 条 CVE，`.trivyignore.yaml` 于
+    2026-12-31 到期、到期自动重新变红；pip-audit 没有到期机制，靠文档 §4 的同一日期人守），
+    并新增 `tests/test_dependency_consistency.py`（11 条）核对"声明 ↔ 锁 ↔ 豁免清单"三者不互相漂移 —— 这正是原先缺位的那类"下界棘轮"，也是这条错误下界能在 main 上
+    存活一周没人发现的原因；其中 D4 专门堵本轮自己踩出来的两个**静默失效**坑：
+    `--ignore-vuln` 的号从 CI 表格里目抄被列宽截断成前缀假号（5 条里只生效 1 条）、
+    Trivy 的输入名写成 `ignorefile`（v0.36.0 只认 `trivyignores`，写错仅警告、豁免等于没接）；
+    同一步还暴露出**镜像装 4.52.4 而锁钉 4.52.1**（`Dockerfile:33/38` 按声明装而非按锁装），
+    已作为已知缺口记在分诊文档 §3b，本轮未动 Dockerfile。
     引擎加载失败时的报错也不再断言"PyPI 无 indextts 包"，改为带上底层 ImportError 与版本不匹配提示。
-    20 条 Dependabot 告警因此**没有一条能靠现在就升级消掉**，分诊见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`。
+    20 条 Dependabot 告警因此**没有一条能靠现在就升级消掉**，分诊见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`；
+    且那 20 条只覆盖有 GHSA 记录的 10 个公告，**8 条 PYSEC-only 的 Dependabot 从不开单**。
   * **已知缺口**：CI 冒烟 `scripts/gpu_smoke_minimal.py` 只覆盖 voxcpm2 + indextts2（走 OpenAI 口，
     而 `tts-1` / `tts-1-hd` 两个模型名里没有 IndexTTS **2.0** 的位置）；2.0 的真推理今天人工验过，
     要接进冒烟需改用 `/api/generate/indextts2` 形态并在 GPU runner 上复验，另案。

@@ -55,17 +55,22 @@ dependencies = [
     "torch>=2.5.1",
     "torchvision>=0.20.1",
     "torchaudio>=2.5.1",
-    # ⚠ 这条下界与引擎可用性互斥，取舍交仓库所有者，别顺手改（证据见
-    # docs/SECURITY_DEPENDABOT_TRIAGE.md §2）：2026-09-21 实测 4.57.6 下 VoxCPM2 正常
-    # （合成 243,164 B / RMS 5360）但 IndexTTS 2.5 与 2.0 的 infer_v2_5 / infer_v2 直接
-    # ImportError；4.52.1 + tokenizers 0.21.0 下三引擎真推理全通（2.5：214,040 B / RMS 6176；
-    # 2.0：205,124 B / RMS 6926）。但把下界改回 4.52.x 会让 pip-audit 与 Trivy 两道 CI
-    # 安全门禁同时变红（扫到 4.52.4 的"4.53 已修"CVE），所以这里暂留 >=4.57：
-    # 门禁绿，代价是按本声明装环境的人两个引擎起不来。出路二选一——
-    #   1) 下界改回 >=4.52.1,<4.53，并给两道门禁加逐条带理由的豁免；
-    #   2) 先让 IndexTTS 侧适配 transformers >=4.53（上游放开精确 pin 或改 vendored 拷贝）。
-    "transformers>=4.57.0",
-    "tokenizers>=0.19.0",
+    # 版本策略：上界是实测钉出来的，不是保守猜测。IndexTTS 2.0/2.5 的发行元数据要求
+    # transformers==4.52.1 + tokenizers==0.21.0；2026-09-21 在 4.57.6 下实测
+    # `indextts.infer_v2_5` / `infer_v2` 导入失败（两个引擎直接起不来，VoxCPM2 正常），
+    # 而 4.52.1 + tokenizers 0.21.0 下三引擎真推理全通（2.5：214,040 B / RMS 6176；
+    # 2.0：205,124 B / RMS 6926；VoxCPM2：230,148 B / RMS 4615）。
+    # 代价（2026-09-21 按 api.osv.dev 实测，不是估算）：4.52.x 带 **16 个** transformers 公告
+    # —— A1–A4 要 4.53（被上面的引擎 pin 挡住）、A5–A8 要 5.x 大版本、A9–A16 这 8 条
+    # **上游根本没有修复版本**。已按"已接受风险"逐条登记理由与可达性判据在
+    # docs/SECURITY_DEPENDABOT_TRIAGE.md §1，并在 pip-audit（security.yml，16 个 PYSEC 号）
+    # 与 Trivy（.trivyignore.yaml，只剩 3 条，因为那两步带 severity:CRITICAL,HIGH +
+    # ignore-unfixed:true 过滤）里绑理由豁免——**新出现的公告仍会让门禁变红**。
+    # 注意 pip-audit 没有到期机制，这 16 条靠文档 §4 的 2026-12-31 复审约定守着。
+    # 抬这个上界之前必须先确认 IndexTTS 侧已适配。
+    # tests/test_dependency_consistency.py 会核对：本声明与 requirements-lock.txt 的钉版互相满足。
+    "transformers>=4.52.1,<4.53",
+    "tokenizers>=0.21.0,<0.22",
     # === AI 生态 ===
     "funasr>=1.0.0",
     "modelscope>=1.9.0",
