@@ -32,8 +32,8 @@ A1–A8 有 GHSA 记录（= Dependabot 那 16 条告警的来源）；A9–A16 �
 | A14 | CVE-2025-14928 | PYSEC-2025-216 / 无 GHSA | 同上 | **无** | HuBERT `convert_config` 代码注入 | 同 A9（`HuBERT` 0 命中）；ASR 侧走 funasr 自有权重格式 | 同 A9 |
 | A15 | CVE-2025-14929 | PYSEC-2025-217 / 无 GHSA | 同上 | **无** | X-CLIP checkpoint 转换反序列化 | 同 A9（`XCLIP` 0 命中）；CLIP 在本仓只做安全判定、且用 `AutoTokenizer` 不换 checkpoint | 同 A9 |
 | A16 | CVE-2025-14930 | PYSEC-2025-218 / 无 GHSA | 同上 | **无** | GLM4 反序列化 | 同 A9；本仓无 LLM 对话模型 | 同 A9 |
-| P1 | CVE-2025-4565 | — | high | 4.25.8 | protobuf wire 解析 | **上界来源未证实**（§3a）；服务端 `grep google.protobuf app/` 零命中，无网络输入面 | 待 §3a 复算后再定 |
-| P2 | CVE-2026-0994 | — | high | 5.29.6 | 同 P1 | 同 P1 | 同 P1 |
+| P1 | CVE-2025-4565 | PYSEC-2026-1806 / GHSA-8qvm-5x2c-j2w7 | high | 4.25.8（另有 5.29.5 / 6.31.1 两条并行修复线） | protobuf JSON 解析 DoS | **无人挡住**：95 个钉版包里对 protobuf 的 13 条约束全是 extra 门控，我们没请求任何 extra（§3a 实测表）；本仓 `grep google.protobuf app/` 零命中，服务端不解析来自网络/wire 的数据 | 待复算 + 真机复验后随批量升级一起抬（§7） |
+| P2 | CVE-2026-0994 | PYSEC-2026-1805 / GHSA-7gcm-g887-7qv7 | high | 5.29.6（另有 6.33.5） | protobuf JSON 递归深度绕过 | 同 P1 | 同 P1 |
 
 一句话：**16 个 transformers 公告里没有一个能靠"升个版"现在就消掉** —— A1–A4 要 4.53（被
 IndexTTS 的精确 pin 挡住，§2），A5–A8 要 5.x 大版本，A9–A16 **上游根本没有修复版本**，
@@ -131,20 +131,33 @@ transformers 4.52.1 + tokenizers 0.21.0（引擎元数据要求的组合，最�
 `.github/workflows/ci.yml` 的 lint job，每次 PR 与 push 都跑；改完检查器输出：
 `校验 PyPI 版本 95 个，冲突 0，未核验 0 → PASS`。
 
-## 3a. protobuf 那条上界我**没有**证实（纠正一次过早的结论）
+## 3a. protobuf 那条上界：**已经实测过了，没人挡住**（更正前两版说法）
 
-本文第一版把 P1/P2 的阻断者写成"被 `descript-audiotools<3.20` 与 `modelscope<3.21` 挡住"。
-那两条约束来自**本机开发环境**的包元数据，而核查后发现它们撑不起这个结论：
+本文第一版把 P1/P2 的阻断者写成"被 `descript-audiotools<3.20` 与 `modelscope<3.21` 挡住"，
+第二版改口为"未证实"。2026-09-21 做了实测，两个结论都不对：**当前解析图里没有任何一条
+对 protobuf 的无条件约束**。
 
-- `descript-audiotools` 与 `tensorboardX` **都不在 `requirements-lock.txt`（95 条钉版）里** —— 它们是开发机
-  多装出来的东西，不是发版解析图的一部分；
-- 锁里确有的 `modelscope==1.40.1`，其 `protobuf<3.21.0,>=3.19.0` **只挂在 `nlp` / `all` extra 上**，
-  而 `requirements.txt:8` 写的是 `modelscope>=1.9.0`（**没有请求任何 extra**）；
-- 但锁里 `protobuf==3.19.6` 恰好落在那条约束的**下界**上，所以解析图里很可能确实带进了某个 extra
-  （或经 `funasr==1.4.15` 间接引入 —— 它自身元数据里没有 protobuf 直接约束）。
+方法：读 `requirements-lock.txt` 的 95 个钉版包，逐个取 PyPI 元数据（`/pypi/<name>/<ver>/json`，
+只请求元数据、不下载包），筛出 `requires_dist` 里提到 protobuf 的行。95 个全部查询成功，
+命中 **13 行，13 行全部带 `extra ==` 门控**：
 
-结论：**"被谁挡住"目前只能标为未证实**，确切断链要靠一次 `pip-compile` 复算（属于 §B1 的 relock 工作，
-需要访问索引、拉几百 MB 依赖）。在它做完之前，P1/P2 的处置只写"无攻击面"，不写"被上游挡住"。
+| 包 | 提到 protobuf 的行 | 我们的图里生效吗 |
+|---|---|---|
+| `modelscope==1.40.1` | `protobuf<3.21.0,>=3.19.0`（`nlp`、`all`）、`protobuf`（`audio`、`audio-tts`） | **不生效**：`requirements.txt:8` 写的是 `modelscope>=1.9.0`，没请求任何 extra |
+| `sentencepiece==0.2.2` | `protobuf`（`protobuf`、`test`） | 不生效（同上） |
+| `transformers==4.52.1` | `protobuf`（`all`、`dev`、`dev-torch`、`dev-tensorflow`、`deepspeed-testing`、`sentencepiece`、`torchhub`） | 不生效（我们只装基础包） |
+
+也就是说：**`protobuf==3.19.6` 不是被谁钉住的，是这份锁当年编译时留下的历史值**；
+`funasr==1.4.15` 的元数据里根本不提 protobuf，第一版引它当"阻断者"是拿开发环境多装的包
+（`descript-audiotools` / `tensorboardX` 都**不在锁里**）当成了发版图。
+
+所以 #90（protobuf → 7.36.1）**在元数据层面完全可解**，且能一次关掉 P1/P2 两条告警 ——
+按 OSV 的修复线，其实不必跳到 7.x：`4.25.8` 关 P1、`5.29.6` 关 P2（同一公告还给了 6.31.1 /
+6.33.5 两条并行修复线）。**没合**的原因不是"被挡住"，而是剩下的风险不在元数据里：
+protobuf 跨大版本最常坏在 **gencode 与运行时不匹配**（旧 `_pb2.py` 在新运行时 import 期即报
+`Descriptors cannot be created directly`），而这条只有**真装环境 + 真加载模型**才走得到 ——
+本仓 `app/` 对 `google.protobuf` / `_pb2` 是**零直接引用**，CI 那 12 个 CPU pytest 矩阵覆盖不到。
+判据与复算命令见 §7。
 
 ## 3b. 顺手发现的一个已知缺口：镜像与便携包装的不是同一个 transformers 版本
 
@@ -174,8 +187,10 @@ Dockerfile:38  RUN python3.12 -m pip install --no-cache-dir --user -r requiremen
 1. IndexTTS 官方放开 `transformers` 精确 pin（或我们改 vendored 拷贝适配）→ 抬到 4.53+ 立刻
    可关 A1–A4；抬到 5.10+ 则 A1–A8 一次全消。**A9–A16 只能等它们各自出修复版本**
    （OSV 现在给的是"无修复版本"，所以只要停在 4.52.x，这 8 条就会一直在 pip-audit 里红着）。
-2. protobuf 的 P1/P2：先做 §3a 那次 `pip-compile` 复算确认真正的阻断者，再谈放开哪道上界；
-   本文第一版写的"被 `descript-audiotools<3.20` / `modelscope<3.21` 挡住"**尚未证实**。
+2. protobuf 的 P1/P2：**阻断者已排除** —— §3a 实测 95 个钉版包里对 protobuf 的 13 条约束
+   全是 extra 门控，我们一个 extra 都没请求，所以"被 `descript-audiotools<3.20` /
+   `modelscope<3.21` 挡住"那两版说法都不成立。现在只剩"没做过真机复验"这一件事，
+   复算与验收命令在 §7；做完可一次关掉这两条（4.25.8 关 P1、5.29.6 关 P2，不必跳到 #90 的 7.x）。
 3. 若本服务将来**监听非本机地址**或**接受用户指定模型名/HF 仓库**，A6/A7/A8/A9–A16/P1/P2 的
    "无攻击面"前提立即失效，必须重判。当前证据：`config.yaml host: "127.0.0.1"`、
    `run_server(ip="127.0.0.1")`。
@@ -184,21 +199,54 @@ Dockerfile:38  RUN python3.12 -m pip install --no-cache-dir --user -r requiremen
    pip-audit 侧没有到期机制（它不支持 expiration），所以 A1–A16 的 16 个号靠本文 + 人守 ——
    2026-12-31 之前要么按条件 1 抬版本消掉，要么把这份表带着做一次显式再确认。
 
-## 5. 需要仓库所有者点头的动作
+## 5. 需要仓库所有者点头的动作（枚举已查成真值，命令可直接跑）
 
-GitHub 安全页的 20 条 dismiss 属**共享状态写操作**，我没有代做，也没有在这份文档里写死
-`dismissed_reason` 的取值 —— 那个枚举我该现查而不是照记忆写。执行前先取真值：
+GitHub 安全页的 20 条 dismiss 属**共享状态写操作**，我没有代做。原先说"`dismissed_reason`
+的取值我要现查"—— 已查，两个独立来源一致：
+
+- REST 文档（`docs.github.com/en/rest/dependabot/alerts`）：`state` ∈ `dismissed` / `open`；
+  `dismissed_reason` ∈ **`fix_started` / `inaccurate` / `no_bandwidth` / `not_used` / `tolerable_risk`**；
+  没有独立的 `comment` 字段，注释走 **`dismissed_comment`**。
+- GraphQL 内省（权威，不依赖文档是否过期）：
 
 ```bash
-# 看某条告警现在的状态与字段名（读操作，不改状态）
-gh api repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/22 \
-  -q '{state, dismiss_reason, advisory: .security_advisory.cve_id}'
+gh api graphql -f query='{ __type(name: "DismissReason") { kind enumValues { name } } }'
+# → ENUM: FIX_STARTED, NO_BANDWIDTH, TOLERABLE_RISK, INACCURATE, NOT_USED
 ```
 
-拿到合法枚举后，按 §1 表里"建议处置"一列逐条 PATCH（`state=dismissed` + 对应的
-`dismissed_reason` + 注释里引用本文对应行号），**先跑 1 条确认语义再批量**。
-每条注释必须自带绑定理由（哪条代码路径不存在 / 被哪个上游上界挡住 / 复点条件），
-不接受"误报"三个字了事。
+**告警号 ↔ §1 行的对应（`gh api .../dependabot/alerts?state=open` 实测 20 条 = 10 个公告 × 2 份清单）**：
+
+| 告警号 | 公告 | 对应 §1 | 建议 `dismissed_reason` | 一句话理由（写进 `dismissed_comment`） |
+|---|---|---|---|---|
+| 4、14 | CVE-2025-5197 | A1 | `not_used` | `convert_tf_weight_name_to_pt_weight_name` 在本仓 0 命中，不做 TF→PT 权重名转换 |
+| 5、15 | CVE-2025-6638 | A3 | `not_used` | 不加载 Marian 模型，`remove_language_code` 走不到 |
+| 6、16 | CVE-2025-6051 | A2 | `not_used` | 不用 transformers 的 normalizer，文本前处理在引擎自带前端里 |
+| 7、17 | CVE-2025-6921 | A4 | `not_used` | `AdamWeightDecay` 是训练期优化器，本服务不训练 |
+| 9、19 | CVE-2026-1839 | A5 | `not_used` | 全仓无 `from transformers import Trainer`；自己的 `LoRATrainer` 不继承它 |
+| 10、20 | CVE-2026-4372 | A6 | `tolerable_risk` | 需要加载别人给的 `config.json`；权重走 `model/` 本地目录 + 人工确认 + SHA-256 |
+| 11、21 | CVE-2026-5241 | A7 | `tolerable_risk` | 本仓只加载 TTS 语音模型，无 LightGlue 一类视觉模型 |
+| 12、22 | CVE-2026-9856 | A8 | `not_used` | 全仓 0 处 `save_pretrained`；音色保存走自己的目录写入 |
+| 3、13 | CVE-2025-4565 | P1 | `tolerable_risk` | 服务端不解析网络来的 protobuf/JSON wire；待 §7b 复算后抬到 4.25.8 自然消除 |
+| 8、18 | CVE-2026-0994 | P2 | `tolerable_risk` | 同 P1，修复线 5.29.6 |
+
+跑法（**先只跑 1 条确认语义，再批量**）：
+
+```bash
+# 单条试跑（先读后写，确认字段语义与返回）
+gh api repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/4 \
+  --method PUT \
+  -f state=dismissed \
+  -f dismissed_reason=not_used \
+  -f dismissed_comment='本仓可达性判定见 docs/SECURITY_DEPENDABOT_TRIAGE.md §1 A1（convert_tf_weight_name_to_pt_weight_name 零命中）；复点条件 §4-1。'
+
+# 确认无误后再按上表批量（号与 reason 逐条对，别用同一个值一把梭）
+```
+
+两点别忘：
+1. **`not_used` / `tolerable_risk` 要按上表分开设**，全用 `inaccurate` 会把"我们确实带着这些公告"
+   这件事从台账上抹掉 —— 这 16 条的账本在 pip-audit 豁免清单与本文 §1，不在告警页。
+2. 关掉这 20 条 **不等于登记完成**：A9–A16 那 8 条只有 PYSEC 号、没有 GHSA 记录，
+   Dependabot 从不开单（上面的告警列表里确实没有它们）。别以"告警清零"当验收口径。
 
 ## 6. 开发环境一致性核对（`pip check` 16 条，2026-09-21）
 
@@ -213,3 +261,74 @@ gh api repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/22 \
 顺带说清两件事：`requirements-lock.txt` 是 `pip-compile --no-annotate` 的产物（95 条钉版），
 本机实装与它有 **30/73 条**可对比项不一致，且锁里没有 `descript-audiotools`/`tensorboardX`
 一类开发机依赖 —— 所以"锁 vs 开发机"的差**不等于**锁错，但它同时说明**这份锁从没被真装验证过**（见 §B1 建议）。
+
+## 7. 锁集全量审计结果与复算命令（B1 的可复现部分）
+
+### 7a. 全锁审计（2026-09-21，OSV `querybatch`，95 个钉版包一次问完）
+
+| 结果 | 数字 |
+|---|---|
+| 有公告的包 | **2 / 95** |
+| `transformers==4.52.1` | 24 条记录 = **16 个**去重公告（§1 A1–A16） |
+| `protobuf==3.19.6` | 4 条记录 = **2 个**去重公告（§1 P1/P2） |
+| 其余 93 个包 | **0 公告** |
+
+即：整份锁的已知漏洞面**全部集中在两个包上**，且都在本文登记完了。
+（记录数是 2× 公告数，因为 OSV 对同一公告同时发 GHSA 与 PYSEC 两条记录。）
+
+复现：
+
+```bash
+# 一次性批量问 OSV，不下载任何包
+python - <<'PY'
+import json, re, urllib.request, pathlib
+pairs = re.findall(r'^([A-Za-z0-9][A-Za-z0-9._-]*)==([0-9][0-9a-zA-Z.+-]*)',
+                   pathlib.Path('requirements-lock.txt').read_text(encoding='utf-8'), re.M)
+body = json.dumps({'queries': [{'package': {'name': n, 'ecosystem': 'PyPI'}, 'version': v}
+                              for n, v in pairs]}).encode()
+req = urllib.request.Request('https://api.osv.dev/v1/querybatch', data=body,
+                             headers={'Content-Type': 'application/json'})
+res = json.load(urllib.request.urlopen(req, timeout=180))
+for (n, v), r in zip(pairs, res['results']):
+    if r.get('vulns'):
+        print(f'{n}=={v}:', ', '.join(x['id'] for x in r['vulns']))
+PY
+```
+
+同一把尺子也解释了"为什么 pip-audit 报 16 而 Trivy 报 3"：见 §1a 的过滤口径表。
+
+### 7b. 复算锁 + 真装复验（**需要你拍板的那一步**）
+
+以下命令会访问 PyPI 索引并把 GB 级依赖装进一个**新建的** venv（不动现有 `.venv`，
+不动 `model/`）。按本仓规矩，这种量级的传输我不擅自跑，命令交给你：
+
+```bash
+cd /c/Users/Doro/TTS_MultiModel
+
+# ① 复算（只重解析，不改 requirements.txt 的声明）
+python -m venv .venv-relock && ./.venv-relock/Scripts/python.exe -m pip install -q pip-tools
+./.venv-relock/Scripts/python.exe -m piptools compile --no-annotate \
+  --output-file=requirements-lock.relock.txt requirements.txt
+
+# ② 只对比差异，先不覆盖真锁
+diff <(sort requirements-lock.txt) <(sort requirements-lock.relock.txt) | head -60
+
+# ③ 关键问题要在复算里逐条回答：
+#    - transformers 解析到哪个补丁号（4.52.1 还是 4.52.4）？两者公告集合实测相同（§1a），
+#      但 #25 那批手改过锁，锁与"按声明重解析"的关系从没验证过；
+#    - protobuf 能抬到哪（4.25.8 / 5.29.6 / 7.36.1）？§3a 已证无人挡住，
+#      真拦路的是 funasr/modelscope 的 gencode 运行时兼容，import 期才暴露；
+#    - 锁里 tokenizers==0.21.0 / antlr4-python3-runtime==4.9.3 / mpmath==1.3.0 三处手改
+#      是否被复算保留（不保留就说明声明侧还需要写约束）。
+
+# ④ 装进复算环境后做真机验收（三引擎各一段，数字要与 §2 基线同量级）
+#    基线：indextts2 214,040 B / RMS 6176；indextts20 205,124 B / RMS 6926；
+#          voxcpm2 230,148 B / RMS 4615；每次卸载显存回到 ~3.5 GB
+./.venv-relock/Scripts/python.exe -m pip install -r requirements-lock.relock.txt
+./.venv-relock/Scripts/python.exe scripts/gpu_smoke_minimal.py   # 再手工补 2.0 那条（冒烟脚本没覆盖，DOD §5 已知缺口）
+./.venv-relock/Scripts/python.exe -m pytest tests/ -q --cov=app --cov-fail-under=45
+./.venv-relock/Scripts/python.exe scripts/check_pin_crossconflicts.py   # 期望：冲突 0
+```
+
+跑完把 `requirements-lock.relock.txt` 的 diff 贴回来，我据此决定 #89/#90/#91 是批量合、
+还是只取其中能过真机的那几条。
