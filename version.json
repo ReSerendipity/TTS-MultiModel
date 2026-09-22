@@ -1,6 +1,6 @@
 {
   "version": "2.2.2",
-  "release_date": "2026-09-16",
+  "release_date": "2026-09-22",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.2.2（未发布）桌面分发补全：修复 Tauri 壳 updater pubkey 双重 base64 错误、同步桌面壳版本与完整性清单；尚无便携分卷与增量包资产，安装器/分卷发布需先过 release-gate"
+  "changelog": "2.2.2 发布：桌面分发与便携打包链路补全 + 发布前置回归（干净环境缺 einops/addict 已修、镜像 apt 索引就绪守卫、CSRF 硬失败与 0600、IndexTTS 预热并发崩溃修复）。资产为源码包 + wheel + SHA256SUMS；不含 26 GB 便携分卷与增量包。"
 }
