@@ -10,7 +10,12 @@ permissions:
 jobs:
   dco:
     name: DCO Check
-    # DCO 的 Signed-off-by 是对人类贡献者的来源认证，Dependabot 生成的 commit 无法携带签名。
+    # DCO 的 Signed-off-by 是对**人类**贡献者的来源认证；机器生成的 commit 无从签名。
+    # 原先这里只放过 dependabot[bot]，于是 release-please 开的 release PR 永远红：
+    # 它的提交作者是 github-actions[bot]（用 GitHub API 建提交，不走本地 git，
+    # 工作流里的 GIT_AUTHOR_* 环境变量对它无效），既没有也**不可能有** Signed-off-by。
+    # 净效果 = 分支保护要求 DCO 的仓库里，自动发版路径结构上不可用（#115/#120/#132 都撞在这）。
+    # 现在按"提交作者"而不是"PR 作者"判，豁免名单见脚本里的 BOT_AUTHOR_EMAILS。
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -21,19 +26,36 @@ jobs:
 
       - name: Verify Signed-off-by
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          base_sha="${{ github.event.pull_request.base.sha }}"
-          head_sha="${{ github.event.pull_request.head.sha }}"
-          if [[ -z "$base_sha" || -z "$head_sha" ]]; then
+          # 只豁免"我们自己的自动化"产出的提交；人的提交缺签名照样红。
+          BOT_AUTHOR_EMAILS="41898282+github-actions[bot]@users.noreply.github.com 49699333+dependabot[bot]@users.noreply.github.com"
+          if [[ -z "${BASE_SHA:-}" || -z "${HEAD_SHA:-}" ]]; then
             echo "::error::Could not determine PR base/head SHA"
             exit 1
           fi
           fails=0
+          checked=0
+          skipped=0
           while IFS= read -r commit; do
+            author_email=$(git log -1 --format='%ae' "$commit")
+            is_bot=no
+            for bot in $BOT_AUTHOR_EMAILS; do
+              if [[ "$author_email" == "$bot" ]]; then is_bot=yes; fi
+            done
+            if [[ "$is_bot" == yes ]]; then
+              skipped=$((skipped + 1))
+              echo "跳过机器提交 $commit（作者 $author_email —— 自动化无法签名）"
+              continue
+            fi
+            checked=$((checked + 1))
             if ! git log -1 --format='%B' "$commit" | grep -q 'Signed-off-by:'; then
-              echo "::error::Commit $commit is missing 'Signed-off-by:' trailer (run: git commit -s)"
+              echo "::error::Commit $commit 缺 'Signed-off-by:' 尾注（本地补签：git commit --amend -s）"
               fails=1
             fi
-          done < <(git rev-list "$base_sha..$head_sha")
+          done < <(git rev-list "$BASE_SHA..$HEAD_SHA")
+          echo "DCO：人类提交 $checked 条、机器提交豁免 $skipped 条、失败=$fails"
           exit $fails
