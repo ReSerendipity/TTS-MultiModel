@@ -16,30 +16,81 @@ jobs:
     runs-on: ubuntu-latest
     # 曾经这里是 continue-on-error: true：发版空转与发版失败在 UI 上无法区分，
     # v2.2.2 因此在三次「绿色」的 main push 后始终没有 Release。不要再加回来。
+    # build-release 靠 needs.release-please.outputs.* 把关，**但这个 job 此前从未声明 outputs: 块**
+    # → 引用恒为空 → 即便 RP 正常发了版，sdist/wheel + SHA256SUMS 那一步也永远不跑
+    # （后面 `tag_name: needs.release-please.outputs.tag_name` 同样取不到值）。
+    # 输出名按官方文档为下划线式：release_created / tag_name / version / pr。
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
     env:
       GIT_AUTHOR_NAME: ReSerendipity
       GIT_AUTHOR_EMAIL: 259081123+ReSerendipity@users.noreply.github.com
       GIT_COMMITTER_NAME: ReSerendipity
       GIT_COMMITTER_EMAIL: 259081123+ReSerendipity@users.noreply.github.com
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: actions/checkout@v4
         with:
-          release-type: python
-          package-name: tts-multimodel
-          # Read changelog from CHANGELOG.md
-          changelog-path: CHANGELOG.md
-          # Use Conventional Commits
-          include-component-in-tag: false
-          # 跳过 release PR，直接发版（2026-08-27 调整）
+          # RP 靠 tag 定位"上一个 release"。默认 fetch-depth=1 拿不到 tag，
+          # 于是它看不见已发布版本 → 静默判定"无事可做"（这正是空转的一半成因）。
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: 发版链路自证（配置在位 + manifest 与最新 tag 对齐）
+        # WHY：这条作业曾经"永远绿却什么都不做"——`skip-github-pull-request: true` 让它只认
+        # 「已合并的 release PR」，而仓库从没产生过任何一个，于是每次 main push 都是
+        # `found 0 possible releases` + success（v2.2.2 就是这么拖了三次）。
+        # 这里把"配置是否真的被 RP 读到"变成硬条件，别让下一次静默失效重演。
+        run: |
+          set -eu
+          for f in release-please-config.json .release-please-manifest.json; do
+            test -f "$f" || { echo "::error::缺 $f —— 没有它 v4 只按内置默认跑，with: 里的传参不保证生效"; exit 1; }
+            python -c "import json;json.load(open('$f'))" || { echo "::error::$f 不是合法 JSON"; exit 1; }
+          done
+          manifest=$(python -c "import json;print(json.load(open('.release-please-manifest.json'))['.'])")
+          latest=$(git tag --list 'v[0-9]*' --sort=-creatordate | head -1 | sed 's/^v//')
+          echo "manifest=$manifest  最新 tag=v$latest"
+          if [ -z "$latest" ]; then echo "::error::仓库里没有任何 v* tag，RP 无从定位上一个 release"; exit 1; fi
+          smaller=$(printf '%s\n%s\n' "$manifest" "$latest" | sort -V | head -1)
+          if [ "$smaller" = "$manifest" ] && [ "$manifest" != "$latest" ]; then
+            echo "::error::manifest=$manifest 落后于最新 tag=v$latest —— RP 会把已发布过的版本再算一遍，必须把 manifest 抬到已发布版本"
+            exit 1
+          fi
+          if [ "$manifest" != "$latest" ]; then
+            echo "::warning::manifest=$manifest 领先于最新 tag=v$latest —— 发版进行中的正常状态；长期如此说明 RP 打了提交却没打上 tag"
+          fi
+
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          # 只保留 v4 真认的入参。原先这里还传了 package-name / changelog-path / draft /
+          # label / prerelease —— 日志里 `Unexpected input(s) ... valid inputs are [...]`
+          # 说明它们被整体忽略，配置得写在 release-please-config.json 里。
+          # 也不再设 skip-github-pull-request: true：那种模式下 RP 只从"已合并的 release PR"
+          # 发版，没有 PR 就永远静默无事可做。
           target-branch: main
-          skip-github-pull-request: true
-          # Release as draft for manual approval
-          draft: false
-          # PR labels
-          label: release
-          # Skip CI on release commits
-          prerelease: false
-          # Now using GITHUB_TOKEN after workflow permissions set to write
+          include-component-in-tag: false
+
+      - name: 把结果写进 job 摘要（别让"什么都没发生"再长成一次成功）
+        env:
+          CREATED: ${{ steps.rp.outputs.release_created || '' }}
+          PR: ${{ steps.rp.outputs.pr || '' }}
+          TAG: ${{ steps.rp.outputs.tag_name || '' }}
+          VERSION: ${{ steps.rp.outputs.version || '' }}
+        run: |
+          set -eu
+          {
+            echo "## release-please"
+            echo
+            echo "- release_created: \`${CREATED:-false}\`"
+            echo "- release PR: \`${PR:-（本次没有开）}\`"
+            echo "- tag: \`${TAG:-无}\`（version \`${VERSION:-—}\`）"
+            if [ -z "$CREATED" ] && [ -z "$PR" ]; then
+              echo
+              echo "> 本次既没发版也没开发版 PR：正常情况下等于「自上一个 release 起没有符合约定式的提交」。"
+              echo "> 若你刚合了 feat/fix，那就是失同步 —— 先看上面「发版链路自证」那步的 manifest/tag 结论。"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # After release is created, build and upload artifacts
   build-release:
