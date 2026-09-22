@@ -40,9 +40,28 @@ def _gate_script() -> str:
     head = "python - <<'PY'\n"
     assert body.startswith(head) and body.rstrip().endswith("PY"), "heredoc 形状变了，抽取逻辑要跟着改"
     script = body[len(head) :].rstrip()[: -len("PY")].rstrip()
-    for marker in ("median", "变快不判失败", "拿不到 main 产出的基线"):
+    for marker in ("median", "变快不判失败", "拿不到任何基线", "L3 仓内基线"):
         assert marker in script, f"抽出来的脚本缺标记 {marker!r} —— 抽到的是旧逻辑？"
     return script
+
+
+def _repo_baseline(tmp_path: Path, meds: dict[str, float]) -> Path:
+    """写一份 L3 仓内基线：形状必须是 export_benchmark_baseline.py 的产物
+    （benchmarks 嵌在 {"benchmark": {...}} 里，而不是 storage JSON 的顶层）。
+    这个差别就是"读到 0 条 → 假装通过"与真对比的分界。"""
+    d = tmp_path / "benchmarks"
+    d.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "benchmark": {
+            "name": "main-test",
+            "benchmarks": [
+                {"name": k, "stats": {"median": v, "mean": v, "stddev": 0.0, "min": v, "max": v}}
+                for k, v in meds.items()
+            ],
+        }
+    }
+    (d / "baseline.json").write_text(json.dumps(payload), encoding="utf-8")
+    return tmp_path
 
 
 def _storage(tmp_path: Path, cur: dict[str, float], *, with_baseline: bool = True, with_current: bool = True) -> Path:
@@ -105,7 +124,39 @@ def test_getting_faster_is_not_a_failure(tmp_path: Path) -> None:
 def test_missing_main_baseline_records_without_failing(tmp_path: Path) -> None:
     res = _run(_storage(tmp_path, {"test_alpha": 9.9, "test_beta": 9.9}, with_baseline=False))
     assert res.returncode == 0, res.stdout + res.stderr
-    assert "拿不到 main 产出的基线" in res.stdout
+    assert "拿不到任何基线" in res.stdout
+
+
+def test_l3_repo_baseline_catches_regression_when_cache_is_gone(tmp_path: Path) -> None:
+    """L1 缓存不可靠是有账的：仓库缓存配额 10 GB 已用 10.23 GB，main 存的基线两小时后就被驱逐，
+    PR 侧 restore 直接 "Cache not found"。所以缓存缺席时必须退到仓内基线并**真的对比**。"""
+    wd = _storage(tmp_path, {"test_alpha": 3.0, "test_beta": 2.0}, with_baseline=False)
+    _repo_baseline(wd, _BASE_MED)
+    res = _run(wd)
+    out = res.stdout + res.stderr
+    assert res.returncode == 1, f"缓存缺席 + 有仓内基线，却放过了 +200% 的回退：{out[:400]}"
+    assert "基线来源：L3 仓内基线" in out, out[:400]
+    assert "test_alpha" in out and "+200.0%" in out
+
+
+def test_l3_repo_baseline_passes_within_noise(tmp_path: Path) -> None:
+    wd = _storage(tmp_path, {"test_alpha": 1.3, "test_beta": 2.4}, with_baseline=False)
+    _repo_baseline(wd, _BASE_MED)
+    res = _run(wd)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert "基线来源：L3 仓内基线" in res.stdout
+
+
+def test_placeholder_baseline_is_called_out_not_treated_as_clean(tmp_path: Path) -> None:
+    """`benchmarks/baseline.json` 长期是个 0 条的占位文件。占位 ≠ 通过：要单独喊出来，
+    否则"三级存储"看起来都在，实际一条都没比过。"""
+    wd = _storage(tmp_path, {"test_alpha": 9.9, "test_beta": 9.9}, with_baseline=False)
+    _repo_baseline(wd, {})
+    res = _run(wd)
+    out = res.stdout + res.stderr
+    assert res.returncode == 0, out
+    assert "::warning::" in out and "占位文件" in out, f"空基线没有被指出来：{out[:300]}"
+    assert "拿不到任何基线" in out
 
 
 def test_missing_current_run_is_a_hard_failure(tmp_path: Path) -> None:
@@ -130,3 +181,22 @@ def test_gate_threshold_is_not_tuned_back_to_noise_level() -> None:
 @pytest.mark.parametrize("marker", ["median", "GATE_PCT"])
 def test_gate_still_reads_median_and_is_configurable(marker: str) -> None:
     assert marker in _WF.read_text(encoding="utf-8"), f"门禁不再使用 {marker}，本测试的假设要更新"
+
+
+def test_repo_baseline_file_is_not_a_placeholder() -> None:
+    """`benchmarks/baseline.json` 从 2026-09-22 起是门禁的兜底基线，就不再允许是占位文件。
+    这条钉三件事：至少有 1 条、median 全为正、形状仍是 export 脚本的 `{"benchmark": {...}}`
+    （门禁的读取器认两种形状，但仓内这份必须是其中一种，否则等于没基线）。"""
+    path = _ROOT / "benchmarks" / "baseline.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    body = data.get("benchmark") or data
+    items = body.get("benchmarks") or []
+    assert items, (
+        "benchmarks/baseline.json 又是 0 条 —— 那是占位。用 scripts/export_benchmark_baseline.py "
+        "从一次 main 的 benchmark 结果填它（见 benchmarks/README.md），别让它假装成三级存储。"
+    )
+    assert body.get("name"), "基线没有 name，回看时不知道它是哪次 run 锚的"
+    bad = {b["name"]: b["stats"]["median"] for b in items if not b["stats"]["median"] > 0}
+    assert not bad, f"基线里有非正 median：{bad}"
+    missing = [b["name"] for b in items if "median" not in b.get("stats", {})]
+    assert not missing, f"基线条目缺 stats.median：{missing}"
