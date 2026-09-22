@@ -9,8 +9,7 @@
     { "type": "json", "path": "version.json", "jsonpath": "$.version" },
     { "type": "json", "path": "desktop/package.json", "jsonpath": "$.version" },
     { "type": "json", "path": "desktop/src-tauri/tauri.conf.json", "jsonpath": "$.version" },
-    { "type": "toml", "path": "desktop/src-tauri/Cargo.toml", "jsonpath": "$.package.version" },
-    { "type": "yaml", "path": "config.yaml", "jsonpath": "$.version" }
+    { "type": "toml", "path": "desktop/src-tauri/Cargo.toml", "jsonpath": "$.package.version" }
   ],
   "packages": {
     ".": {}
