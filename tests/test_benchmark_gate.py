@@ -66,7 +66,9 @@ def _storage(tmp_path: Path, cur: dict[str, float], *, with_baseline: bool = Tru
 
 
 def _run(tmp_path: Path, *, gate: str = "50") -> subprocess.CompletedProcess[str]:
-    env = dict(os.environ, SHA=_MINE, GATE_PCT=gate)
+    # PYTHONIOENCODING 不是冗余：Windows 上子进程的 stdout 默认走 GBK，
+    # 父进程按 utf-8 解码就把门禁打印的中文全变成 \ufffd —— 4 条断言只在本地假红。
+    env = dict(os.environ, SHA=_MINE, GATE_PCT=gate, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
     return subprocess.run(
         [sys.executable, "-c", _gate_script()],
         cwd=tmp_path,
@@ -74,7 +76,7 @@ def _run(tmp_path: Path, *, gate: str = "50") -> subprocess.CompletedProcess[str
         capture_output=True,
         text=True,
         encoding="utf-8",
-        errors="replace",
+        errors="strict",
         check=False,
     )
 
