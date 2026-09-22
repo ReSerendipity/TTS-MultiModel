@@ -86,7 +86,20 @@
 | `python scripts/check_tab_switch_race.py`（需服务在跑） | 侧栏换页竞态 | 给第一个 `/tab/` 请求注入 1.5s 延迟、350 ms 后点第二个，要求**末态落在最后点的那一页**（结构签名比对，不看像素）。修前 **6/6 组被旧响应盖回先点那页**，带 `hx-sync="#tab-content:queue last"` 后 **0/6** → 通过（#136）。必须用 async Playwright：sync 的 route handler 会把请求串行化，测出来是假阴性 |
 | `python scripts/make_watermark_ab.py` + 人耳 | 3 的水印面 | 生成同源 A/B 与量化表（落在 `docs/reports/watermark_ab/`，**该目录被 `.gitignore` 忽略**，属可重生成的本地产物）；**能否听出 B 仍需人耳**，脚本只保证差异唯一 |
 
-- 最近一次执行：2026-09-19，v2.2.2 工作树。机器侧佐证：全量 `pytest`（含 e2e、服务在线，
+- 最近一次执行：**2026-09-22，v2.2.4 发版前**（工作树 = `chore/release-2.2.4` 合并后的 `d4d80b7`）。
+  机器侧佐证：全量 `pytest --ignore=tests/e2e --timeout=180` **2131 passed / 38 skipped / 0 failed，77.7s**；
+  真机（RTX 5070 Ti Laptop 12 GB，权重齐）跑 `#84` 那条路：**四次连续直切**
+  `voxcpm2 → indextts2 → indextts20 → voxcpm2`，全程不手动 unload、load 前空闲最低 609 MiB，
+  四步全 `HTTP 200 / status=ok`，**零次 503**；末了真合成一段并回读 `/api/audio/*.wav` =
+  **206,580 B / `RIFF` 头**；收尾 `POST /api/model/unload` 后 `nvidia-smi used 9489 → 3344 MiB`，
+  停服后 7869 无监听、无残留进程（`used 2790 MiB`）。产物侧：`twine check` 双 PASSED、
+  wheel 1065 条、解包按包导入跑 `run_startup_selfcheck(enforce=True)` =
+  **`16/16/0` + `manifest_signed=true`**。
+  **这一轮没覆盖的格子**（别当成已过）：`tests/e2e/` 的 Playwright 没在本机跑（本轮改动不含
+  模板/静态资源，CI 的 `Playwright E2E Tests` 在该改动合入的 `777bfe1` 上是 success）；
+  字体菜单/断网首屏/换页竞态三项**没重跑**（上次取证是 2026-09-19/20 的 v2.2.2 工作树）；
+  `Setup.exe` 真机安装与 26 GB 分卷仍未验收。
+- 上一次全量执行：2026-09-19，v2.2.2 工作树。机器侧佐证：全量 `pytest`（含 e2e、服务在线，
   `--cov=app/integrated_app`）**2084 passed / 40 skipped / 0 failed，8m14s**，覆盖率 51.94%
   （门禁 45%）；mypy 103 = 基线；`tests/e2e/` 68 passed + 5 skipped（跳过的 5 条是视觉回归，
   基线由 Linux CI 生成，Windows 本机按平台守卫 skip）。同一套用 `--cov=integrated_app`
