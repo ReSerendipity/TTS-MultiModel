@@ -12,6 +12,9 @@ on:
     paths:
       - 'app/integrated_app/**'
       - 'tests/benchmarks/**'
+      # 门禁脚本自己也算一条：改了判据却不在 PR 上跑一次，就等于把没验证过的逻辑合进 main
+      # （push 侧本来有这个 paths，PR 侧漏了 —— 2026-09-22 补）。
+      - '.github/workflows/benchmark.yml'
   schedule:
     # Run weekly on Sunday at 00:00 UTC
     - cron: '0 0 * * 0'
@@ -99,26 +102,45 @@ jobs:
 
           sha = os.environ["SHA"]
           gate = float(os.environ["GATE_PCT"])
+          repo_baseline = os.environ.get("REPO_BASELINE", "benchmarks/baseline.json")
           all_runs = glob.glob("output/benchmarks/*/*.json")
           mine = [p for p in all_runs if f"ci-{sha}" in os.path.basename(p)]
           base = [p for p in all_runs if f"ci-{sha}" not in os.path.basename(p)]
 
-          if not mine:
-              print("::error::本轮结果没有存下来，无法对比 —— 这是流程问题，不是性能回退")
-              sys.exit(1)
-          if not base:
-              print("本轮拿不到 main 产出的基线（首次 run，或 fork PR 读不到仓库缓存）→ 仅记录，不判回归。")
-              print("想让门禁生效：先让 main 上跑过一次 benchmark（它会写 benchmark-storage-refs/heads/main-* 缓存）。")
-              sys.exit(0)
-
           def medians(path):
               with open(path, encoding="utf-8") as fh:
                   data = json.load(fh)
-              return {b["name"]: b["stats"]["median"] for b in data.get("benchmarks", [])}
+              # 两种形状都得认，认漏一种就是"0 条对比 → 直接通过"的假绿：
+              #   pytest-benchmark 的 storage JSON：benchmarks 在**顶层**
+              #   scripts/export_benchmark_baseline.py 的 L3 基线：包在 {"benchmark": {...}} 里
+              items = data.get("benchmarks") or (data.get("benchmark") or {}).get("benchmarks") or []
+              return {b["name"]: b["stats"]["median"] for b in items}
 
-          newest = max(base, key=os.path.getmtime)
-          cur, ref = medians(mine[0]), medians(newest)
-          print(f"基线：{os.path.basename(newest)}")
+          if not mine:
+              print("::error::本轮结果没有存下来，无法对比 —— 这是流程问题，不是性能回退")
+              sys.exit(1)
+
+          # 基线来源按 benchmarks/README.md 的三级存储退让：
+          #   L1 = actions 缓存里的历史 run。指望不上：仓库缓存配额 10 GB 已用 10.23 GB，
+          #        实测 main 在 07:42 存的基线，到 09:42（两小时后、同一天）就被驱逐了，
+          #        PR 侧 restore 直接 "Cache not found"。所以必须有 L3。
+          #   L3 = 仓内基线 benchmarks/baseline.json（随 checkout 就在，不受配额影响，可 code review）
+          # 两边都没有 → 仅记录；但 L3 文件在而里面 0 条，要单独喊出来（那是占位文件，不是"没问题"）。
+          if base:
+              ref_path, source = max(base, key=os.path.getmtime), "L1 actions 缓存"
+          elif os.path.exists(repo_baseline) and medians(repo_baseline):
+              ref_path, source = repo_baseline, "L3 仓内基线（缓存被驱逐时的兜底）"
+          else:
+              if os.path.exists(repo_baseline):
+                  print(f"::warning::{repo_baseline} 存在但一条 benchmark 都没有 —— "
+                        "那是占位文件；跑 scripts/export_benchmark_baseline.py 填它，否则这一级等于不存在。")
+              print("拿不到任何基线（L1 缓存没有、L3 仓内基线缺失或为空）→ 仅记录，不判回归。")
+              print("想让门禁生效：把 main 上的一次 benchmark 结果导出成 " + repo_baseline + "。")
+              sys.exit(0)
+
+          cur, ref = medians(mine[0]), medians(ref_path)
+          print(f"基线来源：{source}")
+          print(f"基线：{ref_path}")
           print(f"本轮：{os.path.basename(mine[0])}")
           print(f"{'benchmark':<50} {'基线 median':>13} {'本轮 median':>13} {'变化':>8}  判定")
           bad = []
@@ -148,24 +170,16 @@ jobs:
           path: output/benchmarks/
           retention-days: 30
 
-      # L2 永久存储：tag push（release）时导出基线并上传为 Release Asset
-      - name: Export baseline for release
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          pip install pytest-benchmark 2>/dev/null || true
-          python scripts/export_benchmark_baseline.py \
-            output/benchmarks \
-            benchmark-baseline-${{ github.ref_name }}.json \
-            --name ${{ github.ref_name }}
-
-      - name: Upload baseline to release assets
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload ${{ github.ref_name }} \
-            benchmark-baseline-${{ github.ref_name }}.json \
-            --clobber 2>/dev/null || echo "Release not found or upload failed, baseline preserved as artifact"
+      # 原先这里有两步 "Export baseline for release" / "Upload baseline to release assets"
+      # （README 里的 L2），条件是 `startsWith(github.ref, 'refs/tags/')`。本工作流的触发器是
+      # push:branches[main] / pull_request / schedule / workflow_dispatch，正常跑时 ref 永远不是
+      # tag —— 只有手工 dispatch 并选一个 tag 才可能进去。实测 v2.2.1/v2.2.2/v2.2.3 三个 Release
+      # 的资产里都没有 benchmark-baseline-*.json，即这条路从没真跑通过，门禁也不读它。
+      # 现在基线由上面的 L3（benchmarks/baseline.json，随 checkout 就在）承担；
+      # 需要刷新它时在本地跑：
+      #   python scripts/export_benchmark_baseline.py <storage目录> benchmarks/baseline.json --name main-<sha>
+      # 要恢复 L2 的话，得先给它一个真能触发的入口（独立 workflow_call 或 tag 触发器 + 不带 paths 过滤），
+      # 别放一个永远不会执行的步骤在这里假装"永久存储已有"。
 
       - name: Upload GPU benchmark results
         if: always()
