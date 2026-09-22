@@ -4,6 +4,62 @@
 
 ## [Unreleased]
 
+## [2.2.4] - 2026-09-22
+
+两处用户可见修复，其余是**发布与 CI 链路的收口**（这个版本存在的理由之一：v2.2.3 之后 main 上
+攒了一批"门禁本身错了"的修复，需要一次可安装的锚点）。
+
+### Bug Fixes
+
+* **engines:** 12GB 显存档**直切引擎必 503**（#84）—— 切换路径先做显存预检再清场，于是预检永远
+  看见"上一个引擎还占着"。现在先清场再预检，报错文案给可操作下一步（哪个引擎占了多少、要释放到多少）。
+* **security:** persona / 历史卡片把数据拼进 `onclick="…"` 属性（#99）—— 名字里带 `'` 就能逃出
+  属性上下文。改为事件闭包接线（数据进 JS 闭包，不进 HTML 属性），信息面板的**同源裸插值**一并收口。
+
+### CI / 发布链路（不改运行时行为，但改"能不能信这条流水线"）
+
+* **性能门禁**（issue #118）判据从 `--benchmark-compare-fail=mean:20%` 换成
+  **`median` 单向 > 50%**，逐条打印对比表而不是整段重定向到 step summary；同代码在 runner 间的
+  实测摆动是 **17%–80%**，而旧判据方向也不对（被它判成"回退"的五个例子**全是变快**）。
+* 更深的第二层：门禁的"三级基线存储"**三条都不通** —— L1 `actions/cache` 在
+  **10.23 GB / 配额 10 GB** 下两小时就被驱逐（main 存的基线，同一天 PR 侧 `Cache not found`）、
+  L2 那两步的 `if startsWith(github.ref,'refs/tags/')` 在现有触发器下**永不成立**（三个已发布
+  Release 的资产里确实没有基线文件）、L3 `benchmarks/baseline.json` 是 **0 条占位且无人读**。
+  现在对比按 L1 → L3 退让、空占位单独 `::warning::`（不把"没数据"过成"通过"）、读取器同时认
+  storage 顶层与 `{"benchmark":{…}}` 两种 JSON 形状，L3 用 main 真 run 的 artifact 填了 5 条 median。
+* **release-please 的 `extra-files`** 第一次在真 release PR 上被验：`type: yaml` 不是"改一个字段"，
+  而是 parse 后整份重排 —— `config.yaml` 被改成 **160 增 / 160 删、注释行 96 → 0**。已摘掉该条目
+  （`config.yaml` 归手工同步），并加闸：类型只允许 `json|toml|generic`、逐条走 jsonpath 确认
+  "今天确实命中"、以及拦"RP 抬了 `$.version` 却没抬同文件里的 `changelog`/`release_date`"。
+* 记录一条会咬人的机制：**release PR 上看不到任何 CI 检查**（GitHub 固定行为：`GITHUB_TOKEN`
+  产生的提交不再级联触发 workflow）。所以手工同步位不会红在 release PR 上，只会红在发布之后的
+  main 上 —— 合 release PR 前必须本地跑版本位一致性。v2.2.4 因此走手工路径（#120 关闭）。
+* **§7b 依赖复算**跑完 ①②③：候选锁与真锁**不同源**（97 vs 92 条、一致 74、16 条版本变、
+  7 条 huggingface-hub 的 extras 链来历未定、2 条新增）。`transformers` 复算给 4.52.4 会让
+  引擎血统闸红，`protobuf` 直接给到 7.36.2 但 gencode 兼容要到 import 期才暴露。
+  **候选锁未采纳**，真锁继续手工钉；④ 的 GB 级真装仍待验收。
+* 治理文件：`.gitattributes` 给 `/.gitattributes`、`/.mailmap`、`Dockerfile` 锁 LF；
+  `.mailmap` 补上此前漏掉的 `TTS MultiModel Dev` 两个变体（**249 个提交**，shortlog 上原本
+  多出第三个"贡献者"）；`CODEOWNERS` 指向真实路径（注意：`require_code_owner_reviews` 未开启，
+  它目前**拦不住任何合并**）。
+
+### 版本语义
+
+按约定式提交算也是 patch（`fix:` / `docs:` / `ci:` / `chore:`，无 `feat:`）。
+`.release-please-manifest.json` 随本次一起抬到 2.2.4，避免 release-please 在下一条 release PR
+上把版本号再往抬一格（手工与自动两条路互踩，见 `docs/release-governance.md` §1）。
+
+### 已知未覆盖（比 v2.2.3 多两条）
+
+* 资产仍是 **wheel + sdist + SHA256SUMS**：不含 26 GB 便携分卷（core/torch/model）与桌面增量包，
+  `Setup.exe` 的**真机安装验收**也没做过（该链路无任何 workflow 覆盖）。
+* `ghcr.io/.../tts-multimodel:2.2.4` 是否真的产出，本机无从核对：匿名拉 manifest 得 403、
+  `gh api packages` 得 404（token 无 `read:packages`）。镜像由 `docker-publish.yml` 在
+  `v*` tag push 时按 `type=semver` 产出，且被 Trivy HIGH/CRITICAL 阻断逻辑把关。
+* §7b 的 ④（复算锁真装 + 三引擎复验）未做，#89/#90/#91 三条 dependabot PR 因此仍挂着。
+* 上面那条"合 release PR 前必须本地跑版本位闸"目前只是**文档 + 手工动作**，不是机器闸；
+  要变机器闸需要一个能对 release 分支 head SHA 报 commit status 的作业（权限决策）。
+
 ## [2.2.3] - 2026-09-22
 
 补丁版，只为把一处**随包分发缺口**送进可安装的产物：它修在 main 上，但晚于 v2.2.2 的 tag，
