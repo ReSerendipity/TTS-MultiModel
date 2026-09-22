@@ -73,7 +73,7 @@ class TestMissingWeights:
         """
         events: list[str] = []
 
-        def fake_loader():
+        def fake_loader(**_kwargs):  # auto_unload kwarg（#84）加入 loader 契约后桩需透传
             yield "正在加载 IndexTTS 2.5 引擎...", None, None, None
             yield "IndexTTS 2.5 加载失败: FileNotFoundError: 模型文件不存在", None, None, None
 
@@ -105,7 +105,7 @@ class TestMissingWeights:
         """热待机路径（未卸载）也必须升级成异常，但不能触发回滚。"""
         events: list[str] = []
 
-        def fake_loader():
+        def fake_loader(**_kwargs):  # auto_unload kwarg（#84）加入 loader 契约后桩需透传
             yield "IndexTTS 2.5 加载失败: 显存不足", None, None, None
 
         with (

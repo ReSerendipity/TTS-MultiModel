@@ -3,11 +3,80 @@
 包含 PersonaWarmupService / warmup_persona_cache、load_voxcpm2 /
 _do_load_voxcpm2_internal / load_indextts2、PreloadService / preload_model /
 get_preload_status。
-【边界】不做卸载（unload.py）；不做引擎切换（switch.py）。
+【边界】不做引擎切换（switch.py）。卸载动作仍由 unload.py 承担：#84 起
+load_voxcpm2 / load_indextts2 在预检前经 _unload_loaded_engines_for_load
+委托 unload_model() 清场卸载驻留引擎（switch_engine 热待机路径以
+``auto_unload=False`` 跳过，保持双引擎常驻语义）。
 """
 
 from . import state as _state
 from .state import *
+
+
+def _unload_loaded_engines_for_load(target_engine: str) -> str | None:
+    """加载前清场：卸载已驻留引擎并等待显存回收（#84）。
+
+    WHY: routes 的 load 端点把 voxcpm2 / indextts2 / indextts20 直接指到
+    专用加载器（routes/model.py 的 ``load_fn`` 分派），这条路径此前没有
+    switch_engine 的卸载阶段，预检又是「当前空闲 vs 需求」的裸比较——
+    12GB 级显卡上从 UI 直切引擎必然 503 INSUFFICIENT_VRAM（issue #84 的
+    三段证据：无 [引擎切换] VRAM 检查日志、绕过 M-R1 记账、加载器不卸载）。
+
+    与 switch_engine 的关系：传统切换路径已先 ``unload_model()``，此时本
+    函数检测不到驻留引擎、是幂等空操作；热待机路径必须由调用方传
+    ``auto_unload=False`` 跳过（见 switch.py 调用点），否则「双引擎常驻」
+    的快切语义会被破坏。
+
+    锁约定：专用加载器进入本函数时已持有 ``_model_lock``（RLock），
+    ``unload_model()`` 内部的 ``with _model_lock`` 依赖同线程可重入，
+    与 switch_engine 阶段④的既有用法一致（见 state.py RLock WHY 注释）。
+
+    Args:
+        target_engine: 即将加载的引擎名（用于日志与语义标注）。
+
+    Returns:
+        str | None: 本次被卸载的驻留引擎名；没有驻留引擎时返回 ``None``。
+    """
+    from ..gpu_backend import GPUBackend, GPUBackendManager
+    from ..model_registry import ENGINE_VRAM_REQUIREMENTS
+    from .unload import unload_model
+
+    resident: str | None = registry.current_engine
+    has_generic = any(inst is not None for inst in registry.get_all_engine_instances().values())
+    if registry.voxcpm_model is None and registry.indextts2_engine is None and not has_generic:
+        return None
+
+    logger.info(f"[模型加载] 检测到已驻留引擎 {resident or '未知'}，先卸载再加载 {target_engine}")
+    gpu_device: Any = _state.get_gpu_device()
+    backend: GPUBackend = GPUBackendManager.detect_backend()
+    baseline_bytes: int = 0
+    expected_release_bytes: int = int(ENGINE_VRAM_REQUIREMENTS.get(resident or "", 0.0) * 1024**3)
+    if backend != GPUBackend.CPU and gpu_device is not None:
+        with contextlib.suppress(Exception):
+            baseline_bytes = GPUBackendManager.memory_allocated(gpu_device)
+
+    # RLock 同线程重入：见 state.py WHY 注释与 switch_engine 阶段④先例
+    unload_model()
+
+    if backend != GPUBackend.CPU and gpu_device is not None:
+        # 延迟导入避免循环依赖：switch.py 在模块级导入本模块（load.py）
+        from .switch import _wait_vram_freed
+
+        with contextlib.suppress(Exception):
+            GPUBackendManager.empty_cache()
+        if _wait_vram_freed(
+            gpu_device,
+            baseline_allocated=baseline_bytes,
+            expected_release_bytes=expected_release_bytes,
+        ):
+            logger.info("[模型加载] 旧引擎显存已按预期回收")
+        else:
+            logger.warning(
+                "[模型加载] 卸载后显存回收未达预期（期望约 "
+                f"{expected_release_bytes / 1024**3:.2f}GB）；若随后加载失败，"
+                "请排查 [模型卸载] 日志中的强引用告警"
+            )
+    return resident
 
 
 def get_persona_cache_stats() -> dict[str, Any]:
@@ -448,23 +517,16 @@ def load_voxcpm2(
     # 模型加载开始时重置显存泄漏检测基线，避免加载期间显存上升导致误报
     get_health_monitor().reset_vram_baseline()
     try:
-        # Unload current engine if any
-        old_model: Any = registry.voxcpm_model
-        old_asr: Any = registry.voxcpm_asr
-        registry.voxcpm_model = None
-        registry.voxcpm_asr = None
-        if old_model is not None:
-            del old_model
-        if old_asr is not None:
-            del old_asr
-        gc.collect()
+        # #84: 统一清场——原先这里只手工摘 voxcpm_model / voxcpm_asr 两个槽位
+        # （漏掉 enhancer、引擎门面实例与 persona 缓存，也完全不清 IndexTTS 与
+        # 通用引擎），现在统一走 _unload_loaded_engines_for_load 委托
+        # unload_model() 全量卸载并核验显存回收；无驻留引擎时是快速空操作。
+        _unload_loaded_engines_for_load(EngineName.VOXCPM2.value)
+        time.sleep(_LOAD_RETRY_AFTER_UNLOAD_SECONDS)
+
         from ..gpu_backend import GPUBackend, GPUBackendManager
 
         backend: GPUBackend = GPUBackendManager.detect_backend()
-        if backend != GPUBackend.CPU:
-            with contextlib.suppress(Exception):
-                GPUBackendManager.empty_cache()
-        time.sleep(_LOAD_RETRY_AFTER_UNLOAD_SECONDS)
 
         gpu_device: Any = _state.get_gpu_device()
 
@@ -487,12 +549,17 @@ def load_voxcpm2(
 def load_indextts2(
     progress_callback: Callable[..., None] | None = None,
     version: str = "2.5",
+    *,
+    auto_unload: bool = True,
 ) -> Generator[tuple[str, None, None, None], None, None]:
     """加载 IndexTTS 引擎（2.5 / 2.0 双版本共用，生成器进度事件流）。
 
     Args:
         progress_callback: 预留回调参数（保持签名兼容；默认 ``None``）。
         version: ``"2.5"``（默认）或 ``"2.0"``。决定权重目录、注册名与提示文案。
+        auto_unload: 加载前是否卸载已驻留引擎（#84）。routes 直连时保持默认
+            ``True``；switch_engine 热待机路径必须传 ``False``，否则
+            「双引擎常驻」的快切语义被破坏。
 
     Yields:
         tuple[str, None, None, None]: ``(status_text, None, None, None)`` 四元组。
@@ -514,6 +581,14 @@ def load_indextts2(
         # Check if model files exist
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"{label} 模型文件不存在: {model_path}\n请运行: python {download_script} 下载模型")
+
+        # #84: routes 直连本加载器时没有 switch_engine 的卸载阶段。若已有引擎
+        # 驻留，先全量卸载并等待显存回收，否则下面的预检是「当前空闲 vs 需求」
+        # 的裸比较——12GB 级显卡上从 UI 直切引擎必然 503。热待机路径由
+        # switch_engine 显式传 auto_unload=False 跳过（语义是双引擎常驻）。
+        unloaded_engine: str | None = None
+        if auto_unload:
+            unloaded_engine = _unload_loaded_engines_for_load(engine_name)
 
         # Step 1: VRAM/RAM check
         from ..model_registry import estimate_engine_vram_need_gb
@@ -551,7 +626,14 @@ def load_indextts2(
                         "③ 确认已启用 bf16（fp32 需要约两倍显存）；"
                         "④ 最后才调低 config.yaml 的 models.vram_safety_margin_gb"
                         "（会增加推理期显存溢出风险）。"
-                        "已加载的引擎将自动回滚，不会丢失当前可用状态。"
+                        + (
+                            # #84: 走到这里说明清场卸载已经做过、回收等待也已结束，
+                            # 当前 free 就是卸载后的真实余量——报错必须说清这一点，
+                            # 否则用户会误以为「没卸载旧引擎」（#84 之前的误判路径）。
+                            f"本次已自动卸载驻留引擎 {unloaded_engine} 并等待回收，当前可用即卸载后的真实余量。"
+                            if unloaded_engine
+                            else "已加载的引擎将自动回滚，不会丢失当前可用状态。"
+                        )
                     )
             except InsufficientVRAMError:
                 raise
@@ -666,15 +748,21 @@ def load_indextts2(
 
 def load_indextts20(
     progress_callback: Callable[..., None] | None = None,
+    *,
+    auto_unload: bool = True,
 ) -> Generator[tuple[str, None, None, None], None, None]:
     """加载 IndexTTS 2.0 引擎（复用 ``load_indextts2``，version="2.0"）。
 
     与 2.5 共用同一推理代码包与引擎槽位（互斥），仅权重目录与入口类不同。
 
+    Args:
+        auto_unload: 透传给 :func:`load_indextts2`（#84）。switch_engine 的
+            热待机路径必须传 ``False``，routes 直连保持默认 ``True``。
+
     Yields:
         同 :func:`load_indextts2` 的 ``(status_text, None, None, None)`` 四元组。
     """
-    yield from load_indextts2(progress_callback=progress_callback, version="2.0")
+    yield from load_indextts2(progress_callback=progress_callback, version="2.0", auto_unload=auto_unload)
 
 
 # ====================================================================

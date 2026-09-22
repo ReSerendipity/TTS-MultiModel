@@ -190,6 +190,22 @@ function renderLoraGrid() {
     });
     grid.className = 'persona-grid' + (_loraView === 'list' ? ' list-view' : '');
     grid.innerHTML = '';
+    // #99: 卡片动作按钮改用 createElement + addEventListener 接线。原先把
+    // ckpt.path 只做 JS 引号转义就拼进 innerHTML 的 onclick 属性——文件名
+    // 含双引号即可闭合属性注入 HTML（属性上下文 ≠ JS 字符串上下文）。
+    // 数据现在经闭包传递，不再进入任何 HTML/属性上下文；SVG 为纯静态字面量。
+    function _loraIconBtn(title, colorStyle, svgHtml, onClick) {
+        var btn = document.createElement('button');
+        btn.className = 'btn-icon';
+        btn.title = title;
+        if (colorStyle) btn.style.cssText = colorStyle;
+        btn.innerHTML = svgHtml; // 纯静态字面量，无任何外部输入
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+    var _SVG_LORA_ENABLE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+    var _SVG_LORA_LOAD = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+    var _SVG_LORA_UNLOAD = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>';
     filtered.forEach(function(ckpt) {
         var card = document.createElement('div');
         card.className = 'persona-card';
@@ -198,19 +214,49 @@ function renderLoraGrid() {
         var r = ckpt.r || '-';
         var alpha = ckpt.lora_alpha || '-';
         var steps = ckpt.steps || '-';
-        card.innerHTML =
-            '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">' +
-                '<div class="persona-card-name">' + (ckpt.name || ckpt.path) + '</div>' +
-                '<span class="lora-status-badge" data-path="' + ckpt.path + '" style="font-size:9px;padding:2px 6px;border-radius:8px;background:var(--bg3);color:var(--t3)">{{ "not_enabled"|t(lang) }}</span>' +
-            '</div>' +
-            '<div class="persona-card-desc">' + (ckpt.description || ckpt.name || '') + '</div>' +
-            '<div class="persona-card-tags"><span>R: ' + r + '</span><span>α: ' + alpha + '</span><span>' + steps + ' steps</span></div>' +
-            '<div style="font-size:10px;color:var(--t3);margin-bottom:8px;break-all">{{ "path"|t(lang) }}: ' + ckpt.path + '</div>' +
-            '<div class="persona-card-actions">' +
-                '<button class="btn-icon" title="{{ "enable"|t(lang) }}" style="color:var(--green)" onclick="event.stopPropagation();enableLoraByCard(\'' + ckpt.path.replace(/'/g, "\\'") + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></button>' +
-                '<button class="btn-icon" title="{{ "load"|t(lang) }}" onclick="event.stopPropagation();loadLoraByPath(\'' + ckpt.path.replace(/'/g, "\\'") + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></button>' +
-                '<button class="btn-icon" title="{{ "unload"|t(lang) }}" style="color:var(--orange)" onclick="event.stopPropagation();unloadLora()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></button>' +
-            '</div>';
+
+        // #99: 名称/描述/路径同步改用 textContent 插值——它们与 onclick 同源
+        // （磁盘文件名），原来也是未转义直拼 innerHTML。
+        var head = document.createElement('div');
+        head.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px';
+        var nameEl = document.createElement('div');
+        nameEl.className = 'persona-card-name';
+        nameEl.textContent = ckpt.name || ckpt.path;
+        var badge = document.createElement('span');
+        badge.className = 'lora-status-badge';
+        badge.dataset.path = ckpt.path;
+        badge.style.cssText = 'font-size:9px;padding:2px 6px;border-radius:8px;background:var(--bg3);color:var(--t3)';
+        badge.textContent = '{{ "not_enabled"|t(lang) }}';
+        head.appendChild(nameEl);
+        head.appendChild(badge);
+
+        var desc = document.createElement('div');
+        desc.className = 'persona-card-desc';
+        desc.textContent = ckpt.description || ckpt.name || '';
+
+        var tags = document.createElement('div');
+        tags.className = 'persona-card-tags';
+        ['R: ' + r, 'α: ' + alpha, steps + ' steps'].forEach(function(tagText) {
+            var tag = document.createElement('span');
+            tag.textContent = tagText;
+            tags.appendChild(tag);
+        });
+
+        var pathEl = document.createElement('div');
+        pathEl.style.cssText = 'font-size:10px;color:var(--t3);margin-bottom:8px;break-all';
+        pathEl.textContent = '{{ "path"|t(lang) }}: ' + ckpt.path;
+
+        var actions = document.createElement('div');
+        actions.className = 'persona-card-actions';
+        actions.appendChild(_loraIconBtn('{{ "enable"|t(lang) }}', 'color:var(--green)', _SVG_LORA_ENABLE, function(e) { e.stopPropagation(); enableLoraByCard(ckpt.path); }));
+        actions.appendChild(_loraIconBtn('{{ "load"|t(lang) }}', '', _SVG_LORA_LOAD, function(e) { e.stopPropagation(); loadLoraByPath(ckpt.path); }));
+        actions.appendChild(_loraIconBtn('{{ "unload"|t(lang) }}', 'color:var(--orange)', _SVG_LORA_UNLOAD, function(e) { e.stopPropagation(); unloadLora(); }));
+
+        card.appendChild(head);
+        card.appendChild(desc);
+        card.appendChild(tags);
+        card.appendChild(pathEl);
+        card.appendChild(actions);
         grid.appendChild(card);
     });
     // Refresh active states based on current loaded state
@@ -301,13 +347,23 @@ function updateLoraInfo() {
     if (opt && opt.value !== 'None' && opt.dataset.info) {
         try {
             var info = JSON.parse(opt.dataset.info);
-            contentDiv.innerHTML =
-                '<div>{{ "name"|t(lang) }}: ' + (info.name || '-') + '</div>' +
-                '<div>{{ "path"|t(lang) }}: ' + info.path + '</div>' +
-                (info.base_model ? '<div>{{ "base_model"|t(lang) }}: ' + info.base_model + '</div>' : '') +
-                (info.r ? '<div>{{ "lora_rank"|t(lang) }}: ' + info.r + '</div>' : '') +
-                (info.lora_alpha ? '<div>{{ "lora_alpha"|t(lang) }}: ' + info.lora_alpha + '</div>' : '') +
-                (info.steps ? '<div>{{ "training_steps"|t(lang) }}: ' + info.steps + '</div>' : '');
+            // #99: info 面板原先把 name/path/base_model 等裸拼进 innerHTML——
+            // 它们源自检查点目录名 / adapter_config.json（均用户可控），与
+            // 卡片同一类注入面（UI 验证中 alert 实锤）。改 DOM API + textContent。
+            contentDiv.textContent = '';
+            var rows = [
+                ['{{ "name"|t(lang) }}', info.name || '-'],
+                ['{{ "path"|t(lang) }}', info.path]
+            ];
+            if (info.base_model) rows.push(['{{ "base_model"|t(lang) }}', info.base_model]);
+            if (info.r) rows.push(['{{ "lora_rank"|t(lang) }}', info.r]);
+            if (info.lora_alpha) rows.push(['{{ "lora_alpha"|t(lang) }}', info.lora_alpha]);
+            if (info.steps) rows.push(['{{ "training_steps"|t(lang) }}', info.steps]);
+            rows.forEach(function(pair) {
+                var line = document.createElement('div');
+                line.textContent = pair[0] + ': ' + pair[1];
+                contentDiv.appendChild(line);
+            });
             infoDiv.style.display = '';
         } catch(e) {
             infoDiv.style.display = 'none';

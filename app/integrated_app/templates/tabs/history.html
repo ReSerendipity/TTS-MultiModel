@@ -388,6 +388,24 @@
         return div.innerHTML;
     }
 
+    // #99: 动作按钮接线辅助——数据经闭包传递，不再拼进 onclick 属性。
+    // （原先把文件名只做 JS 引号转义就拼进 innerHTML 的 onclick，
+    // 文件名含双引号即可闭合属性注入 HTML；改用 createElement +
+    // addEventListener 后数据不再进入任何 HTML/属性上下文。）
+    function _historyIconBtn(title, colorStyle, svgHtml, onClick) {
+        var btn = document.createElement('button');
+        btn.className = 'btn-icon';
+        btn.title = title;
+        if (colorStyle) btn.style.cssText = colorStyle;
+        btn.innerHTML = svgHtml; // 纯静态字面量，无任何外部输入
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+    var _SVG_HISTORY_PLAY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    var _SVG_HISTORY_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    var _SVG_HISTORY_HIDE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+    var _SVG_HISTORY_DELETE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
     // 根据 filename 推断引擎
     function inferEngine(filename) {
         if (!filename) return 'voxcpm2';
@@ -453,13 +471,16 @@
             var tdActions = document.createElement('td');
             tdActions.setAttribute('data-label', '{{ "actions"|t(lang, default="操作") }}');
             tdActions.style.textAlign = 'right';
-            var escName = String(r[1]).replace(/'/g, "\\'");
-            tdActions.innerHTML = '<div style="display:inline-flex;gap:4px">' +
-                '<button class="btn-icon" title="{{ "play"|t(lang) }}" onclick="playHistoryAudio(\'' + escName + '\', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>' +
-                '<button class="btn-icon" title="{{ "download"|t(lang, default="下载") }}" onclick="downloadHistoryAudio(\'' + escName + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>' +
-                '<button class="btn-icon" title="{{ "hide"|t(lang, default="隐藏") }}" onclick="hideHistoryRecord(' + r[0] + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>' +
-                '<button class="btn-icon" title="{{ "delete"|t(lang) }}" style="color:var(--red)" onclick="deleteHistoryAudio(' + r[0] + ', \'' + escName + '\', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>' +
-            '</div>';
+            // #99: r[1] 是历史库里的音频文件名（用户可控），原先只做 JS 引号
+            // 转义就拼进 onclick 属性——含双引号的文件名即可闭合属性注入 HTML。
+            // 改为事件闭包传参，名称不再进入任何 HTML/属性上下文。
+            var actionsWrap = document.createElement('div');
+            actionsWrap.style.cssText = 'display:inline-flex;gap:4px';
+            actionsWrap.appendChild(_historyIconBtn('{{ "play"|t(lang) }}', '', _SVG_HISTORY_PLAY, function(e) { playHistoryAudio(String(r[1]), e.currentTarget); }));
+            actionsWrap.appendChild(_historyIconBtn('{{ "download"|t(lang, default="下载") }}', '', _SVG_HISTORY_DOWNLOAD, function() { downloadHistoryAudio(String(r[1])); }));
+            actionsWrap.appendChild(_historyIconBtn('{{ "hide"|t(lang, default="隐藏") }}', '', _SVG_HISTORY_HIDE, function() { hideHistoryRecord(r[0]); }));
+            actionsWrap.appendChild(_historyIconBtn('{{ "delete"|t(lang) }}', 'color:var(--red)', _SVG_HISTORY_DELETE, function(e) { deleteHistoryAudio(r[0], String(r[1]), e.currentTarget); }));
+            tdActions.appendChild(actionsWrap);
 
             tr.appendChild(tdCheck);
             tr.appendChild(tdName);
