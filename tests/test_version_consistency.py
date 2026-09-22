@@ -84,6 +84,11 @@ def test_no_hardcoded_old_version():
 _SEMVER = re.compile(r"\d+\.\d+\.\d+")
 
 
+def _ver_tuple(s: str) -> tuple[int, ...]:
+    """x.y.z → 可比较的整数元组（避免字典序把 2.9 判成比 2.10 大）。"""
+    return tuple(int(p) for p in s.split("."))
+
+
 def _site_versions() -> dict[str, str]:
     """从各版本位精确取值；取不到就抛，避免"少一个站点"被当成"一致"。"""
 
@@ -103,6 +108,10 @@ def _site_versions() -> dict[str, str]:
     sites = {
         "pyproject.toml": grab("pyproject.toml", r'^version\s*=\s*"([^"]+)"', "Python 包版本"),
         "version.json": grab_json("version.json", "更新契约版本"),
+        # 安装器**内嵌**的那份：`setup.nsi` 的 `File "version.json"` 取的是本目录里的这个文件，
+        # 而仓库里没有任何脚本重新生成它（makensis 是手工跑的）—— 不跟着抬，
+        # 装出来的壳就会拿一份旧版本号做本地识别（那份注释自己写着"缺失会静默跳过更新"）。
+        "scripts/installer/version.json": grab_json("scripts/installer/version.json", "安装器内嵌版本（壳本地识别）"),
         "config.yaml": grab("config.yaml", r'^version:\s*"?([^"\n]+)"?', "前端缓存参数版本"),
         "desktop/package.json": grab_json("desktop/package.json", "桌面壳 npm 版本"),
         "desktop/src-tauri/tauri.conf.json": grab_json("desktop/src-tauri/tauri.conf.json", "Tauri 壳版本"),
@@ -130,7 +139,7 @@ def _site_versions() -> dict[str, str]:
 
 def test_all_version_sites_agree() -> None:
     sites = _site_versions()
-    assert len(sites) >= 9, f"只核到 {len(sites)} 个版本位，本条已失去意义"
+    assert len(sites) >= 10, f"只核到 {len(sites)} 个版本位，本条已失去意义"
     bad = {k: v for k, v in sites.items() if not _SEMVER.fullmatch(v)}
     assert not bad, f"这些版本位不是 x.y.z 形态：{bad}"
     distinct = set(sites.values())
@@ -150,4 +159,10 @@ def test_installer_artifact_names_track_the_version_site() -> None:
     assert f"TTSMultiModel-Setup-v{ver}.exe" in text, f"OutFile 还没跟到 v{ver}"
     assert f'VIProductVersion "{ver}.0"' in text, f"VIProductVersion 还没跟到 {ver}.0"
     data = json.loads((PROJECT_ROOT / "version.json").read_text(encoding="utf-8"))
-    assert data.get("minimum_shell_version") == ver, "更新契约的最低壳版本与本批版本不一致"
+    minimum = str(data.get("minimum_shell_version", ""))
+    assert _SEMVER.fullmatch(minimum), f"minimum_shell_version 不是 x.y.z 形态：{minimum!r}"
+    # 它是**下界**，不是"必须等于当前版本"：语义是"低于它的壳不接受了"。
+    # 强令相等等于每次发版都把上一版壳判死（而目前代码里还没人真的读它：
+    # updater.rs 只在 AppVersion 结构里解析它，shell-update.json 契约里没有这个字段），
+    # 所以这里只钉住唯一站得住的关系：下界不得高于本次版本。
+    assert _ver_tuple(minimum) <= _ver_tuple(ver), f"minimum_shell_version={minimum} 高于本次版本 {ver}"
