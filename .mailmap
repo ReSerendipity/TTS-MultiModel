@@ -14,3 +14,9 @@ ReSerendipity <zengyangc@outlook.com> Doro <ReSerendipity@outlook.com>
 # —— GitHub bot（不代表真人，归并到主身份以保持 shortlog 干净）——
 ReSerendipity <zengyangc@outlook.com> <41898282+github-actions[bot]@users.noreply.github.com>
 ReSerendipity <zengyangc@outlook.com> <49699333+dependabot[bot]@users.noreply.github.com>
+
+# —— 仓库脚手架/脚本提交用的本地身份（2026-09-22 实测补，`git log --all --format='%an <%ae>'`）——
+# `TTS MultiModel Dev` 两个变体合计 249 个提交（135 + 114），是这份 .mailmap 之前漏掉的
+# 最大一块：shortlog 上会出现第三个"贡献者"。
+ReSerendipity <zengyangc@outlook.com> TTS MultiModel Dev <dev@tts-multimodel.local>
+ReSerendipity <zengyangc@outlook.com> TTS MultiModel Dev <zengyangc@outlook.com>
