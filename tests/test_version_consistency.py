@@ -184,7 +184,9 @@ def test_installer_artifact_names_track_the_version_site() -> None:
     """OutFile / VIProductVersion 与 APP_VERSION 必须同源，否则装出来的包自称一个版本、
     文件名叫另一个版本（`version.json` 的 min_shell_version 比对就失去意义）。"""
     sites = _site_versions()
-    ver = next(iter(set(sites.values())))
+    # 基准取 pyproject，别用 next(iter(set(sites.values())))：版本位互相矛盾时那是在**随机挑一个**
+    # 当真值，setup.nsi 可能恰好撞上被挑中的那个而判过（2026-09-22 用假工作树撞通过一次）。
+    ver = sites["pyproject.toml"]
     text = (PROJECT_ROOT / "scripts" / "installer" / "setup.nsi").read_text(encoding="utf-8", errors="ignore")
     assert f"TTSMultiModel-Setup-v{ver}.exe" in text, f"OutFile 还没跟到 v{ver}"
     assert f'VIProductVersion "{ver}.0"' in text, f"VIProductVersion 还没跟到 {ver}.0"
