@@ -57,9 +57,11 @@ jobs:
         with:
           path: output/benchmarks
           key: benchmark-storage-${{ github.ref }}-${{ github.sha }}
+          # 只允许命中 **main** 产出的基线。原先末尾那条裸前缀 `benchmark-storage-`
+          # 会让任何分支的缓存都被命中 —— 于是"历史基线"经常是同一个 PR 两分钟前的那次 run
+          # （issue #118 的机制之一：自己和自己比，然后因为 runner 抖动判你回退）。
           restore-keys: |
             benchmark-storage-refs/heads/main
-            benchmark-storage-
 
       - name: Run performance benchmarks
         env:
@@ -75,39 +77,68 @@ jobs:
             --benchmark-storage=output/benchmarks \
             --benchmark-save=ci-${{ github.sha }}
 
-      # 趋势对比（regression gate）：仅 PR 且能取到历史基线时阻断。
-      # pytest-benchmark 的 --benchmark-compare 会与 storage 中最近的 run 对比，
-      # --benchmark-compare-fail=mean:20% 表示均值回退超过 20% 即失败。
+      # 趋势对比（regression gate）：仅 PR 且拿得到 main 基线时阻断。
+      # 判据换掉了，原因都在 issue #118 里有实测数据：
+      #   ① 同一份代码在共享 runner 之间 median/mean 能差 17%–80%，旧阈值 `mean:20%` 没有判别力
+      #      → 随机红。随机红的门禁会让人学会忽略红灯，比没有门禁更坏。
+      #   ② pytest-benchmark 的 `--benchmark-compare-fail` 是双向判定，**变快也算失败** —— 方向就错了。
+      #   ③ 旧的 restore-keys 有裸前缀兜底，会命中任意分支的缓存，"基线"经常是同一 PR 上一轮
+      #      （已在上一步修掉）。
+      #   ④ 整段输出被 `>> $GITHUB_STEP_SUMMARY 2>&1 || exit 1` 吞掉，日志里只剩一行
+      #      `Process completed with exit code 1`，红得没有可读证据。
+      #   ⑤ 旧步骤还会**再跑一遍 pytest** 来对比，等于把同一批基准测两次、把抖动放大两次。
+      # 现在：直接读上一步存下的 JSON 与 main 基线比，只判"变慢超过阈值"，并逐条打印数字。
       - name: Compare benchmark results (regression gate)
         if: github.event_name == 'pull_request' && github.base_ref == 'main'
         env:
-          TRANSFORMERS_OFFLINE: "1"
-          HF_HUB_OFFLINE: "1"
-          MODELSCOPE_OFFLINE: "1"
-          CUDA_VISIBLE_DEVICES: ""
+          SHA: ${{ github.sha }}
+          GATE_PCT: "50"  # 变慢 >50% 才红。不是"宽松"，是承认噪声地板：见 ①，更紧的阈值只会随机红
         run: |
-          echo "## Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          python - <<'PY'
+          import glob, json, os, sys
 
-          # 统计 storage 中已有的 run 数量（不含刚保存的本轮）
-          RUNS=$(find output/benchmarks -name '*.json' 2>/dev/null | grep -v "ci-${{ github.sha }}" | wc -l)
-          echo "历史基线 run 数: $RUNS"
+          sha = os.environ["SHA"]
+          gate = float(os.environ["GATE_PCT"])
+          all_runs = glob.glob("output/benchmarks/*/*.json")
+          mine = [p for p in all_runs if f"ci-{sha}" in os.path.basename(p)]
+          base = [p for p in all_runs if f"ci-{sha}" not in os.path.basename(p)]
 
-          if [ "$RUNS" -gt 0 ]; then
-            echo "存在历史基线，执行回归对比（mean 回退 >20% 即失败）..."
-            pytest tests/benchmarks/ -q \
-              -m "benchmark" \
-              --benchmark-only \
-              --benchmark-columns=mean,median,stddev,min,max \
-              --benchmark-storage=output/benchmarks \
-              --benchmark-compare \
-              --benchmark-compare-fail=mean:20% \
-              --benchmark-autosave \
-              >> $GITHUB_STEP_SUMMARY 2>&1 || exit 1
-          else
-            echo "未取到历史基线（首次 run 或 fork PR 无缓存），仅记录本次结果，跳过回归门禁。"
-            echo "建议在 main 分支跑通一次后重跑本 PR 以开启趋势对比。"
-          fi
+          if not mine:
+              print("::error::本轮结果没有存下来，无法对比 —— 这是流程问题，不是性能回退")
+              sys.exit(1)
+          if not base:
+              print("本轮拿不到 main 产出的基线（首次 run，或 fork PR 读不到仓库缓存）→ 仅记录，不判回归。")
+              print("想让门禁生效：先让 main 上跑过一次 benchmark（它会写 benchmark-storage-refs/heads/main-* 缓存）。")
+              sys.exit(0)
+
+          def medians(path):
+              with open(path, encoding="utf-8") as fh:
+                  data = json.load(fh)
+              return {b["name"]: b["stats"]["median"] for b in data.get("benchmarks", [])}
+
+          newest = max(base, key=os.path.getmtime)
+          cur, ref = medians(mine[0]), medians(newest)
+          print(f"基线：{os.path.basename(newest)}")
+          print(f"本轮：{os.path.basename(mine[0])}")
+          print(f"{'benchmark':<50} {'基线 median':>13} {'本轮 median':>13} {'变化':>8}  判定")
+          bad = []
+          for name in sorted(set(cur) | set(ref)):
+              a, b = ref.get(name), cur.get(name)
+              if not a or a <= 0 or b is None:
+                  print(f"{name[:50]:<50} {'—':>13} {'—':>13} {'—':>8}  跳过（单侧缺数据）")
+                  continue
+              delta = (b - a) / a * 100.0
+              hit = delta > gate
+              if hit:
+                  bad.append(f"{name}: median {a:.6f} → {b:.6f}（+{delta:.1f}%）")
+              print(f"{name[:50]:<50} {a:13.6f} {b:13.6f} {delta:+7.1f}%  {'红' if hit else 'ok'}")
+          if bad:
+              print(f"\n::error::性能回退：{len(bad)} 项 median 变慢超过 {gate:.0f}%（阈值由来见本步骤上方注释与 issue #118）")
+              for line in bad:
+                  print("  " + line)
+              sys.exit(1)
+          print(f"\n没有项变慢超过 {gate:.0f}%。变快不判失败（issue #118 的 ②）。")
+          PY
 
       - name: Upload benchmark results
         if: always()
