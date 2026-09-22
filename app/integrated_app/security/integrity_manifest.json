@@ -16,7 +16,7 @@
     "middleware/rate_limit.py": "9fe4beb2e8cada5d6b5404e0d028b2155013dde55fe03463324235d07824fe60",
     "middleware/request_id.py": "b0196972a30e77cc80497e12ef0e668964a62191835981d2f77ac4c92590d335",
     "security/integrity_check.py": "df788a55f11cab03919d434a31d1e5709c03bd4ce74fc6e58999d4f342e668c3",
-    "security/integrity_selfcheck.py": "bcb565f2cb4c2ab9a295ebbfbbb4d12bd65348995736a456edeb9e0c4f8a18a9",
+    "security/integrity_selfcheck.py": "c1cfb634430d36e733d3896d2121794283dd5c70a36ff338f53dd35e6ee04246",
     "security/secret_key.py": "eabd5a6f730cd47d7faa498d958e3a10fa14d6400b0d1123378814c0e1792eb1"
   }
 }

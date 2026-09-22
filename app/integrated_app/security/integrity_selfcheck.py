@@ -151,19 +151,32 @@ def run_startup_selfcheck(enforce: bool = False) -> dict:
 
     Args:
         enforce: True 时校验失败抛出 RuntimeError 阻断启动（fail-fast）；
-            清单缺失仍跳过不阻断（避免误伤首次部署）。
+            **清单缺失在 enforce=True 下同样是失败**（见下）。
 
     Returns:
         dict: 包含 total/passed/failed/skipped/failed_files/manifest_signed 字段。
 
     Raises:
-        RuntimeError: enforce=True 且存在校验失败的文件或清单签名无效。
+        RuntimeError: enforce=True 且存在校验失败的文件、清单签名无效，或清单根本不存在。
     """
     manifest_path = _get_manifest_path()
     app_dir = Path(__file__).parent.parent  # app/integrated_app/
 
     # 读取清单
     if not manifest_path.exists():
+        if enforce:
+            # 口径变更（2026-09-22）：原先这里"清单缺失也照旧跳过"，注释写的是"避免误伤首次部署"。
+            # 但 config.yaml 默认就是 enforce=true，而 v2.2.2 的 wheel 实测**没把清单打进包**
+            # （security/ 里只有 .py）—— 结果配置声明"强制校验"，实际一条都没跑，日志里只有
+            # 一行 info。"enforce 开着却没有清单"不是首次部署，是分发产物坏了，必须响。
+            raise RuntimeError(
+                f"完整性清单不存在（{manifest_path}），但 enforce 已开启 —— 拒绝以「无校验模式」启动。"
+                " 若这是源码检出：运行 `python scripts/generate_integrity_manifest.py` 生成清单"
+                "（有私钥时再跑 `python scripts/sign_integrity_manifest.py` 签名）；"
+                " 若这是 pip 安装出来的包：说明 wheel 漏打了清单/签名/公钥，"
+                " 见 pyproject 的 [tool.setuptools.package-data] 与 tests/test_integrity_selfcheck_packaging.py；"
+                " 确要关闭这道保护：显式设 security.integrity_selfcheck.enforce=false，别让它静默降级。"
+            )
         logger.info(
             "[SELF-CHECK] 完整性清单不存在，跳过自检。"
             " 运行 `python scripts/generate_integrity_manifest.py` 生成清单以启用启动自检。"

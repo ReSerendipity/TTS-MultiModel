@@ -155,7 +155,19 @@ where = ["app"]
 include = ["integrated_app*", "integrated_app.vendor*"]
 
 [tool.setuptools.package-data]
-"integrated_app" = ["templates/**/*", "static/**/*", "locales/*.json"]
+"integrated_app" = [
+    "templates/**/*",
+    "static/**/*",
+    "locales/*.json",
+    # 完整性自检的三件套必须随包走：清单、清单的 Ed25519 签名、验签公钥。
+    # 少任何一件，装出来的环境里 `integrity_selfcheck.py` 就走"清单不存在 → 跳过自检"分支，
+    # 而 config.yaml 默认 `security.integrity_selfcheck.enforce: true` —— 于是配置说自己
+    # 在强制校验，实际一条都没校验。2026-09-22 核对 v2.2.2 的 wheel 时实测到此项缺失
+    # （security/ 目录里只打进 .py）。现在缺清单会在 enforce 下直接拒绝启动，见该文件的自证。
+    "security/integrity_manifest.json",
+    "security/integrity_manifest.json.sig.ed25519",
+    "security/manifest_signing_public_key.pem",
+]
 
 [tool.ruff]
 target-version = "py310"
