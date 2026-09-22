@@ -536,9 +536,11 @@ def switch_engine(
             if engine_name == EngineName.VOXCPM2.value:
                 yield from _forward(_load_voxcpm2_engine(gpu_device, backend))
             elif engine_name == EngineName.INDEXTTS2.value:
-                yield from _forward(load_indextts2())
+                # #84: 热待机必须跳过加载前清场（语义就是双引擎常驻）；传统
+                # 路径已先 unload_model()，传 True 只是幂等空操作。
+                yield from _forward(load_indextts2(auto_unload=not hot_standby))
             elif engine_name == EngineName.INDEXTTS20.value:
-                yield from _forward(load_indextts20())
+                yield from _forward(load_indextts20(auto_unload=not hot_standby))
             else:
                 # 通用新式引擎（声明式注册）
                 yield from _forward(_load_generic_engine(engine_name))

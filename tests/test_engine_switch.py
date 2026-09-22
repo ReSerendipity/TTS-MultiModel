@@ -183,3 +183,99 @@ class TestSwitchVramRelease:
 
         reported = {float(v) for v in re.findall(r"需要 (\d+\.\d+)GB", caplog.text)}
         assert reported == {9.0}
+
+
+class TestUnloadForDirectLoad:
+    """回归 #84：routes 直连专用加载器时，加载前必须先清场卸载驻留引擎。
+
+    背景：load 端点对 voxcpm2 / indextts2 / indextts20 直接调专用加载器，
+    绕过 switch_engine 的 M-R1 记账与卸载阶段，12GB 卡上直切必然 503。
+    """
+
+    def test_helper_unloads_resident_engine_and_waits(self):
+        """有驻留引擎时：委托 unload_model、清缓存并按基线核验回收。"""
+        from integrated_app.model_manager_core.load import _unload_loaded_engines_for_load
+
+        gb = 1024**3
+        with (
+            patch("integrated_app.model_manager_core.unload.unload_model") as mock_unload,
+            patch("integrated_app.model_manager_core.load.registry") as mock_reg,
+            patch("integrated_app.model_registry.ENGINE_VRAM_REQUIREMENTS", {"voxcpm2": 6.5}),
+            patch("integrated_app.gpu_backend.GPUBackendManager.detect_backend", return_value=GPUBackend.CUDA),
+            patch("integrated_app.gpu_backend.GPUBackendManager.memory_allocated", return_value=int(9.0 * gb)),
+            patch("integrated_app.gpu_backend.GPUBackendManager.empty_cache") as mock_empty,
+            patch("integrated_app.model_manager_core.switch._wait_vram_freed", return_value=True) as mock_wait,
+            patch("integrated_app.model_manager_core.state.get_gpu_device", return_value=0),
+        ):
+            mock_reg.current_engine = "voxcpm2"
+            mock_reg.voxcpm_model = object()
+            mock_reg.indextts2_engine = None
+            mock_reg.get_all_engine_instances.return_value = {}
+            unloaded = _unload_loaded_engines_for_load("indextts2")
+
+        assert unloaded == "voxcpm2"
+        mock_unload.assert_called_once_with()
+        mock_empty.assert_called_once_with()
+        mock_wait.assert_called_once_with(0, baseline_allocated=int(9.0 * gb), expected_release_bytes=int(6.5 * gb))
+
+    def test_helper_noop_when_nothing_loaded(self):
+        """无驻留引擎时必须是零成本空操作（传统切换路径已卸载后复入此场景）。"""
+        from integrated_app.model_manager_core.load import _unload_loaded_engines_for_load
+
+        with (
+            patch("integrated_app.model_manager_core.unload.unload_model") as mock_unload,
+            patch("integrated_app.model_manager_core.load.registry") as mock_reg,
+        ):
+            mock_reg.current_engine = None
+            mock_reg.voxcpm_model = None
+            mock_reg.indextts2_engine = None
+            mock_reg.get_all_engine_instances.return_value = {}
+            unloaded = _unload_loaded_engines_for_load("voxcpm2")
+
+        assert unloaded is None
+        mock_unload.assert_not_called()
+
+    def test_load_indextts2_unloads_resident_engine_before_precheck(self):
+        """默认路径：load_indextts2 必须在预检前调用清场助手（接线证明）。"""
+        from integrated_app.model_manager_core.load import load_indextts2
+
+        gb = 1024**3
+        with (
+            patch(
+                "integrated_app.model_manager_core.load._unload_loaded_engines_for_load",
+                return_value="voxcpm2",
+            ) as mock_clear,
+            patch("integrated_app.model_manager_core.load.get_indextts2_model_path", return_value="fake/model"),
+            patch("integrated_app.model_manager_core.load.os") as mock_os,
+            patch("integrated_app.gpu_backend.GPUBackendManager.detect_backend", return_value=GPUBackend.CUDA),
+            patch(
+                "integrated_app.gpu_backend.GPUBackendManager.get_memory_info",
+                return_value=(int(11.94 * gb), int(6.04 * gb), int(6.12 * gb), int(5.9 * gb)),
+            ),
+            pytest.raises(InsufficientVRAMError, match="已自动卸载驻留引擎 voxcpm2"),
+        ):
+            mock_os.path.exists.return_value = True
+            list(load_indextts2())
+
+        mock_clear.assert_called_once_with("indextts2")
+
+    def test_load_indextts2_skips_unload_when_auto_unload_false(self):
+        """热待机传 auto_unload=False 时不得清场（双引擎常驻语义）。"""
+        from integrated_app.model_manager_core.load import load_indextts2
+
+        gb = 1024**3
+        with (
+            patch("integrated_app.model_manager_core.load._unload_loaded_engines_for_load") as mock_clear,
+            patch("integrated_app.model_manager_core.load.get_indextts2_model_path", return_value="fake/model"),
+            patch("integrated_app.model_manager_core.load.os") as mock_os,
+            patch("integrated_app.gpu_backend.GPUBackendManager.detect_backend", return_value=GPUBackend.CUDA),
+            patch(
+                "integrated_app.gpu_backend.GPUBackendManager.get_memory_info",
+                return_value=(int(11.94 * gb), int(6.04 * gb), int(6.12 * gb), int(5.9 * gb)),
+            ),
+            pytest.raises(InsufficientVRAMError, match="显存不足"),
+        ):
+            mock_os.path.exists.return_value = True
+            list(load_indextts2(auto_unload=False))
+
+        mock_clear.assert_not_called()
