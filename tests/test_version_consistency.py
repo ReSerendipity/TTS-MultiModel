@@ -146,6 +146,13 @@ def _site_versions() -> dict[str, str]:
             r"image:\s*ghcr\.io/\S+/tts-multimodel:([0-9][^\s\"]*)",
             "k8s 镜像 tag",
         ),
+        # 第 10 处：文档里那句"已发布最新"。它以前只是散文，于是会这样漂 ——
+        # v2.2.5 由 release-please 发出去之后，这行还停在 v2.2.4（RP 不碰散文，手工补齐时也没带上它）。
+        "docs/release-governance.md": grab(
+            "docs/release-governance.md",
+            r"\*\*已发布最新 = v(\d+\.\d+\.\d+)",
+            "治理文档声称的最新已发布版本",
+        ),
     }
     # 安装器**内嵌**的那份版本：`setup.nsi` 的 `File "version.json"` 取的是
     # `scripts/installer/version.json`，而它是 .gitignore:436 明写的"装配中间物"
