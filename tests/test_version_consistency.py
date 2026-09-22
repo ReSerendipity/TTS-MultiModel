@@ -85,10 +85,16 @@ _SEMVER = re.compile(r"\d+\.\d+\.\d+")
 
 #: release-please 通过 `release-please-config.json` 的 extra-files 会自动抬的版本位。
 #: 键与本文件 `_site_versions()` 的键一致；改 config 时同步改这里，否则失败信息会指错方向。
+#:
+#: `config.yaml` **不在**这里，而且不是遗漏：release-please 的 `yaml` 写入器会整份重排
+#: 文档，第一次真跑（PR #120，2026-09-22）就把 232 行配置改成了 160 增/160 删，
+#: 注释行从 96 行变成 0 行（`model_source_mode` 的选型说明、SSL 开关怎么打开、
+#: `vram_safety_margin_gb` 的算式），并把 `"127.0.0.1"` 的引号去掉。
+#: 同一条 PR 上 json/toml 那 4 条各只动 1 行 —— 破坏性是 `yaml` 类型特有的。
+#: 见 `test_extra_files_entries_are_all_actionable` 里的类型白名单。
 _RP_MANAGED = {
     "pyproject.toml",
     "version.json",
-    "config.yaml",
     "desktop/package.json",
     "desktop/src-tauri/tauri.conf.json",
     "desktop/src-tauri/Cargo.toml",
@@ -167,7 +173,8 @@ def test_all_version_sites_agree() -> None:
             f"{k} = {v}{'  ← RP 自动' if k in _RP_MANAGED else '  ← 手工同步'}" for k, v in sorted(sites.items())
         )
         + "\n  release-please 只会改上面标『RP 自动』的那些（它只支持 json/toml/yaml/xml/pom/generic，"
-        "没有 regex）；标『手工同步』的必须在 release PR 上补一个 commit —— "
+        "没有 regex，且 yaml 写入器会整份重排、把注释洗掉，所以 config.yaml 也不在里面）；"
+        "标『手工同步』的必须在 release PR 上补一个 commit —— "
         "Cargo.lock 归 cargo 生成、setup.nsi 的注释符是 `;` 用不了 generic 的 `# x-release-please-version` 标记、"
         "k8s 镜像 tag 要跟 ghcr 上真存在的标签走、安装器那份是 gitignore 的装配中间物。"
     )
@@ -191,15 +198,117 @@ def test_installer_artifact_names_track_the_version_site() -> None:
     assert _ver_tuple(minimum) <= _ver_tuple(ver), f"minimum_shell_version={minimum} 高于本次版本 {ver}"
 
 
+def _extra_files_entries() -> list[dict]:
+    cfg = json.loads((PROJECT_ROOT / "release-please-config.json").read_text(encoding="utf-8"))
+    return list(cfg.get("extra-files") or [])
+
+
 def test_rp_managed_annotation_matches_the_actual_config() -> None:
     """`_RP_MANAGED` 只是给失败信息指路用的，它自己不能漂：必须与
     release-please-config.json 的 extra-files + pyproject（python release-type 自带）一致。"""
-    import re as _re
-
-    cfg = (PROJECT_ROOT / "release-please-config.json").read_text(encoding="utf-8")
-    listed = set(_re.findall(r'"path":\s*"([^"]+)"', cfg))
+    listed = {str(e.get("path")) for e in _extra_files_entries()}
     assert listed, "config 里一个 extra-files 都没有，那这条闸就没意义了"
     assert listed | {"pyproject.toml"} == _RP_MANAGED, (
         f"RP 自动位与测试里的标注不一致：config 有 {sorted(listed)}，标注多/少的部分是"
         f" {sorted((listed | {'pyproject.toml'}) ^ _RP_MANAGED)}"
+    )
+
+
+def test_extra_files_entries_are_all_actionable() -> None:
+    """每一条 extra-files 都必须"真的能命中"，否则 release-please 会在无人察觉时少抬一处版本位。
+
+    三件事都在这里钉住：
+      1. 类型白名单只放 `json|toml|generic`。`yaml` 被排除是有账的：它在 PR #120（2.2.4）
+         上把 `config.yaml` 的 232 行改写成 160 增/160 删，注释行 96 → 0 —— 静默、且每次都发生。
+      2. `json|toml`：按 jsonpath 走进目标文件，取到的值必须**当前就是那个版本号**
+         （写错 key、文件搬家、字段改名都会在这里红，而不是在发版当天发现）。
+      3. `generic`：那一行必须带着 `x-release-please-version` 标记，它是行内匹配 ——
+         标记一旦丢（`routes/system/settings.py` 的 `_save_yaml_raw` 用 safe_dump 整体重写
+         config.yaml，注释必然消失），版本位就再也不动。
+    """
+    entries = _extra_files_entries()
+    assert entries, "config 里没有 extra-files，本条闸没有对象"
+    ver = _site_versions()["pyproject.toml"]
+
+    unsupported = [e for e in entries if str(e.get("type")) not in {"json", "toml", "generic"}]
+    assert not unsupported, (
+        "extra-files 用了没在 PR 上验过的类型："
+        + str([(e.get("path"), e.get("type")) for e in unsupported])
+        + " —— release-please 的 yaml 写入器会整份重排文档并删掉注释（实测见本文件 "
+        "_RP_MANAGED 上方的账），只允许 json/toml/generic。"
+    )
+
+    pending: list[str] = []
+    sites = _site_versions()
+    for entry in entries:
+        rel, type_, path = str(entry["path"]), str(entry["type"]), str(entry.get("jsonpath") or "")
+        target = PROJECT_ROOT / rel
+        if not target.exists():
+            pending.append(f"{rel}：文件不存在")
+            continue
+        if type_ == "generic":
+            body = target.read_text(encoding="utf-8", errors="ignore")
+            hit = [ln for ln in body.splitlines() if "x-release-please-version" in ln and _SEMVER.search(ln)]
+            if not hit:
+                pending.append(
+                    f"{rel}：generic 要求同一行内既有 `x-release-please-version` 标记又有一个 x.y.z，两者都没找到"
+                )
+            continue
+        value = _jsonpath_value(target, path, type_)
+        if value == _NO_PARSER:
+            # Python 3.10 没有 tomllib（CI 矩阵里就有 3.10），这一位只能交给
+            # `test_all_version_sites_agree` 的读取器去核 —— 它对 Cargo.toml 是覆盖到的；
+            # 连站点读取器都没有（下表没这一行）就真的没人管了，那种情况要响。
+            if rel not in sites:
+                pending.append(
+                    f"{rel}：本解释器读不了 {type_}（无 tomllib），且 {rel} 不在 _site_versions() 里 —— 没人核对这一位"
+                )
+            continue
+        if isinstance(value, str) and value.startswith("__unread__"):
+            pending.append(f"{rel}：jsonpath {path} 走不到（{value}）")
+        elif str(value) != ver:
+            pending.append(
+                f"{rel}：jsonpath {path} 现在是 {value!r}，与 canonical {ver!r} 不等 —— 它不会被抬到本次版本"
+            )
+        if rel in sites and sites[rel] != ver:
+            pending.append(f"{rel}：本文件另一个读取器看到的是 {sites[rel]!r}，与 canonical 不一致")
+    assert not pending, "extra-files 有命中不了的条目：\n  " + "\n  ".join(pending)
+
+
+#: 当前解释器没有 TOML 解析器时的哨兵（区别于"有解析器但走不到 key"）。
+_NO_PARSER = "__no-toml-parser__"
+
+
+def _jsonpath_value(target: Path, path: str, type_: str) -> object:
+    """按 RP 的 jsonpath 取当前值；取不到返回 `__unread__:原因` 字符串（交给调用方汇总）。"""
+    keys = path.removeprefix("$").strip(".").split(".")
+    try:
+        if type_ == "json":
+            doc: object = json.loads(target.read_text(encoding="utf-8"))
+        else:
+            try:
+                import tomllib
+            except ImportError:  # CI 矩阵有 3.10，那里没有 tomllib
+                return _NO_PARSER
+            doc = tomllib.loads(target.read_text(encoding="utf-8"))
+        for key in keys:
+            if not isinstance(doc, dict) or key not in doc:
+                return f"__unread__:缺 key {key!r}"
+            doc = doc[key]
+        return doc
+    except (json.JSONDecodeError, OSError, ValueError) as exc:
+        return f"__unread__:{type(exc).__name__}: {exc}"
+
+
+def test_bundled_changelog_describes_its_own_version() -> None:
+    """`version.json` 的 `$.version` 由 RP 自动抬，但 `changelog`/`release_date` 不会 ——
+    而 `desktop/src-tauri/src/updater.rs` 会读本地 `version.json` 的 changelog 展示给用户。
+    只抬版本号就会发出"自称 2.2.4、说明写着 2.2.3"的壳，所以这条必须红在 release PR 上。"""
+    data = json.loads((PROJECT_ROOT / "version.json").read_text(encoding="utf-8"))
+    ver = str(data["version"])
+    changelog = str(data.get("changelog", ""))
+    assert changelog.strip(), "version.json 没有 changelog 字段，壳里那栏是空的"
+    assert changelog.lstrip().startswith(ver), (
+        f"version.json 自称 {ver}，changelog 却在讲另一个版本：{changelog.splitlines()[0][:40]!r}..."
+        " —— RP 只改 $.version，发版时把这段说明（和 release_date）一起补上。"
     )
