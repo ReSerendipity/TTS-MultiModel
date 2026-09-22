@@ -2,6 +2,20 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.2.5](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.4...v2.2.5) (2026-09-22)
+
+
+### Bug Fixes
+
+* **ci:** DCO 按"提交作者"豁免自动化，否则自动发版路径结构上不可用 ([d267d37](https://github.com/ReSerendipity/TTS_MultiModel/commit/d267d3751d524b38191e6786109a1b9f623833ea))
+* **ci:** DCO 按提交作者豁免自动化 —— 否则自动发版路径结构上不可用 ([9eec594](https://github.com/ReSerendipity/TTS_MultiModel/commit/9eec5941a4a6f73eb395c53d8f9cb56fb3a34633))
+
+
+### Documentation
+
+* **DOD:** 记 v2.2.4 发版前这一轮的验收，并写清没覆盖的格子 ([d051529](https://github.com/ReSerendipity/TTS_MultiModel/commit/d051529978328d28993be1361f00bd2434b395b8))
+* **DOD:** 记 v2.2.4 发版前这一轮验收，并写明没重跑的格子 ([c54b474](https://github.com/ReSerendipity/TTS_MultiModel/commit/c54b4749075ba5b37156581b7a7ba406a2800f22))
+
 ## [Unreleased]
 
 ## [2.2.4] - 2026-09-22

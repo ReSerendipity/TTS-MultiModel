@@ -5,7 +5,7 @@ Unicode true
 !include "LogicLib.nsh"
 
 Name "TTSMultiModel 桌面版"
-OutFile "TTSMultiModel-Setup-v2.2.4.exe"
+OutFile "TTSMultiModel-Setup-v2.2.5.exe"
 InstallDir "$LOCALAPPDATA\Programs\TTSMultiModel"
 InstallDirRegKey HKCU "Software\TTSMultiModel" "InstallDir"
 RequestExecutionLevel user
@@ -13,7 +13,7 @@ SetCompressor /SOLID lzma
 CRCCheck on
 BrandingText "TTSMultiModel"
 
-!define APP_VERSION "2.2.4"
+!define APP_VERSION "2.2.5"
 !define DATA_PREFIX "TTSMultiModel-Data.7z"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\TTSMultiModel"
 !define APP_ICON "${__FILEDIR__}\..\..\desktop\src-tauri\icons\icon.ico"
@@ -135,7 +135,7 @@ Section "TTSMultiModel 桌面版" SEC_APP
 SectionEnd
 
 ; ---------- 版本信息 ----------
-VIProductVersion "2.2.4.0"
+VIProductVersion "2.2.5.0"
 VIAddVersionKey "ProductName" "TTSMultiModel 桌面版"
 VIAddVersionKey "LegalCopyright" "Copyright (C) 2026 TTSMultiModel"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
