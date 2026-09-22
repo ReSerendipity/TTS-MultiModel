@@ -1,27 +1,60 @@
 # ============================================================
-# CODEOWNERS — 代码审查负责人机制
-# 安全相关代码指定专人审查，确保任何改动都经过安全把关。
-# 格式：<路径> <审查者>（GitHub 用户名或团队）
+# CODEOWNERS — 代码审查负责人
+#
+# 现状说清楚：本仓是单人维护，`main` 的分支保护目前**没有**开
+# "Require review from Code Owners"，所以这个文件现在的作用是把"哪些路径是安全边界"
+# 写成机器可读的清单，而不是真的拦住合并。要让它变成硬闸：
+#   gh api -X PUT repos/:owner/:repo/branches/main/protection \
+#     --field required_status_checks... （含 required_pull_request_reviews.require_code_owner_reviews=true）
+# —— 但单人仓开了之后**自己也没法合自己的 PR**（除非允许 self-review），
+# 所以这一步留给所有者决定，不在这里默认打开。
+#
+# 规则里每一条非注释路径都必须在本仓真实存在 —— 原稿写的
+# `app/security/`、`app/auth/`、`app/csrf*`、`config/` 四个目录本仓根本没有：
+# 安全边界清单指到不存在的路径，比没有清单更危险（它给出"这些地方有人把关"的假印象）。
 # ============================================================
 
-# 全局默认 — 所有 PR 默认指派
+# 全局默认
 * @ReSerendipity
 
-# 安全核心模块 — 所有改动必须由安全负责人审查
-app/security/ @ReSerendipity
-app/auth/ @ReSerendipity
-app/csrf* @ReSerendipity
+# 安全核心模块（真实路径）
+app/integrated_app/security/ @ReSerendipity
+app/integrated_app/middleware/csrf.py @ReSerendipity
+app/integrated_app/middleware/security_headers.py @ReSerendipity
+app/integrated_app/routes/system/settings.py @ReSerendipity
+scripts/sign_integrity_manifest.py @ReSerendipity
+scripts/generate_integrity_manifest.py @ReSerendipity
 
-# 密钥与配置
-.env* @ReSerendipity
-config/ @ReSerendipity
+# 分发产物里的完整性三件套：清单/签名/公钥的改动等于改安全边界
+app/integrated_app/security/integrity_manifest.json @ReSerendipity
+app/integrated_app/security/integrity_manifest.json.sig.ed25519 @ReSerendipity
+app/integrated_app/security/manifest_signing_public_key.pem @ReSerendipity
 
-# 安全策略与审查流程
-SECURITY.md @ReSerendipity
-SECURITY_MATRIX.md @ReSerendipity
+# 依赖与构建（决定装出来的环境里有什么）
+pyproject.toml @ReSerendipity
+requirements.txt @ReSerendipity
+requirements-lock.txt @ReSerendipity
+launcher/requirements-small.txt @ReSerendipity
+Dockerfile @ReSerendipity
+.trivyignore.yaml @ReSerendipity
+
+# 密钥/配置与安装器
+config.yaml @ReSerendipity
+.env.example @ReSerendipity
+scripts/installer/ @ReSerendipity
+desktop/src-tauri/ @ReSerendipity
+
+# CI 与门禁本身（改门禁 = 改谁能通过什么检查）
 .github/workflows/ @ReSerendipity
 .github/CODEOWNERS @ReSerendipity
+.pre-commit-config.yaml @ReSerendipity
 
-# 构建与发布
-scripts/build* @ReSerendipity
-scripts/assemble* @ReSerendipity
+# 安全策略与审查流程文档
+SECURITY.md @ReSerendipity
+SECURITY_MATRIX.md @ReSerendipity
+docs/SECURITY_DEPENDABOT_TRIAGE.md @ReSerendipity
+docs/SECURITY_CODEQL_TRIAGE.md @ReSerendipity
+docs/release-governance.md @ReSerendipity
+
+# vendored 第三方引擎代码：改动前必须写清"为什么不走上游"
+app/integrated_app/vendor/ @ReSerendipity
