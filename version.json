@@ -2,5 +2,5 @@
   "version": "2.2.5",
   "release_date": "2026-09-22",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.2.4：两处用户可见修复 —— 12GB 显存档直切引擎不再 503（先清场再预检），persona/历史里的 onclick 字符串拼接改为事件闭包（消除属性注入面，同源裸插值一并收口）。其余是发布与 CI 链路收口：性能门禁改判 median 单向 50% 且基线改从仓内 L3 取、release-please 的 extra-files 摘掉会整份重写 config.yaml 的 yaml 类型、版本位新增『每条自动位今天真能命中』的闸、§7b 依赖复算结果落成账。资产为 wheel + sdist + SHA256SUMS；不含 26 GB 便携分卷与桌面增量包，NSIS 安装包真装未验收。"
+  "changelog": "2.2.5：这一版的内容是发布链路本身。docker 层缓存从 mode=max（无 scope）改成 mode=min + 固定 scope —— 旧配置每次构建往 Actions 缓存里写一份 ~3.2 GiB 快照、三次就把 10 GiB 配额吃满，被 LRU 先挤掉的反而是小缓存（性能门禁的基线与 12 平台矩阵的 pip 缓存）。性能门禁改判 median 单向 >50%，基线按 L1→L3 退让（三级存储原本三条都不通：缓存被配额驱逐、Release 资产那两步的 tag 条件永不成立、仓内基线是 0 条占位）。release-please 的 extra-files 摘掉会整份重写 config.yaml 的 yaml 类型（注释行 96→0），并加“每条自动位今天真能命中”的闸。另：给 release PR 加了 release-gate 提交状态（这类 PR 拿不到 CI 是 GitHub 固定行为）。文档侧记了 v2.2.4 发版前的验收与未覆盖项。资产为 wheel + sdist + SHA256SUMS；不含 26 GB 便携分卷与桌面增量包，NSIS 安装包真装未验收。"
 }
