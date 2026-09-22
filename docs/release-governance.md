@@ -14,6 +14,16 @@
   > 其中 `desktop/package-lock.json` 在 `.gitignore` 里（不是仓库内的版本位）；仓库内跟踪的 9 处
   > 由 `tests/test_version_consistency.py::test_all_version_sites_agree` 逐条比对，漂一处就红
   > （v2.2.2 发版前 `deploy/kubernetes/deployment.yaml` 的镜像 tag 就停在 2.2.1，红得下来）。
+  >
+  > **哪几处 release-please 会自动改、哪几处必须人改**（它只支持 `json|toml|yaml|xml|pom|generic`，
+  > 没有 regex）：`pyproject.toml` 与 `release-please-config.json` 的 `extra-files`
+  > （`version.json`/`config.yaml`/`desktop/package.json`/`tauri.conf.json`/`Cargo.toml`）是自动的；
+  > **必须人补**的是 `desktop/src-tauri/Cargo.lock`（归 cargo 生成）、
+  > `scripts/installer/setup.nsi` 的 `OutFile`/`APP_VERSION`/`VIProductVersion`
+  > （NSIS 注释符是 `;`，用不了 `generic` 要求的 `# x-release-please-version` 标记）、
+  > `deploy/kubernetes/deployment.yaml` 的镜像 tag（要跟 ghcr 上真存在的标签走）。
+  > 所以下一条 release PR 上，红在这三处是**预期行为**，补一个 commit 即可 ——
+  > 失败信息里会逐条标注哪处是『RP 自动』、哪处是『手工同步』。
 - 版本位：`pyproject.toml` + `config.yaml`（release-please 驱动前端缓存参数需人工补齐，见本地 AGENTS.md #9（AGENTS.md 为本地维护、不随仓库分发））+ `CHANGELOG.md`。
 - 发布**目前**由人工 `git tag -a` + `gh release create` 完成：**`release-please.yml` 是结构性空转**，
   不会替你发版 —— 它设了 `skip-github-pull-request: true` 而仓库从未产生过 release PR，

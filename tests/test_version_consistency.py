@@ -83,6 +83,17 @@ def test_no_hardcoded_old_version():
 
 _SEMVER = re.compile(r"\d+\.\d+\.\d+")
 
+#: release-please 通过 `release-please-config.json` 的 extra-files 会自动抬的版本位。
+#: 键与本文件 `_site_versions()` 的键一致；改 config 时同步改这里，否则失败信息会指错方向。
+_RP_MANAGED = {
+    "pyproject.toml",
+    "version.json",
+    "config.yaml",
+    "desktop/package.json",
+    "desktop/src-tauri/tauri.conf.json",
+    "desktop/src-tauri/Cargo.toml",
+}
+
 
 def _ver_tuple(s: str) -> tuple[int, ...]:
     """x.y.z → 可比较的整数元组（避免字典序把 2.9 判成比 2.10 大）。"""
@@ -151,9 +162,14 @@ def test_all_version_sites_agree() -> None:
     assert not bad, f"这些版本位不是 x.y.z 形态：{bad}"
     distinct = set(sites.values())
     assert len(distinct) == 1, (
-        "版本位互相矛盾（release-governance §5 的『版本位全部同步』没做到）："
-        + "\n  "
-        + "\n  ".join(f"{k} = {v}" for k, v in sorted(sites.items()))
+        "版本位互相矛盾（release-governance §5 的『版本位全部同步』没做到）：\n  "
+        + "\n  ".join(
+            f"{k} = {v}{'  ← RP 自动' if k in _RP_MANAGED else '  ← 手工同步'}" for k, v in sorted(sites.items())
+        )
+        + "\n  release-please 只会改上面标『RP 自动』的那些（它只支持 json/toml/yaml/xml/pom/generic，"
+        "没有 regex）；标『手工同步』的必须在 release PR 上补一个 commit —— "
+        "Cargo.lock 归 cargo 生成、setup.nsi 的注释符是 `;` 用不了 generic 的 `# x-release-please-version` 标记、"
+        "k8s 镜像 tag 要跟 ghcr 上真存在的标签走、安装器那份是 gitignore 的装配中间物。"
     )
 
 
@@ -173,3 +189,17 @@ def test_installer_artifact_names_track_the_version_site() -> None:
     # updater.rs 只在 AppVersion 结构里解析它，shell-update.json 契约里没有这个字段），
     # 所以这里只钉住唯一站得住的关系：下界不得高于本次版本。
     assert _ver_tuple(minimum) <= _ver_tuple(ver), f"minimum_shell_version={minimum} 高于本次版本 {ver}"
+
+
+def test_rp_managed_annotation_matches_the_actual_config() -> None:
+    """`_RP_MANAGED` 只是给失败信息指路用的，它自己不能漂：必须与
+    release-please-config.json 的 extra-files + pyproject（python release-type 自带）一致。"""
+    import re as _re
+
+    cfg = (PROJECT_ROOT / "release-please-config.json").read_text(encoding="utf-8")
+    listed = set(_re.findall(r'"path":\s*"([^"]+)"', cfg))
+    assert listed, "config 里一个 extra-files 都没有，那这条闸就没意义了"
+    assert listed | {"pyproject.toml"} == _RP_MANAGED, (
+        f"RP 自动位与测试里的标注不一致：config 有 {sorted(listed)}，标注多/少的部分是"
+        f" {sorted((listed | {'pyproject.toml'}) ^ _RP_MANAGED)}"
+    )
