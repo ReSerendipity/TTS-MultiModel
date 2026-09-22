@@ -39,6 +39,15 @@
   2. 手工：`git tag -a` + `gh release create`（v2.2.2/v2.2.3 走的就是这条）。
   手工发版之后 RP 会在下一条 release PR 里把版本号再抬一格（它按 manifest 算），
   所以手工发完要把 `.release-please-manifest.json` 一起抬到刚发的版本，否则两边在版本号上互踩。
+  > **走第 1 条时，release PR 上看不到任何 CI 检查**（实测 #120：`gh pr checks 120` 是空的）。
+  > 原因是 GitHub 的固定行为：由 `GITHUB_TOKEN` 产生的提交不再级联触发 workflow，
+  > 而 release PR 的提交正是 bot 用 `GITHUB_TOKEN` 推的。
+  > 后果很具体：§1 上面列的那些**手工同步位**在 release PR 上不会变红 ——
+  > `test_all_version_sites_agree` 要到合并进 main 之后才红，那时 Release 已经发出去了。
+  > 所以合 release PR 之前**必须本地跑**：`.venv/Scripts/python.exe -m pytest tests/test_version_consistency.py`
+  > （外加 §2 第 1–2 步的手工位补齐）。要把它变成机器闸，就得给 release PR 配一个
+  > 由 `workflow_dispatch`/`push` 触发、能对 release 分支的 head SHA 报 commit status 的作业 ——
+  > 那是权限决策，不在本文档的"现状"里。
   历史上 `release-please.yml` 曾是**结构性空转**（`skip-github-pull-request: true` + 缺
   config/manifest + 5 个 v4 不认的入参 → 每次 main push 输出 `found 0 possible releases` 后绿，
   v2.2.2 因此三次绿 run 都没 Release）；已修，现在它真的会开 PR。挂在它下面的
