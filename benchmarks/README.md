@@ -4,7 +4,7 @@
 
 | 层级 | 位置 | 持久性 | 用途 |
 |------|------|--------|------|
-| L1 热缓存 | CI `actions/cache` (`output/benchmarks/`) | **实测两小时就被驱逐**（仓库缓存 10.23 GB / 配额 10 GB） | PR 回归对比的第一顺位，命中就用、不命中退 L3 |
+| L1 热缓存 | CI `actions/cache` (`output/benchmarks/`) | **实测两小时就被驱逐**（配额 10 GiB、占用 9.64 GiB，其中 **9.52 GiB 是 `docker-publish.yml` 的 buildkit 层缓存** —— 大缓存把它吃满，LRU 先牺牲的却是这条 2.8 KB 的基线） | PR 回归对比的第一顺位，命中就用、不命中退 L3 |
 | L2 发布资产 | ~~GitHub Release Assets~~ | — | **已删**：触发器决定那两步永远不会执行，见下面"更新流程" |
 | L3 仓库基线 | `benchmarks/baseline.json` | 版本控制 | **当前真正稳定生效的一级**：手动锚定的基线，可 code review，随 checkout 就在 |
 

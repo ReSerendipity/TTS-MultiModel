@@ -56,8 +56,19 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # 层缓存的配额账（2026-09-22 实测，别再改回去）：
+          #   `mode=max` + 不写 scope 时，本工作流每跑一次就往 Actions 缓存里塞一份
+          #   ~3.2 GiB 的全量快照，且**每次的 blob key 都不一样**（内容含构建期元数据），
+          #   于是旧快照变成没人再引用但仍计配额 near-duplicate 垃圾。
+          #   今天三次构建（main push / v2.2.4 tag push / 又一次 main push）之后：
+          #   仓库缓存 9.64 GiB / 配额 10 GiB，其中 9.52 GiB 是 12 条 buildkit-blob，
+          #   全挂在 refs/heads/main 下。副作用不是"docker 慢一点"，而是
+          #   **LRU 先把小缓存挤掉** —— 性能门禁的 benchmark 基线（2.8 KB）存进去两小时就
+          #   `Cache not found`，12 平台矩阵的 setup-python/pip 缓存也没了。
+          #   mode=min 只缓存"下一步要用到的"层（base 镜像与依赖层，正是耗时的部分），
+          #   不缓存中间产物；固定 scope 让 push/PR/tag 共用一个桶而不是各自开新桶。
+          cache-from: type=gha,scope=tts-mm
+          cache-to: type=gha,mode=min,scope=tts-mm
           # provenance=false：跳过 SBOM/provenance 内联，缩小镜像并避免与单架构冲突
           provenance: false
 
