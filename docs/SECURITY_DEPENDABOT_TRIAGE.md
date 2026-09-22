@@ -357,3 +357,53 @@ diff <(sort requirements-lock.txt) <(sort requirements-lock.relock.txt) | head -
 
 跑完把 `requirements-lock.relock.txt` 的 diff 贴回来，我据此决定 #89/#90/#91 是批量合、
 还是只取其中能过真机的那几条。
+
+### 7b-结果（2026-09-22：①②③ 已跑完，只剩 ④ 真装）
+
+环境：新建 `.venv-relock`（`.venv` 与 `model/` 一个字节都没动），pip-tools 7.6.1，
+命令与上面 ① 一致，产物 `requirements-lock.relock.txt`（**没有**覆盖真锁）。
+确定性：换一条输出路径再复算一次，去掉表头后与第一次**逐字节相同**。
+小疑点：两次表头都回显了 `--no-index`（我没传这个参数）。解析结果里 protobuf 7.36.2、
+filelock 4.0.1 都比 dependabot 最近看到的版本新，只能来自活索引，所以它没有实际生效；
+为什么被回显没查清，记在这里以免下次又当成"复算没联网"。
+
+**③ 的三个问题逐条答：**
+
+| 问题 | 复算答案 | 后果 |
+|---|---|---|
+| transformers 落到哪个补丁号 | `4.52.4`（声明 `>=4.52.1,<4.53` 允许） | `test_engine_pinned_transformers_lineage` **红**：IndexTTS 2.0/2.5 的发行元数据要 `==4.52.1` + `tokenizers==0.21.0` |
+| protobuf 能抬到哪 | 直接 `7.36.2`（跨过 4.x/5.x/6.x 三个大版本） | §3a 说的 gencode 运行时兼容**这一步覆盖不到**，只有 ④ 的 import 期才暴露 |
+| 三处手改是否被复算保留 | `antlr4-python3-runtime==4.9.3` 保留、`mpmath==1.3.0` 保留、**`tokenizers==0.21.0` 不保留**（复算给 0.21.4） | 说明 `tokenizers` 这一位需要在声明侧写约束，否则每次复算都会漂 |
+
+**差异总账**（当前锁 97 条 / 复算 92 条 / 完全一致 74 条）：
+
+- 版本变了 16 条：filelock 3.32.7→4.0.1、fsspec 2026.7.0→2026.9.0、funasr 1.4.15→1.4.16、
+  idna 3.19→3.20、lazy-loader 0.5→0.6、modelscope-hub 0.4.3→0.4.5、networkx 3.6.1→3.7、
+  numpy 2.5.2→2.5.3、platformdirs 4.11.9→4.11.12、protobuf 3.19.6→7.36.2、
+  rapidfuzz 3.14.5→3.14.6、scikit-learn 1.9.0→1.9.1、scipy 1.18.0→1.18.1、
+  tokenizers 0.21.0→0.21.4、transformers 4.52.1→4.52.4、websockets 17.0.1→17.1
+- 复算里没有这 7 条：hf-xet 1.6.0、markdown-it-py 4.2.0、mdurl 0.1.2、pygments 2.21.0、
+  rich 15.0.0、shellingham 1.5.4、typer 0.27.2。它们是 `huggingface-hub` 的 cli / xet
+  **extras 链**（transformers 4.52.1 与 4.52.4 的 `rich`、`hf-xet` 都只挂在 extra 下，
+  且两版声明逐条相同，所以不是 transformers 抬版本导致的）。这 7 条随 `ea8b8c7`（#64）进入锁；
+  **那一次为什么会带出 extras 没查清**，这里只确认交叉约束检查器判它们不冲突。
+- 复算多出这 2 条：cloudpickle 3.1.2、tensorboardx 2.6.5。
+
+**门禁复跑**（把候选锁临时换进 `requirements-lock.txt`，跑完换回；前后 sha256
+`fae76cf9b04b06d0` 一致，真锁没被写过）：
+
+- `scripts/check_pin_crossconflicts.py` → **PASS**：并发抓 PyPI 元数据 115 个包、12.4s、
+  冲突 0 条、未核验 0 条。
+- `tests/test_dependency_consistency.py` → **1 failed / 12 passed**，唯一红的是上面那条
+  transformers 血统钉版。
+
+**结论：候选锁不能直接覆盖真锁。**两条路二选一：
+
+1. 把声明侧收紧（`transformers>=4.52.1,<4.52.2`、`tokenizers==0.21.0`），让"按声明复算"与
+   "引擎实际能跑"同源；代价是放弃 4.52.x 补丁号的自由度，且 protobuf 7.36.2 会随复算进来，
+   必须先过 ④ 的 import 期验证。
+2. 维持现状：真锁继续手工钉，复算只当**巡检工具**（这次就是它把"锁与声明已经不同源"这件事
+   量化出来的：97 vs 92、74 条一致、7 条来历未定）。
+
+④（GB 级真装 + 三引擎各一段、数字对齐 §2 基线）按约定停在 owner 手上；
+#89/#90/#91 三条 dependabot PR 的批量处置同样挂在那之后。
