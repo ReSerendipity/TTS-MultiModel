@@ -440,3 +440,9 @@ scripts/installer/pyproject.toml
 backups/
 
 tts_test/
+
+# 复算锁的工作区（docs/SECURITY_DEPENDABOT_TRIAGE.md §7b）：第二个 venv + 候选锁 +
+# 本地排障脚手架。都不入库，也不删（候选锁要留给 ④ 的真装复验）。
+/.venv-relock/
+/requirements-lock.relock.txt
+/output/
