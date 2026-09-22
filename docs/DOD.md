@@ -202,6 +202,21 @@
     绿色 run 同一行是 `Get:7 ... Packages [44.3 kB]`。
     性质上正是"警告后照旧继续"：报错文案（包不存在）与真原因（索引没抓下来）完全对不上，
     下一次抖动随时会再红一遍。修法与验收（含不等抖动的破坏态复现）见 #111 与 `Dockerfile` 注释。
+  * **wheel 漏打完整性清单三件套已修（发版后核对产物发现，PR #117）**：v2.2.2 的 wheel 里
+    `integrated_app/security/` 只有 `.py`，`integrity_manifest.json` / 其 `.sig.ed25519` /
+    验签公钥 `.pem` **三件都没进包**；而 `config.yaml` 默认 `security.integrity_selfcheck.enforce: true`，
+    自检在"清单不存在"分支只 `logger.info("跳过自检")` 就返回 → **纯 `pip install` 那条部署路径上
+    P0 完整性保护一条都没跑，配置却声称它在强制运行**（Docker/便携另拷源码树，所以不受影响，
+    这也是容器启动探测一直绿着的原因）。两处一起改：`package-data` 逐条点名三件；
+    enforce 开着却没清单 → `RuntimeError` 并给出三条出路（生成 / 重打 wheel / 显式关 enforce），
+    非强制模式保持原"跳过"语义。
+    验收不靠"配置看起来对"：本机 `python -m build` 前后对比（包内条目 1062 → 1065，三件均 `OK`），
+    再把 wheel 解到临时目录当成安装环境真跑一遍 —— 有清单时 `enforce=True` 返回
+    `total/passed/failed/signed = 16/16/0/True`；把清单挪走则拒绝启动、`enforce=False` 仍返回 `skipped=16`。
+    CI 侧在 `Build (sdist/wheel)` 作业里加了产物核对（只查 pyproject 不算数：setuptools 行为一变就谎报）。
+    守卫 `tests/test_integrity_selfcheck_packaging.py`（8 条，含"仓库自带三件套所以 enforce 该通过"的
+    反空验证，与"CI 不再核对 wheel 就红"的自证）；`integrity_selfcheck.py` 属 16 个被签模块，
+    清单已重算并重签（`--verify` PASS、sync 16/16）。
   * **仍未覆盖**：桌面安装包链路（staging → data 7z → NSIS）**无任何 workflow 调用**、本机也无从安装
     （`scripts/installer/` 只有一个 4.3 MB `Setup.exe`、无同目录分卷），所以 `unpack_desktop.ps1`
     新加的许可/字体落地核对只过了语法层，`release_gate.ps1` 的第 ⑥ 步也只在发版/dispatch 时跑；

@@ -259,6 +259,31 @@ jobs:
         # 2026-08-31 治理修复（P1-1）：移除 `|| true`，元数据校验失败应真实阻断
         run: twine check dist/*
 
+      - name: 核对 wheel 里有完整性自检三件套
+        # 为什么单独查产物：`config.yaml` 默认 enforce=true，而 wheel 若漏打清单/签名/公钥，
+        # 装出来的环境里 P0 完整性保护会**一声不响地不运行**（v2.2.2 的 wheel 实测就是这样，
+        # 详见 app/integrated_app/security/integrity_selfcheck.py 的分支注释）。
+        # 光有 pyproject 的 package-data 声明不算数 —— setuptools 行为一变就谎报了。
+        run: |
+          set -eu
+          python - <<'PY'
+          import glob, sys, zipfile
+          whl = glob.glob("dist/*.whl")[0]
+          names = set(zipfile.ZipFile(whl).namelist())
+          need = [
+              "integrated_app/security/integrity_manifest.json",
+              "integrated_app/security/integrity_manifest.json.sig.ed25519",
+              "integrated_app/security/manifest_signing_public_key.pem",
+          ]
+          miss = [n for n in need if n not in names]
+          for n in need:
+              print(("OK   " if n in names else "MISS ") + n)
+          if miss:
+              print("::error::wheel 缺以上文件 → 安装后 enforce 模式的完整性自检不会运行")
+              sys.exit(1)
+          print(f"[wheel-integrity] {whl} 含完整性三件套（包内 {len(names)} 项）")
+          PY
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
