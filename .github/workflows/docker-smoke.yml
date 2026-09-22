@@ -175,6 +175,14 @@ jobs:
           mods = [
               "integrated_app.vendor.voxcpm",
               "integrated_app.engines.voxcpm2.engine",
+              # 真正 `from einops import rearrange` 的那三个模块。只列包根目录不够：
+              # 2026-09-21 这一步第一次真跑就抓出 `No module named 'einops'`（run 35618578940），
+              # 而 einops 只在 funasr/modelscope 的 **extras** 里被声明，核心集装不出来 ——
+              # 点名到模块，报的错才等于"谁缺的依赖"。由 D5（tests/test_dependency_consistency.py）
+              # 在跑 pytest 的门禁上先拦一道，这里兜住"只有干净镜像才暴露"的那一半。
+              "integrated_app.vendor.voxcpm.model.voxcpm",
+              "integrated_app.vendor.voxcpm.model.voxcpm2",
+              "integrated_app.vendor.voxcpm.modules.locenc.local_encoder",
           ]
           bad = []
           for m in mods:
@@ -185,9 +193,13 @@ jobs:
                   bad.append((m, type(exc).__name__, str(exc)[:200]))
                   print("FAIL", m, type(exc).__name__, str(exc)[:200])
           if bad:
-              print("::error::镜像内的引擎模块导入失败 —— 检查 pyproject/requirements.txt 的 "
-                    "transformers 与 tokenizers 区间（引擎要求 4.52.x，见 "
-                    "docs/SECURITY_DEPENDABOT_TRIAGE.md §2）")
+              print("::error::镜像内的引擎模块导入失败 —— 两类原因都要排：")
+              print("::error::  (a) ModuleNotFoundError 指某个包没装：它多半只在 extras 里声明，"
+                    "核心集（pyproject [project].dependencies / requirements.txt）里没有 → "
+                    "补声明并同步 requirements-lock.txt 与 launcher/requirements-small.txt，"
+                    "D5 会替你守住；")
+              print("::error::  (b) ImportError 指向 transformers/tokenizers：引擎要求 4.52.x，"
+                    "见 docs/SECURITY_DEPENDABOT_TRIAGE.md §2")
               sys.exit(1)
           PY
 

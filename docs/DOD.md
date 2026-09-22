@@ -185,17 +185,23 @@
     ② 完整冒烟 10 格全绿：`engine_imports` → `ready` → `csrf_ticket` → voxcpm2 321,962 B →
     切 2.5 → `openai_tts1hd_contract` 400 → 2.5 = 386,796 B → 切 2.0 → 2.0 = 402,400 B →
     版本门负向按预期拒绝；结束显存回落 2,666 MiB。
-  * **镜像构建今天起在 CI 上确定性失败（与本仓改动无关的基础设施故障，未修）**：
-    `Dockerfile` 的 `apt-get install` 层报
-    `update-alternatives: error: alternative path /usr/share/man/man7/bash-builtins.7.gz doesn't exist`
-    → buildx 失败，`Build & Scan Image` 与 `Boot hardened container & probe` 两个作业同时红。
-    判据链：main 上 11:07 的同类构建还是 **success**（`41f5a12`/`1b29d0f`），12:19 与 12:28 两次
-    PR 构建红在**同一步**，且**各重试一次仍然一模一样** → 不是瞬时网络、也不是本 PR 引入
-    （本 PR 没碰 `Dockerfile`，失败发生在我的探针步骤之前）。jammy 已进入归档期，
-    疑点是 `software-properties-common` 一条依赖链带进来的 man-db/manpages 组合。
-    **我没有改 Dockerfile**：本机没有 docker daemon，任何 apt/dpkg 层的规避手法（
-    `path-exclude=/usr/share/man/*` 之类）在我这儿都是盲改，而它会改变发版镜像的内容 ——
-    要改就该在能真构建的环境里改并验，不该靠 CI 试错。交所有者定谁来做。
+  * **镜像构建的间歇性失败已定位并修掉（PR #111）—— 记一次我自己的误判纠偏**：
+    先前这里写的是"确定性失败、根因是 `update-alternatives: error: alternative path
+    /usr/share/man/man7/bash-builtins.7.gz doesn't exist`、jammy 归档期 man-db/manpages 组合问题"。
+    **那是错的**，两条都错：
+    ① 那条 error 在**成功**的构建里同样出现（run 35607107888 13:42:31 `#11 97.72`），
+      它是 `apt-get upgrade` 期间的良性噪声，与失败无因果；为验证它而开的探针 PR #110 五步全绿，
+      等于把自己的前提证伪，故关闭。
+    ② 也不是确定性基础设施故障：同一个 `Dockerfile`，12:19/12:28 红、13:40 绿。
+      "重试一次仍一模一样"只说明那 9 分钟里 PPA 一直取不到，不说明它不是网络问题。
+    真 fatal（红 run 的 `--log-failed`）：
+    `Ign:7 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 Packages`
+    → `W: Some index files failed to download. They have been ignored, or old ones used instead.`
+    → **`apt-get update` 仍然返回 0** → 两条命令之后才炸
+    `E: Unable to locate package python3.12` / `python3.12-venv`。
+    绿色 run 同一行是 `Get:7 ... Packages [44.3 kB]`。
+    性质上正是"警告后照旧继续"：报错文案（包不存在）与真原因（索引没抓下来）完全对不上，
+    下一次抖动随时会再红一遍。修法与验收（含不等抖动的破坏态复现）见 #111 与 `Dockerfile` 注释。
   * **仍未覆盖**：桌面安装包链路（staging → data 7z → NSIS）**无任何 workflow 调用**、本机也无从安装
     （`scripts/installer/` 只有一个 4.3 MB `Setup.exe`、无同目录分卷），所以 `unpack_desktop.ps1`
     新加的许可/字体落地核对只过了语法层，`release_gate.ps1` 的第 ⑥ 步也只在发版/dispatch 时跑；
