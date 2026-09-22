@@ -9,6 +9,12 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # release-gate 那一步要把检查结论写成 commit status 打在 release PR 的 head 上。
+  # 为什么非得用 status 而不是普通 workflow 检查：release-please 自己开的 PR **拿不到任何 CI** ——
+  # GitHub 固定行为，由 GITHUB_TOKEN 产生的提交不再级联触发 workflow（实测 #120 / #132 的
+  # `gh pr checks` 都是空）。没有这个 status，"这条 release PR 合下去会让 main 立刻变红"
+  # 这件事就只能靠人在合并前自己跑一遍脚本记着。
+  statuses: write
 
 jobs:
   release-please:
@@ -91,6 +97,50 @@ jobs:
               echo "> 若你刚合了 feat/fix，那就是失同步 —— 先看上面「发版链路自证」那步的 manifest/tag 结论。"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 发布条件检查（把结论写成 release PR head 上的 commit status）
+        # 判据不在这里重写：调 scripts/check_release_readiness.py，它复用
+        # tests/test_version_consistency.py 的那 8 条 —— CI 里红的与发版前拦的必须同源。
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          pr=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+                 --jq '.[] | select(.head.ref == "release-please--branches--main") | .number' | head -1)
+          if [ -z "${pr:-}" ]; then
+            echo "没有待合的 release PR，跳过发布条件检查。"
+            exit 0
+          fi
+          sha=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/$pr" --jq .head.sha)
+          wt="$RUNNER_TEMP/release-pr-$pr"
+          rm -rf "$wt"
+          git config --global --add safe.directory "$wt" || true
+          git fetch -q origin "refs/pull/$pr/head"
+          git worktree add -q --detach "$wt" FETCH_HEAD
+          if out=$(python3 scripts/check_release_readiness.py --root "$wt" 2>&1); then
+            st=success
+            desc="发版条件满足：PR #${pr} 的 head 上全部版本位一致、判据全过"
+          else
+            st=failure
+            desc="有手工同步位未补齐：合下去会让 main 立刻变红（详见本作业日志）"
+          fi
+          echo "$out"
+          {
+            echo "## 发布条件检查（release PR #${pr}，head ${sha:0:8}）"
+            echo '```'
+            echo "$out"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          git worktree remove --force "$wt" || true
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/$sha" \
+            -f state="$st" \
+            -f context="release-gate" \
+            -f description="$desc" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >/dev/null
+          echo "已在 ${sha:0:8} 上回写 release-gate=${st}"
+          # 这里刻意不 exit 1：结论已经以 commit status 的形式打在 release PR 上；要真拦合并，
+          # 就把分支保护里的必需检查加上 `release-gate`（一键，属于 owner 的决定）。
+          # 让本作业失败只会把"有一条 release PR 待发"这件事的红染到每次 main push 的历史上。
 
   # After release is created, build and upload artifacts
   build-release:
