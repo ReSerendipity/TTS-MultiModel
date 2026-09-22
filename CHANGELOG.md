@@ -4,7 +4,10 @@
 
 ## [Unreleased]
 
-## [2.2.2] - 2026-09-16（未发布：v2.2.2 tag 已撤销，无 GitHub Release、无便携分卷资产）
+## [2.2.2] - 2026-09-22
+
+<!-- 2026-09-16 那批内容原挂在「未发布」的 v2.2.2 标题下（tag 曾建后撤销）；2026-09-22 正式发出，
+     并追加「发布前置回归」一节记录 09-21/22 这一批。资产范围见本节末尾的说明。 -->
 
 ### Features
 
@@ -42,6 +45,39 @@
 ### Chore
 
 * **dist:** 便携依赖钉装（`launcher/requirements-small.txt` 93 项 + `torch==2.13.0+cu132` 系列钉版，`sync_requirements.py --check-small` 校验）（P1-1）
+
+### 发布前置回归（2026-09-21/22，随 v2.2.2 发出）
+
+* **deps（P0）:** `einops` 提为**核心依赖** —— vendored VoxCPM 在模块顶层
+  `from einops import rearrange`，而它原先只出现在 `training` extra 里，`funasr`/`modelscope`
+  又只在 **extras** 声明它：任何按 `requirements.txt` / `[project].dependencies` 装出来的干净环境
+  （镜像、便携包）都起不来默认引擎 `tts-1`。由 docker-smoke 新增的"镜像内引擎导入探针"第一次真跑抓到
+  （run 35618578940）。同形状把 `addict` 补进两份钉版集；新增守卫 D5「核心声明必须有钉版」。
+* **docker:** 镜像构建间歇性失败的真因是 `apt-get update` 对「某个索引没抓下来」只打 `W:` 并**返回 0**，
+  两行之后才炸成 `E: Unable to locate package python3.12`。两段 RUN 都改成「PPA 索引里真查得到才继续」，
+  取不到则重试 5 轮后硬停并给可操作原因。先前记成「`bash-builtins`/man-db 的确定性故障」是**误判**，
+  已被探针数据与绿色 run 双重证伪（`docs/DOD.md` 相应段落已更正）。
+* **security:** CSRF 密钥取不出来时**拒绝启动**（原为 warning 后以空密钥继续挂 `CSRFMiddleware`，
+  等于静默关掉这道防护）；密钥改 `0o600` 落盘、既有宽权限文件收紧；CodeQL 既有告警 #1
+  （明文存储密钥）走「真加固 + sink 行带理由抑制」，不整条静音。
+* **engine:** IndexTTS 推理按引擎名加 `threading.RLock`。真因是**预热绕过串行队列、与用户请求并发**
+  （不是先前记的「第二次引擎切换之后」），device-side assert 会毒化整个 CUDA context 使同进程后续合成全废；
+  真机并发条件下字节数与串行一致（2.5 = 336,642 B / 2.0 = 239,674 B）。
+* **api:** OpenAI 口 `tts-1-hd` 不再必然 500 —— 该口没有参考音频通道，改回 400 并指明该走哪个端点。
+* **ci:** 修两处「永远绿的假信号」：`gpu-smoke.yml` 的 job 因缺 secret + 零注册 runner 一直 `skipped`
+  而 run 顶层 success（现发 warning 并写进 step summary）；镜像内的引擎模块此前**从没被导入过**（新增探针）。
+* **deps:** 依赖下界回到实测能跑的 `transformers>=4.52.1,<4.53` + `tokenizers>=0.21.0,<0.22`；
+  4.52.x 的代价按 OSV 实测是 **16 个公告**（其中 8 条上游根本没有修复版本），逐条写可达性判据与理由后
+  在 pip-audit / Trivy 里绑由头豁免；20 条 Dependabot 告警同样逐条 dismiss
+  （台账见 `docs/SECURITY_DEPENDABOT_TRIAGE.md`）。
+* **security:** CodeQL 存量分诊台账救回并按 09-21 实测刷新：open **110 → 76**、critical **1 → 0**，
+  34 条差额逐条对上账（`docs/SECURITY_CODEQL_TRIAGE.md` §6）。
+
+> **版本口径如实记一句**：本批含 **43 个 `feat:` 提交**却仍标 `2.2.2`（按 SemVer 应为 `2.3.0`）。
+> 这是所有者的显式决定 —— 本段内容与 2026-09-16 那次被撤销的 v2.2.2 tag 属同一批，沿用该号。
+> 另：仓库只有 1 个 Actions secret（`MANIFEST_SIGNING_KEY_B64`），`GPG_PRIVATE_KEY` 缺席 →
+> `gpg-signed-release.yml` 只会 notice 跳过，资产不做分离签名；本次 Release 附源码包 + wheel +
+> SHA256SUMS，**不含** 26 GB 便携分卷与增量包（那部分资产未获授权，命令见 `docs/release-governance.md` §2）。
 
 ## [2.2.1](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.0...v2.2.1) (2026-08-22)
 
