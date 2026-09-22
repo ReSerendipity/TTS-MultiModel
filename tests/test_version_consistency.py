@@ -107,11 +107,7 @@ def _site_versions() -> dict[str, str]:
 
     sites = {
         "pyproject.toml": grab("pyproject.toml", r'^version\s*=\s*"([^"]+)"', "Python 包版本"),
-        "version.json": grab_json("version.json", "更新契约版本"),
-        # 安装器**内嵌**的那份：`setup.nsi` 的 `File "version.json"` 取的是本目录里的这个文件，
-        # 而仓库里没有任何脚本重新生成它（makensis 是手工跑的）—— 不跟着抬，
-        # 装出来的壳就会拿一份旧版本号做本地识别（那份注释自己写着"缺失会静默跳过更新"）。
-        "scripts/installer/version.json": grab_json("scripts/installer/version.json", "安装器内嵌版本（壳本地识别）"),
+        "version.json": grab_json("version.json", "更新契约版本（唯一版本源）"),
         "config.yaml": grab("config.yaml", r'^version:\s*"?([^"\n]+)"?', "前端缓存参数版本"),
         "desktop/package.json": grab_json("desktop/package.json", "桌面壳 npm 版本"),
         "desktop/src-tauri/tauri.conf.json": grab_json("desktop/src-tauri/tauri.conf.json", "Tauri 壳版本"),
@@ -134,12 +130,23 @@ def _site_versions() -> dict[str, str]:
             "k8s 镜像 tag",
         ),
     }
+    # 安装器**内嵌**的那份版本：`setup.nsi` 的 `File "version.json"` 取的是
+    # `scripts/installer/version.json`，而它是 .gitignore:436 明写的"装配中间物"
+    # （与 TTSMultiModel.exe 同批手工放进去，makensis 不在仓库里跑）—— 真版本源只有根
+    # version.json。所以不变式是**若在场则必须等于源**：干净检出里没有这个文件（CI 就没有），
+    # 可一旦装进安装器的那份与源不同步，装出来的壳就拿一份旧版本号做本地识别
+    # （assemble_installer_data.ps1:59 的注释写着"缺失会静默跳过更新"）。
+    installer_copy = PROJECT_ROOT / "scripts" / "installer" / "version.json"
+    if installer_copy.exists():
+        sites["scripts/installer/version.json（装配中间物）"] = grab_json(
+            "scripts/installer/version.json", "安装器内嵌版本（壳本地识别）"
+        )
     return sites
 
 
 def test_all_version_sites_agree() -> None:
     sites = _site_versions()
-    assert len(sites) >= 10, f"只核到 {len(sites)} 个版本位，本条已失去意义"
+    assert len(sites) >= 9, f"只核到 {len(sites)} 个版本位，本条已失去意义"
     bad = {k: v for k, v in sites.items() if not _SEMVER.fullmatch(v)}
     assert not bad, f"这些版本位不是 x.y.z 形态：{bad}"
     distinct = set(sites.values())
