@@ -40,6 +40,7 @@ _CARRIERS = (
     # 判据里有两条要读它（extra-files 的类型白名单与标注一致性），漏搬就会以 FileNotFoundError
     # 崩在"判据未能执行"上 —— 那正是脚本设计上要区分开的那一档（崩 != 漂移，但同样不能放行）。
     "release-please-config.json",
+    "docs/release-governance.md",
 )
 
 
@@ -115,6 +116,10 @@ def _complete_hand_sites(root: Path) -> None:
     (root / "scripts" / "installer" / "setup.nsi").write_text(
         f'OutFile "TTSMultiModel-Setup-v{NEW}.exe"\n!define APP_VERSION "{NEW}"\nVIProductVersion "{NEW}.0"\n',
         encoding="utf-8",
+    )
+    gov = root / "docs" / "release-governance.md"
+    gov.write_text(
+        gov.read_text(encoding="utf-8").replace("已发布最新 = v" + CUR, "已发布最新 = v" + NEW), encoding="utf-8"
     )
     (root / "version.json").write_text(
         json.dumps(

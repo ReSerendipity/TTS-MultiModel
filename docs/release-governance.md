@@ -8,7 +8,7 @@
 
 ## 1. 版本号规范
 
-- 遵循 SemVer `MAJOR.MINOR.PATCH`。**已发布最新 = v2.2.4（2026-09-22）**。
+- 遵循 SemVer `MAJOR.MINOR.PATCH`。**已发布最新 = v2.2.5（2026-09-22）**。
   版本号出现在 11 处（`version.json`/`pyproject.toml`/`config.yaml`/`desktop/*`/`scripts/installer/setup.nsi`），
   但只有 tag + GitHub Release 同时存在才算发出去；核对：`gh release view v<版本>`。
   > 其中 `desktop/package-lock.json` 在 `.gitignore` 里（不是仓库内的版本位）；仓库内跟踪的 9 处
@@ -28,17 +28,35 @@
   > `scripts/installer/setup.nsi` 的 `OutFile`/`APP_VERSION`/`VIProductVersion`
   > （NSIS 注释符是 `;`，用不了 `generic` 要求的 `# x-release-please-version` 行内标记）、
   > `deploy/kubernetes/deployment.yaml` 的镜像 tag（要跟 ghcr 上真存在的标签走）。
+  > **第 10 处是散文**：本文开头那句"已发布最新 = v<X.Y.Z>" —— RP 不碰它，而它真会漂
+  > （v2.2.5 发出去之后这里还停在 v2.2.4），所以已被 `test_all_version_sites_agree`
+  > 当版本位钉住，补齐时顺手改一行。
   > `version.json` 里 RP 只抬 `$.version`，**`changelog` 与 `release_date` 也是手工位**
   > （壳的 `updater.rs` 会把 changelog 显示给用户，只抬版本号会发出"自称 2.2.4、说明写着 2.2.3"的包）。
-  > 所以下一条 release PR 上，红在这几处是**预期行为**，补一个 commit 即可 ——
+  > 补齐这几处的那条提交要加在 release 分支上、**并且紧接着就合**：任何一次 main push 都会让
+  > RP 重写那条分支，把你补的提交冲掉（2026-09-22 真被冲掉过一次 `1c2597a`）。
   > 失败信息里会逐条标注哪处是『RP 自动』、哪处是『手工同步』，
   > 并由 `test_extra_files_entries_are_all_actionable` 钉住"每条 extra-files 今天确实能命中"。
 - 版本位：`pyproject.toml` + `config.yaml`（release-please 驱动前端缓存参数需人工补齐，见本地 AGENTS.md #9（AGENTS.md 为本地维护、不随仓库分发））+ `CHANGELOG.md`。
 - **发版有两条路，别同时走**：
-  1. 自动：合入 release PR（RP 在 main push 后自动开/刷新，如 #120）并等它自己打 tag 发 Release；
-  2. 手工：`git tag -a` + `gh release create`（v2.2.2/v2.2.3 走的就是这条）。
-  手工发版之后 RP 会在下一条 release PR 里把版本号再抬一格（它按 manifest 算），
-  所以手工发完要把 `.release-please-manifest.json` 一起抬到刚发的版本，否则两边在版本号上互踩。
+  1. 自动：合入 release PR（RP 在 main push 后自动开/刷新）并等它自己打 tag 发 Release。
+     **已于 2026-09-22 走通一次**：v2.2.5 的 tag `9125a3e`、Release 与 4 个资产
+     （`SHA256SUMS`、`SHA256SUMS.scripts`、wheel、sdist）都是 RP 自己产出/挂上的。
+     走这条路必须知道三件事：
+     - **它只抬 5+1 处自动位**，剩下 5 类手工位（`config.yaml`、`Cargo.lock`、
+       `setup.nsi` 三处、k8s 镜像 tag、`version.json` 的 `changelog`/`release_date`）
+       要你在 release 分支上**另加一条提交**补齐；而**任何一次 main push 都会让 RP 重写那条分支**，
+       把你补的提交冲掉（今天冲掉过一次：`1c2597a`）。所以顺序是"补齐 → 立刻合"，中间别合别的。
+     - **DCO 曾经让它结构上不可合**：RP 的提交作者是 `github-actions[bot]`，永远签不出
+       `Signed-off-by`，而分支保护要求 DCO —— 已按"提交作者"豁免（#135），并留下
+       `tests/test_dco_bot_exemption.py` 钉住"豁免不是后门"。
+     - **release PR 拿不到 CI**（见下面那段），所以合并前的判据是本地跑
+       `python scripts/check_release_readiness.py --root <release 分支检出>`，
+       结论也会以 commit status `release-gate` 打在 PR head 上（把它加成必需检查是 owner 的一键决定）。
+  2. 手工：`git tag -a` + `gh release create`（v2.2.2 / v2.2.3 / v2.2.4 走的就是这条）。
+     手工发版之后 RP 会在下一条 release PR 里把版本号再抬一格（它按 manifest 算），
+     所以手工发完要把 `.release-please-manifest.json` 一起抬到刚发的版本，否则两边在版本号上互踩。
+     —— 反过来也成立：走自动路径时别顺手再手工打同版本的 tag。
   > **走第 1 条时，release PR 上看不到任何 CI 检查**（实测 #120：`gh pr checks 120` 是空的）。
   > 原因是 GitHub 的固定行为：由 `GITHUB_TOKEN` 产生的提交不再级联触发 workflow，
   > 而 release PR 的提交正是 bot 用 `GITHUB_TOKEN` 推的。
