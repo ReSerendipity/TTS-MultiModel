@@ -1,5 +1,5 @@
 {
-  "version": "2.2.4",
+  "version": "2.2.5",
   "release_date": "2026-09-22",
   "minimum_shell_version": "2.2.2",
   "changelog": "2.2.4：两处用户可见修复 —— 12GB 显存档直切引擎不再 503（先清场再预检），persona/历史里的 onclick 字符串拼接改为事件闭包（消除属性注入面，同源裸插值一并收口）。其余是发布与 CI 链路收口：性能门禁改判 median 单向 50% 且基线改从仓内 L3 取、release-please 的 extra-files 摘掉会整份重写 config.yaml 的 yaml 类型、版本位新增『每条自动位今天真能命中』的闸、§7b 依赖复算结果落成账。资产为 wheel + sdist + SHA256SUMS；不含 26 GB 便携分卷与桌面增量包，NSIS 安装包真装未验收。"
