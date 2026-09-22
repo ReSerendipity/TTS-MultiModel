@@ -42,5 +42,12 @@
 *.db   binary
 *.sqlite binary
 
-# Pin .gitignore to LF in the working tree (CRLF working copy creates a catch-all ignore rule)
+# 治理文件自身固定 LF：让 gitignore / mailmap / attributes 在各平台 checkout 后字节一致。
+# 注：旧注释写的是"CRLF working copy creates a catch-all ignore rule"，实测复现不出来
+# （git 2.55.0.windows.3 / core.autocrlf=true：模式行带 \r 时 git 会剥掉 CR，
+# `/model/`、`outputs/`、`*.tmp` 与 negation 行的行为与 LF 版逐条一致）。留这条的理由换成
+# "字节一致便于审计与 diff"，而不是修一个不存在的 catch-all bug —— 见 #74 处置记录。
 /.gitignore text eol=lf
+/.gitattributes text eol=lf
+/.mailmap text eol=lf
+Dockerfile text eol=lf
