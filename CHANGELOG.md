@@ -4,6 +4,39 @@
 
 ## [Unreleased]
 
+## [2.2.3] - 2026-09-22
+
+补丁版，只为把一处**随包分发缺口**送进可安装的产物：它修在 main 上，但晚于 v2.2.2 的 tag，
+所以 v2.2.2 的 wheel 里仍然带着这个缺陷。
+
+### Security
+
+* **integrity:** wheel 此前**没把完整性自检三件套打进包**（`integrity_manifest.json`、其
+  `Ed25519` 签名、验签公钥），而 `config.yaml` 默认 `security.integrity_selfcheck.enforce: true`，
+  且"清单不存在"分支只 `logger.info("跳过自检")` 就返回 → **纯 `pip install` 的部署路径上
+  P0 完整性保护一条都没执行，配置却声称它在强制运行**（Docker 与便携包另外拷了源码树，
+  所以容器启动探测一直是绿的，把这个缺口遮住了）。现在三件随包走，且 enforce 开着却没清单
+  → `RuntimeError` 拒绝启动并给三条出路；非强制模式保持原跳过语义。验收落在**产物**而非声明：
+  包内条目 1062 → 1065，并把 wheel 解到临时目录真跑一遍正负两向。
+  守卫 `tests/test_integrity_selfcheck_packaging.py` + CI 的 `Build (sdist/wheel)` 新增产物核对步骤。
+
+### Bug Fixes
+
+* **ci:** `release-please.yml` 的三处静默失效已修（`skip-github-pull-request: true` 而仓库从无
+  release PR → 每次 main push 都 `found 0 possible releases` 后成功；5 个 v4 不认的入参被整段忽略；
+  job 从未声明 `outputs:` → 挂在它下面的 `build-release`（sdist/wheel + SHA256SUMS）永远不跑）。
+  修好后它当场自动开出了下一条 release PR，故补上 `release-please-config.json` 与
+  `.release-please-manifest.json`，并加"什么都没发生就硬失败/写进 job 摘要"的自证。
+* **version:** 版本位一致性守卫（#113 引入）补两处：漏核了**安装器内嵌**的
+  `scripts/installer/version.json`（`setup.nsi` 的 `File "version.json"` 取的就是它，且没有脚本
+  会重新生成它）；另撤掉一条我自己写反的断言 —— `minimum_shell_version` 是**下界**，
+  强令它等于当前版本等于每次发版把上一版壳判死，改为只要求"不高于本次版本"。
+
+### 已知未覆盖（同 v2.2.2 口径，未变）
+
+桌面安装包链路与便携分卷仍无 workflow 覆盖；GPU 冒烟因无注册 runner 在 CI 上恒为 skipped；
+锁集的全新 venv 真装复验待执行。
+
 ## [2.2.2] - 2026-09-22
 
 <!-- 2026-09-16 那批内容原挂在「未发布」的 v2.2.2 标题下（tag 曾建后撤销）；2026-09-22 正式发出，
