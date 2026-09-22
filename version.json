@@ -1,6 +1,6 @@
 {
-  "version": "2.2.2",
+  "version": "2.2.3",
   "release_date": "2026-09-22",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.2.2 发布：桌面分发与便携打包链路补全 + 发布前置回归（干净环境缺 einops/addict 已修、镜像 apt 索引就绪守卫、CSRF 硬失败与 0600、IndexTTS 预热并发崩溃修复）。资产为源码包 + wheel + SHA256SUMS；不含 26 GB 便携分卷与增量包。"
+  "changelog": "2.2.3：修复随包分发缺口 —— wheel 此前没打进完整性自检清单三件套（清单/签名/公钥），而 enforce 默认开启，导致 pip 安装出来的环境里 P0 完整性保护一条都没执行却写着在强制运行；现在三件随包走，且 enforce 开着而清单缺失会拒绝启动。另含 2.2.2 的发布前置回归（干净环境缺 einops/addict、镜像 apt 索引就绪守卫、CSRF 硬失败与 0600、IndexTTS 预热并发崩溃修复）。资产为 wheel + sdist + SHA256SUMS；不含 26 GB 便携分卷与增量包。"
 }
