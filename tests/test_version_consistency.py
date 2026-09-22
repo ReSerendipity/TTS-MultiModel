@@ -255,6 +255,15 @@ def test_extra_files_entries_are_all_actionable() -> None:
                 )
             continue
         value = _jsonpath_value(target, path, type_)
+        if value == _NO_PARSER:
+            # Python 3.10 没有 tomllib（CI 矩阵里就有 3.10），这一位只能交给
+            # `test_all_version_sites_agree` 的读取器去核 —— 它对 Cargo.toml 是覆盖到的；
+            # 连站点读取器都没有（下表没这一行）就真的没人管了，那种情况要响。
+            if rel not in sites:
+                pending.append(
+                    f"{rel}：本解释器读不了 {type_}（无 tomllib），且 {rel} 不在 _site_versions() 里 —— 没人核对这一位"
+                )
+            continue
         if isinstance(value, str) and value.startswith("__unread__"):
             pending.append(f"{rel}：jsonpath {path} 走不到（{value}）")
         elif str(value) != ver:
@@ -264,6 +273,10 @@ def test_extra_files_entries_are_all_actionable() -> None:
         if rel in sites and sites[rel] != ver:
             pending.append(f"{rel}：本文件另一个读取器看到的是 {sites[rel]!r}，与 canonical 不一致")
     assert not pending, "extra-files 有命中不了的条目：\n  " + "\n  ".join(pending)
+
+
+#: 当前解释器没有 TOML 解析器时的哨兵（区别于"有解析器但走不到 key"）。
+_NO_PARSER = "__no-toml-parser__"
 
 
 def _jsonpath_value(target: Path, path: str, type_: str) -> object:
@@ -276,7 +289,7 @@ def _jsonpath_value(target: Path, path: str, type_: str) -> object:
             try:
                 import tomllib
             except ImportError:  # CI 矩阵有 3.10，那里没有 tomllib
-                return "__unread__:py<3.11 无 tomllib（该文件已由 _site_versions 的读取器覆盖）"
+                return _NO_PARSER
             doc = tomllib.loads(target.read_text(encoding="utf-8"))
         for key in keys:
             if not isinstance(doc, dict) or key not in doc:
