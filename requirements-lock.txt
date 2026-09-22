@@ -4,6 +4,7 @@
 #
 #    pip-compile --no-annotate --output-file=requirements-lock.txt requirements.txt
 #
+addict==2.4.0
 aiofiles==25.1.0
 aliyun-python-sdk-core==2.16.1
 aliyun-python-sdk-kms==2.16.5
@@ -19,6 +20,7 @@ colorama==0.4.6
 crcmod==1.7
 cryptography==50.0.1
 decorator==5.3.1
+einops==0.8.2
 fastapi==0.141.1
 filelock==3.32.7
 fsspec==2026.7.0

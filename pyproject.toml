@@ -78,6 +78,16 @@ dependencies = [
     # （_load_voxcpm2_engine 强制 include_denoiser=True）会经 speech_zipenhancer
     # 走到它。缺失时降噪会降级关闭、音质下降，故列为生产依赖而非可选。
     "addict>=2.4.0",
+    # vendored VoxCPM 的模型代码在**模块顶层** `from einops import rearrange`
+    # （vendor/voxcpm/model/voxcpm.py:29、voxcpm2.py:30、modules/locenc/local_encoder.py:4），
+    # 而 funasr / modelscope 只在 extras 里声明 einops（我们装的是无 extras 的核心集）——
+    # 于是任何只按 [project].dependencies / requirements.txt 装出来的环境都起不来 tts-1：
+    # 2026-09-21 docker-smoke 的镜像内导入探针第一次真跑就报
+    # `FAIL integrated_app.vendor.voxcpm ModuleNotFoundError No module named 'einops'`（run 35618578940）。
+    # 本机 .venv 从未暴露此事，因为 einops 是从 conformer / vector-quantize-pytorch / indextts
+    # 那条**训练链路传递**进来的（`pip show einops` 的 Required-by 实测），不是我们自己声明的。
+    # 它是第一方代码的直接依赖，不该靠运气继承 —— 由 tests/test_dependency_consistency.py D5 守住。
+    "einops>=0.7.0",
     # === Web 框架 ===
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",

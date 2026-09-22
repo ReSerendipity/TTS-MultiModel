@@ -321,3 +321,64 @@ def test_d3_d4_guards_are_not_vacuous():
         assert "ignorefile:" not in text, f"{wf.name} 里混进了 trivy-action 不认的输入名"
         mutated = text.replace(f"{_TRIVY_INPUT}:", "ignorefile:")
         assert f"{_TRIVY_INPUT}:" not in mutated, "判据不是恒真：把输入名换成错的那个之后必须失去匹配"
+
+
+# ---------------------------------------------------------------------------
+# D5 核心声明必须在两份钉版集里齐全（2026-09-21 由镜像内导入失败暴露）
+# ---------------------------------------------------------------------------
+
+# 便携包里 torch 家族是独立组件（CUDA wheel 不走 PyPI 默认索引），所以它们**理应**不在
+# 钉版集中。allowlist 写死成这三条，是为了让"再加一个豁免"必须过一次评审。
+_TORCH_TRIO = {"torch", "torchvision", "torchaudio"}
+
+
+def _core_declared_names() -> set[str]:
+    """requirements.txt（pyproject `[project].dependencies` 的同步产物）里的核心包名。"""
+    names: set[str] = set()
+    for line in _REQ.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith(("#", "-")):
+            continue
+        m = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)", line)
+        if m:
+            names.add(_norm(m.group(1)))
+    return names
+
+
+def _unpinned_core(pins: dict[str, str], core: set[str]) -> set[str]:
+    return {n for n in core if n not in pins} - _TORCH_TRIO
+
+
+def test_core_dependencies_are_pinned_in_both_manifests() -> None:
+    """第一方代码 import 的东西不能靠传递依赖碰运气。
+
+    `app/integrated_app/vendor/voxcpm/model/voxcpm.py:29`、`voxcpm2.py:30` 在**模块顶层**
+    `from einops import rearrange`，而 funasr / modelscope 只在 extras 里声明 einops
+    （我们装的是无 extras 的核心集）—— docker-smoke 的镜像内导入探针第一次真跑就报
+    `FAIL integrated_app.vendor.voxcpm ModuleNotFoundError No module named 'einops'`
+    （run 35618578940）。本机 .venv 永远看不见这件事，因为 einops 是从训练链路
+    （`pip show` 实测：conformer / vector-quantize-pytorch / indextts）传递进来的。
+    `addict` 是同形状的缺席：已声明为生产依赖（modelscope 运行期要），却两份钉版集里都没有。
+    """
+    core = _core_declared_names()
+    assert len(core) >= 25, f"只解析到 {len(core)} 个核心声明，本条的解析已失效"
+    for manifest in (_LOCK, _SMALL):
+        missing = _unpinned_core(_pins(manifest), core)
+        assert not missing, (
+            f"{manifest.name} 缺钉版：{sorted(missing)} —— 声明了却没钉，"
+            "镜像与便携这类干净环境装不出来（开发 venv 里却因为传递依赖而照常能跑）"
+        )
+
+
+def test_d5_guard_is_not_vacuous() -> None:
+    """变异自证：把 einops 的钉版摘掉，D5 必须变红。"""
+    core = _core_declared_names()
+    assert "einops" in core, "einops 不在核心声明里 —— D5 的前提（我们自己顶层 import 它）已不成立"
+    pins = _pins(_LOCK)
+    assert "einops" in pins, "锁里没有 einops，D5 现在本该红"
+    stripped = {k: v for k, v in pins.items() if k != "einops"}
+    assert "einops" in _unpinned_core(stripped, core), "摘掉钉版却不被抓到 = D5 在空转"
+    # 反向：torch 三件套缺席是设计如此，不能因为"缺钉版"把便携包判红
+    assert _unpinned_core({k: v for k, v in _pins(_SMALL).items() if not k.startswith("torch")}, core) == set(), (
+        "torch 家族应当被 allowlist 排除，否则便携包永远红"
+    )

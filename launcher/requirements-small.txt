@@ -9,6 +9,7 @@
 # 安装（CUDA wheel 体积大、不走 PyPI 默认索引）。
 # ============================================================
 
+addict==2.4.0
 aiofiles==25.1.0
 aliyun-python-sdk-core==2.16.1
 aliyun-python-sdk-kms==2.16.5
@@ -24,6 +25,7 @@ colorama==0.4.6
 crcmod==1.7
 cryptography==50.0.1  # GOTCHAS #98：WinPython 7z 解 NSIS 后预装 cryptography 丢失 -> Ed25519 验签不可用 -> 自检误报缺少有效签名，便携包必须显式钉装
 decorator==5.3.1
+einops==0.8.2
 fastapi==0.141.1
 filelock==3.32.7
 fsspec==2026.7.0
