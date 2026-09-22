@@ -12,6 +12,8 @@
     { "type": "toml", "path": "desktop/src-tauri/Cargo.toml", "jsonpath": "$.package.version" }
   ],
   "packages": {
-    ".": {}
+    ".": {
+      "exclude-paths": ["docs", "tests"]
+    }
   }
 }

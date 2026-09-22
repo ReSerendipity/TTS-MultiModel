@@ -284,6 +284,85 @@ def test_extra_files_entries_are_all_actionable() -> None:
     assert not pending, "extra-files 有命中不了的条目：\n  " + "\n  ".join(pending)
 
 
+def _exclude_paths_entries() -> list[str]:
+    """`packages["."].exclude-paths` —— 故意读包内那一层，不读顶层同名键。
+
+    RP 的 `CommitExclude` 构造器吃的是 `Record<packagePath, {excludePaths}>`，
+    包内那层一定是生效的；顶层那层是否被合并进包配置我没在 RP 源码里读到确证，
+    写在那里就会变成"看起来配了、其实没生效"。
+    """
+    cfg = json.loads((PROJECT_ROOT / "release-please-config.json").read_text(encoding="utf-8"))
+    pkg = (cfg.get("packages") or {}).get(".") or {}
+    return [str(p) for p in (pkg.get("exclude-paths") or [])]
+
+
+#: RP 匹配排除目录的方式（`src/util/commit-exclude.ts`，2026-09-22 读源码确认）：
+#: `file.indexOf(`${path}/`) === 0` —— 前缀比对，**不是 glob**。
+_EXCLUDE_GLOB_CHARS = re.compile(r"[*?\[\]]")
+
+
+def test_exclude_paths_entries_are_all_actionable() -> None:
+    """每一条 exclude-paths 都必须"今天真的会排掉提交"，否则它就是一行装饰。
+
+    起因是实测：#136（两个 `docs(release):` 提交、零代码改动）合并后 25 秒，
+    RP 就开出了 `chore(main): release 2.2.6`（CHANGELOG 段是 3 条 `### Documentation`）——
+    纯文档改动会被当成一次可发布的版本，而每条这种版本都要人补 5 类手工同步位。
+    于是加了 `exclude-paths: ["docs", "tests"]`。这条闸钉住它别写错，因为这里最容易写错：
+
+      1. **不是 glob**。写 `docs/**` 或 `docs/**/*.md` 一点都不会生效 ——
+         匹配式是 `file.startsWith(entry + "/")`，`docs/**/` 永远不是任何文件路径的前缀。
+         RP 自己的测试用的也是裸目录名（`test/util/commit-exclude.ts` 里是 `['pkg3','pkg1']`）。
+      2. **排不掉仓库根上的单个文件**：同样的 `+"/"` 规则让 `README.md`、`CHANGELOG.md`、
+         `release-please-config.json` 这类根文件做不成条目（所以下面要求条目必须是真实目录）。
+      3. **"." 会把所有提交都排掉** → RP 永远不开 release PR，而且**不会报错**，
+         正是本仓踩过的"永远绿却什么都不做"那个形状（见 §1 的 v2.2.2 旧账）。
+      4. 排掉的目录里不能有任何 RP 要写的版本位或随包分发的代码：那才是真会漏东西的地方。
+    """
+    entries = _exclude_paths_entries()
+    assert entries, (
+        "exclude-paths 空了。今天的行为已经实测过：纯文档合并会在 25 秒内开出一条 "
+        "release PR（#136 → #137 / 2.2.6），所以要么把它加回来，要么连同 "
+        "docs/release-governance.md §1 第 5 条一起改口径 —— 别只删配置。"
+    )
+
+    dead: list[str] = []
+    for entry in entries:
+        if entry in ("", ".", "/"):
+            dead.append(f"{entry!r}：会把仓库根当目录，等于排掉所有提交（RP 不报错，只是再也不发版）")
+            continue
+        if _EXCLUDE_GLOB_CHARS.search(entry) or entry.endswith("/") or entry.startswith("/"):
+            dead.append(
+                f"{entry!r}：带 glob/斜杠。RP 的匹配是 `file.startsWith(entry + '/')`，"
+                "`docs/**` 这种写法永远命中不了 —— 要用裸目录名 `docs`"
+            )
+            continue
+        target = PROJECT_ROOT / entry
+        if not target.is_dir():
+            dead.append(f"{entry}：不是仓库里的目录（根级单文件排不掉，见 `isRelevant` 的 `+'/')")
+            continue
+        files = [p for p in target.rglob("*") if p.is_file() and ".git" not in p.parts]
+        if not files:
+            dead.append(f"{entry}：目录是空的，没有任何提交会只落在这里 → 排了等于没排")
+
+    covered = [
+        f"{rel}（RP 自动位）"
+        for rel in sorted(_RP_MANAGED | {"CHANGELOG.md"})
+        if any(e and rel.startswith(f"{e}/") for e in entries)
+    ]
+    assert not covered, f"exclude-paths 覆盖到了 RP 要写的版本位：{covered} —— 这些位一旦落在被排的目录里，发版时没人抬"
+
+    shipped = [
+        str(p.relative_to(PROJECT_ROOT)).replace("\\", "/")
+        for p in (PROJECT_ROOT / "app").rglob("*.py")
+        if any(e and str(p.relative_to(PROJECT_ROOT)).replace("\\", "/").startswith(f"{e}/") for e in entries)
+    ]
+    assert not shipped, (
+        "exclude-paths 覆盖到了随包分发的代码（pyproject 的 packages.find where=['app']）："
+        f"{shipped[:5]} —— 排掉这种目录会让真改动不发版"
+    )
+    assert not dead, "exclude-paths 有排不掉任何提交的条目：\n  " + "\n  ".join(dead)
+
+
 #: 当前解释器没有 TOML 解析器时的哨兵（区别于"有解析器但走不到 key"）。
 _NO_PARSER = "__no-toml-parser__"
 
