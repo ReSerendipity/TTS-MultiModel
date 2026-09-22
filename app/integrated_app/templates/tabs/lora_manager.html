@@ -347,13 +347,23 @@ function updateLoraInfo() {
     if (opt && opt.value !== 'None' && opt.dataset.info) {
         try {
             var info = JSON.parse(opt.dataset.info);
-            contentDiv.innerHTML =
-                '<div>{{ "name"|t(lang) }}: ' + (info.name || '-') + '</div>' +
-                '<div>{{ "path"|t(lang) }}: ' + info.path + '</div>' +
-                (info.base_model ? '<div>{{ "base_model"|t(lang) }}: ' + info.base_model + '</div>' : '') +
-                (info.r ? '<div>{{ "lora_rank"|t(lang) }}: ' + info.r + '</div>' : '') +
-                (info.lora_alpha ? '<div>{{ "lora_alpha"|t(lang) }}: ' + info.lora_alpha + '</div>' : '') +
-                (info.steps ? '<div>{{ "training_steps"|t(lang) }}: ' + info.steps + '</div>' : '');
+            // #99: info 面板原先把 name/path/base_model 等裸拼进 innerHTML——
+            // 它们源自检查点目录名 / adapter_config.json（均用户可控），与
+            // 卡片同一类注入面（UI 验证中 alert 实锤）。改 DOM API + textContent。
+            contentDiv.textContent = '';
+            var rows = [
+                ['{{ "name"|t(lang) }}', info.name || '-'],
+                ['{{ "path"|t(lang) }}', info.path]
+            ];
+            if (info.base_model) rows.push(['{{ "base_model"|t(lang) }}', info.base_model]);
+            if (info.r) rows.push(['{{ "lora_rank"|t(lang) }}', info.r]);
+            if (info.lora_alpha) rows.push(['{{ "lora_alpha"|t(lang) }}', info.lora_alpha]);
+            if (info.steps) rows.push(['{{ "training_steps"|t(lang) }}', info.steps]);
+            rows.forEach(function(pair) {
+                var line = document.createElement('div');
+                line.textContent = pair[0] + ': ' + pair[1];
+                contentDiv.appendChild(line);
+            });
             infoDiv.style.display = '';
         } catch(e) {
             infoDiv.style.display = 'none';
