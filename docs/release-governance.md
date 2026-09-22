@@ -28,7 +28,8 @@
   > `scripts/installer/setup.nsi` 的 `OutFile`/`APP_VERSION`/`VIProductVersion`
   > （NSIS 注释符是 `;`，用不了 `generic` 要求的 `# x-release-please-version` 行内标记）、
   > `deploy/kubernetes/deployment.yaml` 的镜像 tag（要跟 ghcr 上真存在的标签走）。
-  > **第 10 处是散文**：本文开头那句"已发布最新 = v<X.Y.Z>" —— RP 不碰它，而它真会漂
+  > **还有一处是散文**（今天这张版本位表 11 行，它是最后收进来的一行）：本文开头那句
+  > "已发布最新 = v<X.Y.Z>" —— RP 不碰它，而它真会漂
   > （v2.2.5 发出去之后这里还停在 v2.2.4），所以已被 `test_all_version_sites_agree`
   > 当版本位钉住，补齐时顺手改一行。
   > `version.json` 里 RP 只抬 `$.version`，**`changelog` 与 `release_date` 也是手工位**
@@ -42,7 +43,7 @@
   1. 自动：合入 release PR（RP 在 main push 后自动开/刷新）并等它自己打 tag 发 Release。
      **已于 2026-09-22 走通一次**：v2.2.5 的 tag `9125a3e`、Release 与 4 个资产
      （`SHA256SUMS`、`SHA256SUMS.scripts`、wheel、sdist）都是 RP 自己产出/挂上的。
-     走这条路必须知道四件事：
+     走这条路必须知道五件事：
      - **它只抬 5+1 处自动位**，剩下 5 类手工位（`config.yaml`、`Cargo.lock`、
        `setup.nsi` 三处、k8s 镜像 tag、`version.json` 的 `changelog`/`release_date`）
        要你在 release 分支上**另加一条提交**补齐；而**任何一次 main push 都会让 RP 重写那条分支**，
@@ -65,6 +66,21 @@
        把版本位一致性一起判红（2026-09-22 的 v2.2.5 就卡在这一点上，见 §2 第 5 步）。
        GPG 签名那一格现在不痛（`GPG_PRIVATE_KEY` 未配，作业进 skip 分支只出 notice），
        但 owner 配上密钥后，RP 发的每个版本都要把 `gpg-signed-release.yml` 一起手工补跑。
+     - **"什么算一次发版"默认宽到不实用**：实测 #136（两个 `docs(release):` 提交、零代码改动）
+       合并 25 秒后 RP 就开出 **#137 `chore(main): release 2.2.6`**，CHANGELOG 段是 3 条
+       `### Documentation`（它把 PR 的两个提交**和那条 merge commit 各算一条**）。
+       一条纯文档改动要人补 5 类手工位 + 补跑镜像，这税不划算，所以
+       `release-please-config.json` 加了 `packages["."].exclude-paths = ["docs", "tests"]`。
+       这个字段有三个坑，都在 `src/util/commit-exclude.ts` 里（匹配式是
+       `file.startsWith(entry + "/")`，**不是 glob**）：
+       ① 写 `docs/**` 永不命中，只能用裸目录名 `docs`；RP 自己的测试用的也是 `['pkg3','pkg1']`；
+       ② **仓库根上的单个文件排不掉**（那个 `+"/"` 让 `README.md`、`CHANGELOG.md`、
+       `release-please-config.json` 都做不成条目）—— 所以"只改发版配置"这一类提交仍然会
+       mint 一个版本，今天这条 #137 就是这么留下的；
+       ③ 条目写成 `.` 会把**所有**提交排掉，RP 从此一声不响再也不发版（本仓踩过同形状的
+       "永远绿却什么都不做"，见下面 v2.2.2 那段旧账）。
+       闸是 `test_exclude_paths_entries_are_all_actionable`：glob / `.` / 不存在的目录 /
+       清空列表 / 覆盖 `app/` 这 5 种写法都实测过会红。
   2. 手工：`git tag -a` + `gh release create`（v2.2.2 / v2.2.3 / v2.2.4 走的就是这条）。
      手工发版之后 RP 会在下一条 release PR 里把版本号再抬一格（它按 manifest 算），
      所以手工发完要把 `.release-please-manifest.json` 一起抬到刚发的版本，否则两边在版本号上互踩。
@@ -123,8 +139,10 @@
 
 ## 5. 发布前检查清单
 
-- [ ] 版本位全部同步（`pyproject.toml` + `config.yaml` + `CHANGELOG.md`；仓库内跟踪的 9 处已由
-      `tests/test_version_consistency.py::test_all_version_sites_agree` 机器核对，这格是**复看**用）
+- [ ] 版本位全部同步（`pyproject.toml` + `config.yaml` + `CHANGELOG.md`；仓库内跟踪的 11 处
+      由 `tests/test_version_consistency.py::test_all_version_sites_agree` 机器核对 ——
+      数目以 `_site_versions()` 实际返回为准，含 `scripts/installer/version.json` 那个装配中间物
+      和本文 §1 开头那句"已发布最新"，这格是**复看**用）
 - [ ] `version.json` 的 `changelog`/`release_date` 已改成本次版本（RP 只抬 `$.version`；
       `test_bundled_changelog_describes_its_own_version` 会拦"版本号新、说明旧"）
 - [ ] CHANGELOG `[Unreleased]` 已改版本 + 日期
