@@ -143,7 +143,7 @@ def _site_versions() -> dict[str, str]:
         ),
         "deploy/kubernetes/deployment.yaml": grab(
             "deploy/kubernetes/deployment.yaml",
-            r"image:\s*ghcr\.io/\S+/tts-multimodel:([0-9][^\s\"]*)",
+            r"image:\s*ghcr\.io/[A-Za-z0-9._/-]+:([0-9][^\s\"]*)",
             "k8s 镜像 tag",
         ),
         # 第 10 处：文档里那句"已发布最新"。它以前只是散文，于是会这样漂 ——

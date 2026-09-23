@@ -44,7 +44,8 @@ python scripts/rollback_release.py --target v2.2.0
 
 ```bash
 # Kubernetes（最干净：直接切镜像版本，无需改代码）
-kubectl -n tts set image deployment/tts-multimodel tts=ghcr.io/reserendipity/tts-multimodel:v2.2.0
+# 镜像名是下划线、tag 不带 `v`（两个都错过一次，见 tests/test_image_name_consistency.py）
+kubectl -n tts set image deployment/tts-multimodel tts=ghcr.io/reserendipity/tts_multimodel:2.2.0
 kubectl -n tts rollout status deployment/tts-multimodel
 
 # 或回滚到上一个 ReplicaSet

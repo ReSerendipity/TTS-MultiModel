@@ -18,6 +18,10 @@
 
 ## [Unreleased]
 
+### Bug Fixes
+
+* **deploy:** k8s 清单写的镜像名与工作流真正推的不是一个：`ghcr.io/.../tts-multimodel`（连字符）从未存在，真实的是 `tts_multimodel`（下划线，`${{ github.repository }}` 整体小写、`_` 原样保留）。照着 `deploy/kubernetes/deployment.yaml` apply 的两个容器（含 init 容器）必然拉不到镜像；`docs/rollback_sop.md` 那条回滚命令除了名字还多带了个 `v` 前缀 —— 工作流的 semver 图案（`type=semver,pattern={{version}}`）产出的形状是 `2.2.0`，不带 `v`。名字与 tag 形状现在由 `tests/test_image_name_consistency.py` 从工作流推导钉住（原来那处正则把名字写死了，所以只核得出版本、核不出名字）。
+
 ## [2.2.4] - 2026-09-22
 
 两处用户可见修复，其余是**发布与 CI 链路的收口**（这个版本存在的理由之一：v2.2.3 之后 main 上

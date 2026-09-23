@@ -16,7 +16,7 @@
 
 - 集群已安装 [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) 或 `nvidia-container-toolkit`，
   提供 `nvidia.com/gpu` 可分配资源。
-- 镜像已推送到 `ghcr.io/reserendipity/tts-multimodel`（见 `.github/workflows/ci.yml` 的 `docker-publish`）。
+- 镜像已推送到 `ghcr.io/reserendipity/tts_multimodel`（**下划线**：名字由 `${{ github.repository }}` 整体小写得到，`_` 原样保留，见 `.github/workflows/docker-publish.yml`；`tests/test_image_name_consistency.py` 就是把这条引用与工作流钉成同源的闸）。
 - 模型权重通过**独立的大文件分发流程**提供（`.dockerignore` 已排除 `model/`），
   运行时以 PVC（`tts-models`，见 pvc.yaml）只读挂载到 `/app/model`。
   **部署前必须先把权重预填充进该 PVC**（如经临时 Pod / rsync / 对象存储同步），
