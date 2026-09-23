@@ -612,7 +612,8 @@ function Write-TTSMultiModelSha256Sums {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
     $enc = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllLines($OutFile, [string[]]$lines, $enc)
+    # 这份清单是跨平台工具产物，换行只能是 LF。
+    [System.IO.File]::WriteAllText($OutFile, (($lines -join "`n") + "`n"), $enc)
     return $OutFile
 }
 

@@ -144,6 +144,15 @@
 > 需要 `scripts/release_gate.ps1 -ModelDir ... -RuntimeDir ... -TorchWheelDir ...` 真构建 + 单独点头
 > （权重未变时重传 13 个 model 分卷是逐字节浪费）。GPG 分离签名同理 ——
 > `GPG_PRIVATE_KEY` 这个 secret 目前不存在，`gpg-signed-release.yml` 只会 notice 跳过。
+> 构建本身还有两个口径要记（2026-09-23 都实测过）：
+> **① `-OutDir`/`-StagingDir` 必须显式指到 `outputs/` 之下** —— 脚本默认值是
+> `$Root\dist\bundles` 与 `$Root\dist\portable-staging`，也就是**忘传参数就会往禁区写 26 GB**。
+> 现在漏传会被护栏直接 fail（`# 禁区护栏` 那段），真要写 `dist/` 得显式改脚本、而不是靠漏参数发生。
+> **② `SHA256SUMS.txt` 必须是 LF 清单** —— 早先用 `File.WriteAllLines` 在 Windows 上写成 CRLF，
+> `sha256sum -c` 于是把 `` 当成文件名的一部分，18 条全报 "No such file or directory"：
+> **一整份全红的假失败**，真相是独立用 hashlib 复算 18/18 逐字节相符。Windows 上也可用
+> `Get-FileHash` 逐卷核；用 `sha256sum` 的退出码时别把它接进管道 ——
+> `sha256sum -c ... | tail` 之后 `$?` 是 `tail` 的（这条今天又踩了一次）。
 
 ## 3. 回滚（详见 `docs/rollback_sop.md`）
 
