@@ -32,6 +32,7 @@
     - 失败：HTMX HTML 错误片段
 """
 
+import html
 import logging
 import os
 import time
@@ -193,20 +194,27 @@ async def step_audio_editx_edit_endpoint(
         return _error_html(request, result.message, status_code=500)
 
     audio_filename = os.path.basename(result.audio_path)
+    # 这些值全部或部分来自请求（edit_type / edit_info 是表单原文，source_path 由上传
+    # 文件名派生），此前直接插进 HTML 文本与属性 -> 反射型 XSS。quote=True 同时覆盖
+    # 属性上下文（data-audio-filename / src / href / download）。
+    esc_filename = html.escape(audio_filename, quote=True)
+    esc_source = html.escape(os.path.basename(source_path or ""), quote=True)
+    esc_edit_type = html.escape(str(edit_type), quote=True)
+    esc_edit_info = html.escape(edit_info or "(无)", quote=True)
     success_html = f"""
-    <div class="step-audio-editx-result" data-audio-filename="{audio_filename}">
+    <div class="step-audio-editx-result" data-audio-filename="{esc_filename}">
         <div class="result-success">
             <p>✅ 音频编辑完成（耗时 {elapsed:.1f}s）</p>
-            <p>编辑类型: {edit_type}</p>
-            <p>编辑标签: {edit_info or "(无)"}</p>
-            <p>参考音频: {os.path.basename(source_path or "")}</p>
+            <p>编辑类型: {esc_edit_type}</p>
+            <p>编辑标签: {esc_edit_info}</p>
+            <p>参考音频: {esc_source}</p>
             <p>输出时长: {result.duration:.2f}s</p>
         </div>
         <audio controls preload="metadata">
-            <source src="/api/audio/{audio_filename}" type="audio/wav">
+            <source src="/api/audio/{esc_filename}" type="audio/wav">
             您的浏览器不支持音频播放。
         </audio>
-        <a href="/api/audio/{audio_filename}" download="{audio_filename}">
+        <a href="/api/audio/{esc_filename}" download="{esc_filename}">
             下载编辑后的音频
         </a>
     </div>

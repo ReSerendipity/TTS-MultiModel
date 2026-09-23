@@ -27,6 +27,7 @@
     3. 点击转换，输出用目标音色重说源内容的音频
 """
 
+import html
 import logging
 import os
 import time
@@ -183,20 +184,26 @@ async def voicebox_convert_endpoint(
 
     # 构建 HTMX 成功响应
     audio_filename = os.path.basename(result.audio_path)
+    # 同 step_audio_editx/edit.py：audio_filename / 两个 basename / tau 均可被请求侧
+    # 影响（上传文件名、表单值），此前直接插进 HTML 文本与属性 -> 反射型 XSS。
+    esc_filename = html.escape(audio_filename, quote=True)
+    esc_source = html.escape(os.path.basename(source_path or ""), quote=True)
+    esc_target = html.escape(os.path.basename(target_path or ""), quote=True)
+    esc_tau = html.escape(str(tau), quote=True)
     success_html = f"""
-    <div class="voicebox-result" data-audio-filename="{audio_filename}">
+    <div class="voicebox-result" data-audio-filename="{esc_filename}">
         <div class="result-success">
             <p>✅ 音色转换完成（耗时 {elapsed:.1f}s）</p>
-            <p>源音频: {os.path.basename(source_path or "")}</p>
-            <p>目标音色: {os.path.basename(target_path or "")}</p>
-            <p>转换强度 (tau): {tau}</p>
+            <p>源音频: {esc_source}</p>
+            <p>目标音色: {esc_target}</p>
+            <p>转换强度 (tau): {esc_tau}</p>
             <p>输出时长: {result.duration:.2f}s</p>
         </div>
         <audio controls preload="metadata">
-            <source src="/api/audio/{audio_filename}" type="audio/wav">
+            <source src="/api/audio/{esc_filename}" type="audio/wav">
             您的浏览器不支持音频播放。
         </audio>
-        <a href="/api/audio/{audio_filename}" download="{audio_filename}">
+        <a href="/api/audio/{esc_filename}" download="{esc_filename}">
             下载转换后的音频
         </a>
     </div>
