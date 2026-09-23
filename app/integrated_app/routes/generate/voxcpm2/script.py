@@ -65,6 +65,7 @@ from fastapi.responses import HTMLResponse
 
 from ....config import MAX_TEXT_LENGTH
 from ....model_registry import registry
+from ....path_guard import ensure_within_dir, is_bare_filename
 from ..utils import (
     _check_engine_ready,
     _error_html,
@@ -171,29 +172,32 @@ async def generate_voxcpm_script(
     # ------------------------------------------------------------------
     persona_map_with_wav: dict[str, str] = {}
     if persona_names.strip():
-        from ....persona_manager import load_persona_embedding
+        from ....persona_manager import PERSONA_DIR, load_persona_embedding
 
         persona_name_list = [n.strip() for n in persona_names.split(",") if n.strip()]
         for pname in persona_name_list:
-            safe_name: str = os.path.basename(pname)
+            # 单个非法角色名只降级跳过（下方局部降级策略），不阻断整份剧本。
+            if not is_bare_filename(pname):
+                logger.warning(f"[VoxCPM剧本工坊] 音色名格式不合法，已跳过: {pname!r}")
+                continue
+            safe_name: str = pname
             persona_data = load_persona_embedding(safe_name)
             if persona_data is not None:
                 # 兼容不同 .pt 缓存格式：
                 # 新格式：二元组 (wav_path, ref_text)；旧格式：dict {'items': [嵌入数据]}
-                wav_path = None
+                wav_path: str | None = None
                 if isinstance(persona_data, tuple) and len(persona_data) == 2:
-                    wav_path, _ = persona_data
-                elif isinstance(persona_data, (str, os.PathLike)) and os.path.isfile(str(persona_data)):
+                    wav_path = str(persona_data[0])
+                elif isinstance(persona_data, (str, os.PathLike)):
                     wav_path = str(persona_data)
                 else:
                     # 嵌入缓存对象（张量等），wav 文件必然存在
-                    from ....persona_manager import PERSONA_DIR as _PD
+                    candidate = os.path.join(PERSONA_DIR, f"{safe_name}.wav")
+                    wav_path = candidate
 
-                    candidate = os.path.join(_PD, f"{safe_name}.wav")
-                    wav_path = candidate if os.path.isfile(candidate) else None
-
-                if wav_path and os.path.isfile(wav_path):
-                    persona_map_with_wav[safe_name] = wav_path
+                contained = ensure_within_dir(PERSONA_DIR, wav_path or "")
+                if contained and os.path.isfile(contained):
+                    persona_map_with_wav[safe_name] = contained
                     logger.info(f"[VoxCPM剧本工坊] 已加载音色 '{safe_name}' 的参考音频")
                 else:
                     # Why：单行失败局部降级策略。

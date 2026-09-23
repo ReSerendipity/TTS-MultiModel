@@ -42,6 +42,8 @@ import aiofiles
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from ..error_surface import safe_error_message
+
 try:
     import yaml
 except ImportError:
@@ -409,8 +411,10 @@ async def start_training(request: Request) -> JSONResponse:
     train_script: str = os.path.join(project_root, "scripts", "train_voxcpm_finetune.py")
 
     if not os.path.isfile(train_script):
+        # 绝对路径只进日志：响应里带上它等于向客户端披露服务端目录结构。
+        logger.error(f"训练脚本不存在: {train_script}")
         return JSONResponse(
-            {"status": "error", "message": f"Training script not found: {train_script}"},
+            {"status": "error", "message": "Training script not found: scripts/train_voxcpm_finetune.py"},
             status_code=400,
         )
 
@@ -535,7 +539,7 @@ async def start_training(request: Request) -> JSONResponse:
         logger.error(f"训练启动失败: {spawn_err}")
         _training_process = None
         return JSONResponse(
-            {"status": "error", "message": f"训练启动失败，请检查配置和日志: {spawn_err}"},
+            {"status": "error", "message": f"训练启动失败，请检查配置和日志: {safe_error_message(spawn_err)}"},
             status_code=500,
         )
 

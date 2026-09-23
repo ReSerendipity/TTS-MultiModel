@@ -29,8 +29,10 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..config import SAVE_DIR
+from ..error_surface import safe_error_message
 from ..exceptions import PersonaNotFoundError
 from ..exceptions import ValidationError as TTSValidationError
+from ..path_guard import resolve_bare_in_dir
 from ..persona_manager import (
     delete_persona,
     fn_save_persona,
@@ -97,15 +99,11 @@ def _resolve_generated_audio(value: str) -> str | None:
     Returns:
         命中且合法时返回绝对路径，否则 None。
     """
-    if not value or os.path.basename(value) != value or value in {".", ".."}:
+    # 判定逻辑收敛到 path_guard：裸文件名 + 扩展名白名单 + 带 os.sep 的真实路径前缀。
+    contained = resolve_bare_in_dir(SAVE_DIR, value, allowed_extensions=ALLOWED_AUDIO_EXTENSIONS)
+    if contained is None:
         return None
-    if os.path.splitext(value)[1].lower() not in ALLOWED_AUDIO_EXTENSIONS:
-        return None
-    save_root = os.path.realpath(SAVE_DIR)
-    candidate = os.path.realpath(os.path.join(SAVE_DIR, value))
-    if candidate != save_root and not candidate.startswith(save_root + os.sep):
-        return None
-    return candidate if os.path.isfile(candidate) else None
+    return contained if os.path.isfile(contained) else None
 
 
 @router.post(
@@ -322,7 +320,7 @@ async def persona_delete(name: str) -> JSONResponse:
     except OSError as fs_err:
         logger.error(f"删除 Persona 底层文件失败 name={name}: {fs_err}")
         return JSONResponse(
-            {"status": "error", "message": f"删除文件失败: {fs_err}"},
+            {"status": "error", "message": f"删除文件失败: {safe_error_message(fs_err)}"},
             status_code=400,
         )
 

@@ -43,10 +43,12 @@ from .config import (
     _PERSONA_NAME_RE,
     PERSONA_DIR,
 )
+from .error_surface import safe_error_message
 from .exceptions import EngineNotLoadedError
 from .generation import preprocess_and_save_temp
 from .model_manager import _model_lock, _persona_embedding_cache
 from .model_registry import registry
+from .path_guard import resolve_bare_in_dir
 from .persona_metadata import (
     PersonaMetadata,
     load_persona_metadata,
@@ -174,10 +176,12 @@ def fn_save_persona(
 
     tmp_p: str | None = None
     try:
-        wav_path = os.path.join(PERSONA_DIR, f"{name}.wav")
-        txt_path = os.path.join(PERSONA_DIR, f"{name}.txt")
-        wav_real = os.path.realpath(wav_path)
-        if not wav_real.startswith(os.path.realpath(PERSONA_DIR)):
+        # 裸名 + 真实路径严格前缀（含 os.sep），一次判定 wav/txt 两个写入点。
+        # 此前的 startswith(realpath(PERSONA_DIR)) 少了 os.sep，兄弟目录
+        # personas_evil/x.wav 会以 personas 前缀通过判定，属假包含。
+        wav_path = resolve_bare_in_dir(PERSONA_DIR, f"{name}.wav")
+        txt_path = resolve_bare_in_dir(PERSONA_DIR, f"{name}.txt")
+        if not wav_path or not txt_path:
             return "❌ 非法路径", False
 
         existing = os.path.exists(wav_path) or os.path.exists(txt_path)
@@ -248,7 +252,7 @@ def fn_save_persona(
             with contextlib.suppress(Exception):
                 os.unlink(tmp_p)
         logger.exception(f"[音色固化] 音色 [{name}] 固化失败")
-        return f"❌ 固化失败: {str(e)}", False
+        return f"❌ 固化失败: {safe_error_message(e)}", False
 
 
 def get_persona_list(search_keyword: str = "") -> list[str]:
@@ -433,21 +437,20 @@ def load_persona_embedding(name: str) -> Any | None:
         EngineNotLoadedError: 走到在线计算分支但 VoxCPM2 模型尚未加载时抛出，
             ``engine`` 属性固定为 ``"voxcpm2"``。
     """
-    # 与 _save/_delete 一致的第二段防线（realpath 前缀比对）放在函数入口：
-    # 读路径的调用方各自用 os.path.basename 兜底，收敛到这里后不再依赖调用方自觉，
-    # 也避免越出 PERSONA_DIR 的 name 命中内存缓存。
-    _persona_root = os.path.realpath(PERSONA_DIR)
-    if not os.path.realpath(os.path.join(_persona_root, f"{name}.wav")).startswith(_persona_root):
+    # 与 _save/_delete 一致的第二段防线放在函数入口：读路径的调用方各自兜底不可靠，
+    # 收敛到这里后不再依赖调用方自觉，也避免越出 PERSONA_DIR 的 name 命中内存缓存。
+    # 三个后缀分别判定（wav/txt/pt 都是独立落盘点），且带 os.sep 的严格前缀，
+    # 因此 personas 与 personas_evil 这类同前缀兄弟目录不再被误判为"在目录内"。
+    wav_path = resolve_bare_in_dir(PERSONA_DIR, f"{name}.wav")
+    txt_path = resolve_bare_in_dir(PERSONA_DIR, f"{name}.txt")
+    pt_path = resolve_bare_in_dir(PERSONA_DIR, f"{name}.pt")
+    if not wav_path or not txt_path or not pt_path:
         logger.warning(f"[嵌入加载] 音色名越出 PERSONA_DIR，拒绝加载: {name!r}")
         return None
 
     cached = _persona_embedding_cache.get(name)
     if cached is not None:
         return cached
-
-    wav_path = os.path.join(PERSONA_DIR, f"{name}.wav")
-    txt_path = os.path.join(PERSONA_DIR, f"{name}.txt")
-    pt_path = os.path.join(PERSONA_DIR, f"{name}.pt")
 
     wav_exists = os.path.exists(wav_path)
     txt_exists = os.path.exists(txt_path)
@@ -595,13 +598,12 @@ def delete_persona(name: str) -> tuple[bool, str]:
     if not valid:
         return False, err_msg
 
-    wav_path = os.path.join(PERSONA_DIR, f"{name}.wav")
-    txt_path = os.path.join(PERSONA_DIR, f"{name}.txt")
-    pt_path = os.path.join(PERSONA_DIR, f"{name}.pt")
-    meta_path = os.path.join(PERSONA_DIR, f"{name}.metadata.json")
-
-    real_wav = os.path.realpath(wav_path)
-    if not real_wav.startswith(os.path.realpath(PERSONA_DIR)):
+    # 四个待删路径逐个判定，判定标准与写入/加载侧共用 path_guard（含 os.sep 前缀）。
+    wav_path = resolve_bare_in_dir(PERSONA_DIR, f"{name}.wav")
+    txt_path = resolve_bare_in_dir(PERSONA_DIR, f"{name}.txt")
+    pt_path = resolve_bare_in_dir(PERSONA_DIR, f"{name}.pt")
+    meta_path = resolve_bare_in_dir(PERSONA_DIR, f"{name}.metadata.json")
+    if wav_path is None or txt_path is None or pt_path is None or meta_path is None:
         return False, "非法路径"
 
     deleted_any = False
@@ -613,7 +615,8 @@ def delete_persona(name: str) -> tuple[bool, str]:
                 os.remove(path)
                 deleted_any = True
             except OSError as e:
-                errors.append(f"删除 {os.path.basename(path)} 失败: {e}")
+                # 只回传文件名 + 脱敏后的原因：OSError 原文带绝对路径。
+                errors.append(f"删除 {os.path.basename(path)} 失败: {safe_error_message(e)}")
 
     if name in _persona_embedding_cache:
         with contextlib.suppress(Exception):

@@ -298,8 +298,173 @@ basename、`tau` 等直接插进 HTML 文本与 4 处属性，`basename()` 不�
 - **#97（锁集自相矛盾）已按「退」路解决**：main 锁内为 `antlr4 4.9.3`、`mpmath 1.3.0`、
   `tokenizers 0.21.0`、`transformers 4.52.1`，且 `pyproject.toml`/`requirements.txt` 同步把
   声明收窄成 `transformers>=4.52.1,<4.53`、`tokenizers>=0.21.0,<0.22` —— 声明与锁一致了。
-  **仍开放的代价**：注释里写明 4.52.x 带 16 条 transformers 公告（按 api.osv.dev 实测），
-  但没看到 pip-audit 对这 16 条的命中/豁免说明，属于"已知未结"。
+  **仍开放的代价**：4.52.x 带 16 条 transformers 公告（按 api.osv.dev 实测）。
+  ⚠️ 本条原写法「没看到 pip-audit 的命中/豁免说明，属于已知未结」是错的，已在 §8.5 更正：
+  豁免与逐条判定在 `security.yml` 与 `docs/SECURITY_DEPENDABOT_TRIAGE.md` §1/§1a/§2/§4，
+  并由 `tests/test_dependency_consistency.py` 的 D3/D4 钉住。
 - **#99（前端 XSS）**：其中 3 处真问题（文件名进 `innerHTML` 的 `onclick` 属性，只做了 JS
   字符串转义）在告警表里已消失（`js/incomplete-sanitization` 整族为 0），说明已被修；
   具体修法本轮未复核。
+
+---
+
+## 8. 第二阶段（2026-09-24）：54 条逐条读完后落地
+
+### 8.0 先更正开工基线：open 不是 30 条，是 54 条
+
+交下来的基线写的是「open 30（`py/stack-trace-exposure` 18 + `py/path-injection` 12）、dismissed 30 / fixed 10」。
+按 §0 的命令实测 `origin/main@2433c10`：
+
+| 口径 | 交下来的 | 实测 | 差额出处 |
+|---|---|---|---|
+| open | 30 | **54** | §7.2 判过但**没执行**的 24 条：19 条「已缓解」+ 5 条 `settings.py` 真修 |
+| `py/path-injection` open | 12 | **36** | 同上（24 条差额全落在这一族） |
+| `py/stack-trace-exposure` open | 18 | 18 | 一致 |
+| dismissed | 30 | **48** | 09-20→09-23 三批累计；`js/xss-through-dom` 10 + `overly-large-range` 7 也在里面 |
+| fixed | 10 | 10 | 一致 |
+
+差额不是数据漂移：54 条 open 的 `created_at` 与 `updated_at` 全部等于 `2026-09-10T03:38:29Z`，
+说明**没有任何一条是被重扫新开出来的**；而 09-23 16:24 那次扫描（run 35888530990，`2433c10`，success）
+确实生效过——它把 `py/reflective-xss` #107/#108 翻成 fixed（PR #153 的真修）。所以「open 54」是当前有效的判定。
+
+### 8.1 读的过程中挖到一个真缺陷：假包含
+
+§7.2 把 `persona_manager` 那 18 条记成「已缓解」，依据是「白名单 + realpath 前缀比对」。
+逐字读守卫后：**前缀比对少了 `+ os.sep`**。
+
+```python
+# 旧（persona_manager.py:180 / :440 / :604 三处同一写法）
+if not os.path.realpath(p).startswith(os.path.realpath(PERSONA_DIR)):
+```
+
+`PERSONA_DIR` 为 `.../personas` 时，`.../personas_evil/trap.wav` 同样以 `personas` 开头 → 判定放行。
+可利用路径：`load_persona_embedding` 的入口守卫**没有**白名单（只有这条前缀比对），
+所以传 `name="../personas_evil/trap"` 就能把读越界变成实际发生 —— `wav_exists` 用的是
+`os.path.join(PERSONA_DIR, name)`，那个 `../` 会真的解析到兄弟目录。
+`fn_save_persona`/`delete_persona` 因为白名单在前（`_PERSONA_NAME_RE` 不含任何分隔符），
+走不到这一步，但那三行守卫本身是假的。
+
+现在由 `path_guard.ensure_within_dir` 统一做 `base + os.sep` 前缀判定，
+反例与正例都钉在测试里（`test_old_prefix_check_is_the_bug` 断言旧写法确实放行，
+`test_sibling_dir_prefix_is_rejected` 断言新写法拒绝）。
+
+### 8.2 逐条台账（54 条，全部读完落点函数原文后判定）
+
+| 告警 | 规则 | 文件:行 | 落点函数 | 判定 | 依据组 |
+|---|---|---|---|---|---|
+| #10 | `path-injection` | `generation.py:857` | preprocess_and_save_temp | **真修** | A |
+| #9 | `path-injection` | `generation.py:857` | preprocess_and_save_temp | **真修** | A |
+| #11 | `path-injection` | `generation.py:863` | preprocess_and_save_temp | **真修** | A |
+| #22 | `path-injection` | `persona_manager.py:183` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | B |
+| #21 | `path-injection` | `persona_manager.py:183` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | B |
+| #24 | `path-injection` | `persona_manager.py:202` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | B |
+| #23 | `path-injection` | `persona_manager.py:202` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | B |
+| #25 | `path-injection` | `persona_manager.py:205` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | C |
+| #26 | `path-injection` | `persona_manager.py:207` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | C |
+| #31 | `path-injection` | `persona_manager.py:222` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | B |
+| #27 | `path-injection` | `persona_manager.py:238` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | C |
+| #28 | `path-injection` | `persona_manager.py:240` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | C |
+| #29 | `path-injection` | `persona_manager.py:247` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | C |
+| #30 | `path-injection` | `persona_manager.py:249` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | C |
+| #32 | `path-injection` | `persona_manager.py:452` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | D |
+| #33 | `path-injection` | `persona_manager.py:453` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | D |
+| #34 | `path-injection` | `persona_manager.py:454` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | D |
+| #35 | `path-injection` | `persona_manager.py:458` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | D |
+| #36 | `path-injection` | `persona_manager.py:491` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | D |
+| #37 | `path-injection` | `persona_manager.py:611` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | E |
+| #38 | `path-injection` | `persona_manager.py:613` | fn_save_persona / load_persona_embedding / delete_persona | **真修** | E |
+| #15 | `path-injection` | `persona_metadata.py:361` | load/save_persona_metadata | **真修** | F |
+| #16 | `path-injection` | `persona_metadata.py:363` | load/save_persona_metadata | **真修** | F |
+| #17 | `path-injection` | `persona_metadata.py:370` | load/save_persona_metadata | **真修** | F |
+| #18 | `path-injection` | `persona_metadata.py:372` | load/save_persona_metadata | **真修** | F |
+| #19 | `path-injection` | `persona_metadata.py:403` | load/save_persona_metadata | **真修** | F |
+| #20 | `path-injection` | `persona_metadata.py:407` | load/save_persona_metadata | **真修** | F |
+| #51 | `path-injection` | `routes/generate/utils.py:1247` | resolve_persona_ref / _error_html | **真修** | G |
+| #52 | `path-injection` | `routes/generate/utils.py:1255` | resolve_persona_ref / _error_html | **真修** | G |
+| #6 | `path-injection` | `routes/generate/voxcpm2/design.py:189` | generate_voxcpm_design | **真修** | H |
+| #7 | `path-injection` | `routes/generate/voxcpm2/design.py:196` | generate_voxcpm_design | **真修** | H |
+| #8 | `path-injection` | `routes/generate/voxcpm2/design.py:198` | generate_voxcpm_design | **真修** | H |
+| #39 | `path-injection` | `routes/generate/voxcpm2/script.py:186` | generate_voxcpm_script | **真修** | I |
+| #40 | `path-injection` | `routes/generate/voxcpm2/script.py:193` | generate_voxcpm_script | **真修** | I |
+| #41 | `path-injection` | `routes/generate/voxcpm2/script.py:195` | generate_voxcpm_script | **真修** | I |
+| #14 | `path-injection` | `routes/persona.py:108` | _resolve_generated_audio / persona_delete | **已缓解** | — |
+| #90 | `stack-trace-exposure` | `routes/generate/utils.py:829` | resolve_persona_ref / _error_html | **已缓解** | — |
+| #91 | `stack-trace-exposure` | `routes/generate/utils.py:1096` | resolve_persona_ref / _error_html | **真修** | N |
+| #83 | `stack-trace-exposure` | `routes/generate/voxcpm2/streaming.py:526` | stream_generate SSE | **真修** | N |
+| #74 | `stack-trace-exposure` | `routes/persona.py:84` | _resolve_generated_audio / persona_delete | **真修** | L |
+| #75 | `stack-trace-exposure` | `routes/persona.py:325` | _resolve_generated_audio / persona_delete | **真修** | M |
+| #76 | `stack-trace-exposure` | `routes/persona.py:330` | _resolve_generated_audio / persona_delete | **真修** | L |
+| #77 | `stack-trace-exposure` | `routes/persona.py:331` | _resolve_generated_audio / persona_delete | **真修** | L |
+| #78 | `stack-trace-exposure` | `routes/system/settings.py:725` | advanced_params / general_settings / generation_defaults | **真修** | K |
+| #79 | `stack-trace-exposure` | `routes/system/settings.py:769` | advanced_params / general_settings / generation_defaults | **真修** | K |
+| #80 | `stack-trace-exposure` | `routes/system/settings.py:802` | advanced_params / general_settings / generation_defaults | **真修** | K |
+| #81 | `stack-trace-exposure` | `routes/system/settings.py:819` | advanced_params / general_settings / generation_defaults | **真修** | K |
+| #82 | `stack-trace-exposure` | `routes/system/settings.py:852` | advanced_params / general_settings / generation_defaults | **真修** | K |
+| #84 | `stack-trace-exposure` | `routes/training.py:373` | start_training / get_training_log | **误报** | — |
+| #85 | `stack-trace-exposure` | `routes/training.py:421` | start_training / get_training_log | **误报** | P |
+| #86 | `stack-trace-exposure` | `routes/training.py:426` | start_training / get_training_log | **误报** | P |
+| #87 | `stack-trace-exposure` | `routes/training.py:431` | start_training / get_training_log | **误报** | P |
+| #88 | `stack-trace-exposure` | `routes/training.py:538` | start_training / get_training_log | **真修** | J |
+| #89 | `stack-trace-exposure` | `routes/training.py:601` | start_training / get_training_log | **记录不修** | — |
+
+合计：**真修 47｜误报 4｜已缓解 2｜记录不修 1**。
+
+### 8.3 真修怎么修的（两处统一，不在各写一遍）
+
+1. **`app/integrated_app/path_guard.py`（新增）** —— `is_bare_filename`（单段裸名：无分隔符、
+   无控制字符、非隐藏、非 `.`/`..`、长度上限）、`ensure_within_dir`（真实路径 + `os.sep` 严格前缀）、
+   `resolve_bare_in_dir`（两者合用，可选扩展名白名单）。
+   接入点：`generation.preprocess_and_save_temp`、`persona_manager` 的固化/嵌入加载/删除、
+   `persona_metadata` 读写、`routes/generate/utils.resolve_persona_ref`、
+   `voxcpm2/design`、`voxcpm2/script`、`routes/persona._resolve_generated_audio`。
+   `routes/training._validate_path` 本来就带 `os.sep`，保持不变，作为对照。
+2. **`app/integrated_app/error_surface.py`（新增）** —— 把 `routes/model.py` 私有的
+   `_safe_error_message` 提为共用的 `safe_error_message` / `redact_paths`（行为不变，
+   四条领域异常分支仍先脱敏再截断）。接入点：`settings.py` 7 处 `str(exc)`
+   （CodeQL 标了 5 处，同形的 `HTTPException(detail=…)` 639/702 一并改）、
+   `routes/persona.py:325`、`training.py:538` 与 `:413`（后者不是异常，但把
+   `train_script` 绝对路径原样写进了响应）、`persona_manager` 的两条用户可见消息、
+   `routes/generate/utils._safe_error_msg` 六条分支，以及 `_error_html` 的渲染入口
+   （一处管住 toast 头 / 模板 / 内联降级三个出口，SSE 的 #83 与 #91 都在这条链上）。
+   顺带修掉 `model.py` 里脱敏**晚了一行**的问题：`_notify_load(last_msg, …)` 把未脱敏的
+   原文写进进度状态，客户端轮询拿到的仍是原文。
+
+新增测试：`tests/test_path_guard.py`、`tests/test_error_surface_leaks.py`；
+扩写 `tests/test_persona_embedding_load.py`（兄弟目录那一条）、
+`tests/test_error_message_redaction.py`（改指向共用模块）。
+本地：ruff check/format 全绿、`pytest -m "not gpu and not cuda and not integration and not benchmark and not e2e"`
+**2114 passed / 12 skipped**、mypy 棘轮 **103→103** 不变。
+
+### 8.4 dismiss 的先后次序（不给没落地的证据交差）
+
+- **现在就按 `false positive` 单独 dismiss 的**：#84、#85、#86、#87（`training.py`
+  的 JSON 解析回显与 `_validate_path` 只回显 `user_path`）；#90（`_partial_success_html`
+  三个插值无异常文本流入）；#14（`_resolve_generated_audio` 原本就是正确实现，本 PR 只是提为共用）。
+- **合并后按 `mitigated` 单独 dismiss 的**：47 条真修点位，理由绑定**合并 SHA + 具体守卫行 + 测试名**。
+  这一族清不掉数字是预期内的：CodeQL 不认自定义净化器，`model.py` 那 11 条在 #96 合并、
+  测试也钉住之后仍是 open（§7.1 已记录），所以只能靠绑定证据的逐条交差。
+- **按 `won't fix` 交差并记录口径的**：#89 `get_training_log` —— 端点契约就是回传训练子进程
+  stdout（路径与 traceback 是排障需要的东西），本机单用户应用无跨信任边界。**不为清数字而 dismiss。**
+
+### 8.5 `transformers 4.52.x` 的 16 条公告：账本在哪（更正 §7.3）
+
+§7.3 里「没看到 pip-audit 对这 16 条的命中/豁免说明，属于已知未结」**是我没翻 `security.yml` 的错话**。
+实际状态：
+
+- `.github/workflows/security.yml` 的 pip-audit 步骤带 16 个 `--ignore-vuln`，
+  号取自 run 35575129704 job 106255145288 的真实表格；
+- `docs/SECURITY_DEPENDABOT_TRIAGE.md` §1 表 A1–A16 逐条给可达性判定，§1a 给两道扫描器
+  口径差异（Trivy 因 `CRITICAL,HIGH` + `ignore-unfixed` 只见 3 条，pip-audit 无过滤所以 16 条），
+  §2 给「为什么不升」（4.57.6 实测让 IndexTTS 2.0/2.5 的 `infer_v2` / `infer_v2_5` 直接 ImportError），
+  §4 给复点条件，复审截止 **2026-12-31**；
+- 同步关系由 `tests/test_dependency_consistency.py` 的 D3/D4 钉住：
+  工作流里的号集合 == 分诊表里的号集合，且豁免的号必须真的绑在被扫的版本上。
+  本地实测 13 passed。
+
+本轮不新增、不放宽任何豁免：16 个号是 `api.osv.dev` 对 4.52.1 返回的全部公告（24 条记录按 CVE
+去重后 16 个，与 §1a 记的 4.52.4 集合一致），新出现的公告仍会让这一步变红。
+
+缺的那一件是**跟踪载体**：§4 的复点条件、D3/D4 的机器门禁都在，但 `security.yml` 的注释与本节
+都没有指向一个 open issue，Dependabot 又只会为 A1–A8（GHSA 有记录的那批）开单，
+A9–A16 那 8 条 PYSEC-only 的永远不会自己冒出来。要不要为这 16 条开一个显式跟踪 issue
+（标题挂 `transformers 4.52.x` + 截止 2026-12-31），留在第二阶段的四态清单里等一句话。

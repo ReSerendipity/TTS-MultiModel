@@ -34,6 +34,8 @@ import zipfile
 from datetime import datetime
 from typing import Any
 
+from .path_guard import resolve_bare_in_dir
+
 logger = logging.getLogger("tts_multimodel")
 
 
@@ -356,7 +358,12 @@ def load_persona_metadata(persona_dir: str, persona_name: str) -> PersonaMetadat
         PersonaMetadata: 加载到的元数据实例，永远不会返回 None。
     """
     legacy_shared = os.path.join(persona_dir, "metadata.json")
-    meta_path = os.path.join(persona_dir, f"{persona_name}.metadata.json")
+    # 按名拼接的两个路径都是读点：音色名可能来自配置或导入清单，不假定已校验。
+    meta_path = resolve_bare_in_dir(persona_dir, f"{persona_name}.metadata.json")
+    txt_path = resolve_bare_in_dir(persona_dir, f"{persona_name}.txt")
+    if meta_path is None or txt_path is None:
+        logger.warning(f"音色名越出目录或不是裸文件名，跳过按名读取元数据: {persona_name!r}")
+        return PersonaMetadata(name=persona_name)
 
     if os.path.exists(meta_path):
         try:
@@ -366,7 +373,6 @@ def load_persona_metadata(persona_dir: str, persona_name: str) -> PersonaMetadat
         except Exception as e:
             logger.warning(f"加载 {persona_name} 的 {persona_name}.metadata.json 失败: {e}")
 
-    txt_path = os.path.join(persona_dir, f"{persona_name}.txt")
     if os.path.exists(txt_path):
         try:
             with open(txt_path, encoding="utf-8") as f:
@@ -399,10 +405,14 @@ def save_persona_metadata(persona_dir: str, persona_name: str, meta: PersonaMeta
         persona_name: 音色名称，用于生成 .metadata.json / .txt 文件名。
         meta: 待保存的元数据实例。
     """
-    meta_path = os.path.join(persona_dir, f"{persona_name}.metadata.json")
+    # 写点比读点更需要硬失败：越界的名字会把元数据写到目录外，静默返回等于丢失。
+    meta_path = resolve_bare_in_dir(persona_dir, f"{persona_name}.metadata.json")
+    txt_path = resolve_bare_in_dir(persona_dir, f"{persona_name}.txt")
+    if meta_path is None or txt_path is None:
+        raise ValueError(f"非法音色名，拒绝写入元数据: {persona_name!r}")
+
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta.to_dict(), f, ensure_ascii=False, indent=2)
 
-    txt_path = os.path.join(persona_dir, f"{persona_name}.txt")
     with open(txt_path, "w", encoding="utf-8") as f:
         f.write(meta.to_legacy_text())

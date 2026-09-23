@@ -36,6 +36,7 @@ import soundfile as sf
 
 from .config import SAVE_DIR
 from .exceptions import AudioProcessingError, ValidationError
+from .path_guard import resolve_bare_in_dir
 from .watermark import WATERMARK_SOURCE_ID
 
 logger = logging.getLogger("tts_multimodel")
@@ -794,6 +795,12 @@ def preprocess_and_save_temp(
             提示用户支持的输入类型。
         AudioProcessingError: 当音频读取、重采样或写入磁盘失败时抛出。
     """
+    # 文件名由调用方给出（表单值或音色名派生）：钉死为 SAVE_DIR 内的单段裸名。
+    # 少了这一步，os.replace 会把临时文件搬到 SAVE_DIR 之外，等于任意位置写文件。
+    out_path = resolve_bare_in_dir(SAVE_DIR, filename)
+    if out_path is None:
+        raise ValidationError(f"非法的临时文件名: {filename!r}（只允许 SAVE_DIR 内的裸文件名）")
+
     tmp_p: str | None = None
     try:
         # 形态 1：本地文件路径 (str)
@@ -847,8 +854,6 @@ def preprocess_and_save_temp(
                 sr = target_sr
             except Exception as exc:
                 raise AudioProcessingError(f"参考音频重采样失败: {exc}") from exc
-
-        out_path = os.path.join(SAVE_DIR, filename)
 
         # 写入策略：先落到 SAVE_DIR 内的临时文件，再 os.replace 原子替换
         # 保证并发写入时不会读到半截文件

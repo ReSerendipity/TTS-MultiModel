@@ -56,6 +56,7 @@ from fastapi.responses import HTMLResponse
 
 from ....config import get_engine_text_limit
 from ....model_registry import registry
+from ....path_guard import ensure_within_dir, is_bare_filename
 from ..utils import (
     _check_engine_ready,
     _error_html,
@@ -175,28 +176,30 @@ async def generate_voxcpm_design(
     # ------------------------------------------------------------------
     actual_ref_path: str | None = None
     if persona_name:
-        from ....persona_manager import load_persona_embedding
+        from ....persona_manager import PERSONA_DIR, load_persona_embedding
 
-        safe_name: str = os.path.basename(persona_name)
+        # 音色名必须是单段裸名，非法输入不再静默 basename 改写后继续查。
+        if not is_bare_filename(persona_name):
+            return _error_html(request, f"音色名格式不合法: {persona_name}")
+
+        safe_name: str = persona_name
         persona_data = load_persona_embedding(safe_name)
         if persona_data is not None:
             # 兼容不同 .pt 缓存格式：
             # 新格式：二元组 (wav_path, ref_text) — 在线计算/新缓存分支
             # 旧格式：字典 {'items': [嵌入数据]} — 嵌入缓存分支
-            wav_path = None
+            wav_path: str | None = None
             if isinstance(persona_data, tuple) and len(persona_data) == 2:
-                wav_path, _ = persona_data
-            elif isinstance(persona_data, (str, os.PathLike)) and os.path.isfile(str(persona_data)):
+                wav_path = str(persona_data[0])
+            elif isinstance(persona_data, (str, os.PathLike)):
                 wav_path = str(persona_data)
             else:
                 # 嵌入缓存对象（张量等），wav 文件必然存在
-                from ....persona_manager import PERSONA_DIR as _PD
+                wav_path = os.path.join(PERSONA_DIR, f"{safe_name}.wav")
 
-                candidate = os.path.join(_PD, f"{safe_name}.wav")
-                wav_path = candidate if os.path.isfile(candidate) else None
-
-            if wav_path and os.path.isfile(wav_path):
-                actual_ref_path = wav_path
+            contained = ensure_within_dir(PERSONA_DIR, wav_path or "")
+            if contained and os.path.isfile(contained):
+                actual_ref_path = contained
                 logger.info(f"[VoxCPM声音设计] 已加载音色 '{safe_name}' 的参考音频")
             else:
                 return _error_html(request, f"音色文件不存在: {safe_name}")

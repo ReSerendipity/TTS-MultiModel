@@ -38,7 +38,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 from typing import Any
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -49,6 +48,10 @@ from ..engines.voxcpm2_engine import (
     fn_voxcpm_load_lora,
     fn_voxcpm_set_lora_enabled,
     fn_voxcpm_unload_lora,
+)
+from ..error_surface import (
+    redact_paths,
+    safe_error_message,
 )
 from ..exceptions import (
     EngineSwitchError,
@@ -79,56 +82,6 @@ from .system import log_operation
 router = APIRouter(prefix="/api/model", tags=["model"])
 
 logger = logging.getLogger("tts_multimodel.model_routes")
-
-# S-R6: 错误消息脱敏 — 匹配 Windows/Unix 文件路径
-_SENSITIVE_PATH_PATTERN = re.compile(r"[A-Za-z]:\\[^\s\"'<>|*?]+|/(?:[^\s\"'<>|*?]+/)+[^\s\"'<>|*?]*")
-_ERROR_MESSAGE_MAX_LENGTH = 200
-
-
-def _safe_error_message(exc: Exception, max_length: int = _ERROR_MESSAGE_MAX_LENGTH) -> str:
-    """对错误消息进行脱敏，避免向客户端泄露敏感信息。
-
-    Security [D6]：
-        错误消息可能包含文件路径、SQL 语句、堆栈细节等敏感信息。
-
-    Args:
-        exc:        异常对象。
-        max_length: 返回消息的最大字符数。
-
-    Returns:
-        脱敏后的错误消息字符串。
-    """
-    if exc is None:
-        return "未知错误"
-
-    def _redact(msg: str) -> str:
-        # 先脱敏再截断：截断可能把路径切成半截，反而留下更难识别的残片。
-        return _SENSITIVE_PATH_PATTERN.sub("[PATH]", msg)
-
-    # 以下四条分支历史上直接返回未脱敏的 str(exc)，而这几个类恰恰是最常把
-    # 文件路径写进消息的（模型加载/切换/显存报错都带 model/ 下的绝对或相对路径）。
-    # S-R6 的脱敏只覆盖了 OSError 与兜底分支，等于漏了最容易泄的一类。
-    if isinstance(exc, InsufficientVRAMError):
-        return f"显存不足：{_redact(str(exc))[:max_length]}"
-    if isinstance(exc, EngineSwitchError):
-        return f"引擎切换失败：{_redact(str(exc))[:max_length]}"
-    if isinstance(exc, ModelLoadError):
-        return f"模型加载失败：{_redact(str(exc))[:max_length]}"
-    if isinstance(exc, TTSError):
-        return _redact(str(exc))[:max_length]
-    if isinstance(exc, FileNotFoundError):
-        return "文件不存在或已被删除"
-    if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
-        return "操作超时，请稍后重试"
-    if isinstance(exc, PermissionError):
-        return "权限不足，无法访问所需资源"
-    if isinstance(exc, OSError):
-        return f"系统错误：{_redact(str(exc))[:max_length]}"
-
-    msg = _redact(str(exc))
-    if len(msg) > max_length:
-        msg = msg[:max_length] + "..."
-    return msg
 
 
 def _get_vram_used_mb() -> int:
@@ -284,8 +237,9 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
                             _notify_load("显存不足，正在清理后重试...")
                             free_gpu_memory()
                             continue
-                        _notify_load(last_msg, status="failed", error=last_msg)
-                        safe_msg = _SENSITIVE_PATH_PATTERN.sub("[PATH]", last_msg)
+                        # 进度状态与响应体都是客户端可见面，脱敏要一次做在两者之前。
+                        safe_msg = redact_paths(last_msg)
+                        _notify_load(safe_msg, status="failed", error=safe_msg)
                         return JSONResponse({"status": "error", "message": safe_msg, "engine": engine})
                     _notify_load(last_msg, status="completed")
                     log_operation("model", f"{engine} 加载完成")
@@ -308,7 +262,7 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
                     continue
                 if isinstance(exc, ImportError):
                     _notify_load("加载失败：模型文件缺失", status="failed", error=str(exc))
-                    raise ModelLoadError(f"模型文件缺失: {_safe_error_message(exc)}") from exc
+                    raise ModelLoadError(f"模型文件缺失: {safe_error_message(exc)}") from exc
                 if isinstance(exc, RuntimeError) and is_oom_error(exc):
                     _notify_load("显存不足，加载失败", status="failed", error=str(exc))
                     raise InsufficientVRAMError(str(exc)) from exc
@@ -316,9 +270,9 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
                     _notify_load(f"加载失败：{exc}", status="failed", error=str(exc))
                     raise
                 _notify_load(f"加载异常：{exc}", status="failed", error=str(exc))
-                raise GenerationError(f"模型加载异常: {_safe_error_message(exc)}") from exc
+                raise GenerationError(f"模型加载异常: {safe_error_message(exc)}") from exc
 
-        safe_error = _safe_error_message(last_error) if last_error else "unknown error"
+        safe_error = safe_error_message(last_error) if last_error else "unknown error"
         logger.error("模型加载在 %d 次重试后失败: %s", MAX_RETRIES, last_error, exc_info=True)
         _notify_load(f"加载失败（重试{MAX_RETRIES}次后）", status="failed", error=safe_error)
         return JSONResponse(
@@ -328,7 +282,7 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
         raise
     except Exception as exc:  # noqa: BLE001
         logger.error("模型加载失败: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "message": _safe_error_message(exc)})
+        return JSONResponse({"status": "error", "message": safe_error_message(exc)})
 
 
 @router.post("/unload", summary="卸载模型", description="从 GPU 卸载当前模型，释放显存")
@@ -356,7 +310,7 @@ async def unload_model_endpoint(request: Request) -> Response:
         raise
     except Exception as exc:  # noqa: BLE001
         logger.error("模型卸载失败: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "message": _safe_error_message(exc)})
+        return JSONResponse({"status": "error", "message": safe_error_message(exc)})
 
 
 @router.post("/preload", summary="预加载模型", description="后台触发预加载模型到 GPU")
@@ -387,7 +341,7 @@ async def preload_model_endpoint(request: Request) -> Response:
         raise
     except Exception as exc:  # noqa: BLE001
         logger.error("模型预加载失败: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "message": _safe_error_message(exc)})
+        return JSONResponse({"status": "error", "message": safe_error_message(exc)})
 
 
 @router.get("/preload/status", summary="预加载状态", description="查询模型预加载进度")
@@ -402,7 +356,7 @@ async def preload_status_endpoint() -> Response:
         return JSONResponse({"status": "ok", "preload": status})
     except Exception as exc:  # noqa: BLE001
         logger.error("预加载状态查询失败: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "message": _safe_error_message(exc)})
+        return JSONResponse({"status": "error", "message": safe_error_message(exc)})
 
 
 @router.post("/switch", summary="切换引擎", description="切换当前激活的 TTS 引擎")
@@ -470,7 +424,7 @@ async def switch_engine_endpoint(request: Request, engine: str = Form(...)) -> R
         rolled_back_engine = registry.current_engine if registry.current_engine else prev_engine
         rollback_msg = f"已自动回滚到 {rolled_back_engine} 引擎" if rolled_back_engine else ""
 
-        safe_err = _safe_error_message(exc)
+        safe_err = safe_error_message(exc)
         request.app.state.engine_switch_state = {
             "active": True,
             "step": f"切换失败 - {rollback_msg}",
@@ -550,7 +504,7 @@ async def lora_load_endpoint(request: Request) -> Response:
         raise
     except Exception as exc:  # noqa: BLE001
         logger.error("LoRA 加载失败: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "message": _safe_error_message(exc)})
+        return JSONResponse({"status": "error", "message": safe_error_message(exc)})
 
 
 @router.post("/lora/unload", summary="卸载 LoRA", description="卸载当前 LoRA 权重")
@@ -577,7 +531,7 @@ async def lora_unload_endpoint(request: Request) -> Response:
         raise
     except Exception as exc:  # noqa: BLE001
         logger.error("LoRA 卸载失败: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "message": _safe_error_message(exc)})
+        return JSONResponse({"status": "error", "message": safe_error_message(exc)})
 
 
 @router.post("/lora/toggle", summary="切换 LoRA", description="启用或禁用 LoRA 权重")
@@ -607,7 +561,7 @@ async def lora_toggle_endpoint(request: Request) -> Response:
         raise
     except Exception as exc:  # noqa: BLE001
         logger.error("LoRA 切换失败: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "message": _safe_error_message(exc)})
+        return JSONResponse({"status": "error", "message": safe_error_message(exc)})
 
 
 @router.get("/lora/state", summary="LoRA 状态", description="获取当前 LoRA 启用/加载状态")
@@ -629,7 +583,7 @@ async def lora_state_endpoint() -> Response:
         return JSONResponse({"status": "ok", "state": state})
     except Exception as exc:  # noqa: BLE001
         logger.error("LoRA 状态查询失败: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "message": _safe_error_message(exc)})
+        return JSONResponse({"status": "error", "message": safe_error_message(exc)})
 
 
 @router.get("/lora/list", summary="LoRA 列表", description="列出可用的 LoRA 检查点")
@@ -663,7 +617,7 @@ async def lora_list_endpoint() -> Response:
         return JSONResponse({"status": "ok", "checkpoints": checkpoints})
     except Exception as exc:  # noqa: BLE001
         logger.error("LoRA 列表查询失败: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "message": _safe_error_message(exc)})
+        return JSONResponse({"status": "error", "message": safe_error_message(exc)})
 
 
 @router.get("/download_hints", summary="模型下载提示", description="返回缺失模型的下载命令与链接")

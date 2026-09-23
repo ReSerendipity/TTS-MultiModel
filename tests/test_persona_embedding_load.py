@@ -146,6 +146,20 @@ class TestLoadPersonaEmbeddingPathContainment:
 
         assert pm.load_persona_embedding(str(outside)) is None
 
+    def test_sibling_dir_prefix_is_rejected(self, persona_env):
+        """同前缀兄弟目录 ``personas_evil`` 不算「PERSONA_DIR 内」。
+
+        入口守卫此前写的是 ``realpath(p).startswith(realpath(PERSONA_DIR))``，少了
+        ``os.sep``，于是 ``../personas_evil/trap`` 解析出的路径以 ``personas`` 开头
+        并通过判定 —— 这条就是那个洞的直接回归。
+        """
+        root, pm = persona_env
+        sibling = root.parent / (root.name + "_evil")
+        sibling.mkdir()
+        (sibling / "trap.wav").write_bytes(b"RIFF....WAVEfmt ")
+
+        assert pm.load_persona_embedding(f"../{sibling.name}/trap") is None
+
     def test_in_dir_name_still_loads(self, persona_env):
         """守卫不能顺手挡掉正常音色（回归断言，与上面两条互为对照）。"""
         root, pm = persona_env

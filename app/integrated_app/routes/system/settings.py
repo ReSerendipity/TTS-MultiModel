@@ -34,6 +34,7 @@ logger = logging.getLogger("tts_multimodel")
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
+from ...error_surface import safe_error_message  # noqa: E402
 from .gpu import _get_gpu_device, _get_gpu_utilization  # noqa: E402
 from .logs import log_operation  # noqa: E402
 
@@ -636,7 +637,7 @@ async def update_settings(request: Request) -> dict[str, Any]:
         logger.error(f"[settings/PUT] 写入 config.yaml 失败: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
+            detail=safe_error_message(exc),
         ) from exc
 
     _apply_patch_to_runtime(payload)
@@ -699,7 +700,7 @@ def reset_settings() -> dict[str, Any]:
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
+            detail=safe_error_message(exc),
         ) from exc
 
     with contextlib.suppress(Exception):
@@ -722,7 +723,7 @@ def get_advanced_params() -> dict[str, Any]:
         return {"status": "ok", "params": params.to_dict() if hasattr(params, "to_dict") else dict(params)}
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"获取高级参数失败: {exc}")
-        return {"status": "error", "message": str(exc), "params": {}}
+        return {"status": "error", "message": safe_error_message(exc), "params": {}}
 
 
 @router.post("/advanced_params", summary="保存高级生成参数", description="更新并持久化 VoxCPM2 高级参数")
@@ -766,7 +767,7 @@ async def save_advanced_params(request: Request) -> dict[str, Any]:
         raise
     except Exception as exc:  # noqa: BLE001
         logger.error(f"保存高级参数失败: {exc}", exc_info=True)
-        return {"status": "error", "message": str(exc)}
+        return {"status": "error", "message": safe_error_message(exc)}
 
 
 # ---------------------------------------------------------------------------
@@ -799,7 +800,7 @@ async def save_general_settings(request: Request) -> dict[str, Any]:
         return {"status": "ok", "settings": existing}
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         logger.error(f"保存通用设置失败: {exc}", exc_info=True)
-        return {"status": "error", "message": str(exc)}
+        return {"status": "error", "message": safe_error_message(exc)}
 
 
 # ---------------------------------------------------------------------------
@@ -816,7 +817,7 @@ async def get_generation_defaults() -> dict[str, Any]:
         return {"status": "ok", "params": params}
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"获取默认生成参数失败: {exc}")
-        return {"status": "error", "message": str(exc), "params": dict(_DEFAULT_GENERATION_DEFAULTS)}
+        return {"status": "error", "message": safe_error_message(exc), "params": dict(_DEFAULT_GENERATION_DEFAULTS)}
 
 
 @router.post("/generation_defaults", summary="保存默认生成参数", description="持久化默认生成参数")
@@ -849,4 +850,4 @@ async def save_generation_defaults(request: Request) -> dict[str, Any]:
         return {"status": "ok", "params": existing}
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         logger.error(f"保存默认生成参数失败: {exc}", exc_info=True)
-        return {"status": "error", "message": str(exc)}
+        return {"status": "error", "message": safe_error_message(exc)}

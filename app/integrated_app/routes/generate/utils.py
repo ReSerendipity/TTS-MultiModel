@@ -40,6 +40,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...audio_processing import enhance_audio
 from ...config import MAX_UPLOAD_SIZE_BYTES, SAVE_DIR, get_config
+from ...error_surface import redact_paths
 from ...exceptions import (
     EngineSwitchError,
     GenerationCancelledError,
@@ -51,6 +52,7 @@ from ...gpu_utils import free_gpu_memory, is_oom_error
 from ...history_db import get_history_db
 from ...model_manager import _time_estimator
 from ...monitor import get_health_monitor
+from ...path_guard import ensure_within_dir, is_bare_filename
 from ...security.audit import log_audit
 from ..system import increment_generation, log_operation
 
@@ -74,6 +76,8 @@ _SEMAPHORE_ACQUIRE_TIMEOUT_S: float = float(os.environ.get("TTS_SEMAPHORE_TIMEOU
 # E6-1 SECURITY/ROBUSTNESS: 单次生成硬超时 (秒) — 防止超长文本耗尽信号量池
 # 默认 600s (10 分钟)，可按硬件调优。生成超时后释放信号量，返回友好错误。
 _GENERATION_HARD_TIMEOUT_S: float = float(os.environ.get("TTS_GENERATION_TIMEOUT_S", "600.0"))
+# 对外错误消息长度上限：比 error_surface 的默认 200 宽松，留给中文校验提示可读性。
+_CLIENT_MESSAGE_MAX_LENGTH: int = 500
 
 # ---------------------------------------------------------------------------
 # 生成结果缓存（BACKEND_DESIGN_ASSESSMENT §长期能力建设 T9）：相同请求短 TTL 命中，
@@ -765,11 +769,11 @@ def _safe_error_msg(exc: BaseException) -> str:
         用户可读的错误描述（中文，不含文件路径/堆栈等技术细节）。
     """
     if isinstance(exc, InsufficientVRAMError):
-        return f"显存不足：{str(exc)}"
+        return f"显存不足：{redact_paths(str(exc))}"
     if isinstance(exc, EngineSwitchError):
-        return f"引擎切换失败：{str(exc)}"
+        return f"引擎切换失败：{redact_paths(str(exc))}"
     if isinstance(exc, TTSError):
-        return str(exc)
+        return redact_paths(str(exc))
 
     exc_str: str = str(exc)
     lowered: str = exc_str.lower()
@@ -782,9 +786,9 @@ def _safe_error_msg(exc: BaseException) -> str:
     if isinstance(exc, RuntimeError):
         if "cuda" in lowered or "vram" in lowered or "out of memory" in lowered:
             return "显存不足，请尝试缩短文本、关闭其他GPU程序，或在设置中切换到CPU模式"
-        return f"运行时错误：{exc_str[:200]}"
+        return f"运行时错误：{redact_paths(exc_str)}"
     if isinstance(exc, ValueError):
-        return f"参数错误：{exc_str[:200]}"
+        return f"参数错误：{redact_paths(exc_str)}"
     if isinstance(exc, FileNotFoundError):
         return "参考音频文件不存在或已被删除，请重新上传"
     if isinstance(exc, TimeoutError):
@@ -1050,6 +1054,10 @@ def _error_html(
     """
     from ...i18n import get_lang, t
 
+    # 对外错误面：调用方常把 str(exc) 原样传进来，绝对路径会随响应外泄。
+    # 在唯一的渲染出口统一脱敏，比要求每个调用方都记得脱敏可靠。
+    error_message = redact_paths(error_message, _CLIENT_MESSAGE_MAX_LENGTH)
+
     lang: str = get_lang(request)
     # 合并自定义头与内置 toast 头（自定义头优先，避免覆盖 HX-Trigger）
     merged_headers: dict[str, str] = {
@@ -1224,7 +1232,7 @@ async def resolve_persona_ref(
 
     Args:
         request: FastAPI 请求（用于渲染错误 HTML）。
-        persona_name: Persona 音色名称（basename）。
+        persona_name: Persona 音色名称（必须是裸文件名，不含目录成分）。
 
     Returns:
         成功: (wav_path, None)
@@ -1235,29 +1243,33 @@ async def resolve_persona_ref(
 
     from ...persona_manager import PERSONA_DIR, load_persona_embedding
 
-    safe_name: str = os.path.basename(persona_name)
-    persona_data: Any | None = load_persona_embedding(safe_name)
-    if persona_data is not None:
-        # 处理不同返回格式（兼容 .pt 缓存嵌入和在线计算）
-        # 情况 1: 在线计算分支 -> 返回二元组 (wav_path, ref_text)
-        # 情况 2: .pt 缓存分支 -> 直接返回嵌入对象（此时音频文件必然存在）
-        wav_path: str | None = None
-        if isinstance(persona_data, tuple) and len(persona_data) == 2:
-            wav_path, ref_text = persona_data
-        elif isinstance(persona_data, (str, os.PathLike)) and os.path.isfile(str(persona_data)):
-            wav_path = str(persona_data)
-        else:
-            # 缓存嵌入对象（张量或其他嵌入数据），wav 文件必然存在
-            # （.pt 缓存只在 wav 存在后才会写入）
-            candidate = os.path.join(PERSONA_DIR, f"{safe_name}.wav")
-            wav_path = candidate
+    # 音色名必须是单段裸名：此前只靠 os.path.basename 削掉分隔符，既挡不住
+    # 同目录内的命名混淆，也让非法输入被静默改写成另一个名字去查。
+    if not is_bare_filename(persona_name):
+        return None, _error_html(request, f"音色名格式不合法: {persona_name}")
 
-        if wav_path and os.path.isfile(wav_path):
-            return wav_path, None
-        else:
-            return None, _error_html(request, f"音色文件不存在: {safe_name}")
-    else:
+    safe_name: str = persona_name
+    persona_data: Any | None = load_persona_embedding(safe_name)
+    if persona_data is None:
         return None, _error_html(request, f"音色不存在: {safe_name}")
+
+    # 处理不同返回格式（兼容 .pt 缓存嵌入和在线计算）
+    # 情况 1: 在线计算分支 -> 返回二元组 (wav_path, ref_text)
+    # 情况 2: .pt 缓存分支 -> 直接返回嵌入对象（此时音频文件必然存在）
+    # 情况 3: 其它对象 -> 按音色名回到 PERSONA_DIR 内定位
+    wav_path: str | None = None
+    if isinstance(persona_data, tuple) and len(persona_data) == 2:
+        wav_path = str(persona_data[0])
+    elif isinstance(persona_data, (str, os.PathLike)):
+        wav_path = str(persona_data)
+    else:
+        wav_path = os.path.join(PERSONA_DIR, f"{safe_name}.wav")
+
+    # 返回值来自引擎侧，不假定它仍在 PERSONA_DIR 内：用同一把包含性尺子再过一次。
+    contained = ensure_within_dir(PERSONA_DIR, wav_path or "")
+    if contained and os.path.isfile(contained):
+        return contained, None
+    return None, _error_html(request, f"音色文件不存在: {safe_name}")
 
 
 def pre_validate(
