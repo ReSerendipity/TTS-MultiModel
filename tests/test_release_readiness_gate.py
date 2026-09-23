@@ -109,9 +109,10 @@ def _complete_hand_sites(root: Path) -> None:
     (root / "desktop" / "src-tauri" / "Cargo.lock").write_text(
         f'[[package]]\nname = "tts-multimodel-desktop"\nversion = "{NEW}"\n', encoding="utf-8"
     )
-    # 镜像名要照判据的正则来（它认 `ghcr.io/<owner>/tts-multimodel:x.y.z`），否则测的是"读取器失效"而不是"版本漂移"
+    # 镜像名用工作流真的推的那个（名字与 workflows 的同源关系由
+    # `tests/test_image_name_consistency.py` 钉；这里只要保证版本位读取器能命中这一行）
     (root / "deploy" / "kubernetes" / "deployment.yaml").write_text(
-        f"          image: ghcr.io/reserendipity/tts-multimodel:{NEW}\n", encoding="utf-8"
+        f"          image: ghcr.io/reserendipity/tts_multimodel:{NEW}\n", encoding="utf-8"
     )
     (root / "scripts" / "installer" / "setup.nsi").write_text(
         f'OutFile "TTSMultiModel-Setup-v{NEW}.exe"\n!define APP_VERSION "{NEW}"\nVIProductVersion "{NEW}.0"\n',

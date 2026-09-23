@@ -117,7 +117,7 @@
    `tests/test_version_consistency.py` 必须绿（它就是"§5 版本位全部同步"那格闸）
 2. 同步 `config.yaml` 顶层 `version` 与 `deploy/kubernetes/deployment.yaml` 的镜像 tag
    （都不在 extra-files 里：前者因为 RP 的 YAML 写入器会整份重排并洗掉注释，见 §1；
-   后者要跟 ghcr 上真存在的标签走。两处都红在版本位一致性测试里）
+   后者要跟 ghcr 上真存在的标签走，且**镜像名必须等于工作流真的推的那个**（`tts_multimodel` 下划线 —— 由 `${{ github.repository }}` 小写得来；名字与 tag 形状由 `tests/test_image_name_consistency.py` 钉，版本位由 `test_all_version_sites_agree` 钉）。两处都红在版本位一致性测试里）
 3. 手工发版（v2.2.2/v2.2.3 走的就是这条；自动那条见 §1 末）：
    `git tag -a v<版本> -m "..." <SHA>` → `git push origin v<版本>` →
    `python -m build` + `twine check dist/*` + `SHA256SUMS.txt` →
