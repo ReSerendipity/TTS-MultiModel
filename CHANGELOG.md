@@ -2,6 +2,15 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.2.6](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.5...v2.2.6) (2026-09-23)
+
+
+### Bug Fixes
+
+* **deploy:** k8s 清单声明 ghcr 拉取凭证要求，README 给出建法 ([e00e17c](https://github.com/ReSerendipity/TTS_MultiModel/commit/e00e17c7fb2e5db57cb45e6990dcbbb80a8f5cc7))
+* **deploy:** k8s 清单的镜像名从"tts-multimodel"改成工作流真推的"tts_multimodel"，并加一条同源闸 ([5f56d5c](https://github.com/ReSerendipity/TTS_MultiModel/commit/5f56d5c4c5c3c37335a0640c985f2cf7ae2219c3))
+* **deploy:** k8s 清单里的镜像名改成工作流真正推的那个，并加一条同源闸 ([4274162](https://github.com/ReSerendipity/TTS_MultiModel/commit/4274162f347c6b7c70c726b485330706abc27f0c))
+
 ## [2.2.5](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.4...v2.2.5) (2026-09-22)
 
 
