@@ -244,3 +244,62 @@ commit `552b0c6`（= 当前 main），results=97。逐条 GET 校验 state 与�
 `Typecheck (mypy ratchet)`，且 `strict=false`；**CodeQL 不在其中**。所以这张表不会因为谁没看而阻塞合并，
 也正因为这样它的数字只能靠人定期重测。§4 最后那行"CodeQL 是否进 main 必需检查"仍未定，
 判据不变：先降到 <30 条再纳入（现在 76）。
+
+## 7. 2026-09-24 刷新（**现状以本节为准**，§6 是 09-21 快照）
+
+### 7.1 总量：76 → **56**
+
+本批 dismiss **16 条**，每条都在 CodeQL 上写了绑定代码事实的理由（注意 `dismissed_comment`
+上限 280 字符，长判据只能留在本表）：
+
+| 组 | 条数 | 判定 | 理由要点 |
+|---|---|---|---|
+| `routes/model.py` 的 `py/stack-trace-exposure` | 11 | `mitigated` | 全部经 `_safe_error_message`；PR **#96** 补齐该函数此前漏脱敏的四条领域异常分支，`tests/test_error_message_redaction.py` 14 断言（修复前 8 failed / 后 14 passed）。CodeQL 不建模自定义净化器，故告警留存 |
+| `js/xss-through-dom`（`indextts20_clone.html:140`、`indextts2_clone.html:175`、`indextts2_duration.html:211`） | 3 | `false positive` | 告警行是 `previewAudio.src = URL.createObjectURL(file)`，只能是同源 `blob:` URL，不可能变 `javascript:`；同函数里的文件名走 `textContent`（DOM 文本赋值，非 HTML 解析） |
+| `py/url-redirection` #61（`routes/tabs.py:292`） | 1 | `false positive` | `RedirectResponse(url=f"/?tab={tab_name}")` 目标是固定相对路径，用户串落在 query 值内；该文件另有 frozenset 白名单显式拦 `tab_name="../../config.yaml"` |
+| `py/bad-tag-filter` #62（`engines/voxcpm2/design.py:82`） | 1 | `false positive` | 规则误用：这里去标签的对象是送进 VoxCPM2 文本编码器的提示串（另有 300 字符硬限），不是 XSS 出口；全仓 Jinja `|safe` 仅 1 处（`partials/progress_bar.html`），渲染面由 autoescape 覆盖 |
+
+同期 PR **#153** 真修 2 条：`py/reflective-xss` #107 #108（`voicebox/convert.py`、
+`step_audio_editx/edit.py` 的成功页把表单原文 `edit_type`/`edit_info`、上传文件名派生的
+basename、`tau` 等直接插进 HTML 文本与 4 处属性，`basename()` 不去 `<` 与引号 →
+可实现反射型 XSS；统一 `html.escape(..., quote=True)`）。
+另有 PR **#98** 的 `check_pin_crossconflicts.py` 已进 main（抓上界/通配型锁冲突）。
+
+### 7.2 剩余 40 条的逐条判定（本轮机器扫 + 人读，未在本阶段提交大改）
+
+**`py/path-injection` 36 条**
+
+- **19 条已缓解，可下一批直接收口**：`persona_manager.py` 的 `fn_save_persona`/`delete_persona`
+  13 条（`_validate_persona_name` 白名单正则 + `realpath` 前缀比对）、`load_persona_embedding`
+  5 条（#79 在函数入口加的 realpath 守卫，越界返回 None，有 `Containment` 测试）、
+  `routes/persona.py:108` `_resolve_generated_audio` 1 条（函数体内有 realpath + 前缀判定）。
+- **17 条无强校验，需人读或真修**（按簇）：
+  `generation.py:preprocess_and_save_temp` **3**（函数体内无任何已知净化器）、
+  `persona_metadata.py:load/save_persona_metadata` **6**（同上）、
+  `routes/generate/utils.py:resolve_persona_ref` **2**（仅 `os.path.basename`，弱）、
+  `voxcpm2/design.py:generate_voxcpm_design` **3** 与 `voxcpm2/script.py:generate_voxcpm_script`
+  **3**（仅 basename）。
+  共同形态：外部串经 `basename()` 后参与拼路径；`basename` 挡遍历但挡不住同目录内的
+  指向与命名混淆。要收口建议统一走 `persona_manager` 那套（白名单 + realpath 前缀），
+  而不是每处再写一遍 basename。
+
+**`py/stack-trace-exposure` 18 条**
+
+- **5 条确认为真**：`routes/system/settings.py` 的 725 / 769 / 802 / 819 / 852 五处把
+  **`str(exc)` 原文放进响应**。修法是走 `model.py::_safe_error_message` 那套（或泛化文案），
+  本阶段未改。
+- 13 条待读：`training.py` 5（`start_training` 结构化响应，需确认是否夹 exc 原文）+
+  `get_training_log:601` 1（日志接口，返回内容可能本就是设计）、`routes/persona.py` 4、
+  `routes/generate/utils.py:829/1096` 2（有 `html.escape`，但 **escape 只防 XSS，不防信息泄露**，
+  不能拿它给这族交差）、`voxcpm2/streaming.py:526` 1。
+
+### 7.3 与 issue #97 / #99 的衔接
+
+- **#97（锁集自相矛盾）已按「退」路解决**：main 锁内为 `antlr4 4.9.3`、`mpmath 1.3.0`、
+  `tokenizers 0.21.0`、`transformers 4.52.1`，且 `pyproject.toml`/`requirements.txt` 同步把
+  声明收窄成 `transformers>=4.52.1,<4.53`、`tokenizers>=0.21.0,<0.22` —— 声明与锁一致了。
+  **仍开放的代价**：注释里写明 4.52.x 带 16 条 transformers 公告（按 api.osv.dev 实测），
+  但没看到 pip-audit 对这 16 条的命中/豁免说明，属于"已知未结"。
+- **#99（前端 XSS）**：其中 3 处真问题（文件名进 `innerHTML` 的 `onclick` 属性，只做了 JS
+  字符串转义）在告警表里已消失（`js/incomplete-sanitization` 整族为 0），说明已被修；
+  具体修法本轮未复核。

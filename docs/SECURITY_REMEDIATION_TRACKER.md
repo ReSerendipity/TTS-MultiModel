@@ -43,3 +43,8 @@ TTS_MultiModel 在家族复用前**已具备较完整的安全基础设施**，�
 
 - **H-01 HTTPS**：令 `clean_launch.py` 的 uvicorn 按 `server.ssl` 构造 `ssl_certfile/ssl_keyfile`（与 IM 同款修复）。
 - 若需可配置 CSP，可在 `SecurityConfig` 增加 `headers: HeadersConfig(enabled/csp)` 子配置。
+
+## 相关
+
+- 静态扫描告警的逐条判定与收口台账：`docs/SECURITY_CODEQL_TRIAGE.md`（现状以其最新日期小节为准；
+  本文件只管"配置-实现一致性"那类根因门禁，两边不要互相覆盖）。
