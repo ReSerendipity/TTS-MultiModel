@@ -116,10 +116,10 @@
                                 <td data-label="{{ 'size'|t(lang) }}" style="color:var(--t2);font-family:var(--mono)">{{ row[3] }}</td>
                                 <td data-label="{{ 'actions'|t(lang, default='操作') }}" style="text-align:right">
                                     <div style="display:inline-flex;gap:4px">
-                                        <button class="btn-icon" title="{{ 'play'|t(lang) }}" onclick="playHistoryAudio('{{ row[1] }}', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
-                                        <button class="btn-icon" title="{{ 'download'|t(lang, default='下载') }}" onclick="downloadHistoryAudio('{{ row[1] }}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
-                                        <button class="btn-icon" title="{{ 'hide'|t(lang, default='隐藏') }}" onclick="hideHistoryRecord({{ row[0] }})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
-                                        <button class="btn-icon" title="{{ 'delete'|t(lang) }}" style="color:var(--red)" onclick="deleteHistoryAudio({{ row[0] }}, '{{ row[1] }}', this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                                        <button class="btn-icon" title="{{ 'play'|t(lang) }}" data-history-play="{{ row[1]|e }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+                                        <button class="btn-icon" title="{{ 'download'|t(lang, default='下载') }}" data-history-download="{{ row[1]|e }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                                        <button class="btn-icon" title="{{ 'hide'|t(lang, default='隐藏') }}" data-history-hide="{{ row[0]|e }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
+                                        <button class="btn-icon" title="{{ 'delete'|t(lang) }}" style="color:var(--red)" data-history-delete="{{ row[0]|e }}" data-history-delete-name="{{ row[1]|e }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                                     </div>
                                 </td>
                             </tr>
@@ -1076,4 +1076,28 @@
         });
     };
 })();
+    // issue #130：文件名与行 id 不再拼进 onclick 的 JS 字符串（属性里的 HTML 实体会被解回去），
+    // 改由 data-history-* + 捕获阶段委托驱动。签名与原来的内联调用一一对应。
+    (function () {
+        var body = document.getElementById('hist-table-body');
+        if (!body || body.dataset.histActionsDelegated === '1') return;
+        body.dataset.histActionsDelegated = '1';
+        body.addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest
+                ? e.target.closest('button[data-history-play],button[data-history-download],'
+                    + 'button[data-history-hide],button[data-history-delete]')
+                : null;
+            if (!btn || !body.contains(btn)) return;
+            var d = btn.dataset;
+            if (d.historyPlay !== undefined && typeof window.playHistoryAudio === 'function') {
+                window.playHistoryAudio(d.historyPlay, btn);
+            } else if (d.historyDownload !== undefined && typeof window.downloadHistoryAudio === 'function') {
+                window.downloadHistoryAudio(d.historyDownload);
+            } else if (d.historyHide !== undefined && typeof window.hideHistoryRecord === 'function') {
+                window.hideHistoryRecord(Number(d.historyHide));
+            } else if (d.historyDelete !== undefined && typeof window.deleteHistoryAudio === 'function') {
+                window.deleteHistoryAudio(Number(d.historyDelete), d.historyDeleteName, btn);
+            }
+        }, true);
+    })();
 </script>

@@ -4,7 +4,7 @@
   <div class="error-message">{{ error_message }}</div>
   <div class="tts-error-actions">
     {% if error_type == 'engine_not_ready' and engine_id %}
-    <button type="button" class="tts-btn tts-btn-load-now" onclick="window.switchModel('{{ engine_id }}')" style="background:var(--p500);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;margin-right:6px">
+    <button type="button" class="tts-btn tts-btn-load-now" data-switch-model="{{ engine_id|e }}" style="background:var(--p500);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;margin-right:6px">
       {{ "load_now"|t(lang|default('zh-CN')) }}
     </button>
     {% endif %}

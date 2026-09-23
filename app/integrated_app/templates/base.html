@@ -57,6 +57,36 @@
                 }
             };
         })();
+            // issue #130：错误块与后处理区块是 htmx 用 innerHTML 换进来的，所以这两个委托挂在
+            // document 上（事件委托不要求节点在绑定时刻就存在）。engine_id 与 prefix 不再进
+            // JS 字符串字面量，只走 data-*。
+            document.addEventListener('click', function (e) {
+                var el = e.target && e.target.closest ? e.target.closest('[data-switch-model]') : null;
+                if (el && typeof window.switchModel === 'function') {
+                    window.switchModel(el.dataset.switchModel);
+                    return;
+                }
+                el = e.target && e.target.closest ? e.target.closest('[data-reprocess]') : null;
+                if (el) {
+                    var fn = window[el.dataset.reprocess + 'Reprocess'];
+                    if (typeof fn === 'function') fn();
+                }
+            });
+            // issue #130 续：快捷描述按钮与后处理滑杆以前把服务器值拼进 onclick/oninput 的 JS 字面量，
+            // 现在值与目标 id 都只走 data-*，这里做通用委托（挂在 document 上，
+            // 因为这些块会被 htmx 用 innerHTML 换进来，绑定时机不可靠）。
+            document.addEventListener('click', function (e) {
+                var btn = e.target && e.target.closest ? e.target.closest('button[data-fill-text]') : null;
+                if (!btn) return;
+                var target = document.getElementById(btn.dataset.fillTarget || '');
+                if (target && 'value' in target) target.value = btn.dataset.fillText;
+            });
+            document.addEventListener('input', function (e) {
+                var el = e.target && e.target.closest ? e.target.closest('[data-pp-value-target]') : null;
+                if (!el) return;
+                var span = document.getElementById(el.dataset.ppValueTarget);
+                if (span) span.textContent = el.value;
+            });
     </script>
     <!-- htmx.ext.sse.js 已随报告 D3 移除：SSE 走 sse_manager.js 原生 EventSource，该扩展从未被任何元素使用 -->
     <link rel="stylesheet" href="/static/css/main.css?v={{ app_version }}">

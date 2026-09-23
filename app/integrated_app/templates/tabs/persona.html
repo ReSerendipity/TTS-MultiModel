@@ -105,7 +105,7 @@
                                 {% for row in persona_table_data %}
                                 <tr class="persona-row" onclick="selectPersonaRow(this)" style="cursor:pointer">
                                     <td data-label="{{ 'preview'|t(lang) }}">
-                                        <button class="btn-icon" onclick="event.stopPropagation(); playPersonaAudio('{{ row[0]|e }}', this)" title="{{ 'preview_voice'|t(lang) }}" aria-label="{{ 'preview_voice'|t(lang) }} {{ row[0]|e }}">
+                                        <button class="btn-icon" data-persona-audio="{{ row[0]|e }}" title="{{ 'preview_voice'|t(lang) }}" aria-label="{{ 'preview_voice'|t(lang) }} {{ row[0]|e }}">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                                         </button>
                                     </td>
@@ -745,4 +745,22 @@
         }
     }
 })();
+    // issue #130：persona 名以前被拼进 onclick 的 JS 字符串字面量里，而属性值里的 HTML 实体
+    // （&#39;）在解析属性时会被解回 `'` —— HTML 转义不是 JS 字符串的转义，名字带撇号就截断。
+    // 名字现在只走 data-persona-audio（属性上下文里 autoescape 是对的），调用点改成事件委托。
+    (function () {
+        var body = document.getElementById('persona-table-body');
+        if (!body || body.dataset.personaAudioDelegated === '1') return;
+        body.dataset.personaAudioDelegated = '1';
+        // 必须是捕获阶段：旧代码靠内联的 event.stopPropagation() 阻止冒泡到行上的
+        // selectPersonaRow，而冒泡阶段的委托跑到 tbody 时那条行内处理器已经先执行过了。
+        body.addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest ? e.target.closest('button[data-persona-audio]') : null;
+            if (!btn || !body.contains(btn)) return;
+            e.stopPropagation();
+            if (typeof window.playPersonaAudio === 'function') {
+                window.playPersonaAudio(btn.dataset.personaAudio, btn);
+            }
+        }, true);
+    })();
 </script>
