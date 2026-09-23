@@ -14,6 +14,14 @@ updates:
       # lock instead: let pip resolve the pair together.
       - dependency-name: "pydantic-core"
       - dependency-name: "pydantic_core"
+      # torch 三件套是交付轨（便携包 / 镜像 / 开发环境）的共用锚点：显存行为只在
+      # 2.13.0+cu132 上实测过（v2.2.4 的四次连续切换与 9489→3344 MiB 回落都是它）。
+      # 2026-09-20 这个组把锁单独顶到 2.14.0/0.29.0，而 build_portable_bundle.ps1 仍钉
+      # 2.13.0 —— 锁与交付轨静默分叉，且 2.14.0 那组合从未安装、从未运行过。
+      # 升级走显式流程：先改脚本里的三处版本 + 三处哈希，再复算锁，两侧一起动；
+      # 不变量由 tests/test_torch_track_consistency.py 机器核对。
+      - dependency-name: "torch"
+      - dependency-name: "torchvision"
     groups:
       minor-and-patch:
         applies-to: version-updates

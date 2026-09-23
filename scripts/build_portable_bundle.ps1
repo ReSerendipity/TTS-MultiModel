@@ -42,6 +42,14 @@ param(
     [string]$TorchVersion = '2.13.0',
     [string]$TorchvisionVersion = '0.28.0',
     [string]$TorchaudioVersion = '2.11.0',
+    # 三件套的 SHA256 权威值（2026-09-23 首次实测下载算得）。cu132 index 不发布哈希，
+    # 这里就是唯一权威值；torchaudio 那条与 PyPI 公布的 digest 逐字符相同，可交叉核对。
+    # 升 torch 版本必须同时改上面三个版本参数与这里的哈希：漏改会被
+    # tests/test_torch_track_consistency.py（锁 == 脚本）与运行时门禁双重拦下。
+    # 置空 = 跳过校验（只用于排障；CI 与发版构建不该依赖空值）。
+    [string]$TorchSha256 = '0bcf7ae00b2e20ef2b53af2e764a4fd8646b913bfaaeba2b9c975e672e8c7902',
+    [string]$TorchvisionSha256 = 'ce0744fde0efdafe4277843afdafa4a886225b11da2f8991d586c8c4c4b6bdeb',
+    [string]$TorchaudioSha256 = '478110f981e5d40a8d82221732c57a56c85a1d5895fb8fe646e86ee15eded3bd',
     # 可选 Authenticode 代码签名（P3）：提供代码签名证书 .pfx 时，随包分发的
     # .ps1 助手在生成 SHA256SUMS.txt 之前完成签名（否则清单哈希会失配）。
     [string]$SigningPfxPath = '',
@@ -654,6 +662,18 @@ if ($needWheels -and -not $TorchWheelDir) {
     $TorchWheelDir = Join-Path $prepDir 'torch_wheels'
     Write-Host "`n[准备] torch wheels"
     Start-TTSMultiModelTorchWheelPrepare -WheelDir $TorchWheelDir -PythonExe $pyInfo.PythonExe -IndexUrl $TorchIndexUrl
+}
+# wheel 哈希门禁：自动准备与外部传 -TorchWheelDir 两条路都经过这里。文件名由版本参数
+# 拼出（便携解释器固定 cp312 = WinPython 3.12.10），所以版本与哈希一旦不同步，报的是
+# 「钉版 wheel 缺失」而不是静默装上另一个二进制。
+if ($TorchWheelDir) {
+    $wheelPins = @{
+        "torch-$TorchVersion+cu132-cp312-cp312-win_amd64.whl"             = $TorchSha256
+        "torchvision-$TorchvisionVersion+cu132-cp312-cp312-win_amd64.whl" = $TorchvisionSha256
+        "torchaudio-$TorchaudioVersion-cp312-cp312-win_amd64.whl"         = $TorchaudioSha256
+    }
+    $hashChecked = Assert-TTSMultiModelWheelHashes -WheelDir $TorchWheelDir -Pins $wheelPins
+    Write-Host "  [哈希门禁] torch wheels 已校验 $hashChecked / $($wheelPins.Count) 条"
 }
 if ($TorchWheelDir -and $RuntimeDir -and -not $SkipOfflineTorchCheck) {
     Write-Host "`n[验证] torch wheels 在便携解释器上是否可离线安装"

@@ -106,6 +106,12 @@ if ($WinPythonUrl) { $buildArgs.WinPythonUrl = $WinPythonUrl }
 if (-not $realBuild) {
     # fixture 模式：跳过离线可装性验证（伪 wheels 无意义）与自动准备
     $buildArgs.SkipOfflineTorchCheck = $true
+    # fixture 的轮子是 1.7 MB 全零节造假，必然过不了 build 脚本的
+    # wheel SHA256 门禁（那条门禁是为真实构建设的，这里显式关闭）。
+    # 真实构建（-realBuild）不走这里，因此发版轨次永远被校验。
+    $buildArgs.TorchSha256 = ''
+    $buildArgs.TorchvisionSha256 = ''
+    $buildArgs.TorchaudioSha256 = ''
     $buildArgs.SkipAutoPrepare = $true
 }
 & (Join-Path $PSScriptRoot 'build_portable_bundle.ps1') @buildArgs | Out-Host

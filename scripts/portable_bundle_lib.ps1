@@ -655,3 +655,34 @@ function Remove-TTSMultiModelTreeFast {
         }
     }
 }
+
+function Assert-TTSMultiModelWheelHashes {
+    <#
+    wheel 哈希门禁（2026-09-23 加）：download.pytorch.org 的 cu132 index 只列文件名、
+    **不发布 SHA256**，所以权威值只能钉在本仓里 —— 首次实测下载后算得，写在
+    build_portable_bundle.ps1 的 -TorchSha256 / -TorchvisionSha256 / -TorchaudioSha256。
+    空值 = 该条跳过（仅供排障）。返回实际校验条数；任何一条不符直接 throw。
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$WheelDir,
+        [hashtable]$Pins = @{}
+    )
+    if (-not (Test-Path -LiteralPath $WheelDir -PathType Container)) {
+        throw "Assert-TTSMultiModelWheelHashes: 目录不存在 $WheelDir"
+    }
+    $checked = 0
+    foreach ($name in @($Pins.Keys | Sort-Object)) {
+        $want = [string]$Pins[$name]
+        if (-not $want) { continue }
+        $path = Join-Path $WheelDir $name
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "钉版 wheel 缺失：$name（目录 $WheelDir）—— 版本参数与哈希参数不同步，或下载源变了"
+        }
+        $actual = Get-TTSMultiModelFileSha256 -Path $path
+        if ($actual -ne $want.ToLowerInvariant()) {
+            throw ("wheel SHA256 不符：{0} 期望 {1} 实际 {2} —— 下载损坏或上游被替换" -f $name, $want.ToLowerInvariant(), $actual)
+        }
+        $checked++
+    }
+    return $checked
+}
