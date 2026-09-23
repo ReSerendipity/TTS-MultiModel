@@ -17,6 +17,20 @@
 - 集群已安装 [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) 或 `nvidia-container-toolkit`，
   提供 `nvidia.com/gpu` 可分配资源。
 - 镜像已推送到 `ghcr.io/reserendipity/tts_multimodel`（**下划线**：名字由 `${{ github.repository }}` 整体小写得到，`_` 原样保留，见 `.github/workflows/docker-publish.yml`；`tests/test_image_name_consistency.py` 就是把这条引用与工作流钉成同源的闸）。
+- **拉这个镜像要有凭证**：上面那个包不是匿名可拉的（实测匿名 token 无 grant、manifest GET 回 404）。
+  先建 `tts` 命名空间，再建 registry secret：
+
+  ```bash
+  kubectl create namespace tts   # 已存在就跳过
+  kubectl -n tts create secret docker-registry ghcr-pull \
+    --docker-server=ghcr.io \
+    --docker-username=<你的 GitHub 用户名> \
+    --docker-password=<带 read:packages 作用域的 PAT>
+  ```
+
+  清单里 `imagePullSecrets: [{name: ghcr-pull}]` 指的就是它。**少了这一步，`kubectl apply` 不报错**，
+  Pod 只会一直 `ImagePullBackOff` —— 别把"apply 成功"当成"上线成功"。
+  用 PAT 而不是 `GITHUB_TOKEN`：后者只对当次 workflow run 有效，且 API 拒绝拿它建 registry secret。
 - 模型权重通过**独立的大文件分发流程**提供（`.dockerignore` 已排除 `model/`），
   运行时以 PVC（`tts-models`，见 pvc.yaml）只读挂载到 `/app/model`。
   **部署前必须先把权重预填充进该 PVC**（如经临时 Pod / rsync / 对象存储同步），
