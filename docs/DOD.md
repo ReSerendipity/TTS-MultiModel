@@ -45,6 +45,12 @@
 
 - [ ] 涉及部署时遵守 `docs/SRE_RUNBOOK.md`（SLO / 探针 / 错误预算）与 `docs/rollback_sop.md`
 - [ ] 涉及镜像发布遵守 docker / k8s 钉版（digest）约定，不用 `:latest`
+- [ ] readiness 探针只用 `/readyz`，**不要**拿 `/api/health/ready` 当 k8s readinessProbe：后者是**深度健康报告**，
+      模型未加载时仍返回 **200**（body 里 `status:"degraded"`、`model_loaded:false`），那是给 WebUI 展示告警用的；
+      前者以 `model_loaded` 为闸门、未加载即 **503**，才是真正挡流量的那个（实现与理由见
+      `app/integrated_app/app_server.py:989-1009`，存活探针另有 `/api/health/ping`）。
+      **两个端点码值不一致是分工而不是缺陷，别"顺手修成一致"** —— 2026-09-23 在 v2.2.7 候选的 V4 真机取证里
+      就差点被当成"探针不一致"误修（当时 503 出现在模型后台加载的 30 秒窗口内，属预期）。
 
 ## 5. 构建 & 验证
 
