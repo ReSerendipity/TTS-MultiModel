@@ -86,7 +86,38 @@
 | `python scripts/check_tab_switch_race.py`（需服务在跑） | 侧栏换页竞态 | 给第一个 `/tab/` 请求注入 1.5s 延迟、350 ms 后点第二个，要求**末态落在最后点的那一页**（结构签名比对，不看像素）。修前 **6/6 组被旧响应盖回先点那页**，带 `hx-sync="#tab-content:queue last"` 后 **0/6** → 通过（#136）。必须用 async Playwright：sync 的 route handler 会把请求串行化，测出来是假阴性 |
 | `python scripts/make_watermark_ab.py` + 人耳 | 3 的水印面 | 生成同源 A/B 与量化表（落在 `docs/reports/watermark_ab/`，**该目录被 `.gitignore` 忽略**，属可重生成的本地产物）；**能否听出 B 仍需人耳**，脚本只保证差异唯一 |
 
-- 最近一次执行：**2026-09-22，v2.2.4 发版前**（工作树 = `chore/release-2.2.4` 合并后的 `d4d80b7`）。
+- 最近一次执行：**2026-09-23，v2.2.6 + #144（issue #130 那 16 处）**。工作树 = **独立 `git worktree`
+  检出的 `origin/main`**（主工作树当时挂着另一个写者的未提交改动，"跑测试期间冻结工作树"的前提在
+  那边不成立，所以这轮全部证据都来自干净检出）。四组：
+  - **机器侧全量**：`pytest --ignore=tests/e2e --timeout=180` → **#144 那轮 2147 passed / 38 skipped /
+    0 failed，66.8s**；#143 那轮 2145 passed / 38 skipped / 0 failed，94.63s。
+  - **CI 侧**：12 平台 `Test (pytest)` 矩阵 + `Lint (ruff)` + `Typecheck (mypy ratchet)` + `DCO` 全绿，
+    并且 **`Playwright E2E Tests` pass（9m2s）** —— #144 改的就是服务端模板与事件绑定，这一格不能免
+    （v2.2.4 那轮记的是"e2e 没在本机跑"，这次由 CI 补上，不是我自己跑的，别记成同源证据）。
+  - **真机（浏览器）侧**：起 `python -m integrated_app.app_server --port 7899`，**不加载模型**，
+    `nvidia-smi` 显存占用**全程 9638 MiB 恒定**；收工核实 **7899 无监听、PID 已退出**。
+    口径写清楚：这一格证明的是"页面与事件链路在真浏览器里行为正确、且没有偷偷申请显存"，
+    **不是**模型加载/切换的显存曲线（那格这轮零覆盖，与 v2.2.4 的"切换后 9489→3344 MiB"不是一类证据）。
+    四组取证：① 对照组证明旧写法是真坏（属性里的 `&#39;` 解回 `'` → 整段 handler 编译期 SyntaxError，
+    连前半句都不执行；同一探针不带撇号则正常执行）② Jinja 真渲染的字节交给浏览器解析 → 值逐字节相等、
+    `attributes.length==3`、没生成 `onmouseover` ③ persona 页点注入的带撇号行 → 参数送达且行选中未触发
+    ④ history 页四个动作分别核对（id 到处理器手里是 `number`）。详单在 #144 的 PR body 与
+    issue #130 的关闭评论。
+  - **产物侧**（RP 构建、挂在 v2.2.6 Release 上的那份，不是我本地重跑的构建）：wheel 28,381,933 B /
+    **1065 条目** / `METADATA Version: 2.2.6`；sdist 28,341,730 B / **1209 文件**（比 2.2.5 的 1208 多的
+    那 1 个正是新增的 `tests/test_image_name_consistency.py`，能对上就说明差异是真的）。
+    两者 sha256 **三方一致**：本地 `sha256sum -c SHA256SUMS` rc=0 == Release 资产里的 `SHA256SUMS`
+    == GitHub 自算的 `asset.digest`（`002231f2…` / `6bdd5bbf…`）；完整性三件套齐；解包后**按包导入**跑
+    `run_startup_selfcheck(enforce=True)` = **`total=16 passed=16 failed=0 skipped=0
+    manifest_signed=true`**。
+  - **镜像侧**：`:2.2.6` / `:2.2` / `:latest` / `:sha-62af6f6` 四个标签推到同一 digest `dcedcf0d…`
+    （run 35832045215，`completed/success`，Trivy HIGH/CRITICAL 门禁在推之后跑）。
+    **集群里真拉一次仍未取证**：那个包匿名读不到，要先按 `deploy/kubernetes/README.md` 建
+    `ghcr-pull` secret（要一个带 `read:packages` 的 PAT，属 owner 动作）。
+  - **这一轮仍未覆盖的格子**（别当成已过）：字体菜单可用性、断网首屏、侧栏换页竞态三项**没重跑**
+    （上次取证是 2026-09-19/20 的 v2.2.2 工作树）；模型加载与切换的显存曲线这轮没碰；
+    `Setup.exe` 真机安装与 ~26 GB 便携分卷**仍未验收**。
+- 上一次执行：**2026-09-22，v2.2.4 发版前**（工作树 = `chore/release-2.2.4` 合并后的 `d4d80b7`）。
   机器侧佐证：全量 `pytest --ignore=tests/e2e --timeout=180` **2131 passed / 38 skipped / 0 failed，77.7s**；
   真机（RTX 5070 Ti Laptop 12 GB，权重齐）跑 `#84` 那条路：**四次连续直切**
   `voxcpm2 → indextts2 → indextts20 → voxcpm2`，全程不手动 unload、load 前空闲最低 609 MiB，
