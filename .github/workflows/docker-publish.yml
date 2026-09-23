@@ -14,6 +14,16 @@ permissions:
   contents: read
   packages: write
 
+# 同一时刻只跑一条镜像构建（2026-09-22 实测的浪费）：13:29 的 main push、14:03 的 main push
+# 与 14:12 我为 v2.2.5 手工 dispatch 的那条在同一天里并行 —— 单次构建 20+ 分钟，
+# 还要读写同一份 Actions 层缓存（配额只有 10 GiB，曾经就是被这里的缓存吃满的，见 #133）。
+# 按 ref 分组的方案我否掉了：实测重叠的两条恰好是**不同 ref**（refs/heads/main 与
+# refs/tags/v2.2.5），分组等于没管住。cancel-in-progress 关掉：被中途取消会留下半份层缓存，
+# 还可能让 :latest 停在中间态，而 release 那条尤其不能事后取消。
+concurrency:
+  group: docker-publish
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}

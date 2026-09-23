@@ -110,10 +110,19 @@
   config/manifest + 5 个 v4 不认的入参 → 每次 main push 输出 `found 0 possible releases` 后绿，
   v2.2.2 因此三次绿 run 都没 Release）；已修，现在它真的会开 PR。挂在它下面的
   `build-release`（sdist/wheel + SHA256SUMS）同样只在 `release_created == true` 时执行。
+  > **`[Unreleased]` 不是中转站，RP 不读它**（2026-09-23 实测）：#140 里我手写了一条
+  > `## [Unreleased]` → `### Bug Fixes` 的条目，RP 开 #141 时**没把它折进 2.2.6** —— 它照提交信息
+  > 另生成两条（真实提交 + merge commit 各一条），把我那段原文留在原地，位置在 `[2.2.5]` 与
+  > `[2.2.4]` 之间。于是"已经随 2.2.6 发出去的内容"会永久挂在 Unreleased 底下，是一份自相矛盾的
+  > 假账（已删）。**走自动路径时别手写 `[Unreleased]`**：要留的说明写进提交信息与本文，
+  > CHANGELOG 由提交信息生成。§2 第 1 步那句"`[Unreleased]` 收敛进 `[<新版本>]`"只对第 2 条
+  > （手工发版）成立。
 
 ## 2. 发布流程
 
-1. 确认本批内容已进 CHANGELOG（`[Unreleased]` 收敛进 `[<新版本>]` 并改日期）；
+1. 确认本批内容已进 CHANGELOG（`[Unreleased]` 收敛进 `[<新版本>]` 并改日期）——
+   **这一步只属于手工路径**：走 §1 第 1 条时 CHANGELOG 由 release-please 按提交信息生成，
+   手写 `[Unreleased]` 不会被消费，只会在 `[2.2.5]` 与 `[2.2.4]` 之间留一份永久假账（见 §1 末）；
    `tests/test_version_consistency.py` 必须绿（它就是"§5 版本位全部同步"那格闸）
 2. 同步 `config.yaml` 顶层 `version` 与 `deploy/kubernetes/deployment.yaml` 的镜像 tag
    （都不在 extra-files 里：前者因为 RP 的 YAML 写入器会整份重排并洗掉注释，见 §1；
