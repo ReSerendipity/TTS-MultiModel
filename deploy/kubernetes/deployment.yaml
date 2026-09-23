@@ -28,6 +28,13 @@ spec:
       labels:
         app: tts-multimodel
     spec:
+      # 这个 ghcr 包不是匿名可拉的（实测：匿名 token 无 grant、manifest GET 回 404；
+      # 已登录但缺 read:packages 的 token 回 403）。没有拉取凭证时 Pod 会一直
+      # ImagePullBackOff，而 `kubectl apply` 本身不会报错 —— 所以这一步必须显式做。
+      # 凭证要的是带 read:packages 的 PAT，**不是** GITHUB_TOKEN（只对当次 run 有效，
+      # 且 API 拒绝拿它建 registry secret）。建法见 deploy/kubernetes/README.md「前置条件」。
+      imagePullSecrets:
+        - name: ghcr-pull
       terminationGracePeriodSeconds: 90
       securityContext:
         runAsNonRoot: true
