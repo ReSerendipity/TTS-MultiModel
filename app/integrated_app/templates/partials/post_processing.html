@@ -6,7 +6,7 @@
         <div>
             <label for="{{ prefix }}-pp-tempo" style="font-size:12px;color:var(--text-secondary);">{{ "speed_factor"|t(lang) }}</label>
             <div style="display:flex;align-items:center;gap:6px;">
-                <input type="range" id="{{ prefix }}-pp-tempo" aria-label="{{ 'speed_factor'|t(lang) }}" min="0.5" max="2.0" step="0.1" value="1.0" style="flex:1;" oninput="document.getElementById('{{ prefix }}-pp-tempo-val').textContent=this.value">
+                <input type="range" id="{{ prefix }}-pp-tempo" aria-label="{{ 'speed_factor'|t(lang) }}" min="0.5" max="2.0" step="0.1" value="1.0" style="flex:1;" data-pp-value-target="{{ prefix }}-pp-tempo-val">
                 <span id="{{ prefix }}-pp-tempo-val" style="font-size:12px;min-width:28px;text-align:center;">1.0</span>
             </div>
         </div>
@@ -18,6 +18,6 @@
         </div>
     </div>
     <div style="padding:0 12px 10px;text-align:right;">
-        <button type="button" class="tts-btn tts-btn-secondary" onclick="{{ prefix.replace('-','_') }}Reprocess()">{{ "reprocess"|t(lang) }}</button>
+        <button type="button" class="tts-btn tts-btn-secondary" data-reprocess="{{ prefix.replace('-','_')|e }}">{{ "reprocess"|t(lang) }}</button>
     </div>
 </details>

@@ -75,10 +75,10 @@
                                 <label class="fl" for="it20e-emotion-text">{{ "emotion_text_input"|t(lang) }}</label>
                                 <input type="text" id="it20e-emotion-text" name="emo_text" class="fi" placeholder="{{ 'emotion_text_input_placeholder'|t(lang) }}">
                                 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
-                                    <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it20e-emotion-text').value='{{ "quick_desc_value_1"|t(lang) }}'">{{ "quick_desc_1"|t(lang) }}</button>
-                                    <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it20e-emotion-text').value='{{ "quick_desc_value_2"|t(lang) }}'">{{ "quick_desc_2"|t(lang) }}</button>
-                                    <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it20e-emotion-text').value='{{ "quick_desc_value_3"|t(lang) }}'">{{ "quick_desc_3"|t(lang) }}</button>
-                                    <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('it20e-emotion-text').value='{{ "quick_desc_value_4"|t(lang) }}'">{{ "quick_desc_4"|t(lang) }}</button>
+                                    <button type="button" class="btn btn-o btn-sm" data-fill-target="it20e-emotion-text" data-fill-text="{{ "quick_desc_value_1"|t(lang) }}">{{ "quick_desc_1"|t(lang) }}</button>
+                                    <button type="button" class="btn btn-o btn-sm" data-fill-target="it20e-emotion-text" data-fill-text="{{ "quick_desc_value_2"|t(lang) }}">{{ "quick_desc_2"|t(lang) }}</button>
+                                    <button type="button" class="btn btn-o btn-sm" data-fill-target="it20e-emotion-text" data-fill-text="{{ "quick_desc_value_3"|t(lang) }}">{{ "quick_desc_3"|t(lang) }}</button>
+                                    <button type="button" class="btn btn-o btn-sm" data-fill-target="it20e-emotion-text" data-fill-text="{{ "quick_desc_value_4"|t(lang) }}">{{ "quick_desc_4"|t(lang) }}</button>
                                 </div>
                             </div>
                         </div>
