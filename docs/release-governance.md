@@ -75,12 +75,22 @@
        `file.startsWith(entry + "/")`，**不是 glob**）：
        ① 写 `docs/**` 永不命中，只能用裸目录名 `docs`；RP 自己的测试用的也是 `['pkg3','pkg1']`；
        ② **仓库根上的单个文件排不掉**（那个 `+"/"` 让 `README.md`、`CHANGELOG.md`、
-       `release-please-config.json` 都做不成条目）—— 所以"只改发版配置"这一类提交仍然会
-       mint 一个版本，今天这条 #137 就是这么留下的；
+       `release-please-config.json` 都做不成条目）。**但"排不掉"不等于"会发版"** —— 我原先
+       由这一点推"只改发版配置仍会 mint 一个版本"，#138 合入后被实测否掉：那条提交改的正是
+       `release-please-config.json`，而 RP 的日志是
+       `✔ No user facing commits found since 9125a3e… - skipping`。原因是类型侧还有一道闸：
+       `ci:` 不算 user facing（`docs:` 算，这才是当初 2.2.6 被开出来的原因）。
        ③ 条目写成 `.` 会把**所有**提交排掉，RP 从此一声不响再也不发版（本仓踩过同形状的
        "永远绿却什么都不做"，见下面 v2.2.2 那段旧账）。
        闸是 `test_exclude_paths_entries_are_all_actionable`：glob / `.` / 不存在的目录 /
        清空列表 / 覆盖 `app/` 这 5 种写法都实测过会红。
+       另外两条例外的账要记着：
+       · **收窄口径会留下"死信 release PR"** —— RP 对已开出但内容不再算数的 PR 既不更新也
+         **不关闭**（走 `skipping` 分支），#137 就是靠人关掉的。以后每次动 `exclude-paths`
+         或提交类型口径，都要去 `gh pr list --author app/github-actions` 看一眼有没有旧的要清。
+       · **排除 `tests` 不是零代价**：实测 v2.2.5 的 sdist 里有 **138 个 `tests/` 文件**
+         （wheel 里 0 个，`docs/`/`scripts/`/`.github/` 也都是 0）。所以"只改测试"不发版这条
+         是对** wheel（用户真正装的东西）**成立的判断，对 sdist 不成立 —— 是有意的取舍，别当成无影响。
   2. 手工：`git tag -a` + `gh release create`（v2.2.2 / v2.2.3 / v2.2.4 走的就是这条）。
      手工发版之后 RP 会在下一条 release PR 里把版本号再抬一格（它按 manifest 算），
      所以手工发完要把 `.release-please-manifest.json` 一起抬到刚发的版本，否则两边在版本号上互踩。

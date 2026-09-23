@@ -99,6 +99,18 @@
   模板/静态资源，CI 的 `Playwright E2E Tests` 在该改动合入的 `777bfe1` 上是 success）；
   字体菜单/断网首屏/换页竞态三项**没重跑**（上次取证是 2026-09-19/20 的 v2.2.2 工作树）；
   `Setup.exe` 真机安装与 26 GB 分卷仍未验收。
+- **v2.2.5 只做产物侧回读，没重跑本清单**（2026-09-22 22:3xZ）。这一版的内容是发布链路本身
+  （docker 层缓存 `mode=min`+scope、`release-gate` commit status、DCO 按作者豁免、治理文档），
+  运行时代码零改动，而且主工作树当时有另一个写者在改 38 项 —— 全量门禁的前提"跑测试期间冻结
+  工作树"不成立，所以**不拿局部绿灯冒充本清单执行过**。产物侧取证（RP 自己构建、挂上 Release 的那份）：
+  wheel 28,381,932 B / **1065 条目** / `METADATA Version: 2.2.5`，sdist 28,337,605 B /
+  **1208 文件**（`app/` 1064 + `tests/` 138 + 根 6），两者的 sha256 与 Release 的 `SHA256SUMS`
+  以及 GitHub 自算 `asset.digest` **双向对上**（`4eba3c28…` / `04d012b6…`）；完整性三件套
+  （清单 / `.sig.ed25519` / 公钥）在两个产物里都在；解包后**按包导入**跑
+  `run_startup_selfcheck(enforce=True)` = `total=16 passed=16 failed=0 skipped=0
+  manifest_signed=true`，rc=0（按文件路径加载会打断相对导入 → 假红，见 GOTCHAS #150）。
+  顺带一条分发面事实：**`tests/` 随 sdist 分发**（138 个），wheel 里则没有 ——
+  `release-please-config.json` 把 `tests` 放进 `exclude-paths` 的取舍依据就在这里（§1 第 5 条）。
 - 上一次全量执行：2026-09-19，v2.2.2 工作树。机器侧佐证：全量 `pytest`（含 e2e、服务在线，
   `--cov=app/integrated_app`）**2084 passed / 40 skipped / 0 failed，8m14s**，覆盖率 51.94%
   （门禁 45%）；mypy 103 = 基线；`tests/e2e/` 68 passed + 5 skipped（跳过的 5 条是视觉回归，
