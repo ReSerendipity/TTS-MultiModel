@@ -36,44 +36,63 @@ on:
 
 permissions:
   contents: read
+  # smoke-status 要把"本次有没有真推理"写成一条独立 check run（neutral 而非红），
+  # 见 jobs.smoke-status。只需本工作流级别的 checks:write，不动仓库设置。
+  checks: write
 
 jobs:
   runner-precheck:
     runs-on: ubuntu-latest
     outputs:
-      available: ${{ steps.check.outputs.available }}
+      # verdict ∈ {available, no-repo-admin-token-secret, no-registered-gpu-runner,
+      #            runner-query-denied}；gpu-smoke 只在 available 时跑。
+      verdict: ${{ steps.probe.outputs.verdict }}
     steps:
-      - name: Check for an online self-hosted GPU runner
-        id: check
+      - name: Probe GPU runner availability
+        id: probe
         env:
           GH_TOKEN: ${{ secrets.REPO_ADMIN_TOKEN }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            # 以前这里是 ::notice::，整个 run 以"success"收场 —— 而真推理 job 一次都没跑过
-            # （本仓 2026-09-21 实测：3 次 schedule run 全部 gpu-smoke=skipped，
-            # 且 REPO_ADMIN_TOKEN 这个 secret 从未配置）。跳过必须显眼，不能长得像通过。
-            echo "::warning::REPO_ADMIN_TOKEN 未配置 → 无法查询 runner 在线状态，本次 GPU 真机冒烟**没有跑**。真推理覆盖率为 0，别把本 run 当验收依据。"
-            echo "### GPU 真机冒烟未执行" >> "$GITHUB_STEP_SUMMARY"
-            echo "原因：secret \`REPO_ADMIN_TOKEN\` 未配置，无法判断有没有在线的 \`gpu\` self-hosted runner。" >> "$GITHUB_STEP_SUMMARY"
-            echo "available=false" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          # 这里不再"发个 warning 然后让整条 run 长得像通过"。
+          # 2026-09-24 审计实测：REPO_ADMIN_TOKEN 从未配置 + 注册 runner 数 = 0，
+          # 于是 3 次 schedule run 全是 gpu-smoke=skipped 而 run 结论 success；
+          # docs/DOD.md:225 记的"改成 ::warning + job summary"那一步并不够 ——
+          # warning 还是读作成功。现在 precheck 只负责把原因定成机器可读的 verdict，
+          # 显式结论由 smoke-status 落成一条 neutral check run。
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "verdict=no-repo-admin-token-secret" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # runners 列表 API 需要管理员级 token（GITHUB_TOKEN 即使 actions:read 也 403）
           COUNT=$(gh api "repos/${{ github.repository }}/actions/runners" \
-            --jq '[.runners[] | select(.status == "online") | select(any(.labels[]; .name == "gpu"))] | length')
-          echo "online gpu-labelled runners: ${COUNT}"
-          if [ "${COUNT}" -gt 0 ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
+            --jq '[.runners[] | select(.status == "online") | select(any(.labels[]; .name == "gpu"))] | length' 2>/dev/null || echo "")
+          if [ -z "$COUNT" ]; then
+            echo "verdict=runner-query-denied" >> "$GITHUB_OUTPUT"
+          elif [ "${COUNT}" -gt 0 ]; then
+            echo "online gpu-labelled runners: ${COUNT}"
+            echo "verdict=available" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::没有在线的 self-hosted \`gpu\` runner → 本次 GPU 真机冒烟**没有跑**，真推理覆盖率为 0（别把本 run 的 green 当验收依据）。"
-            echo "### GPU 真机冒烟未执行" >> "$GITHUB_STEP_SUMMARY"
-            echo "原因：仓库里没有在线且带 \`gpu\` 标签的 self-hosted runner（注册数见上一步输出）。" >> "$GITHUB_STEP_SUMMARY"
-            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "verdict=no-registered-gpu-runner" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: "Skip reason: no-repo-admin-token-secret（REPO_ADMIN_TOKEN 未配置）"
+        if: steps.probe.outputs.verdict == 'no-repo-admin-token-secret'
+        run: |
+          echo "::notice::本次没有任何 GPU 真推理：secret REPO_ADMIN_TOKEN 未配置，precheck 无法查询 runner 在线状态。"
+          echo "### GPU 真机冒烟未执行" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`verdict=no-repo-admin-token-secret\` —— precheck 拿不到管理员级 token，无法判断有没有在线的 \`gpu\` runner。" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Skip reason: no-registered-gpu-runner（在线 gpu runner 数为 0）"
+        if: steps.probe.outputs.verdict == 'no-registered-gpu-runner'
+        run: |
+          echo "::notice::本次没有任何 GPU 真推理：仓库里没有在线且带 gpu 标签的 self-hosted runner。"
+          echo "### GPU 真机冒烟未执行" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`verdict=no-registered-gpu-runner\` —— 查询成功，但在线的 \`gpu\` runner 数为 0。" >> "$GITHUB_STEP_SUMMARY"
 
   gpu-smoke:
     needs: runner-precheck
-    if: needs.runner-precheck.outputs.available == 'true'
+    if: needs.runner-precheck.outputs.verdict == 'available'
     runs-on: [self-hosted, gpu]
     timeout-minutes: 150
     env:
@@ -196,3 +215,57 @@ jobs:
             ${{ runner.temp }}/server.err
           if-no-files-found: ignore
           retention-days: 7
+
+  smoke-status:
+    # 把"这一轮到底有没有跑成真 GPU 推理"落成一眼可读的结论：一条独立的 check run
+    # （名字自带 ASCII 原因码）+ run 页面摘要。用 neutral 而不是 exit 1 ——
+    # 注册 runner 属基础设施决策，每周红一次不是目标；但 success + warning 也不行，
+    # 因为它读起来就是"过了"。check 名用 ASCII：本仓在 Windows 控制台与文档里
+    # 多次栽过非 ASCII 编码（release-gate 的 cp1252、bsdtar 中文名），不再引入新变量。
+    name: GPU real-inference attestation
+    needs: [runner-precheck, gpu-smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish verdict as a neutral check run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERDICT: ${{ needs.runner-precheck.outputs.verdict }}
+          SMOKE: ${{ needs.gpu-smoke.result }}
+          HEAD_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # precheck 自己挂掉时 verdict 会是空串 —— 别让它落成一个读不出原因的裸名字。
+          VERDICT="${VERDICT:-precheck-did-not-report}"
+          SMOKE="${SMOKE:-unknown}"
+          case "${SMOKE}/${VERDICT}" in
+            success/*)                          CONCL=success;   NAME="[gpu-smoke] REAL inference executed and passed" ;;
+            failure/*)                          CONCL=failure;   NAME="[gpu-smoke] REAL inference executed and FAILED" ;;
+            cancelled/*)                        CONCL=cancelled; NAME="[gpu-smoke] real inference cancelled" ;;
+            skipped/no-repo-admin-token-secret) CONCL=neutral;   NAME="[gpu-smoke] NO REAL INFERENCE - no-repo-admin-token-secret" ;;
+            skipped/no-registered-gpu-runner)   CONCL=neutral;   NAME="[gpu-smoke] NO REAL INFERENCE - no-registered-gpu-runner" ;;
+            skipped/runner-query-denied)        CONCL=neutral;   NAME="[gpu-smoke] NO REAL INFERENCE - runner-query-denied (token lacks rights)" ;;
+            skipped/*)                          CONCL=neutral;   NAME="[gpu-smoke] NO REAL INFERENCE - ${VERDICT}" ;;
+            *)                                  CONCL=neutral;   NAME="[gpu-smoke] status unknown (${SMOKE}/${VERDICT})" ;;
+          esac
+
+          {
+            echo "## GPU 真机推理结论：${NAME}"
+            echo ""
+            echo "| 项 | 值 |"
+            echo "|---|---|"
+            echo "| gpu-smoke job 结果 | ${SMOKE} |"
+            echo "| precheck verdict | ${VERDICT} |"
+            echo "| check conclusion | ${CONCL} |"
+            echo ""
+            echo "整条 run 的 Success 不代表真推理跑过 —— 本条 check 才是结论。"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # 写不进去就是自证机制本身坏了，这种情况要红（它和"没有真推理"是两回事）。
+          if ! gh api -X POST "repos/${{ github.repository }}/check-runs"               -f "name=${NAME}"               -f "head_sha=${HEAD_SHA}"               -f status=completed               -f "conclusion=${CONCL}"               -f "html_url=${RUN_URL}"               -f "external_id=gpu-smoke-${{ github.run_id }}-${{ github.run_attempt }}"               -f "title=GPU smoke - real inference attestation"               -f "summary=${NAME} | verdict=${VERDICT} | gpu-smoke=${SMOKE} | run=${RUN_URL}" >/dev/null; then
+            echo "::error::check run 写入失败：需要 permissions.checks=write。自证链路断了，必须显眼。"
+            exit 1
+          fi
+          echo "已发布 check run：${NAME} -> conclusion=${CONCL}"
