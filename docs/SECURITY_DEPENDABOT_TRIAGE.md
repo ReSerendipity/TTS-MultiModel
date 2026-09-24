@@ -211,6 +211,8 @@ Dockerfile:38  RUN python3.12 -m pip install --no-cache-dir --user -r requiremen
 5. **到期复审**：`.trivyignore.yaml` 三条的 `expiration` 都是 2026-12-31，到期那一步自动变红；
    pip-audit 侧没有到期机制（它不支持 expiration），所以 A1–A16 的 16 个号靠本文 + 人守 ——
    2026-12-31 之前要么按条件 1 抬版本消掉，要么把这份表带着做一次显式再确认。
+   那个"人守"的载体是 issue **#158**（`tracking: transformers 16 条 pip-audit 豁免跟踪（复审截止 2026-12-31）`）：
+   它是本文 §1 表的摘要，判据以本文为准，本文改动需同步到它。到期那次显式再确认在它下面留结论。
 
 ## 5. 告警 dismiss 的执行记录与 API 实测（2026-09-21 已全部做完）
 
