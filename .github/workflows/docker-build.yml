@@ -10,6 +10,13 @@ permissions:
   contents: read
   security-events: write
 
+# 同一 PR / 同一分支的连续 push 只留最新一条：本作业 `push: false` + `load: true`，
+# 既不写注册表也不用 buildx 层缓存（对比 docker-publish.yml 的固定 scope gha 缓存），
+# 所以被后来者取消没有外部副作用；而单次要 20+ 分钟，堆队列纯属浪费。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build & Scan Image

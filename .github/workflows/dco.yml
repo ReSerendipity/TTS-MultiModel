@@ -11,12 +11,14 @@ jobs:
   dco:
     name: DCO Check
     # DCO 的 Signed-off-by 是对**人类**贡献者的来源认证；机器生成的 commit 无从签名。
-    # 原先这里只放过 dependabot[bot]，于是 release-please 开的 release PR 永远红：
-    # 它的提交作者是 github-actions[bot]（用 GitHub API 建提交，不走本地 git，
-    # 工作流里的 GIT_AUTHOR_* 环境变量对它无效），既没有也**不可能有** Signed-off-by。
-    # 净效果 = 分支保护要求 DCO 的仓库里，自动发版路径结构上不可用（#115/#120/#132 都撞在这）。
-    # 现在按"提交作者"而不是"PR 作者"判，豁免名单见脚本里的 BOT_AUTHOR_EMAILS。
-    if: github.actor != 'dependabot[bot]'
+    # 豁免按"提交作者"而不是"PR 作者"判，名单见脚本里的 BOT_AUTHOR_EMAILS：
+    # release-please 的 release PR 作者是 github-actions[bot]（用 GitHub API 建提交，
+    # 不走本地 git，工作流里的 GIT_AUTHOR_* 对它无效），既没有也**不可能有** Signed-off-by。
+    #
+    # 这里原先还挂着一行 `if: github.actor != 'dependabot[bot]'`，删掉它的原因是实测：
+    # 它让作业在 dependabot PR 上整体 **skipped**（#148/#149/#150 三条的 dco 作业结论都是
+    # skipped），而 skipped 的检查拿不到 conclusion=pass —— 于是 DCO 永远无法被设为必需检查。
+    # 脚本体自己会跳过机器提交并 `exit 0`，所以放开后 bot PR 上是真 pass，不是变红。
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
