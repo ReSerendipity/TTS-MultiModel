@@ -22,7 +22,7 @@ cryptography==50.0.1
 decorator==5.3.1
 einops==0.8.2
 fastapi==0.141.1
-filelock==3.32.7
+filelock==4.0.1
 fsspec==2026.7.0
 funasr==1.4.15
 h11==0.16.0
