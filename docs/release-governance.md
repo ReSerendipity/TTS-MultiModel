@@ -54,11 +54,17 @@
      - **release PR 拿不到 CI**（见下面那段），所以合并前的判据是本地跑
        `python scripts/check_release_readiness.py --root <release 分支检出>`，
        结论也会以 commit status `release-gate` 打在 PR head 上（把它加成必需检查是 owner 的一键决定）。
-     - **它不会替你发出镜像**："bot 的 `GITHUB_TOKEN` 不级联"这条规则不止吃 release PR 的 CI，
-       也吃**它自己打的 tag 和它自己建的 Release** 这两个下游事件。实测对照（2026-09-22）：
-       v2.2.2 / v2.2.3 / v2.2.4 三次手工 `git tag` 各留下 `docker-publish.yml` 一条
-       `ev=push br=vX.Y.Z` 和 `gpg-signed-release.yml` 一条 `ev=release`；
-       v2.2.5 这两个工作流上**都是 0 条**（`gh run list --workflow docker-publish.yml` 复算）。
+     - **它不会替你发出 semver 镜像标签**（原先这条写成"不会替你发出镜像"，以偏概全，见下）：
+       "bot 的 `GITHUB_TOKEN` 不级联"这条规则确实吃掉**它自己打的 tag 与它自己建的 Release**
+       这两个下游事件。实测对照（2026-09-22）：v2.2.2 / v2.2.3 / v2.2.4 三次手工 `git tag`
+       各留下 `docker-publish.yml` 一条 `ev=push br=vX.Y.Z` 和 `gpg-signed-release.yml`
+       一条 `ev=release`；v2.2.5 起这两个**腿**就都没了。
+       但 2026-09-25 复算要补一句口径：`docker-publish.yml` 的 `on.push` 里本来就有
+       `branches: [main]`，所以合 release commit 那次 main push **会**触发它 —— 实测 v2.2.5
+       当天 13:29:56Z 就有一条 `push/main` 且 success。所以"0 条"说的是 **tag 腿**，
+       不等于"镜像没发"：那次发的是 `:latest` 与 `:sha-<long>`，而 `type=semver` 在分支
+       push 上不出标签，因此 `:2.2.5` 当时确实不存在（14:12:36Z 那条
+       `workflow_dispatch --ref v2.2.5` 就是去补它的；v2.2.6 同型，09-23T07:30:15Z）。
        于是合完 release PR 后要立刻补一手 `gh workflow run docker-publish.yml --ref vX.Y.Z` ——
        `metadata-action` 的 `type=semver` 在 tag ref 上就能出 `:2.2.5`，**不用改工作流**。
        不补的后果是具体的：`deploy/kubernetes/deployment.yaml` 指着 ghcr 上不存在的标签，
@@ -153,6 +159,29 @@
 > **一整份全红的假失败**，真相是独立用 hashlib 复算 18/18 逐字节相符。Windows 上也可用
 > `Get-FileHash` 逐卷核；用 `sha256sum` 的退出码时别把它接进管道 ——
 > `sha256sum -c ... | tail` 之后 `$?` 是 `tail` 的（这条今天又踩了一次）。
+
+### 2.1 v2.3.0 走自动路径的实测记录（2026-09-25）
+
+- #145 被 RP 从 2.2.7 重写为 **2.3.0**（#142 带 `feat:` → minor，与"提交类型决定 bump"一致），
+  head 上加了一笔人工同步提交 `dd6f7d6` 补齐五处手工位，随后 squash 合并 → main `cd80d735`
+  （提交作者 `github-actions[bot]`），合并时刻 08:32:03Z。
+- **tag `v2.3.0` 与 Release 由 RP 创建：`publishedAt = 2026-09-25T08:32:15Z`、`isDraft = false`**，
+  4 个资产齐（`tts_multimodel-2.3.0-py3-none-any.whl`、`tts_multimodel-2.3.0.tar.gz`、
+  `SHA256SUMS`、`SHA256SUMS.scripts`）。
+- main push 侧：**30 条 check success + 1 skipping**（reusable 模板里的 `Test + Coverage`），零失败。
+- **两个时间戳（tag 创建 → 镜像落库）**：`docker-publish` 被那次 main push 触发
+  （run `36113445697`，08:32:05Z 起、**09:03:14Z success**，≈31 min），但它推上去的是
+  `ghcr.io/reserendipity/tts_multimodel:latest` 与 `:sha-cd80d735c838d8744e0fdd7ed88efe1c5a64f137`
+  （同 run 日志的 `Processing tags input` 可核：两条 `type=semver` 在分支 push 上不产出标签）。
+  **`:2.3.0` 尚未落库** —— `deploy/kubernetes/deployment.yaml` 里的 `2.3.0` 目前是目标值而非已存在值；
+  补法沿用 v2.2.5 / v2.2.6 的先例：`gh workflow run docker-publish.yml --ref v2.3.0`。
+- `release-gate` 的 tag 腿与 `gpg-signed-release` 对 v2.3.0 **各 0 条 run**（这两条 workflow 的
+  `head_branch` 全集只到 `v2.2.4`）；GPG 那一格另因 `GPG_PRIVATE_KEY` 未配置而本就走 skip + notice，
+  记为已知状态，不算故障。
+- 一条边界修正：上面说"release PR 拿不到任何 CI"，但**这次 #145 上 30 条 check 真跑了**。
+  级联规则吃的是"**由 `GITHUB_TOKEN` 产生的提交**"，不是"bot 开的 PR" —— 人工往 release 分支补一笔
+  再推，必需检查就能在 release PR 上完整跑一遍（本版第一次出现这个状态，也是它能带着
+  `pytest 12 格全绿` 被合并的原因）。
 
 ## 3. 回滚（详见 `docs/rollback_sop.md`）
 
