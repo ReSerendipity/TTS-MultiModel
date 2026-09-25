@@ -2,6 +2,21 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.3.0](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.6...v2.3.0) (2026-09-25)
+
+
+### Features
+
+* **upstream-sync:** 落地 2.5 参数面 + prompt_text 链路与护栏 + 上游同步探针 ([#142](https://github.com/ReSerendipity/TTS_MultiModel/issues/142)) ([d7f609f](https://github.com/ReSerendipity/TTS_MultiModel/commit/d7f609fae4381cb8b234d2d194aa921cb6bba918))
+
+
+### Bug Fixes
+
+* **security:** 路径包含性与对外错误面各收敛到一处 ([#155](https://github.com/ReSerendipity/TTS_MultiModel/issues/155)) ([d875c9c](https://github.com/ReSerendipity/TTS_MultiModel/commit/d875c9c9d757478d2041f70dd8524a727205b313))
+* **security:** 转义 step-audio-editx / voicebox 成功页的请求可控插值 ([#153](https://github.com/ReSerendipity/TTS_MultiModel/issues/153)) ([3d549a8](https://github.com/ReSerendipity/TTS_MultiModel/commit/3d549a8946f864b3e8fe4a5afabf164425253dc3))
+* **ui:** [#130](https://github.com/ReSerendipity/TTS_MultiModel/issues/130) —— 16 处（不是 7 处）内联事件属性不再把服务器值拼进 JS 字符串，加一条全仓闸 ([650825c](https://github.com/ReSerendipity/TTS_MultiModel/commit/650825cd371e7a18f2599531c0e59d44e4f98c35))
+* **ui:** 16 处内联事件属性不再把服务器值拼进 JS 字符串，改成 data-* + 事件委托（[#130](https://github.com/ReSerendipity/TTS_MultiModel/issues/130)） ([ac9c1dd](https://github.com/ReSerendipity/TTS_MultiModel/commit/ac9c1ddd1c97c610430265cfee373ba021a89dae))
+
 ## [2.2.6](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.5...v2.2.6) (2026-09-23)
 
 

@@ -1,6 +1,6 @@
 {
-  "version": "2.2.6",
-  "release_date": "2026-09-23",
+  "version": "2.3.0",
+  "release_date": "2026-09-25",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.2.6：这一版修的是「照着 k8s 清单上线却拉不到镜像」。清单、README 与回滚 SOP 里的镜像名一直写的是 ghcr.io/reserendipity/tts-multimodel（连字符），而 docker-publish 真正推的是 tts_multimodel（下划线：名字由 github.repository 整体小写得到，下划线原样保留）—— 连字符那个包从来不存在，照清单起的两个容器（含预建目录的 init 容器）必然 ImagePullBackOff。名字与 tag 形状现在由 tests/test_image_name_consistency.py 从工作流推导钉住：原先那道版本位闸把名字写死在正则里，所以只核得出版本、核不出名字。清单同时补上 imagePullSecrets: ghcr-pull 与 README 里的建法——那个包不是匿名可拉的，缺这一步 kubectl apply 不会报错、Pod 却永远起不来。另外 docker-publish 加了并发组（同一天曾有三条 20+ 分钟的构建并行、抢同一份 10 GiB 层缓存），回滚 SOP 那条命令去掉多余的 v 前缀。真机侧的验收没重跑：这一版不含运行时代码改动。"
+  "changelog": "2.3.0：这一版的主干是极致克隆的 prompt_text 链路与 2.5 参数面落地，外加两条上游同步探针（#142）；安全面做了三处收敛——路径包含性与对外错误面各收成一处（#155）、step-audio-editx / voicebox 成功页的请求可控插值改为转义（#153）、16 处内联事件属性不再把服务器值拼进 JS 字符串并加了全仓闸（#130）。口径要说清三件事：GPU 真机推理链路本轮没有覆盖（self-hosted runner 数为 0，release-gate 只跑过 fixture）；CI 侧新增的 DCO 自证与并发去重属门禁改动，不改运行行为；以及 release-please 自己打的 tag 不会级联触发 docker-publish，所以 2.3.0 的容器镜像需要显式发布（手工 git tag 或 dispatch），k8s 清单的镜像 tag 在那之前只是目标值而非已存在值。"
 }

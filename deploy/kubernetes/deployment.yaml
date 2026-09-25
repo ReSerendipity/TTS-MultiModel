@@ -44,7 +44,7 @@ spec:
         # P0-1：subPath 挂载要求 PVC 内子目录预先存在（kubelet 不会自动创建）。
         # 用主镜像（离线可用、自带 python）在可写的 data 卷上预建全部运行时目录。
         - name: init-dirs
-          image: ghcr.io/reserendipity/tts_multimodel:2.2.6
+          image: ghcr.io/reserendipity/tts_multimodel:2.3.0
           imagePullPolicy: IfNotPresent
           command: ["python3.12", "-c",
             "import os; [os.makedirs(f'/mnt/data/{d}', exist_ok=True) for d in ['data','outputs','logs','cache','lora','personas']]; print('init-dirs ok')"]
@@ -65,7 +65,7 @@ spec:
               memory: "256Mi"
       containers:
         - name: tts
-          image: ghcr.io/reserendipity/tts_multimodel:2.2.6
+          image: ghcr.io/reserendipity/tts_multimodel:2.3.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 7869

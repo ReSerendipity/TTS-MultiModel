@@ -8,7 +8,7 @@
 
 ## 1. 版本号规范
 
-- 遵循 SemVer `MAJOR.MINOR.PATCH`。**已发布最新 = v2.2.6（2026-09-23）**。
+- 遵循 SemVer `MAJOR.MINOR.PATCH`。**已发布最新 = v2.3.0（2026-09-25）**。
   版本号出现在 11 处（`version.json`/`pyproject.toml`/`config.yaml`/`desktop/*`/`scripts/installer/setup.nsi`），
   但只有 tag + GitHub Release 同时存在才算发出去；核对：`gh release view v<版本>`。
   > 其中 `desktop/package-lock.json` 在 `.gitignore` 里（不是仓库内的版本位）；仓库内跟踪的 9 处
