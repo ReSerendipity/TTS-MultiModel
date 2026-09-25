@@ -33,6 +33,7 @@
 
 import contextlib
 import os
+import re
 import tempfile
 import time
 from collections.abc import Callable
@@ -502,8 +503,11 @@ def fn_voxcpm_ultimate_clone(
     advanced_denoise: float,
     advanced_steps: int,
     advanced_seed: int,
+    ref_text: str = "",
 ) -> tuple[tuple | None, str]:
-    """VoxCPM 极致克隆路由层入口（向后兼容：函数名/参数/返回结构 100% 不变）。
+    """VoxCPM 极致克隆路由层入口（向后兼容：函数名/既有参数/返回结构不变）。
+
+    ``ref_text`` 是本次新增的**末尾带默认值**参数，老调用方逐位传参不受影响。
 
     本函数是 UI / 路由层调用的传统入口，参数与早期版本完全兼容，
     内部通过 tts_error_handler 装饰器统一异常，再委托到
@@ -519,7 +523,15 @@ def fn_voxcpm_ultimate_clone(
 
     @tts_error_handler
     def _wrapped(
-        text, instruction, ref_audio_path, advanced_cfg, advanced_norm, advanced_denoise, advanced_steps, advanced_seed
+        text,
+        instruction,
+        ref_audio_path,
+        advanced_cfg,
+        advanced_norm,
+        advanced_denoise,
+        advanced_steps,
+        advanced_seed,
+        ref_text="",
     ):
         """终极克隆 WebUI 入口的内部包装函数（带 tts_error_handler 装饰器）。
 
@@ -538,6 +550,8 @@ def fn_voxcpm_ultimate_clone(
             advanced_denoise: 降噪强度。
             advanced_steps: 扩散步数。
             advanced_seed: 随机种子。
+            ref_text: 参考音频的转写文本（上游 prompt_text）。非空时直接采用并
+                跳过 ASR；留空则由 SenseVoice 自动识别。
 
         Returns:
             与 fn_voxcpm_ultimate_clone 返回值相同。
@@ -557,6 +571,7 @@ def fn_voxcpm_ultimate_clone(
                 advanced_steps,
                 advanced_seed,
                 start_time,
+                ref_text=ref_text,
             )
         finally:
             elapsed = time.time() - start_time
@@ -565,8 +580,73 @@ def fn_voxcpm_ultimate_clone(
             logger.info(f"[VoxCPM极致克隆] 生成耗时 {elapsed:.1f} 秒")
 
     return _wrapped(
-        text, instruction, ref_audio_path, advanced_cfg, advanced_norm, advanced_denoise, advanced_steps, advanced_seed
+        text,
+        instruction,
+        ref_audio_path,
+        advanced_cfg,
+        advanced_norm,
+        advanced_denoise,
+        advanced_steps,
+        advanced_seed,
+        ref_text,
     )
+
+
+# 参考文本与参考音频是否配套的判据（UPSTREAM_SYNC A5 的护栏）。
+#
+# 为什么必须有：prompt_text 参与的是**音素级对齐**，给它一段只覆盖了参考音频
+# 开头几句的文本，比不给文本更糟——实测 personas/gf1.txt（63 字）配 47.84s 的
+# gf1.wav，产物从 5.7s 塌成 0.29s、说话人相似度从 0.89 掉到 0.30，还触发
+# 坏例重试把单次耗时从 41s 拉到 321s。而 personas/*.txt 存的恰恰是**演示台词**
+# 不是音频转写，用户很容易照着它填。
+#
+# 阈值来自实测六个内置音色的"字数/秒"分布：配套区间 3.32–5.57，
+# 唯一那份残缺转写是 1.32，两者相距 2.5 倍，取 2.5/1.5 作分界留了充足余量。
+# 英文按词折算成等价汉字（1 词 ≈ 2 字时长），避免把正常的英文转写误判成残缺。
+_CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]")
+_LATIN_WORD_RE = re.compile(r"[A-Za-z0-9']+")
+_PROMPT_TEXT_REJECT_CPS = 1.5  # 低于此值判定为"明显不完整"，丢弃用户输入改用 ASR
+_PROMPT_TEXT_SUSPECT_CPS = 2.5  # 介于两者之间：保留用户输入，但在结果里提示
+
+
+def _prompt_text_units(text: str) -> int:
+    """把混合文种折算成"等价汉字数"：CJK 逐字计，拉丁词按 2 字计。"""
+    return len(_CJK_RE.findall(text)) + 2 * len(_LATIN_WORD_RE.findall(text))
+
+
+def _classify_prompt_text_alignment(ref_text: str, duration_s: float) -> tuple[str, float]:
+    """判用户给的参考文本是否与参考音频配套。
+
+    Args:
+        ref_text: 用户填写的参考音频转写文本。
+        duration_s: 参考音频时长（秒）。
+
+    Returns:
+        ``(verdict, units_per_second)``，verdict 取 ``ok`` / ``suspect`` /
+        ``reject`` / ``unknown``（拿不到时长或文本为空时）。
+    """
+    if not ref_text or duration_s <= 0:
+        return "unknown", 0.0
+    cps = _prompt_text_units(ref_text) / duration_s
+    if cps < _PROMPT_TEXT_REJECT_CPS:
+        return "reject", round(cps, 2)
+    if cps < _PROMPT_TEXT_SUSPECT_CPS:
+        return "suspect", round(cps, 2)
+    return "ok", round(cps, 2)
+
+
+def _audio_duration_seconds(path: str | None) -> float:
+    """读参考音频时长；读不了返回 0（判据会退化为 unknown 而不阻断合成）。"""
+    if not path:
+        return 0.0
+    try:
+        import soundfile as _sf
+
+        info = _sf.info(str(path))
+        return float(info.frames) / float(info.samplerate)
+    except Exception as exc:  # noqa: BLE001 - 时长只用于启发式判断，失败不得影响主流程
+        logger.debug(f"[VoxCPM极致克隆] 参考音频时长读取失败（跳过文本配套性检查）: {exc}")
+        return 0.0
 
 
 def _fn_voxcpm_ultimate_clone_impl(
@@ -579,6 +659,7 @@ def _fn_voxcpm_ultimate_clone_impl(
     advanced_steps: int,
     advanced_seed: int,
     start_time: float = 0,
+    ref_text: str = "",
 ) -> tuple[tuple | None, str]:
     """极致克隆内部实现（与旧版行为完全一致，包含 ASR 参考文本识别流程）。
 
@@ -589,7 +670,7 @@ def _fn_voxcpm_ultimate_clone_impl(
         4. 构建 gen_kwargs_builder（包含 prompt_wav_path + prompt_text）；
         5. 委托 generate_with_template 执行推理（跳过外层进度 start，
            因为本函数已手动启动进度条）；
-        6. 若 ASR 成功，成功消息中显示识别到的参考文本前 50 字。
+        6. 若 ASR 成功，成功消息中显示识别到的参考文本前 50 字并注明来源。
 
     Args:
         text: 待合成文本。
@@ -608,7 +689,7 @@ def _fn_voxcpm_ultimate_clone_impl(
     """
     from ...model_registry import registry
 
-    _progress_mgr.start(total_segments=1, phase="ASR 识别参考音频...")
+    _progress_mgr.start(total_segments=1, phase="准备参考音频...")
 
     processed_ref_path_for_asr = ref_audio_path
     if ref_audio_path and hasattr(registry.voxcpm_model, "denoiser") and registry.voxcpm_model.denoiser:
@@ -622,24 +703,52 @@ def _fn_voxcpm_ultimate_clone_impl(
             logger.warning(f"[VoxCPM极致克隆] ZipEnhancer降噪失败，使用原始音频: {type(e).__name__}: {e}")
             processed_ref_path_for_asr = ref_audio_path
 
-    ref_text = ""
-    if processed_ref_path_for_asr:
+    ref_text = (ref_text or "").strip()
+    ref_text_source = "user" if ref_text else ""
+    alignment_notice = ""
+    if ref_text:
+        verdict, cps = _classify_prompt_text_alignment(ref_text, _audio_duration_seconds(ref_audio_path))
+        if verdict == "reject":
+            # 文本量只有音频应有的几分之一 —— 几乎可以断定是"贴了开头一句"。
+            # 这种输入比留空更有害（实测产物塌成 0.29s、相似度 0.30、耗时翻 6 倍），
+            # 所以丢弃它并回落到 ASR，同时把原因显式回给用户，不做静默替换。
+            alignment_notice = (
+                f"你填写的参考文本约 {cps} 字/秒，与参考音频长度明显不匹配，已改用自动转写（ASR）以保证音素对齐。"
+            )
+            logger.warning(f"[VoxCPM极致克隆] {alignment_notice} 原文本前 40 字：{ref_text[:40]!r}")
+            ref_text, ref_text_source = "", ""
+        elif verdict == "suspect":
+            alignment_notice = (
+                f"参考文本约 {cps} 字/秒，明显低于正常语速，可能不是这段音频的完整转写；"
+                "本次仍按你填写的内容执行，如音色异常请改留空走自动转写。"
+            )
+            logger.warning(f"[VoxCPM极致克隆] {alignment_notice}")
+
+    if not ref_text and processed_ref_path_for_asr:
+        _progress_mgr.update_phase("ASR 识别参考音频...")
         try:
             res = registry.voxcpm_asr.generate(input=processed_ref_path_for_asr)
             if res and len(res) > 0 and isinstance(res[0], dict) and "text" in res[0]:
                 ref_text = str(res[0]["text"])
+                ref_text_source = "asr"
                 logger.info(f"[VoxCPM极致克隆] ASR 识别成功: {ref_text[:50]}...")
         except (RuntimeError, OSError, AttributeError, ValueError, PydanticValidationError) as e:
             logger.warning(f"[VoxCPM极致克隆] ASR 识别失败: {type(e).__name__}: {e}")
             ref_text = ""
-        finally:
-            if (
-                processed_ref_path_for_asr != ref_audio_path
-                and processed_ref_path_for_asr
-                and os.path.isfile(processed_ref_path_for_asr)
-            ):
-                with contextlib.suppress(OSError):
-                    os.remove(processed_ref_path_for_asr)
+    elif ref_text:
+        # 用户已手填参考文本：直接采用，跳过 ASR。填得准比猜得近更值钱——
+        # prompt_text 参与音素对齐，ASR 转错一个字就会污染克隆结果。
+        logger.info(f"[VoxCPM极致克隆] 使用用户提供的参考文本（已跳过 ASR）: {ref_text[:50]}...")
+
+    # 降噪临时文件用完即删。原先挂在 ASR 的 finally 里，现在"跳过 ASR"这条路径
+    # 也生成了临时文件，所以清理必须提到分支外面，否则每次极致克隆漏一个文件。
+    if (
+        processed_ref_path_for_asr != ref_audio_path
+        and processed_ref_path_for_asr
+        and os.path.isfile(processed_ref_path_for_asr)
+    ):
+        with contextlib.suppress(OSError):
+            os.remove(processed_ref_path_for_asr)
 
     _progress_mgr.update_phase("准备极致克隆推理...")
 
@@ -671,7 +780,7 @@ def _fn_voxcpm_ultimate_clone_impl(
         return kwargs
 
     def message_builder(duration_sec, total):
-        """构建极致克隆成功消息（包含 ASR 识别到的参考文本预览）。
+        """构建极致克隆成功消息（标明参考文本是你填的还是 ASR 猜的）。
 
         Args:
             duration_sec: 生成音频时长（秒）。
@@ -680,9 +789,14 @@ def _fn_voxcpm_ultimate_clone_impl(
         Returns:
             str: 用户可见的成功消息。
         """
+        prefix = f"生成成功！{alignment_notice} " if alignment_notice else "生成成功！"
+        if ref_text and ref_text_source == "user":
+            return f"{prefix}参考文本（按你填写的内容）: {ref_text[:50]}..."
         if ref_text:
-            return f"生成成功！参考文本: {ref_text[:50]}..."
-        return "生成成功！"
+            return (
+                f"{prefix}参考文本由 ASR 自动转写: {ref_text[:50]}...（转写有误会拉低克隆一致性，可手填参考文本重跑）"
+            )
+        return prefix
 
     return generate_with_template(
         text=text,

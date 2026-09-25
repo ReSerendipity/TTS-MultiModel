@@ -56,7 +56,7 @@ Attributes:
     index: 段索引（从 0 开始），用于前端排序展示。
     text: 该段对应的文本内容。
     audio: 生成的音频波形 numpy 数组（float32）。
-    sample_rate: 音频采样率（通常为 24000 或 48000）。
+    sample_rate: 音频采样率（Hz），取自模型实例的 ``sample_rate``（VoxCPM2 为 48000）。
     duration_ms: 音频时长（毫秒），用于前端进度条计算。
     seed_used: 该段生成实际使用的随机种子（支持 per-chunk seed 复现）。
 """
@@ -235,6 +235,7 @@ def stream_generate(
         GenerationError: 全部段均推理失败（无任何成功音频）时抛出。
     """
     from ...gpu_utils import free_gpu_memory
+    from ...resampling import get_declared_sample_rate
 
     if not segments:
         raise ValueError("stream_generate: segments 不能为空")
@@ -245,7 +246,7 @@ def stream_generate(
     all_seed_used: list[int] = []
     total_duration_ms = 0
     success_count = 0
-    sample_rate = 48000
+    sample_rate: int = int(getattr(model, "sample_rate", 0) or get_declared_sample_rate("voxcpm2") or 48000)
     merged_audio: np.ndarray | None = None
     temp_files: list[str] = []
 

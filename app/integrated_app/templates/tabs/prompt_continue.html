@@ -15,7 +15,7 @@
                     <div class="card-body">
                         <div class="fg">
                             <label class="fl" for="pc-text">{{ "prompt_prefix"|t(lang) }}</label>
-                            <textarea name="text" id="pc-text"
+                            <textarea name="text" dir="auto" id="pc-text"
                                       class="ft tts-textarea tts-auto-resize"
                                       rows="3"
                                       placeholder="{{ 'prompt_prefix_placeholder'|t(lang) }}"
@@ -49,7 +49,7 @@
                         </div>
                         <div class="fg">
                             <label class="fl" for="pc-prompt-text">{{ "prompt_text_label"|t(lang) }}</label>
-                            <input type="text" name="prompt_text" id="pc-prompt-text" class="fi" placeholder="{{ 'ref_text_placeholder'|t(lang) }}" required>
+                            <input type="text" name="prompt_text" dir="auto" id="pc-prompt-text" class="fi" placeholder="{{ 'ref_text_placeholder'|t(lang) }}" required>
                         </div>
                     </div>
                 </div>

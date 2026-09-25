@@ -34,6 +34,87 @@ SUPPORTED_LANGUAGES = ("zh", "en", "ja", "ko")
 DEFAULT_LANGUAGE = "zh"
 
 # ---------------------------------------------------------------------------
+# 发音 / 风格控制标记的保护（UPSTREAM_SYNC B2 + A4）
+# ---------------------------------------------------------------------------
+#
+# 规范化管线里有三处会毁掉用户手写的控制标记，且都是**静默**的：
+#   1. clean_markdown_emoji 的 ``_re_md_html_tag = <[^>]+>`` 会把整个
+#      ``<重庆|chong2 qing4>`` 当 HTML 标签删掉（实测：标注直接消失，后面的正文照常合成）。
+#   2. _normalize_zh 的数字口语化把 ``chong2`` 改成 ``chong二``。
+#   3. normalize_punctuation 在 lang=zh 时把 ``(``/``)`` 换成全角，破坏 VoxCPM 的
+#      Voice Design 风格前缀 ``(A young woman, gentle and sweet voice)``。
+#
+# 做法：进管线前先把标记替换成 Unicode 私用区（U+E000..U+F8FF）的单字符占位符
+# —— 私用区既不含数字/拉丁字母（躲过 1/2），也不在 _fullwidth_to_halfwidth 与
+# normalize_punctuation 的映射表里（躲过 3）——出管线后原样换回。
+#
+# 模式串与上游逐字一致，漂移由 tests/test_pronunciation_markers.py 拦：
+#   reference_repos/index-tts-main/indextts/infer_v2_5.py:39   发音标注
+#   reference_repos/index-tts-main/indextts/utils/front.py:82  裸拼音+声调
+PRONUNCIATION_ANNOTATION_PATTERN = r"<([^|>\n]+)\|([^>\n]+)>"
+
+PINYIN_TONE_PATTERN = (
+    r"(?<![a-z])((?:[bpmfdtnlgkhjqxzcsryw]|[zcs]h)?"
+    r"(?:[aeiouüv]|[ae]i|u[aio]|ao|ou|i[aue]|[uüv]e|[uvü]ang?|uai|[aeiuv]n|[aeio]ng|ia[no]|i[ao]ng)"
+    r"|ng|er)([1-5])"
+)
+
+# 句首风格前缀（VoxCPM 的 Voice Design 语法）。只认句首，正文里的圆角仍走原规则。
+STYLE_PREFIX_PATTERN = r"^\([A-Za-z][^()\n]*\)"
+
+_CONTROL_MARKER_RE = re.compile(
+    f"{PRONUNCIATION_ANNOTATION_PATTERN}|{PINYIN_TONE_PATTERN}|{STYLE_PREFIX_PATTERN}",
+    re.IGNORECASE,
+)
+
+_PUA_FIRST = 0xE000
+_PUA_LAST = 0xF8FF
+
+
+def _shield_control_markers(text: str) -> tuple[str, dict[str, str]]:
+    """把控制标记换成私用区占位符。
+
+    Args:
+        text: 原始文本。
+
+    Returns:
+        ``(待规范化的文本, {占位符: 原始标记})``；无标记时返回原文与空字典。
+    """
+    matches = list(_CONTROL_MARKER_RE.finditer(text))
+    if not matches:
+        return text, {}
+
+    reserved = {ch for ch in text if _PUA_FIRST <= ord(ch) <= _PUA_LAST}
+    free = [chr(cp) for cp in range(_PUA_FIRST, _PUA_LAST + 1) if chr(cp) not in reserved]
+    if len(matches) > len(free):
+        logger.warning(
+            f"[text_frontend] 控制标记 {len(matches)} 处超出可用占位符 {len(free)} 个，本次不保护（将按原规则被改写）"
+        )
+        return text, {}
+
+    guards: dict[str, str] = {}
+    pieces: list[str] = []
+    cursor = 0
+    for idx, match in enumerate(matches):
+        pieces.append(text[cursor : match.start()])
+        token = free[idx]
+        guards[token] = match.group(0)
+        pieces.append(token)
+        cursor = match.end()
+    pieces.append(text[cursor:])
+    return "".join(pieces), guards
+
+
+def _unshield_control_markers(text: str, guards: dict[str, str]) -> str:
+    """把占位符换回用户手写的控制标记。"""
+    if not guards:
+        return text
+    for token, original in guards.items():
+        text = text.replace(token, original)
+    return text
+
+
+# ---------------------------------------------------------------------------
 # Unicode 范围常量（用于语言检测）
 # ---------------------------------------------------------------------------
 
@@ -692,7 +773,26 @@ class TextNormalizer:
         return text
 
     def normalize(self, text: str, lang: str) -> str:
-        """按指定语言规则规范化文本
+        """按指定语言规则规范化文本，并原样保留用户手写的控制标记。
+
+        与 :meth:`_normalize_body` 的唯一区别是先屏蔽、后还原
+        ``<文字|发音>`` / ``chong2`` 拼音 / 句首 ``(风格描述)`` 三类标记
+        （详见模块内"控制标记保护"注释）。
+
+        Args:
+            text: 输入文本
+            lang: 语言代码 (zh/en/ja/ko)，也接受 UI 的中文显示名
+
+        Returns:
+            规范化后的文本
+        """
+        if not text:
+            return text
+        shielded, guards = _shield_control_markers(text)
+        return _unshield_control_markers(self._normalize_body(shielded, lang), guards)
+
+    def _normalize_body(self, text: str, lang: str) -> str:
+        """规范化主体流程（不含控制标记保护，勿直接对外调用）。
 
         处理流程：
           1. 清理 Markdown/Emoji
@@ -1856,6 +1956,22 @@ def normalize_text(text: str, lang: str) -> str:
     """
     _check_content_safety(text)
     return get_frontend().normalize(text, lang)
+
+
+def check_text_safety(text: str) -> None:
+    """只跑内容安全门禁，不做任何文本改写。
+
+    给"用户要求原文直出"的场景用（``text_normalization=False``，例如保留
+    ``<重庆|chong2 qing4>`` 发音标记）：跳过规范化不等于跳过安全过滤——
+    :func:`normalize_text` 里安全检查是绑在改写前面的，绕过得手动补回。
+
+    Args:
+        text: 待检测文本。
+
+    Raises:
+        ContentSafetyError: 文本未通过内容安全检测。
+    """
+    _check_content_safety(text)
 
 
 def _check_content_safety(text: str) -> None:

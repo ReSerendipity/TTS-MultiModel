@@ -59,6 +59,8 @@ from ....generation import _save_wav_compatible, split_text_for_tts
 from ....gpu_utils import free_gpu_memory, is_oom_error
 from ....model_registry import registry
 from ....monitor import get_health_monitor
+from ....resampling import get_declared_sample_rate
+from ....streaming_monitor import StreamingQualityMonitor
 from ..utils import (
     _EMBEDDED_PLAYER_HTML,
     _GENERATION_HARD_TIMEOUT_S,
@@ -80,11 +82,32 @@ from ..utils import (
 )
 
 # --- 常量提取 (S-R1/A3-1 消除魔法数字) ---
-_STREAMING_SAMPLE_RATE: int = 48000  # VoxCPM2 流式生成固定采样率
+_STREAMING_SAMPLE_RATE_FALLBACK: int = 48000  # 兜底值：VoxCPM2 的 AudioVAE 原生 48kHz
 _STREAMING_AUDIO_CHANNELS: int = 1
 _STREAMING_AUDIO_SAMPLE_WIDTH: int = 2  # 16-bit PCM
 _STREAMING_MIN_LEN: int = 2
 _STREAMING_MAX_LEN: int = 4096
+# 流式解码时保留在上下文里的 prompt 音频 patch 数（上游默认 4）。
+# 调大→首包之后的连贯性更好但首包更慢；调小→首包更快但更容易在段界断裂。
+_STREAMING_DEFAULT_PREFIX_LEN: int = 4
+
+
+def _resolve_stream_sample_rate() -> int:
+    """本次流式响应的输出采样率（Hz）——单一事实源的读取口。
+
+    优先级：**已加载模型的 sample_rate**（真正的权威）> config.yaml 的
+    ``models.engines.voxcpm2.sample_rate`` > 本模块兜底常量。
+
+    Why 不做成常量：48000 曾在本文件、resampling.ENGINE_SAMPLE_RATES(抄成 24000)、
+    spec.SAMPLE_RATE、engines/voxcpm2/streaming.py 文档字符串里各写一份，
+    任何一处漂移都会产出"能播放但音调/时长全错"的文件。
+    """
+    model = registry.voxcpm_model
+    rate = getattr(model, "sample_rate", None) if model is not None else None
+    if rate:
+        return int(rate)
+    return get_declared_sample_rate("voxcpm2") or _STREAMING_SAMPLE_RATE_FALLBACK
+
 
 # Why：segment_chars 默认 100（而非直觉上更快的 300/500）的设计决策。
 # 首段 TTFB（用户看到第一段音频开始播放的时间）是体验金指标：
@@ -179,6 +202,7 @@ def _generate_segment_sync(
     inference_timesteps: int,
     stream_denoise: bool,
     prefer_streaming: bool = True,
+    streaming_prefix_len: int = _STREAMING_DEFAULT_PREFIX_LEN,
 ) -> np.ndarray:
     """REFACTOR: [S-R1] 同步生成单段音频（在 executor 线程中调用）。
 
@@ -194,6 +218,8 @@ def _generate_segment_sync(
         inference_timesteps: 推理步数。
         stream_denoise: 是否降噪。
         prefer_streaming: 是否优先使用 generate_streaming 方法。
+        streaming_prefix_len: 流式解码保留在上下文里的 prompt 音频 patch 数，
+            仅 ``prefer_streaming=True`` 分支生效（一次性生成用不到）。
 
     Returns:
         numpy float32 数组音频数据。
@@ -216,6 +242,7 @@ def _generate_segment_sync(
                 denoise=stream_denoise,
                 min_len=_STREAMING_MIN_LEN,
                 max_len=_STREAMING_MAX_LEN,
+                streaming_prefix_len=streaming_prefix_len,
             )
         )
         return np.concatenate(chunks) if chunks else np.array([], dtype=np.float32)
@@ -240,6 +267,7 @@ async def _generate_segment_async(
     stream_denoise: bool,
     prefer_streaming: bool = True,
     timeout_s: float = _GENERATION_HARD_TIMEOUT_S,
+    streaming_prefix_len: int = _STREAMING_DEFAULT_PREFIX_LEN,
 ) -> np.ndarray:
     """REFACTOR: [S-R1/R3] 异步生成单段音频，带超时保护。
 
@@ -251,6 +279,7 @@ async def _generate_segment_async(
         stream_denoise: 是否降噪。
         prefer_streaming: 是否优先使用 generate_streaming 方法。
         timeout_s: 单段生成超时（秒）。
+        streaming_prefix_len: 透传给 ``_generate_segment_sync`` 的流式前缀 patch 数。
 
     Returns:
         numpy float32 数组音频数据。
@@ -271,6 +300,7 @@ async def _generate_segment_async(
                     inference_timesteps,
                     stream_denoise,
                     prefer_streaming,
+                    streaming_prefix_len=streaming_prefix_len,
                 ),
             ),
             timeout=timeout_s,
@@ -282,12 +312,14 @@ async def _generate_segment_async(
 async def _merge_and_save_wav(
     audio_chunks: list[np.ndarray],
     prefix: str = "streaming",
+    sample_rate: int | None = None,
 ) -> tuple[str, float]:
     """REFACTOR: [S-R1] 合并音频块并保存为 WAV 文件。
 
     Args:
         audio_chunks: int16 numpy 数组列表。
         prefix: 文件名前缀。
+        sample_rate: 写盘采样率；None 时按 ``_resolve_stream_sample_rate()`` 取。
 
     Returns:
         (filename, duration_seconds)
@@ -299,13 +331,14 @@ async def _merge_and_save_wav(
         raise ValueError("未生成任何音频数据")
 
     combined: np.ndarray = np.concatenate(audio_chunks)
-    duration_sec: float = len(combined) / _STREAMING_SAMPLE_RATE
+    sr: int = sample_rate or _resolve_stream_sample_rate()
+    duration_sec: float = len(combined) / sr
 
     wav_bytes: io.BytesIO = io.BytesIO()
     with wave.open(wav_bytes, "wb") as wf:
         wf.setnchannels(_STREAMING_AUDIO_CHANNELS)
         wf.setsampwidth(_STREAMING_AUDIO_SAMPLE_WIDTH)
-        wf.setframerate(_STREAMING_SAMPLE_RATE)
+        wf.setframerate(sr)
         wf.writeframes(combined.tobytes())
 
     timestamp: int = int(time.time())
@@ -362,6 +395,7 @@ async def streaming_sse_generation(
     cfg_value: float = Form(2.0, ge=0.1, le=10),
     inference_timesteps: int = Form(10, ge=1, le=200),
     denoise: str = Form("true"),
+    streaming_prefix_len: int = Form(_STREAMING_DEFAULT_PREFIX_LEN, ge=1, le=32),
 ) -> StreamingResponse:
     """VoxCPM2 SSE 流式生成路由（逐段推送音频 + 进度）。
 
@@ -449,11 +483,12 @@ async def streaming_sse_generation(
         try:
             segments: list[str] = split_text_for_tts(text)
             total: int = len(segments)
+            stream_sr: int = _resolve_stream_sample_rate()
 
             meta: str = json.dumps(
                 {
                     "total_segments": total,
-                    "sample_rate": _STREAMING_SAMPLE_RATE,
+                    "sample_rate": stream_sr,
                     "channels": _STREAMING_AUDIO_CHANNELS,
                     "bits": _STREAMING_AUDIO_SAMPLE_WIDTH * 8,
                 },
@@ -462,6 +497,11 @@ async def streaming_sse_generation(
             yield f"event: meta\ndata: {meta}\n\n"
 
             all_chunks: list[np.ndarray] = []
+            # A3 验收要求"全程无爆音/断裂"。StreamingQualityMonitor 早就实现好了但一直
+            # 没有调用者，接在这里：逐块统计削波/静音/极低音量，最后随 done 事件吐出，
+            # 让"听感没问题"变成有数可查的判据，而不是主观描述。
+            quality_monitor = StreamingQualityMonitor(expected_sr=stream_sr)
+            quality_issues: list[str] = []
 
             for idx, seg in enumerate(segments):
                 seg = seg.strip()
@@ -480,11 +520,22 @@ async def streaming_sse_generation(
 
                 # S-R1: 复用 _generate_segment_async（含超时保护 + OOM 逃逸）
                 wav_data: np.ndarray = await _generate_segment_async(
-                    gen_text, actual_ref_path, cfg_value, inference_timesteps, stream_denoise
+                    gen_text,
+                    actual_ref_path,
+                    cfg_value,
+                    inference_timesteps,
+                    stream_denoise,
+                    streaming_prefix_len=streaming_prefix_len,
                 )
 
                 pcm_data: np.ndarray = (wav_data * 32767).astype(np.int16)
                 all_chunks.append(pcm_data)
+
+                report = quality_monitor.analyze_chunk(wav_data)
+                if report.has_issue or report.has_clipping:
+                    issue = f"段{idx}: {report.summary or report.issue_description}"
+                    quality_issues.append(issue)
+                    logger.warning(f"[流式质检] {issue}")
 
                 b64_data: str = base64.b64encode(pcm_data.tobytes()).decode("ascii")
                 yield f"event: audio\ndata: {b64_data}\n\n"
@@ -498,6 +549,7 @@ async def streaming_sse_generation(
                         "status": "done",
                         "filename": filename,
                         "duration": round(duration_sec, 2),
+                        "quality": quality_monitor.get_summary() | {"issues": quality_issues},
                     },
                     ensure_ascii=False,
                 )
@@ -636,7 +688,7 @@ async def streaming_generation(
         else:
             merged = result
 
-        sample_rate: int = _STREAMING_SAMPLE_RATE
+        sample_rate: int = _resolve_stream_sample_rate()
         timestamp: int = int(time.time())
         filename: str = f"streaming_{timestamp}.wav"
         out_path: str = os.path.join(SAVE_DIR, filename)

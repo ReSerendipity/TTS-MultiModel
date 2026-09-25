@@ -731,6 +731,7 @@ _LANG_ALIASES: dict[str, str] = {
     "俄语": "ru",
     "葡萄牙语": "pt",
     "西班牙语": "es",
+    "阿拉伯语": "ar",
     "意大利语": "it",
     "自动检测": "auto",
     # ISO 代码自身与常见大小写 / 区域变体
@@ -747,6 +748,7 @@ _LANG_ALIASES: dict[str, str] = {
     "ru": "ru",
     "pt": "pt",
     "es": "es",
+    "ar": "ar",
     "it": "it",
     "auto": "auto",
 }
@@ -770,8 +772,10 @@ def to_lang_code(value: str | None) -> str:
         return "auto"
     if key in _LANG_ALIASES:
         return _LANG_ALIASES[key]
-    # 区域标签兜底：取主语言子标签（pt-BR -> pt），仍未知则 auto
-    base: str = key.split("-", 1)[0]
+    # 区域标签兜底：取主语言子标签（pt-BR -> pt），仍未知则 auto。
+    # 分隔符要同时认 "-" 和 "_"：Windows 的 locale 名（zh_TW / en_US / ar_EG）用的是
+    # 下划线，只按 "-" 切会让这些形态整体落进 "auto"，等于语种选择静默失效。
+    base: str = re.split(r"[-_]", key, maxsplit=1)[0]
     return _LANG_ALIASES.get(base, "auto")
 
 
@@ -785,6 +789,7 @@ _LANGS = [
     "俄语",
     "葡萄牙语",
     "西班牙语",
+    "阿拉伯语",
     "意大利语",
     "自动检测",
 ]
@@ -804,6 +809,7 @@ _LANG_I18N_KEYS: dict[str, str] = {
     "俄语": "Russian",
     "葡萄牙语": "Portuguese",
     "西班牙语": "Spanish",
+    "阿拉伯语": "Arabic",
     "意大利语": "Italian",
     "自动检测": "Auto detect",
 }

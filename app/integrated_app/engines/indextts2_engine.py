@@ -112,7 +112,7 @@ from ..exceptions import (
     InsufficientVRAMError,
     TTSError,
 )
-from ..text_frontend import normalize_text
+from ..text_frontend import check_text_safety, normalize_text
 
 logger = logging.getLogger("tts_multimodel")
 
@@ -677,6 +677,7 @@ class IndexTTS2Engine(TTSEngine):
         seed: int | None = None,
         duration_factor: float = 1.0,
         lang: str | None = None,
+        text_normalization: bool = True,
         **kwargs: Any,
     ) -> tuple[int, np.ndarray, str]:
         """执行 IndexTTS 2.5 语音合成推理。
@@ -708,6 +709,11 @@ class IndexTTS2Engine(TTSEngine):
                 时抛 :class:`ValidationError`。默认 ``1.0``（不缩放）。
             lang: 合成语言代码。``None`` 时使用构造时传入的 ``self.lang``
                 默认 ``"Auto"``（自动检测）。
+            text_normalization: 是否做文本规范化。默认 ``True``。传 ``False`` 时
+                跳过本项目的 ``normalize_text`` **并**下传上游
+                ``infer(text_normalization=False)``，让 ``<重庆|chong2 qing4>`` 这类
+                发音控制标记原样进模型。内容安全门禁不受此开关影响（始终执行）。
+                上游仅 2.5 的 ``infer`` 有此形参，2.0 只跳我方规范化。
             **kwargs: 额外透传给底层 ``IndexTTS2.infer`` 的参数。
 
         Returns:
@@ -740,9 +746,15 @@ class IndexTTS2Engine(TTSEngine):
         # 注意：TTSError（含内容安全拦截 ContentSafetyError）必须向上传播，
         # 禁止静默降级为原始文本，否则不安全文本会绕过过滤进入合成。
         try:
-            text = normalize_text(text, lang if lang is not None else self.lang)
-            if emo_text and use_emo_text:
-                emo_text = normalize_text(emo_text, lang if lang is not None else self.lang)
+            if text_normalization:
+                text = normalize_text(text, lang if lang is not None else self.lang)
+                if emo_text and use_emo_text:
+                    emo_text = normalize_text(emo_text, lang if lang is not None else self.lang)
+            else:
+                # 用户要求"原文直出"（发音控制标记场景）：跳过改写，但**绝不**跳过内容安全。
+                check_text_safety(text)
+                if emo_text and use_emo_text:
+                    check_text_safety(emo_text)
         except TTSError:
             raise
         except Exception as e:
@@ -890,10 +902,22 @@ class IndexTTS2Engine(TTSEngine):
             _code = to_lang_code(_raw_lang)
             _lang_val = "Auto" if _code == "auto" else _code.upper()
             if _lang_val not in self.supported_langs:
-                logger.debug(f"[IndexTTS2] {self.version} 不支持语言 {_raw_lang}（归一为 {_lang_val}），回退 Auto")
+                # 用户明确指定了语种却不被当前引擎支持时不能只打 debug：
+                # 上游 utils/tokenizer.py 的 lang_to_token 对未知码同样静默回退 common，
+                # 两级静默叠加的结果是"选了 ES/AR 但读出来像中文"，没有任何地方报错。
+                if _code != "auto":
+                    logger.warning(
+                        f"[IndexTTS2] {self.version} 不支持语言 {_raw_lang}（归一为 {_lang_val}），"
+                        f"已回退 Auto；当前支持：{sorted(self.supported_langs)}"
+                    )
+                else:
+                    logger.debug(f"[IndexTTS2] {self.version} 语言 {_raw_lang} 归一为 Auto")
                 _lang_val = "Auto"
             if self.version_str == "2.5":
                 infer_kwargs["lang"] = _lang_val
+                # 上游 infer 的 text_normalization 只管 2.5；2.0 的 infer 无此形参，
+                # 传下去会落进 **generation_kwargs 被 model.generate 拒绝。
+                infer_kwargs["text_normalization"] = bool(text_normalization)
 
             # 透传额外 kwargs，支持高级用户传入底层 IndexTTS2 的其他参数
             infer_kwargs.update(kwargs)

@@ -310,9 +310,15 @@ window.wireGenerationResult = function (rootEl) {
 
 // 语音设计页：设计页没有参考音频可上传，可固化的只有生成结果；后端结果片段已带
 // data-audio-filename，这里取出写入隐藏字段，避免新增一个暴露服务端路径的接口。
+// 所有把结果 swap 进 `<prefix>-result` 的页面共用这一条钩子。
+// 原来只认 'vd-result'，导致 ultimate_clone / script / prompt_continue 三个
+// 同样带 pp-section + result-audio 的页面生成成功后后处理区不出现、
+// "保存为音色"被判缺少音频（GOTCHAS #91 的同一失效形态）。
+// wireGenerationResult 自身已经会校验 id 后缀与 data-audio-filename，
+// 没有结果块的 tab（纯错误片段）会直接 return，所以放宽匹配是安全的。
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     var target = evt.detail && evt.detail.target;
-    if (!target || target.id !== 'vd-result') return;
+    if (!target || !/-result$/.test(target.id)) return;
     window.wireGenerationResult(target);
 });
 

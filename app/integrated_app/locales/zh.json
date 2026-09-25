@@ -880,5 +880,13 @@
   "consent_required": "请先勾选「我已确认拥有该参考声音的使用权或已获得其授权」后再使用该参考音频",
   "consent_why": "用于声音克隆的参考音频须为本人声音或已获版权方授权，否则后端将拒绝生成。",
   "voice_creating": "创建中…",
-  "voice_create_success": "音色创建成功！"
+  "voice_create_success": "音色创建成功！",
+  "pronunciation_help_title": "发音控制",
+  "pronunciation_help_intro": "用 <文字|发音> 强制指定某个词的读法，支持拼音（带声调数字）、CMU 音素、日文假名。",
+  "pronunciation_pinyin_example": "中文拼音：<重庆|chong2 qing4>欢迎你",
+  "pronunciation_cmu_example": "英文 CMU 音素：<read|R EH1 D> the book",
+  "pronunciation_kana_example": "日文假名：<漢|かん>じます",
+  "pronunciation_keep_raw": "原文直出（跳过文本规范化，保证发音标记完整进模型）",
+  "voice_design_style_prefix": "句首可加英文风格提示，如 (A young woman, gentle and sweet voice)正文……",
+  "Arabic": "阿拉伯语"
 }

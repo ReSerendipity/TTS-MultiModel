@@ -880,5 +880,13 @@
   "consent_required": "請先勾選「我已確認擁有該參考聲音的使用權或已獲得其授權」後再使用該參考音訊",
   "consent_why": "用於聲音克隆的參考音訊須為本人聲音或已獲版權方授權，否則後端將拒絕生成。",
   "voice_creating": "建立中…",
-  "voice_create_success": "音色建立成功！"
+  "voice_create_success": "音色建立成功！",
+  "pronunciation_help_title": "發音控制",
+  "pronunciation_help_intro": "用 <文字|發音> 強制指定某個詞的讀法，支援拼音（帶聲調數字）、CMU 音素、日文假名。",
+  "pronunciation_pinyin_example": "中文拼音：<重慶|chong2 qing4>歡迎你",
+  "pronunciation_cmu_example": "英文 CMU 音素：<read|R EH1 D> the book",
+  "pronunciation_kana_example": "日文假名：<漢|かん>じます",
+  "pronunciation_keep_raw": "原文直出（跳過文字正規化，確保發音標記完整進模型）",
+  "voice_design_style_prefix": "句首可加英文風格提示，如 (A young woman, gentle and sweet voice)正文……",
+  "Arabic": "阿拉伯語"
 }

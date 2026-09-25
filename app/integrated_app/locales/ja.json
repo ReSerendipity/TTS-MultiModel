@@ -880,5 +880,13 @@
   "consent_required": "この参照音声を使用する前に「この参照音声の使用権を保有している、または権利者の許可を得ていることを確認します」にチェックしてください",
   "consent_why": "声彩クローンの参照音声は本人の声、または権利者の許諾を得たものである必要があります。未許可の場合、バックエンドは生成を拒否します。",
   "voice_creating": "作成中…",
-  "voice_create_success": "音色を作成しました！"
+  "voice_create_success": "音色を作成しました！",
+  "pronunciation_help_title": "発音制御",
+  "pronunciation_help_intro": "<文字|発音> で特定の語の読みを強制指定できます。ピンイン（声調数字付き）、CMU ARPAbet 音素、日本語かなに対応。",
+  "pronunciation_pinyin_example": "ピンイン： <重庆|chong2 qing4>",
+  "pronunciation_cmu_example": "英語 CMU：<read|R EH1 D> the book",
+  "pronunciation_kana_example": "仮名：<漢|かん>じます",
+  "pronunciation_keep_raw": "テキストをそのまま送信（正規化をスキップして発音マーカーを完全にモデルへ渡す）",
+  "voice_design_style_prefix": "文頭に英語のスタイル指定を置けます。例：(A young woman, gentle and sweet voice)こんにちは…",
+  "Arabic": "アラビア語"
 }

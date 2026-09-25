@@ -316,6 +316,7 @@ async def generate_voxcpm_ultimate(
     seed: int = Form(-1),
     denoise_strength: float | None = Form(None),
     ref_audio_upload: UploadFile | None = File(None),
+    ref_text: str = Form(""),
     lang: str = Form("Auto"),
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
@@ -398,6 +399,7 @@ async def generate_voxcpm_ultimate(
             advanced_denoise=advanced_denoise,
             advanced_steps=steps,
             advanced_seed=seed,
+            ref_text=ref_text,
         )
 
     def _degraded_run():
@@ -413,6 +415,7 @@ async def generate_voxcpm_ultimate(
             advanced_denoise=0.0,
             advanced_steps=degraded_steps,
             advanced_seed=seed,
+            ref_text=ref_text,
         )
 
     return await _execute_generation(

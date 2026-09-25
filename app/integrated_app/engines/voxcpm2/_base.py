@@ -543,8 +543,11 @@ def generate_with_template(
                 remaining = avg * (total - idx)
                 logger.info(f"[{phase_name}] 第 {idx + 1}/{total} 段，已耗时 {elapsed:.1f}s，预计剩余 {remaining:.1f}s")
             else:
-                mode_str = "reference_wav" if ref_audio_path else "默认音色"
-                logger.info(f"[{phase_name}] 第 1/{total} 段，使用 {mode_str} 模式...")
+                # 只报"有没有参考音频"，不要写成模式名：极致克隆走的是
+                # prompt_wav_path + prompt_text，这里曾把它一并打成 reference_wav，
+                # 排查时会误导成"prompt_text 没生效"。
+                mode_str = "带参考音频" if ref_audio_path else "默认音色"
+                logger.info(f"[{phase_name}] 第 {idx + 1}/{total} 段，{mode_str}...")
 
             # per-chunk seed：首次生成时探测 kwargs 中的 seed，后续段递增
             chunk_seed: int | None = None

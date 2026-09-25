@@ -13,6 +13,40 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+#: 仓库里**非自身源码**的目录名（按路径分段比对，不做子串匹配）。
+#: 这些目录都在 `.gitignore` 里，本地会存在、CI 干净检出里没有——不跳会让"只扫自身代码"
+#: 的闸在本地假红、在 CI 假绿：
+#:   - `.venv` / `.venv-relock`：虚拟环境
+#:   - `outputs` / `output`：生成产物；里面塞着安装器 staging 与便携包解包出的**整套 Python
+#:     runtime**（`.../site-packages/` 下 fastapi / setuptools 等第三方包自带旧版本串，
+#:     2026-09-23 实测 `precheck.ps1 -Full` 因此假红 8 处）
+#:   - `dist` / `build`：打包产物
+#:   - `site-packages` / `node_modules`：第三方依赖
+#:   - `__pycache__` / `.*_cache`：工具缓存
+_SKIP_PARTS = {
+    ".git",
+    ".venv",
+    ".venv-relock",
+    "__pycache__",
+    "node_modules",
+    "site-packages",
+    "outputs",
+    "output",
+    "dist",
+    "build",
+    "logs",
+    "cache",
+    "checkpoints",
+    "backups",
+    "_archive",
+    "torch_compile_cache",
+    "prompt_cache",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".eggs",
+}
+
 
 def _find_version_file():
     candidates = [
@@ -60,7 +94,7 @@ def test_no_hardcoded_old_version():
 
     offenders = []
     for pyfile in PROJECT_ROOT.rglob("*.py"):
-        if any(skip in str(pyfile) for skip in [".venv", "__pycache__", "node_modules"]):
+        if _SKIP_PARTS & set(pyfile.relative_to(PROJECT_ROOT).parts):
             continue
         try:
             content = pyfile.read_text(encoding="utf-8", errors="ignore")

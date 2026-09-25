@@ -17,9 +17,12 @@
 
 **引擎专属高级参数（折叠区，用户可视场景选择是否调整）**：
 
-    由于 ``TTSEngine.generate_voice_clone`` 协议定义为 ``**kwargs``，
-    路由将这些参数透传给当前激活引擎，未匹配字段会被引擎忽略，
-    因此一条端点可同时服务多个引擎。
+    ``TTSEngine.generate_voice_clone`` 的协议签名是 ``**kwargs``，但**协议收下不等于
+    底层消化得了**：VoxCPM2 的实现把 kwargs 原样转发给封闭签名的
+    ``fn_voxcpm_clone(text, instruction, ref_audio_path, cfg_value,
+    inference_timesteps, denoise, normalize)``，IndexTTS 的实现转给 ``infer()``
+    且上游会拒绝未知 model_kwargs。所以本路由按当前引擎做一次词汇翻译
+    （见 :func:`_clone_kwargs_for_engine`），不再原名透传。
 
 **参考音频优先级**：ref_audio 上传 > persona_name。二者均缺失时报错
     （通用克隆需要参考音频）。
@@ -44,6 +47,50 @@ from ..utils import (
 )
 
 logger = logging.getLogger("tts_multimodel")
+
+
+def _clone_kwargs_for_engine(
+    engine_name: str,
+    *,
+    seed: int,
+    num_steps: int,
+    guidance_scale: float,
+    language: str,
+) -> dict[str, object]:
+    """把通用路由的表单词汇翻译成当前引擎真正接受的参数名。
+
+    参数名的出处：
+        - ``fn_voxcpm_clone``（engines/voxcpm2/clone.py）只收
+          ``cfg_value`` / ``inference_timesteps`` / ``denoise`` / ``normalize``，
+          **没有** ``seed`` 与 ``language``；喂错名字直接 TypeError。
+        - ``IndexTTS2.infer`` 收 ``lang``；``seed`` 仅在 > 0 时下传
+          （与 indextts2/synthesize.py 的同款判断保持一致，上游会拒绝未知 model_kwargs）。
+
+    Args:
+        engine_name: 当前激活引擎名（``registry.current_engine``）。
+        seed: 已解析好的随机种子（-1 表示随机）。
+        num_steps: 扩散/采样步数。
+        guidance_scale: CFG / guidance 强度。
+        language: 语言偏好。
+
+    Returns:
+        可直接 ``**`` 展开进 ``generate_voice_clone`` 的字典。
+    """
+    if engine_name == "voxcpm2":
+        if seed != -1:
+            logger.warning("[通用克隆] voxcpm2 可控克隆不接受 seed，本次已忽略（复现请用极致克隆的 advanced_seed）")
+        return {"cfg_value": guidance_scale, "inference_timesteps": num_steps}
+
+    if engine_name.startswith("indextts"):
+        extras: dict[str, object] = {}
+        if language:
+            extras["lang"] = language
+        if seed > 0:
+            extras["seed"] = seed
+        return extras
+
+    logger.warning(f"[通用克隆] 引擎 {engine_name!r} 的参数词汇未知，不下传任何引擎专属参数")
+    return {}
 
 
 @router.post(
@@ -134,14 +181,14 @@ async def generic_clone_endpoint(
         if err:
             return err
 
+    effective_seed = -1 if (random_seed or "").lower() == "true" else seed
+
     if not ref_path:
         return _error_html(request, "通用克隆需要参考音频（上传文件或选择音色）")
 
-        effective_seed = -1 if (random_seed or "").lower() == "true" else seed
-
     # 3. 构造生成闭包（在 executor 线程中执行 GPU 推理）
     def _run():
-        """调用当前引擎的 generate_voice_clone。"""
+        """调用当前引擎的 generate_voice_clone（参数名按引擎翻译，见 _clone_kwargs_for_engine）。"""
         current = registry.get_current_engine()
         if current is None:
             raise RuntimeError("当前无已加载引擎")
@@ -149,10 +196,13 @@ async def generic_clone_endpoint(
             text,
             reference_audio_path=ref_path,
             instruction=prompt_text,
-            # 自定义参数透传给引擎            num_steps=num_steps,
-            guidance_scale=guidance_scale,
-            seed=effective_seed,
-            language=language,
+            **_clone_kwargs_for_engine(
+                registry.current_engine or "",
+                seed=effective_seed,
+                num_steps=num_steps,
+                guidance_scale=guidance_scale,
+                language=language,
+            ),
         )
 
     # 4. 统一生成执行器：串行信号量 + 硬超时 + 后处理 + 历史入库 + SSE

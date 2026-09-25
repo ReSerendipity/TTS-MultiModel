@@ -201,6 +201,7 @@ class VoxCPM:
         retry_badcase_ratio_threshold: float = 6.0,
         streaming: bool = False,
         seed: Optional[int] = None,
+        streaming_prefix_len: int = 4,
     ) -> Generator[np.ndarray, None, None]:
         """Synthesize speech for the given text and return a single waveform.
 
@@ -224,6 +225,9 @@ class VoxCPM:
             retry_badcase_ratio_threshold: Threshold for audio-to-text ratio.
             streaming: Whether to return a generator of audio chunks.
             seed: Optional random seed for reproducibility.
+            streaming_prefix_len: Number of prefix audio patches kept in
+                context when decoding in streaming mode. Only meaningful with
+                ``streaming=True``; forwarded to the model implementation.
         Returns:
             Generator of numpy.ndarray: 1D waveform array (float32) on CPU.
             Yields audio chunks for each generation step if ``streaming=True``,
@@ -301,6 +305,7 @@ class VoxCPM:
                 retry_badcase_ratio_threshold=retry_badcase_ratio_threshold,
                 streaming=streaming,
                 seed=seed,
+                streaming_prefix_len=streaming_prefix_len,
             )
 
             if streaming:

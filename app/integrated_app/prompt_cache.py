@@ -888,8 +888,17 @@ def _ensure_cache_dir() -> None:
     get_prompt_cache()._ensure_cache_dir()
 
 
-def _get_prompt_cache_key(audio_path: str) -> str:
-    """向后兼容：根据音频路径生成缓存键（sha256 前 16 位）。"""
+def _get_prompt_cache_key(audio_path: str, prompt_text: str = "") -> str:
+    """向后兼容：根据音频路径生成缓存键（sha256 前 16 位）。
+
+    Args:
+        audio_path: 参考音频路径。
+        prompt_text: 可选的参考转写文本。上游把 prompt_text 的 token 一并编进
+            prompt_cache（见 ``vendor/voxcpm/model/voxcpm2.py`` 的
+            ``generate_with_prompt_cache``），所以同一段音频配不同转写文本
+            **不是同一份缓存**。留空时键值与加这个参数之前逐字节一致，
+            不会让既有的纯音频缓存条目失效。
+    """
     h = hashlib.sha256()
     try:
         with open(audio_path, "rb") as f:
@@ -897,24 +906,34 @@ def _get_prompt_cache_key(audio_path: str) -> str:
                 h.update(chunk)
     except OSError:
         h.update(audio_path.encode("utf-8"))
+    if prompt_text:
+        # 分隔符含 \x00：音频字节里不会出现，避免"音频尾部恰好撞上文本"造成假同源
+        h.update(b"\x00prompt_text\x00" + prompt_text.encode("utf-8"))
     return h.hexdigest()[:16]
 
 
-def load_cached_prompt(audio_path: str) -> Any | None:
+def load_cached_prompt(audio_path: str, prompt_text: str = "") -> Any | None:
     """向后兼容：按音频路径读取缓存嵌入。
 
-    等价于：``key = hash(audio_path); cache.get(key, audio_hash=hash_content(audio_path))``
+    等价于：``key = hash(audio_path [+ prompt_text]); cache.get(key, audio_hash=...)``
     """
     cache = get_prompt_cache()
-    cache_key = _get_prompt_cache_key(audio_path)
+    cache_key = _get_prompt_cache_key(audio_path, prompt_text)
     audio_hash = PromptCache._compute_audio_hash(audio_path)
     return cache.get(cache_key, audio_hash=audio_hash)
 
 
-def save_prompt_cache(audio_path: str, prompt_cache: Any) -> None:
-    """向后兼容：按音频路径保存嵌入缓存。"""
+def save_prompt_cache(audio_path: str, prompt_cache: Any, prompt_text: str = "") -> None:
+    """向后兼容：按音频路径保存嵌入缓存。
+
+    Args:
+        audio_path: 参考音频路径。
+        prompt_cache: 待缓存的预计算嵌入。
+        prompt_text: 参考转写文本；必须与 :func:`load_cached_prompt` 传的一致，
+            否则同一段音频的不同转写会互相命中（键只含音频时就是这个后果）。
+    """
     cache = get_prompt_cache()
-    cache_key = _get_prompt_cache_key(audio_path)
+    cache_key = _get_prompt_cache_key(audio_path, prompt_text)
     cache.put(cache_key, prompt_cache, audio_path_or_data=audio_path)
 
 

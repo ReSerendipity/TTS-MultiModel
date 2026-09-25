@@ -20,6 +20,28 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 os.environ.setdefault("TTS_AUTO_LOAD_MODEL", "0")
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _no_subprocess_coverage():
+    """关掉子进程的 coverage 自动记录，避免 `pytest --cov` 的 combine 阶段随机崩。
+
+    `--cov` 时 pytest-cov 会设 `COVERAGE_PROCESS_START`，而 coverage 自带的
+    ``a1_coverage.pth`` 见到它就对**每个 Python 进程**调用 ``process_startup()``。
+    本套测试里有若干用例要起子进程跑真实脚本（``python -c`` / ``check_release_readiness.py``
+    等），这些子进程 cwd 不在仓库根，读不到 ``pyproject.toml`` 的 ``[tool.coverage.run]
+    branch = true``，于是写出 ``has_arcs='0'`` 的数据文件混进仓库根，
+    与主进程的 ``'1'`` 合并时抛 ``DataError: Can't combine statement coverage data
+    with branch data`` —— 用例全绿但覆盖率闸失败，且是否触发取决于子进程当时的 cwd。
+
+    子进程覆盖率本来就不是这里想要的度量（被测的是 CLI/脚本自身，不是 app/integrated_app），
+    所以从父进程环境里摘掉开关，让子进程不再记录。
+    """
+    saved = {k: os.environ.pop(k) for k in ("COVERAGE_PROCESS_START", "COVERAGE_PROCESS_CONFIG") if k in os.environ}
+    try:
+        yield saved
+    finally:
+        os.environ.update(saved)
+
+
 @pytest.fixture
 def app():
     """Create the real FastAPI application with all routers discovered."""

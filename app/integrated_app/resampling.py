@@ -1,7 +1,7 @@
 """自动音频重采样管线：引擎切换时的采样率统一转换
 
 本模块提供统一的音频重采样功能，用于在 TTS 引擎之间切换时
-（如 VoxCPM2 @24kHz -> IndexTTS2 @16kHz）自动将输出音频
+（如 VoxCPM2 @48kHz -> IndexTTS2 @22.05kHz）自动将输出音频
 重采样到统一的采样率。
 
 支持的常见 TTS 采样率：16000, 22050, 24000, 44100, 48000 Hz。
@@ -33,12 +33,39 @@ logger = logging.getLogger("tts_multimodel")
 # 常见 TTS 采样率集合
 COMMON_SAMPLE_RATES: frozenset[int] = frozenset({16000, 22050, 24000, 44100, 48000})
 
-# 各引擎默认输出采样率
+# 各引擎默认输出采样率 —— **仅作 config 不可用时的兜底表**。
+# 权威值是 config.yaml 的 ``models.engines.<name>.sample_rate``，经
+# ``model_registry.get_engine_spec()`` 读取；两边必须一致，由
+# tests/test_engine_sample_rate_consistency.py 强制。
+# 历史坑：此表曾抄成 voxcpm2=24000 / indextts=16000，与真实出音（48000 / 22050）
+# 差近一倍——按它重采样会把音频变成慢速低沉。当时全仓无引用所以没暴露。
 ENGINE_SAMPLE_RATES: dict[str, int] = {
-    "voxcpm2": 24000,
-    "indextts2": 16000,
-    "indextts20": 16000,
+    "voxcpm2": 48000,
+    "indextts2": 22050,
+    "indextts20": 22050,
 }
+
+
+def get_declared_sample_rate(engine: str) -> int | None:
+    """取引擎声明的输出采样率：config.yaml 优先，本模块兜底表次之。
+
+    Args:
+        engine: 引擎名（如 ``"voxcpm2"``）。
+
+    Returns:
+        采样率（Hz）；两边都不知道时返回 ``None``。
+    """
+    try:
+        from .model_registry import get_engine_spec
+
+        spec = get_engine_spec(engine)
+        declared = getattr(spec, "sample_rate", None) if spec is not None else None
+        if declared:
+            return int(declared)
+    except Exception as exc:  # noqa: BLE001 - 采样率解析不该让调用方崩，回落兜底表
+        logger.debug(f"[resampling] 读取 {engine} 的引擎规格失败，回落兜底表: {exc}")
+    return ENGINE_SAMPLE_RATES.get(engine)
+
 
 # 默认统一目标采样率
 DEFAULT_TARGET_SR: int = 24000
@@ -620,14 +647,18 @@ class ResamplingPipeline:
         Raises:
             AudioProcessingError: 引擎名称未知
         """
-        source_sr = ENGINE_SAMPLE_RATES.get(from_engine)
+        source_sr = get_declared_sample_rate(from_engine)
         if source_sr is None:
-            raise AudioProcessingError(f"未知源引擎: {from_engine}，已知引擎: {list(ENGINE_SAMPLE_RATES.keys())}")
+            raise AudioProcessingError(
+                f"未知源引擎: {from_engine}，已知引擎: {sorted(ENGINE_SAMPLE_RATES)}（兜底表）或 config.yaml models.engines"
+            )
 
         if to_engine is not None:
-            target_sr = ENGINE_SAMPLE_RATES.get(to_engine)
+            target_sr = get_declared_sample_rate(to_engine)
             if target_sr is None:
-                raise AudioProcessingError(f"未知目标引擎: {to_engine}，已知引擎: {list(ENGINE_SAMPLE_RATES.keys())}")
+                raise AudioProcessingError(
+                    f"未知目标引擎: {to_engine}，已知引擎: {sorted(ENGINE_SAMPLE_RATES)}（兜底表）或 config.yaml models.engines"
+                )
         else:
             target_sr = self.config.target_sr
 
@@ -646,9 +677,11 @@ class ResamplingPipeline:
         Raises:
             AudioProcessingError: 引擎名称未知
         """
-        sr = ENGINE_SAMPLE_RATES.get(engine_name)
+        sr = get_declared_sample_rate(engine_name)
         if sr is None:
-            raise AudioProcessingError(f"未知引擎: {engine_name}，已知引擎: {list(ENGINE_SAMPLE_RATES.keys())}")
+            raise AudioProcessingError(
+                f"未知引擎: {engine_name}，已知引擎: {sorted(ENGINE_SAMPLE_RATES)}（兜底表）或 config.yaml models.engines"
+            )
         return sr
 
     def __repr__(self) -> str:

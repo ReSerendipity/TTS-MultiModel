@@ -880,5 +880,13 @@
   "consent_required": "이 참조 음성을 사용하기 전에 \"이 참조 음성의 사용 권리를 보유했거나 권리자의 승인을 받았음을 확인합니다\"에 체크하세요",
   "consent_why": "음성 클론용 참조 오디오는 본인의 목소리이거나 저작권자의 허가를 받은 것이어야 하며, 그렇지 않으면 백엔드가 생성을 거부합니다.",
   "voice_creating": "생성 중…",
-  "voice_create_success": "음색이 성공적으로 생성되었습니다!"
+  "voice_create_success": "음색이 성공적으로 생성되었습니다!",
+  "pronunciation_help_title": "발음 제어",
+  "pronunciation_help_intro": "<문자|발음> 형식으로 단어의 독음을 강제 지정할 수 있습니다. 병음(성조 숫자), CMU ARPAbet 음소, 일본어 가나 지원.",
+  "pronunciation_pinyin_example": "중국어 병음: <重庆|chong2 qing4>",
+  "pronunciation_cmu_example": "영어 CMU: <read|R EH1 D> the book",
+  "pronunciation_kana_example": "일본어 가나: <漢|かん>じます",
+  "pronunciation_keep_raw": "원문 그대로 전송(정규화를 건너뛰어 발음 표기가 모델에 온전히 전달되도록 함)",
+  "voice_design_style_prefix": "문장 앞에 영어 스타일 지정을 둘 수 있습니다. 예: (A young woman, gentle and sweet voice)여러분…",
+  "Arabic": "아랍어"
 }

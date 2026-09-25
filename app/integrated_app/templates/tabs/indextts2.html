@@ -10,6 +10,24 @@
         {% include 'partials/text_input.html' %}
         {% endwith %}
 
+        {# B2 发音控制：语法是上游 IndexTTS 2.5 的 <文字|发音>（infer_v2_5.py:39），
+           不是裸写拼音——裸写只有带声调数字的拼音在 lang=zh/en/ja 时被识别。 #}
+        <details class="advanced-params" id="it2-pronunciation-help" style="margin-top:4px;border:1px solid var(--border-subtle,var(--border-medium));border-radius:10px;background:var(--bg-secondary,var(--bg-primary));">
+            <summary style="padding:8px 14px;cursor:pointer;font-weight:600;font-size:13px;color:var(--text-secondary);">{{ "pronunciation_help_title"|t(lang) }}</summary>
+            <div style="padding:10px 12px;font-size:12px;line-height:1.7;color:var(--text-secondary);">
+                <p style="margin:0 0 6px;">{{ "pronunciation_help_intro"|t(lang) }}</p>
+                <ul style="margin:0 0 8px;padding-left:18px;">
+                    <li><code>{{ "pronunciation_pinyin_example"|t(lang) }}</code></li>
+                    <li><code>{{ "pronunciation_cmu_example"|t(lang) }}</code></li>
+                    <li><code>{{ "pronunciation_kana_example"|t(lang) }}</code></li>
+                </ul>
+                <label style="display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="it2-text-normalization" name="text_normalization" value="false">
+                    {{ "pronunciation_keep_raw"|t(lang) }}
+                </label>
+            </div>
+        </details>
+
         {% with prefix='it2' %}
         {% include 'partials/language_selector.html' %}
         {% endwith %}

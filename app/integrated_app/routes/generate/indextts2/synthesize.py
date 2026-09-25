@@ -203,6 +203,7 @@ async def generate_indextts2(
     emo_alpha_audio: float = Form(0.8),
     target_duration: float = Form(0.0),
     duration_scale: float = Form(1.0),
+    text_normalization: str = Form("true"),
     tempo_factor: float = Form(1.0),
     voice_enhancement: str = Form("false"),
     target_lufs: float = Form(-16.0),
@@ -459,6 +460,10 @@ async def generate_indextts2(
                 infer_kwargs["duration_factor"] = duration_factor
             if seed > 0 and supports_seed:
                 infer_kwargs["seed"] = seed
+            # B2 发音控制：勾选"原文直出"时跳过规范化，让 <重庆|chong2 qing4> 这类
+            # 标记完整进模型。只在关闭时下传，默认路径的键集合与改动前完全一致。
+            if (text_normalization or "true").strip().lower() != "true":
+                infer_kwargs["text_normalization"] = False
 
             # engine.infer() 的对外契约是 (sample_rate, wav, output_path) 三元组
             # （见 engines/indextts2_engine.py 的 Returns 说明与内部调用点）。

@@ -15,7 +15,7 @@
                     <div class="card-body">
                         <div class="fg">
                             <label class="fl" for="vc-text">{{ "synthesis_text"|t(lang) }}</label>
-                            <textarea name="text" id="vc-text"
+                            <textarea name="text" dir="auto" id="vc-text"
                                       class="ft tts-textarea tts-auto-resize"
                                       rows="3"
                                       placeholder="{{ 'default_clone_text'|t(lang) }}"
@@ -93,7 +93,7 @@
                             </div>
                             <div class="fg">
                                 <label class="fl" for="vc-ref-text">{{ "ref_text"|t(lang) }}</label>
-                                <textarea name="ref_text" id="vc-ref-text" class="ft" rows="2" placeholder="{{ 'ref_text_placeholder'|t(lang) }}"></textarea>
+                                <textarea name="ref_text" dir="auto" id="vc-ref-text" class="ft" rows="2" placeholder="{{ 'ref_text_placeholder'|t(lang) }}"></textarea>
                             </div>
                             <div class="fg">
                                 <label class="fl" for="vc-instruction">{{ "control_instruction"|t(lang) }} <span style="font-size:10px;color:var(--t3)">({{ 'optional'|t(lang) }})</span></label>

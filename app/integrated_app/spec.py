@@ -7,7 +7,9 @@
 from dataclasses import dataclass
 
 # ── 常量 ──
-SAMPLE_RATE: int = 48000  # 采样率 (Hz)
+SAMPLE_RATE: int = 48000  # 本层公式的规范采样率（= VoxCPM2 原生）；各引擎实际出音采样率
+# 不以这里为准，权威值在 config.yaml models.engines.<name>.sample_rate，
+# 经 resampling.get_declared_sample_rate() 读取（tests/test_engine_sample_rate_consistency.py 守）。
 MAX_CHARS_PER_SEGMENT: int = 200  # 单段 TTS 最大字符数
 SPLIT_MAX_CHARS: int = 200  # 长文本分段最大字符数
 MIN_CHARS_PER_SEGMENT: int = 50  # 单段 TTS 最小字符数

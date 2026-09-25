@@ -880,5 +880,13 @@
   "consent_required": "Please check \"I confirm I own the rights to this reference voice or have obtained authorization\" before using this reference audio",
   "consent_why": "The reference audio for voice cloning must be your own voice or properly licensed; otherwise the backend will refuse to generate.",
   "voice_creating": "Creating…",
-  "voice_create_success": "Voice profile created successfully!"
+  "voice_create_success": "Voice profile created successfully!",
+  "pronunciation_help_title": "Pronunciation control",
+  "pronunciation_help_intro": "Use <word|pronunciation> to force how a word is read: pinyin with tone digits, CMU ARPAbet phonemes, or Japanese kana.",
+  "pronunciation_pinyin_example": "Chinese pinyin: <重庆|chong2 qing4>",
+  "pronunciation_cmu_example": "English CMU: <read|R EH1 D> the book",
+  "pronunciation_kana_example": "Japanese kana: <漢|かん>じます",
+  "pronunciation_keep_raw": "Send text as-is (skip normalization so pronunciation markers reach the model intact)",
+  "voice_design_style_prefix": "Optionally prefix an English style hint, e.g. (A young woman, gentle and sweet voice)Hello...",
+  "Arabic": "Arabic"
 }

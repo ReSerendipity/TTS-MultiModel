@@ -140,6 +140,20 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
+      # 上游同步探针（离线档）。抓的是"改了 app/integrated_app/vendor/ 或
+      # reference_repos/ 却没在 SOURCE.md + configs/upstream_sync_state.json 登记"——
+      # 这类未登记改动会让下一次上游同步无法分辨"我们的修复"与"上游的新代码"。
+      # 用 --offline：不联网、~0.2s，CI 与断网机器上行为一致；联网比对留给手动/SOP。
+      # 用 --selftest：先跑已知答案自检（应判"同"与应判"异"的样本各若干），不过就退出码 2，
+      # 绝不允许把"探测链路坏了"输出成"无差异"；自检过后仍继续正式比对。
+      # --strict + --no-report：只做门禁判定，不在每次提交落一份报告文件。
+      - id: check-upstream-sync
+        name: Upstream Vendor Sync Check (offline)
+        entry: python scripts/check_upstream_sync.py --offline --selftest --strict --no-report
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
 
 # Configuration
 

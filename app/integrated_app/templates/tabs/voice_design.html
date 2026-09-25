@@ -16,7 +16,7 @@
                     <form id="vd-form" hx-post="/api/generate/voxcpm_design" hx-target="#vd-result" hx-swap="innerHTML" hx-indicator="#vd-spinner" x-data="{ vdTab: 'create' }">
                         <div class="fg">
                             <label class="fl" for="vd-text">{{ "synthesis_text"|t(lang) }}</label>
-                            <textarea name="text" id="vd-text"
+                            <textarea name="text" dir="auto" id="vd-text"
                                       class="ft tts-textarea tts-auto-resize"
                                       rows="3"
                                       placeholder="{{ 'enter_text_placeholder'|t(lang) }}"
@@ -25,6 +25,9 @@
                                       data-segment-max-chars="{{ gen_split_max_chars }}"
                                       data-auto-resize="true"></textarea>
                             <div class="cc" id="vd-char-counter">0/{{ engine_max_total_chars }} | {{ "per_segment"|t(lang) }} {{ gen_split_max_chars }}{{ "chars"|t(lang) }}</div>
+                            {# A4 Voice Design：括号前缀是写给模型的风格提示，vendor 里没有括号解析，
+                               纯靠 prompt 约定；规范化曾把它全角化，现由 text_frontend 保护句首半角圆角。 #}
+                            <div class="cc" style="opacity:.8">{{ "voice_design_style_prefix"|t(lang) }}</div>
                         </div>
                         <div class="fg">
                             <label class="fl" for="vd-lang-select">{{ "language"|t(lang) }}</label>

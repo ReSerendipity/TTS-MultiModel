@@ -23,7 +23,8 @@
 公开 API（新增）：
     parse_script(script_text) -> List[ScriptLine]
     generate_script_lines(model, lines, persona_map, **kwargs) -> List[ScriptLine]
-    concatenate_lines(lines, silence_ms=250, sample_rate=24000) -> (wav, sr)
+    concatenate_lines(lines, silence_ms=250, sample_rate=None) -> (wav, sr)
+        （sample_rate=None 时取 voxcpm2 声明采样率，不在本模块写字面量）
     export_script_to_zip(lines, full_wav, export_path) -> str
 """
 
@@ -42,6 +43,7 @@ import numpy as np
 
 from ...exceptions import EngineSwitchError
 from ...gpu_utils import free_gpu_memory, is_oom_error
+from ...resampling import get_declared_sample_rate
 from ._base import (
     SAVE_DIR,
     GenerationError,
@@ -53,6 +55,11 @@ from ._base import (
     logger,
 )
 from .decorators import with_generation_context
+
+# 拼接默认采样率的最后兜底：权威顺序是 config.yaml models.engines.voxcpm2.sample_rate
+# → resampling.ENGINE_SAMPLE_RATES，两者都取不到才用它（同 routes 侧的
+# _STREAMING_SAMPLE_RATE_FALLBACK 口径，不是第一事实源）。
+_CONCAT_SAMPLE_RATE_FALLBACK = 48000
 
 
 class ScriptLine(NamedTuple):
@@ -422,7 +429,7 @@ def _resample_or_pad(
 def concatenate_lines(
     lines: list[ScriptLine],
     silence_ms: int = 250,
-    sample_rate: int = 24000,
+    sample_rate: int | None = None,
 ) -> tuple[np.ndarray, int]:
     """把已生成的 ScriptLine.audio 拼接为完整波形。
 
@@ -438,20 +445,23 @@ def concatenate_lines(
         - error 行 / audio 为空行：跳过音频拼接，不插入任何静音
 
     采样率处理：
-        - 若某段形状长度对应采样率与 sample_rate 参数不符（例如某段 16kHz 其余 24kHz）
+        - 若某段形状长度对应采样率与 sample_rate 参数不符（例如某段 22.05kHz 其余 48kHz）
           → 自动尝试 librosa.resample 统一到 sample_rate；resample 失败时用 0 静音填充
           相同点数，避免整笔因为采样率不一致失败。
 
     Args:
         lines: generate_script_lines() 返回的 ScriptLine 列表。
         silence_ms: 台词段间默认静音毫秒数（0~5000，越界 clamp）。
-        sample_rate: 期望输出采样率。
+        sample_rate: 期望输出采样率；None 时取 voxcpm2 在 config.yaml 声明的值
+            （不在本模块硬写，避免与引擎真实输出速率脱钩）。
 
     Returns:
         Tuple[np.ndarray, int]: (concatenated_waveform, sample_rate)。
             如果无任何有效音频，返回 (空数组 zeros(1), sample_rate) 保证后续保存不会崩溃。
     """
     silence_ms = max(0, min(silence_ms, 5000))
+    if sample_rate is None:
+        sample_rate = int(get_declared_sample_rate("voxcpm2") or _CONCAT_SAMPLE_RATE_FALLBACK)
     base_silence_samples = int(sample_rate * silence_ms / 1000.0)
 
     segments: list[np.ndarray] = []
@@ -698,7 +708,7 @@ def fn_voxcpm_script_studio(
         ]
         raise GenerationError("剧本合成失败：所有台词行均未成功。错误明细：\n  - " + "\n  - ".join(fails[:10]))
 
-    wav_merged, sr_out = concatenate_lines(result_lines, silence_ms=300, sample_rate=48000)
+    wav_merged, sr_out = concatenate_lines(result_lines, silence_ms=300)
 
     timestamp = int(time.time())
     out_path = os.path.join(SAVE_DIR, f"voxcpm_script_{timestamp}.wav")

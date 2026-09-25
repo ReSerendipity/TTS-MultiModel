@@ -1,0 +1,83 @@
+# VoxCPM2 LoRA 微调配置（scripts/train_voxcpm_finetune.py --config_path=configs/lora_config.yaml）
+#
+# 这个文件的存在是为了补上一条断链：训练脚本的用法说明自 2026-09 起就引用
+# configs/lora_config.yaml，但仓库里从未有过该文件，按文档敲命令必然
+# FileNotFoundError。键名严格取自 train() 的形参表（vendor/voxcpm/training/config.py
+# 的 load_yaml_config 只做 yaml.safe_load，然后 train(**yaml_args) 展开），
+# 多写一个未知键就是 TypeError —— 所以 tests/test_lora_training_config.py 会把
+# "键集合 ⊆ train() 形参" 钉成断言。
+#
+# 状态：**未经真机训练验证**。本仓 README 一直把 LoRA 训练标为实验特性；
+# 本次只补配置骨架，不执行训练（用户决策）。第一次真跑前请先按下面的
+# "上手前必须改的三处" 替换占位值。
+
+# ── 上手前必须改的三处 ──────────────────────────────────────────────
+# 1) 基座模型目录（需已下载；model/ 是 AGENTS.md 禁区，不要手改内容）
+pretrained_path: model/VoxCPM2
+
+# 2) 数据清单：HuggingFace datasets 的 jsonl，字段 audio / text / duration
+#    参考 vendor/voxcpm/training/data.py。下面两个文件本仓不含，需自备。
+train_manifest: data/lora/train_manifest.json
+val_manifest: data/lora/val_manifest.json
+
+# 3) 产物目录：加载侧已支持从 lora/{persona}/ 读取（engines/voxcpm2/lora.py）
+save_path: lora/new_persona
+# ──────────────────────────────────────────────────────────────────
+
+# ── 音频口径 ──────────────────────────────────────────────────────
+# VoxCPM2 的 AudioVAE 输入侧采样率；换基座（如 1.5 档 44.1kHz）时必须同步改。
+sample_rate: 48000
+# AudioVAE 解码输出采样率，仅用于 TensorBoard 里回放音频的正确重采样。
+# 0 表示不做二次重采样。
+out_sample_rate: 48000
+
+# ── batch 与步数（按本机 1× RTX 5070 Ti Laptop 12GB 单卡给的安全档）──
+# 说明：LoRA 下 48kHz 音频的显存主要由 AudioVAE 激活占，batch_size=1 +
+# grad_accum 是最稳的起点；OOM 时先降 num_workers 再考虑缩短参考音频。
+batch_size: 1
+grad_accum_steps: 8
+num_workers: 2
+num_iters: 2000
+log_interval: 50
+valid_interval: 500
+save_interval: 1000
+
+# ── 优化器 ────────────────────────────────────────────────────────
+learning_rate: 0.0001
+weight_decay: 0.01
+warmup_steps: 100
+max_steps: 2000
+# 0 = 不限制按 token 的动态 batch（避免超长音频把单步撑爆）
+max_batch_tokens: 0
+# 梯度裁剪；0 表示关闭（上游向后兼容默认）。LoRA 小数据集建议开 1.0 更稳。
+max_grad_norm: 1.0
+
+# ── 损失权重 ──────────────────────────────────────────────────────
+# 键名与 train() 内部一致："loss/diff" 是扩散主干重建损失，
+# "loss/stop" 是停止预测（决定句子在哪里收尾）的辅助损失。
+lambdas:
+  "loss/diff": 1.0
+  "loss/stop": 1.0
+
+# ── LoRA 结构 ─────────────────────────────────────────────────────
+# 这几项会被喂给 vendor/voxcpm/model/voxcpm2.py 的 LoRAConfig（Pydantic 模型）。
+# 秩的字段名是 **r**，不是 rank —— Pydantic 默认忽略未知键，写错不会报错只会
+# 静默用默认值。tests/test_lora_training_config.py 会拿 LoRAConfig.model_fields
+# 逐个核对本段键名。
+# scaling 以 buffer 形式存放，所以启用/禁用不会触发 torch.compile 重编译。
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  enable_lm: true
+  enable_dit: true
+  enable_proj: false
+
+# TensorBoard 日志目录；留空则不写 event 文件
+tensorboard: lora/logs
+
+# ── 分发口径 ──────────────────────────────────────────────────────
+# distribute=true 时把 hf_model_id 记进 lora_config.json 的 base_model
+# （给别人复用时比本机绝对路径有用）；false 时记 pretrained_path。
+distribute: false
+hf_model_id: openbmb/VoxCPM2

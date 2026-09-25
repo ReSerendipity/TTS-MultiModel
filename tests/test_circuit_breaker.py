@@ -92,10 +92,41 @@ class TestStateTransitions:
         assert cb._consecutive_failures == 0
 
     def test_half_open_failure_reopens(self, monkeypatch):
-        cb = CircuitBreaker(name="svc", failure_threshold=1, reset_timeout=0.01)
+        """HALF_OPEN 探测失败必须重新 OPEN —— 用可控时钟，不用 sleep。
+
+        原来写成 `reset_timeout=0.01` + `time.sleep(0.02)` 再断言 `state is OPEN`。
+        但 `state` 属性自己会拿 `time.monotonic()` 与冷却窗口比（circuit_breaker.py:127），
+        而 `cb.call()` 每次状态转移都要写日志；在覆盖率插桩 + 全量并发的负载下，
+        两次调用之间就能耗掉 >10 ms，于是读完 HALF_OPEN 后又立刻自动转回 HALF_OPEN，
+        断言偶发扑空（实测：单跑 5/5 通过、整目录 16/16 通过、
+        `precheck -Full` 带 --cov 时失败）。真实时钟在这里既非必要也不可靠，
+        故改为由测试自己推进时间：断言时钟不再走，读数恒定。
+        """
+        from integrated_app import circuit_breaker as cb_mod
+
+        clock = {"t": 0.0}
+
+        class _Clock:
+            """只代理 monotonic，其余照抄真 time 模块，避免波及无关调用。"""
+
+            def __init__(self, real):
+                self._real = real
+
+            def monotonic(self) -> float:
+                return clock["t"]
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+        monkeypatch.setattr(cb_mod, "time", _Clock(time))
+
+        cb = cb_mod.CircuitBreaker(name="svc", failure_threshold=1, reset_timeout=0.01)
+        clock["t"] += 0.005
         with pytest.raises(ConnectionError):
             cb.call(_flaky_fn([True]))
-        time.sleep(0.02)
+        assert cb.state is CircuitState.OPEN
+
+        clock["t"] += 0.02  # 越过冷却：这次 call 先转 HALF_OPEN，探测失败后重新 OPEN
         with pytest.raises(ConnectionError):
             cb.call(_flaky_fn([True]))
         assert cb.state is CircuitState.OPEN

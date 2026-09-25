@@ -4,6 +4,7 @@
 """
 
 import os
+import subprocess
 import time
 
 import pytest
@@ -123,8 +124,16 @@ class TestProcessControl:
     def test_set_process_high_priority_returns_bool(self):
         assert isinstance(set_process_high_priority(), bool)
 
-    def test_open_file_explorer(self, tmp_path):
+    def test_open_file_explorer(self, tmp_path, monkeypatch):
+        # 重定向系统打开调用，避免真实弹出资源管理器 / xdg-open（Windows 上 os.startfile
+        # 会真的拉起 Explorer，见 GOTCHAS #164）。仍断言"确实走了系统打开路径"。
+        calls: dict[str, str] = {}
+        monkeypatch.setattr(os, "startfile", lambda p, *a, **k: calls.setdefault("startfile", str(p)), raising=False)
+        monkeypatch.setattr(subprocess, "Popen", lambda argv, *a, **k: calls.setdefault("popen", str(list(argv))))
         assert isinstance(open_file_explorer(str(tmp_path)), bool)
+        # 关键断言：系统打开路径确实被触发（Windows→startfile，mac/Linux→Popen），但不再真实弹窗
+        assert calls
+        assert str(tmp_path) in next(iter(calls.values()))
 
 
 class TestEnvHelpers:
