@@ -3,8 +3,18 @@ name: Docker Build
 on:
   push:
     branches: [main]
+    # 纯文档改动不改任何构建输入：.dockerignore 已经把 docs / tests / .github 排除在
+    # 构建上下文之外，Dockerfile 的 COPY 面只有 pyproject.toml / requirements.txt / app/。
+    # 反面证据是实测的：#157、#159、#162 三条只改 docs/ 的合并各触发一次
+    # Build & Scan Image（22.6 / 22.6 / 22 分钟），扫的镜像与上一字节相同。
+    # 刻意**不**列 README.md：它被 pyproject 的 readme = "README.md" 吃进 wheel 元数据，
+    # 也没被 .dockerignore 排除，改它确实会改产物。
+    paths-ignore:
+      - "docs/**"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
 
 permissions:
   contents: read
