@@ -173,8 +173,18 @@
   （run `36113445697`，08:32:05Z 起、**09:03:14Z success**，≈31 min），但它推上去的是
   `ghcr.io/reserendipity/tts_multimodel:latest` 与 `:sha-cd80d735c838d8744e0fdd7ed88efe1c5a64f137`
   （同 run 日志的 `Processing tags input` 可核：两条 `type=semver` 在分支 push 上不产出标签）。
-  **`:2.3.0` 尚未落库** —— `deploy/kubernetes/deployment.yaml` 里的 `2.3.0` 目前是目标值而非已存在值；
-  补法沿用 v2.2.5 / v2.2.6 的先例：`gh workflow run docker-publish.yml --ref v2.3.0`。
+  **`:2.3.0` 不在其中** —— 分支 push 拿不到 semver 标签，`deploy/kubernetes/deployment.yaml`
+  里写的 `2.3.0` 当时只是目标值。补法沿用 v2.2.5 / v2.2.6 的先例，已执行：
+  `gh workflow run docker-publish.yml --ref v2.3.0` → run `36131581847`
+  （11:50:21Z 起、**12:03:46Z 四个 manifest 推完**、终态 **12:21:57Z success**（含 Trivy 腿）），
+  落库 `:2.3.0`、`:2.3`、`:latest`、`:sha-cd80d735…`，digest `sha256:aa2494c4…`。
+  证据取自该 run 日志的 `pushing manifest for …` 行；ghcr 的包版本列表这个 token 拿不到
+  （`GET /users/reserendipity/packages/container/tts_multimodel/versions` 回 403，要 `read:packages`），
+  所以外部不可复核这一点也一并记着。
+  **于是 tag 创建 → 镜像落库 = `08:32:15Z` → `12:03:46Z`**；中间 3.5 小时是"等人补标签腿"的空窗，
+  不是构建耗时 —— 下次发版要在合并后立刻 dispatch，别让 k8s 清单空指一个不存在的标签。
+  顺带一条自我修正：我原以为 tag 腿上 `type=raw,value=latest,enable={{is_default_branch}}`
+  会关掉 `:latest`，日志证明它照样重推了 `:latest`，且与 `:2.3.0` 同一 digest。
 - `release-gate` 的 tag 腿与 `gpg-signed-release` 对 v2.3.0 **各 0 条 run**（这两条 workflow 的
   `head_branch` 全集只到 `v2.2.4`）；GPG 那一格另因 `GPG_PRIVATE_KEY` 未配置而本就走 skip + notice，
   记为已知状态，不算故障。
