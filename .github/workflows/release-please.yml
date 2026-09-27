@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  # 普通 PR 上也要有 release-gate context：issue #166 §闸门 A 定性后，release-gate 要被
+  # 提成分支保护必需检查；若只在 release PR 上回写状态，普通 PR 会因缺 context 永远不能合。
+  # release-please 机器人自己的 PR 是 GITHUB_TOKEN 身份、不触发本事件，它的状态仍由上面
+  # push 作业的「发布条件检查」步骤回写；两条路用同一个判定脚本，不产生两套判据。
+  pull_request:
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 permissions:
@@ -226,3 +232,39 @@ jobs:
             ```
 
             ---
+
+  # 每个普通 PR 都要有 release-gate context，否则把它提为必需检查后普通 PR 全被「缺检查」卡死。
+  # release-please 机器人的 PR 不触发 pull_request（GITHUB_TOKEN 身份），它的状态由 push 作业回写。
+  pr-release-gate:
+    name: PR release-gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # job 级权限收窄，覆盖工作流级的 contents/pull-requests: write
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 判定并回写 release-gate 状态
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          out=$(python3 scripts/pr_release_gate.py)
+          state=$(echo "$out" | sed -n '1p')
+          desc=$(echo "$out" | sed -n '2p' | python3 -c 'import json,sys;print(json.load(sys.stdin))')
+          echo "release-gate -> state=$state"
+          echo "description=$desc"
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+            -f state="$state" \
+            -f context="release-gate" \
+            -f description="$desc" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >/dev/null
