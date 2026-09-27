@@ -18,8 +18,8 @@ on:
       - 'tests/e2e/**'
       - '.github/workflows/e2e.yml'
   schedule:
-    # Run nightly at 02:00 UTC
-    - cron: '0 2 * * *'
+    # Run nightly at 02:13 UTC
+    - cron: '13 2 * * *'
   workflow_dispatch:
 
 jobs:

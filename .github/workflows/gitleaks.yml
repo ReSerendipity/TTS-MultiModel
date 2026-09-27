@@ -6,8 +6,8 @@ on:
   pull_request:
     branches: [main, master]
   schedule:
-    # 每周日 01:00 UTC 全量历史扫描
-    - cron: '0 1 * * 0'
+    # 每周日 00:47 UTC 全量历史扫描
+    - cron: '47 0 * * 0'
   workflow_dispatch:
 
 permissions:

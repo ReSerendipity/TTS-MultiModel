@@ -37,7 +37,7 @@ on:
       - "requirements-lock.txt"
       - "pyproject.toml"
   schedule:
-    - cron: "30 3 * * 1" # 每周一 03:30 UTC，与 gpu-smoke（03:00）错峰；捕捉 base 镜像漂移
+    - cron: "47 5 * * 1" # 每周一 05:47 UTC，与 gpu-smoke（05:11）错峰 36 分；捕捉 base 镜像漂移
 
 permissions:
   contents: read
