@@ -1,6 +1,6 @@
 {
   "_comment": "分支保护【声明镜像】。口径：live 为准，本文件是 live 的镜像，不是愿望清单。改远端设置属 owner 的决定；本文件只跟着 live 更新，然后跑 docs/ci/apply_branch_protection.py（默认只读）确认无漂移。别用 --apply 把旧 JSON 压回 live —— 2026-09-27 实测过一次：这里少一条 DCO Check，--apply 就会把这条必需检查静默摘掉。",
-  "_measured_at": "2026-09-27T04:10Z（gh api repos/ReSerendipity/TTS_MultiModel/branches/main/protection + .../protection/required_pull_request_reviews）",
+  "_measured_at": "2026-09-27T07:41Z（gh api repos/ReSerendipity/TTS_MultiModel/branches/main/protection + .../protection/required_pull_request_reviews + repo 本体）",
   "_meets_reality": "镜像的是【配置值】，不等于【实际效果】：同一天实测 #160–#165（人类作者）与 #141/#145（github-actions[bot] 作者）都在 reviews=[] 的情况下合并成功，所以 required_approving_review_count=1 这道闸在本仓当前不拦人（定性见 issue #166 §2/§5）。",
   "owner": "ReSerendipity",
   "repo": "TTS_MultiModel",
