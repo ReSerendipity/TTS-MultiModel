@@ -2,7 +2,7 @@ name: Stale 自动清理
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 每天 UTC 03:00（北京时间 11:00）
+    - cron: '37 4 * * *'  # 每天 UTC 04:37（北京时间 12:37）
 
 permissions:
   issues: write

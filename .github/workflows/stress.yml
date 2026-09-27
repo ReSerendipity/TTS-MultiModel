@@ -2,8 +2,8 @@ name: Stress Tests (nightly)
 
 on:
   schedule:
-    # Run daily at 03:00 UTC（避开 benchmark 周更窗口，错峰）
-    - cron: '0 3 * * *'
+    # Run daily at 03:47 UTC（避开 benchmark 周更窗口，错峰）
+    - cron: '47 3 * * *'
   workflow_dispatch:
     inputs:
       gpu_gate:

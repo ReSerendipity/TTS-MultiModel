@@ -32,7 +32,7 @@ on:
         required: false
         default: ""
   schedule:
-    - cron: "0 3 * * 1" # every Monday 03:00 UTC
+    - cron: "11 5 * * 1" # every Monday 05:11 UTC
 
 permissions:
   contents: read

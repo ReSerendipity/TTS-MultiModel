@@ -11,8 +11,8 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # 每周一 02:00 UTC（北京时间 10:00）例行巡检
-    - cron: "0 2 * * 1"
+    # 每周一 02:47 UTC（北京时间 10:47）例行巡检
+    - cron: "47 2 * * 1"
   workflow_dispatch:
 
 permissions:

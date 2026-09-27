@@ -16,8 +16,8 @@ on:
       # （push 侧本来有这个 paths，PR 侧漏了 —— 2026-09-22 补）。
       - '.github/workflows/benchmark.yml'
   schedule:
-    # Run weekly on Sunday at 00:00 UTC
-    - cron: '0 0 * * 0'
+    # Run weekly on Sunday at 00:07 UTC
+    - cron: '7 0 * * 0'
   workflow_dispatch:
 
 permissions:
