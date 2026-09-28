@@ -18,6 +18,7 @@ training 附加依赖，某些精简环境下可能缺失，因此沿用仓库�
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import json
 import pathlib
 import re
@@ -41,10 +42,16 @@ try:
     )
 
     HAS_CONFIG = True
-except Exception:  # noqa: BLE001 - argbind/pyyaml 缺失时整模块不可用，跳过而非报错
+    IMPORT_ERROR = ""
+except ImportError as exc:  # 只吞 ImportError：其它异常说明导入期真出回归了，必须炸给 CI 看
     HAS_CONFIG = False
+    IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
-pytestmark = pytest.mark.skipif(not HAS_CONFIG, reason="training.config 需要 argbind + pyyaml")
+# 注意依赖面比 config.py 自身（argbind + pyyaml + pydantic）更宽：`integrated_app.training`
+# 包的 __init__ 会连带 import accelerator/data → torch / soundfile / vendor。所以本文件在
+# 缺 torch 的环境里是整文件 skip，不是"只缺 argbind 才跳"。CI 的 test job 显式装了
+# torch 与 training 附加依赖（见 ci.yml 的三个 OS 分支），因此本文件在 CI 上是真跑的。
+pytestmark = pytest.mark.skipif(not HAS_CONFIG, reason=f"导入 integrated_app.training 失败：{IMPORT_ERROR}")
 
 if HAS_CONFIG:
     from integrated_app.training.config import _pydantic_to_dict, _recursive_field_replace
@@ -240,6 +247,23 @@ class TestFieldBounds:
         """合法取值集合本身也要有正向守护，否则收紧 Literal 会无人察觉。"""
         assert _make_config(precision=precision).precision == precision
 
+    # --- 补齐初稿漏掉的三个"另一侧"界（删掉这些界原本不会让任何用例变红） ---
+
+    def test_split_ratio_upper_bound(self) -> None:
+        """split_ratio 的 le=0.99：只测下界等于没测上界。"""
+        with pytest.raises(VALIDATION_ERROR, match="split_ratio"):
+            DatasetConfig(data_dir=pathlib.Path("/tmp/ds"), split_ratio=1.0)
+
+    def test_lr_upper_bound(self) -> None:
+        """lr 的 lt=1.0：学习率取到 1.0 会直接把训练训废，这条界必须有守护。"""
+        with pytest.raises(VALIDATION_ERROR, match="lr"):
+            OptimizerConfig(lr=1.0)
+
+    def test_grad_accum_steps_lower_bound(self) -> None:
+        """grad_accum_steps 的 ge=1：累积 0 步会让等效 batch 变成 0。"""
+        with pytest.raises(VALIDATION_ERROR, match="grad_accum_steps"):
+            _make_config(grad_accum_steps=0)
+
 
 # =====================================================================
 # 序列化辅助
@@ -423,7 +447,11 @@ class TestLoadTrainingConfig:
         header = re.search(r"共 (\d+) 个错误字段", message)
         assert header, message
         listed = re.findall(r"^\s+\d+\. \[", message, flags=re.MULTILINE)
-        assert int(header.group(1)) == len(listed) == 3, message
+        # 只钉本仓自己的不变量（头部计数 == 正文列出条数）+ 每条坏字段都被点名。
+        # 绝不钉"正好 3 条"：条数 = len(ValidationError.errors())，由 pydantic 的枚举方式决定，
+        # 版本升级多报一条级联错误就会假红。
+        assert int(header.group(1)) == len(listed), message
+        assert len(listed) >= 3, message
         for loc in ("sample_rate", "optimizer.lr", "epochs"):
             assert loc in message
 
@@ -466,6 +494,10 @@ class TestParseArgsWithConfig:
     argbind.parse_args() 会从全局 registry 反推 CLI 参数表，依赖具体导入顺序，在测试里
     不可靠（未绑定时直接抛 "ValueError: 'str' is not callable"）。因此这里替换掉 argbind，
     只验证本函数自己的合并逻辑。
+
+    ⚠️ 重要边界：下面用替身的两个用例**只**验证"早退 / 作用域 / update 方向"这三段合并
+    逻辑，不构成对 `parse_args_with_config` 端到端可运行的证明 —— 真实 argbind 根本不接受
+    本函数传给它的 kwargs，见 `TestArgbindContract`。
     """
 
     class _Scope:
@@ -516,18 +548,63 @@ class TestParseArgsWithConfig:
 
 
 # =====================================================================
+# argbind 契约（源码侧缺陷的显式登记）
+# =====================================================================
+
+
+class TestArgbindContract:
+    """用真 argbind（不用替身）钉住一处源码缺陷，防止替身给出错误的安全感。
+
+    `parse_args_with_config` 在 config.py 里这样调用：
+        yaml_args = argbind.parse_args(yaml_args=yaml_args, argv=[])
+    但仓库实际解析到的 argbind（pyproject 只约束 >=0.3.7，CI 不钉版）签名是
+        parse_args(p=None, group="default")
+    两个关键字参数都不存在。因此"带配置文件路径调用 parse_args_with_config"这条路径
+    在真实依赖下必然 TypeError —— 该函数 docstring 宣称的"100% 向后兼容"目前不成立，
+    只是没有任何调用方在 CI 里走过它（训练入口脚本需要 GPU，不在测试矩阵内）。
+
+    修源码（改成 argbind 接受的调用形态）或换上游 fork 时，本类必须同步删除/改写，
+    否则会红 —— 这是刻意的：它的存在就是一份"这里有颗雷、别把它测成绿的"的书面记录。
+    """
+
+    def test_real_argbind_parse_args_has_no_yaml_kwargs(self) -> None:
+        params = inspect.signature(cfg_mod.argbind.parse_args).parameters
+        assert "yaml_args" not in params
+        assert "argv" not in params
+
+    def test_calling_with_yaml_kwargs_raises_type_error(self) -> None:
+        with pytest.raises(TypeError, match="unexpected keyword argument"):
+            cfg_mod.argbind.parse_args(yaml_args={}, argv=[])
+
+    def test_source_still_calls_it_that_way(self) -> None:
+        """反向确认：源码里那行确实还在用不存在的 kwargs（避免上面两条因为"源码已被改掉"
+        而变成空洞通过 —— 那就该删本类，而不是让它静默绿着）。"""
+        text = pathlib.Path(cfg_mod.__file__).read_text(encoding="utf-8")
+        assert "argbind.parse_args(yaml_args=yaml_args, argv=[])" in text
+
+
+# =====================================================================
 # pydantic 缺失兜底分支
 # =====================================================================
 
 
 def _load_without_pydantic(monkeypatch: pytest.MonkeyPatch) -> Any:
-    """把 pydantic 从 sys.modules 里摘掉后重新加载同一个 config.py，拿到兜底实现。"""
-    monkeypatch.setitem(sys.modules, "pydantic", None)
+    """把 pydantic 从 sys.modules 里摘掉后重新加载同一个 config.py，拿到兜底实现。
+
+    两点刻意的加固：
+    - 屏蔽窗口只包住 exec 那一步（用 monkeypatch.context，而不是让 None 挂到整个用例
+      结束）；模块 exec 完就已经不再需要 pydantic 缺席了。
+    - 每次加载都自证走的是兜底分支（BaseModel is None）。否则一旦哪天 pydantic 屏蔽失效，
+      这些用例会转去跑 pydantic 分支照样全绿，而"兜底分支已被覆盖"就成了谎报。
+    """
     source = pathlib.Path(cfg_mod.__file__).resolve()
-    spec = importlib.util.spec_from_file_location("_config_without_pydantic", str(source))
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    with monkeypatch.context() as itempatch:
+        itempatch.setitem(sys.modules, "pydantic", None)
+        spec = importlib.util.spec_from_file_location("_config_without_pydantic", str(source))
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    assert module.BaseModel is None, "未走到 pydantic 缺失分支，下面的断言将失去意义"
     return module
 
 

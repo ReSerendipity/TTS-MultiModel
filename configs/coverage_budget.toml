@@ -48,6 +48,9 @@
 "training/data.py" = 45
 "training/packers.py" = 80
 "training/state.py" = 15
+# 2026-09-28 新增 tests/training/test_config.py 后按本文件规则上调至「当前覆盖率 - 5%」：
+# training/config.py 实测 97%（此前 0%）。
+"training/config.py" = 92
 
 # 音频处理层（目标 ≥60%，当前 39-44%）
 "audio_processing.py" = 40
