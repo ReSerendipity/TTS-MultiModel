@@ -18,10 +18,17 @@
     - vram_gb / ram_gb：config 与 registry 的 vram_requirement 口径可能不同
       （config 含 ASR/Enhancer 余量，registry 为模型基线），仅做信息展示。
     - model_dir 磁盘存在性：**权重是外部产物，不随仓库分发**（``/model/`` 已列入
-      .gitignore，运行时以卷挂载提供，见 Dockerfile 注释）。仓库未附带 ``model/``
-      权重目录时（CI / 纯净克隆），磁盘校验降级为 WARN——否则该门禁在 CI 中结构性
-      不可通过（本门禁首次上线即因此从未真正跑绿，2026-09-11 修复）；仅当 ``model/``
-      已存在（开发机有权重）时，某引擎目录缺失才判 FAIL，用于抓真实的规格漂移。
+      .gitignore，运行时以卷挂载提供，见 Dockerfile 注释）。磁盘校验按引擎粒度分级：
+        - 仓库未附带任何权重（CI / 纯净克隆）→ WARN，否则门禁在 CI 中结构性不可通过
+          （本门禁首次上线即因此从未真正跑绿，2026-09-11 修复）；
+        - 该引擎目录在 ``model/`` 下存在 → 严格检查（存在且非空 = OK；目录为空 = FAIL，
+          用于抓"目录被清空/下载中断"一类的真实问题）；
+        - 该引擎目录缺失、但机器上有其它引擎权重（**部分权重开发机**）→ WARN 并列出
+          已存在的引擎目录。这里无法区分两种情形：该引擎模型确实未下载（正常），还是
+          config 的 ``model_dir`` 与磁盘不符（规格漂移）——2026-09-28 实测部分权重
+          机器（缺 Step-Audio-EditX / OpenVoice 两目录）此前被结构性拦截，与改动无关
+          的 commit 全部失败；从 FAIL 降为 WARN 是为避免假红，代价是该情形下漂移只
+          以提示呈现、不再阻断。
 
 用法：
     python scripts/check_engine_specs.py
@@ -121,6 +128,17 @@ def _model_root_provisioned() -> bool:
     return any(p.is_file() for p in root.rglob("*"))
 
 
+def _present_engine_dirs() -> list[str]:
+    """``model/`` 下已存在的引擎目录名（部分权重机器的诊断提示用）。
+
+    引擎目录名与 config 的 ``model_dir`` 同名（``model/{model_dir}``）。
+    """
+    root = _PROJECT_ROOT / "model"
+    if not root.is_dir():
+        return []
+    return sorted(p.name for p in root.iterdir() if p.is_dir())
+
+
 def run_all_checks() -> list[CheckResult]:
     results: list[CheckResult] = []
 
@@ -205,9 +223,14 @@ def run_all_checks() -> list[CheckResult]:
                 )
             )
 
-        # 磁盘模型路径（权重为外部产物；仓库未附带 model/ 时降级 WARN，见模块 docstring）
+        # 磁盘模型路径（权重为外部产物；按引擎粒度分级，见模块 docstring）：
+        #   - 无任何权重（CI/纯净克隆）→ WARN
+        #   - 该引擎目录存在 → 严格检查（目录为空仍 FAIL）
+        #   - 该引擎目录缺失、但有其它引擎权重（部分权重机器）→ WARN（无法区分
+        #     "模型未下载"与"model_dir 漂移"，附已存在目录清单供人工诊断）
         model_dir = cfg.get("model_dir", "")
         if model_dir:
+            target = _PROJECT_ROOT / "model" / model_dir
             if not _model_root_provisioned():
                 results.append(
                     CheckResult(
@@ -217,13 +240,23 @@ def run_all_checks() -> list[CheckResult]:
                         "运行时卷挂载提供），跳过磁盘存在性校验",
                     )
                 )
-            else:
+            elif target.is_dir():
                 ok, detail = _check_model_path(model_dir)
                 results.append(
                     CheckResult(
                         f"{name}.model_path",
                         "OK" if ok else "FAIL",
                         f"model/{model_dir}: {detail}",
+                    )
+                )
+            else:
+                present = ", ".join(_present_engine_dirs()) or "无"
+                results.append(
+                    CheckResult(
+                        f"{name}.model_path",
+                        "WARN",
+                        f"model/{model_dir}: 目录不存在 —— 该引擎模型未下载，或 config "
+                        f"的 model_dir 与磁盘不符（规格漂移）。已存在的引擎目录: {present}",
                     )
                 )
 
