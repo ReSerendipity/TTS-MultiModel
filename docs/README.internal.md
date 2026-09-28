@@ -3,6 +3,10 @@
 > 本文件为**对内**维护者说明，入库后位于 `DOCS/README.internal.md`，是 `DOCS/` 对内说明的唯一入口。
 > 面向 GitHub 访客的对外文档只有根目录 `README.md`。凡「陌生用户读了无法行动」的内容——开发状态细节、维护者 checklist、许可核实记录、本地环境约定——一律收在本文件，不得写回根 README。
 
+
+## 0. 分支保护与推送策略（2026-09-28）
+
+- **main 直推授权**：main 分支保护已改为「admin（ReSerendipity，本机凭据）直推豁免」——本地预检全绿后可直接 `git push origin main`，无需再开 PR；非 admin 账号 push main 会被拒绝，必须走 PR + 1 审批 + 状态检查全绿。
 ## 1. 实验特性（LoRA 微调 / 训练链路）验证状态
 
 - 训练代码已实现：数据加载、LoRA 注入、混合精度、断点续训、TensorBoard 日志。
