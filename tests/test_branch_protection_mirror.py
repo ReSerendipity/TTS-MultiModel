@@ -40,8 +40,12 @@ REVIEWS_1 = {
 }
 
 
-def _combined(contexts=LIVE_CTX, enforce_admins=True):
-    """复刻组合端点的真实形状：没有 required_pull_request_reviews 这个键。"""
+def _combined(contexts=LIVE_CTX, enforce_admins=False):
+    """复刻组合端点的真实形状：没有 required_pull_request_reviews 这个键。
+
+    2026-09-28 治理变更：enforce_admins 默认 False（admin=ReSerendipity 直推豁免，
+    个人账号仓库以 enforce_admins=false 实现 admin 绕过 PR，其余协作者走 PR + 1 审批）。
+    """
     return {
         "required_status_checks": {"strict": False, "contexts": list(contexts)},
         "enforce_admins": {"enabled": enforce_admins},
@@ -61,13 +65,13 @@ def _am_true(_slug):
 
 
 def test_json_is_a_mirror_of_live_not_an_older_wish():
-    """声明镜像必须与实测 live 对齐：四条必需检查齐、审批数 1、不 dismiss 陈旧审批。"""
+    """声明镜像必须与实测 live 对齐：四条必需检查齐、审批数 1、不 dismiss 陈旧审批、enforce_admins=false（2026-09-28 治理变更：admin 直推豁免）。"""
     cfg = json.loads(MIRROR.read_text(encoding="utf-8"))
     assert cfg["contexts"] == LIVE_CTX, cfg["contexts"]
     assert "DCO Check" in cfg["contexts"], "摘掉 DCO Check 就是关掉 DCO 门禁"
     assert cfg["policy"]["required_approving_review_count"] == 1
     assert cfg["policy"]["dismiss_stale_reviews"] is False
-    assert cfg["policy"]["enforce_admins"] is True
+    assert cfg["policy"]["enforce_admins"] is False
 
 
 def test_annotation_keys_never_reach_the_request_body():

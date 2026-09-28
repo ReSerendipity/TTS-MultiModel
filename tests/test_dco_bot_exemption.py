@@ -64,6 +64,12 @@ def _run_dco(tmp: Path, commits: list[tuple[tuple[str, str], bool]]) -> subproce
     bash = shutil.which("bash")
     if not bash:  # pragma: no cover - 无 bash 的机器上直接跳过，不给假绿
         pytest.skip("本机没有 bash，无法执行从工作流里抽出的脚本")
+    # Windows 上 bash 可能是 WSL 桩（WindowsApps/bash.exe）：能"找到"不代表能"执行"。
+    # 无 WSL 发行版时直接跳过（CI Linux 正常跑），避免把环境问题伪装成 DCO 回归。
+    probe = subprocess.run([bash, "-c", "true"], capture_output=True, timeout=30)
+    if probe.returncode != 0:  # pragma: no cover - 依赖本机环境
+        msg = probe.stderr.decode("utf-8", errors="replace")[:200].strip()
+        pytest.skip(f"bash 不可执行（WSL 未安装发行版？）: {msg}")
     repo, base, head = _repo_with(tmp, commits)
     script = tmp / "dco.sh"
     script.write_text(_dco_script(), encoding="utf-8", newline="\n")
