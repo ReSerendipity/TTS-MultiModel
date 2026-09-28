@@ -14,6 +14,7 @@
 """
 
 import logging
+import threading
 import time
 from collections import deque
 from typing import Any
@@ -109,6 +110,14 @@ class HealthMonitor:
         熔断阈值 90%，加载预检安全系数 1.5 倍。
         """
         self._max_samples = 100
+        # 本对象是进程级单例（见文件末尾 _health_monitor），由请求线程通过
+        # run_in_executor 并发写：下面每个计数器都是 `+= 1` 这种
+        # LOAD-ADD-STORE 三步操作，GIL 不保证原子性；显存基线状态机还跨多个字段。
+        # 此前整个类零锁，多线程下会丢计数（/metrics 与 /health 少报）、
+        # 基线状态机可能读到撕裂的中间态。用 RLock 而不是 Lock：
+        # get_metrics → latency_quantile / check_memory_leak 存在重入。
+        # 约定：只锁内存状态，GPU 探测 / 告警发送 / free_gpu_memory 一律留在锁外。
+        self._lock = threading.RLock()
         self._vram_samples = deque(maxlen=self._max_samples)
         self._leak_threshold_mb = 200
         self._baseline_mb: float | None = None
@@ -135,16 +144,18 @@ class HealthMonitor:
             duration_seconds: 本次生成耗时（秒），负值按 0 处理。
         """
         d = duration_seconds if duration_seconds and duration_seconds > 0 else 0.0
-        self._latency_sum_seconds += d
-        self._latency_count += 1
-        for bound in self.LATENCY_BUCKET_SECONDS:
-            if d <= bound:
-                self._latency_buckets[f"{bound:g}"] += 1
+        with self._lock:
+            self._latency_sum_seconds += d
+            self._latency_count += 1
+            for bound in self.LATENCY_BUCKET_SECONDS:
+                if d <= bound:
+                    self._latency_buckets[f"{bound:g}"] += 1
         # 超过最大桶的样本计入 _latency_count（即 le=+Inf），不进入任何有限桶
 
     def latency_observations(self) -> tuple[dict[str, int], float, int]:
         """返回直方图快照（cumulative 桶、累计秒、观测数），供 /metrics 渲染。"""
-        return dict(self._latency_buckets), self._latency_sum_seconds, self._latency_count
+        with self._lock:
+            return dict(self._latency_buckets), self._latency_sum_seconds, self._latency_count
 
     def latency_quantile(self, q: float) -> float:
         """从累计直方图估算分位数（Prometheus histogram_quantile 同款线性插值）。
@@ -155,7 +166,11 @@ class HealthMonitor:
         Returns:
             float: 估算的分位耗时（秒）；无观测样本时返回 0.0。
         """
-        count = self._latency_count
+        # count 与 buckets 必须取自同一时刻：分开读会出现"新的 count 配旧的桶"，
+        # 下面的插值因此可能算出越界或负数的分位值。
+        with self._lock:
+            count = self._latency_count
+            buckets = dict(self._latency_buckets)
         if count == 0:
             return 0.0
         target = q * count
@@ -163,7 +178,7 @@ class HealthMonitor:
         prev_bound = 0.0
         prev_cum = 0
         for bound in self.LATENCY_BUCKET_SECONDS:
-            cum = self._latency_buckets[f"{bound:g}"]
+            cum = buckets[f"{bound:g}"]
             if cum >= target:
                 # 样本落在 [prev_bound, bound) 区间内：桶内均匀分布假设插值
                 span = cum - prev_cum
@@ -179,7 +194,8 @@ class HealthMonitor:
 
     def error_type_counts(self) -> dict[str, int]:
         """返回失败分类累计快照，供 /metrics 渲染。"""
-        return dict(self._error_type_counts)
+        with self._lock:
+            return dict(self._error_type_counts)
 
     def record_generation_error_type(self, error_type: str) -> None:
         """按类型累计一次生成失败（运维稳定性评估 P1）。
@@ -188,7 +204,8 @@ class HealthMonitor:
             error_type: timeout/oom/param/safety/other 之一；未知值归入 other。
         """
         key = error_type if error_type in self._error_type_counts else "other"
-        self._error_type_counts[key] += 1
+        with self._lock:
+            self._error_type_counts[key] += 1
 
     def record_vram_usage(self, used_mb: float) -> None:
         """记录一次 GPU 显存使用样本，用于后续泄漏诊断。
@@ -199,36 +216,45 @@ class HealthMonitor:
         Args:
             used_mb: 当前已分配的 GPU 显存（MB）。
         """
-        self._vram_samples.append(used_mb)
+        established: float | None = None
+        jumped: tuple[float, float] | None = None
+        with self._lock:
+            self._vram_samples.append(used_mb)
 
-        # 稳定基线自动建立/更新逻辑
-        if self._baseline_mb is None:
-            # 基线尚未建立：等待连续稳定样本
-            if len(self._vram_samples) >= 2:
-                prev = self._vram_samples[-2]
-                if abs(used_mb - prev) <= self._baseline_tolerance_mb:
-                    self._baseline_stable_count += 1
-                    if self._baseline_stable_count >= self._baseline_required_stable:
-                        # 连续稳定样本达到阈值，建立基线（使用最近N个样本均值）
-                        recent = list(self._vram_samples)[-self._baseline_required_stable :]
-                        self._baseline_mb = sum(recent) / len(recent)
-                        logger.debug(
-                            "[HealthMonitor] 显存基线已建立: %.0fMB (稳定样本=%d)",
-                            self._baseline_mb,
-                            self._baseline_required_stable,
-                        )
-                else:
+            # 稳定基线自动建立/更新逻辑
+            if self._baseline_mb is None:
+                # 基线尚未建立：等待连续稳定样本
+                if len(self._vram_samples) >= 2:
+                    prev = self._vram_samples[-2]
+                    if abs(used_mb - prev) <= self._baseline_tolerance_mb:
+                        self._baseline_stable_count += 1
+                        if self._baseline_stable_count >= self._baseline_required_stable:
+                            # 连续稳定样本达到阈值，建立基线（使用最近N个样本均值）
+                            recent = list(self._vram_samples)[-self._baseline_required_stable :]
+                            self._baseline_mb = sum(recent) / len(recent)
+                            established = self._baseline_mb
+                    else:
+                        self._baseline_stable_count = 0
+            else:
+                # 基线已存在：检测是否有剧烈跳变（如模型切换/卸载），需要重置基线
+                if abs(used_mb - self._baseline_mb) > self._baseline_tolerance_mb * 3:
+                    jumped = (self._baseline_mb, used_mb)
+                    self._baseline_mb = None
                     self._baseline_stable_count = 0
-        else:
-            # 基线已存在：检测是否有剧烈跳变（如模型切换/卸载），需要重置基线
-            if abs(used_mb - self._baseline_mb) > self._baseline_tolerance_mb * 3:
-                logger.debug(
-                    "[HealthMonitor] 显存剧烈变化 %.0fMB -> %.0fMB，重置基线",
-                    self._baseline_mb,
-                    used_mb,
-                )
-                self._baseline_mb = None
-                self._baseline_stable_count = 0
+
+        # 日志放在锁外：logger 自身线程安全，但不必让持锁时间取决于 I/O
+        if established is not None:
+            logger.debug(
+                "[HealthMonitor] 显存基线已建立: %.0fMB (稳定样本=%d)",
+                established,
+                self._baseline_required_stable,
+            )
+        if jumped is not None:
+            logger.debug(
+                "[HealthMonitor] 显存剧烈变化 %.0fMB -> %.0fMB，重置基线",
+                jumped[0],
+                jumped[1],
+            )
 
     def reset_vram_baseline(self) -> None:
         """手动重置显存基线（模型加载/切换/卸载后调用）。
@@ -236,8 +262,9 @@ class HealthMonitor:
         下次 record_vram_usage 时将自动重新建立稳定基线，避免加载期间的
         显存跳变误报为泄漏。
         """
-        self._baseline_mb = None
-        self._baseline_stable_count = 0
+        with self._lock:
+            self._baseline_mb = None
+            self._baseline_stable_count = 0
         logger.debug("[HealthMonitor] 显存基线已手动重置")
 
     def check_memory_leak(self) -> str | None:
@@ -251,17 +278,20 @@ class HealthMonitor:
             Optional[str]: 若检测到泄漏则返回中文预警字符串；无泄漏、样本不足或
                 基线未建立时返回 None。
         """
-        if len(self._vram_samples) < 10 or self._baseline_mb is None:
-            return None
-
-        samples_list = list(self._vram_samples)
-        recent_avg = sum(samples_list[-5:]) / 5
-        diff = recent_avg - self._baseline_mb
-
+        with self._lock:
+            # list(deque) 不是原子操作：并发的 record_vram_usage 在迭代期间 append
+            # 会抛 RuntimeError: deque changed size during iteration。快照必须在锁内取，
+            # 且基线与样本必须来自同一时刻，否则泄漏判定会拿"旧基线 + 新窗口"作差。
+            if len(self._vram_samples) < 10 or self._baseline_mb is None:
+                return None
+            samples_list = list(self._vram_samples)
+            recent_avg = sum(samples_list[-5:]) / 5
+            diff = recent_avg - self._baseline_mb
+            baseline_mb = self._baseline_mb
         if diff > self._leak_threshold_mb:
             warning = (
                 f"\u26a0\ufe0f 潜在 GPU 显存泄漏：检测到显存持续上升约 {diff:.0f}MB，"
-                f"当前 {samples_list[-1]:.0f}MB，基线 {self._baseline_mb:.0f}MB。"
+                f"当前 {samples_list[-1]:.0f}MB，基线 {baseline_mb:.0f}MB。"
                 f"建议检查是否存在未释放的中间张量或缓存未清理。"
             )
             logger.warning(warning)
@@ -296,11 +326,11 @@ class HealthMonitor:
                 - sample_count (int): 当前窗口内有效样本数
                 - status (str): 数据状态标识（仅无数据时存在）
         """
-        if not self._vram_samples:
-            return {"status": "no_data"}
-
-        # 转为list确保切片和聚合操作安全
-        samples_list = list(self._vram_samples)
+        with self._lock:
+            if not self._vram_samples:
+                return {"status": "no_data"}
+            # 同一份快照：见 check_memory_leak 里对 list(deque) 非原子的说明
+            samples_list = list(self._vram_samples)
         current = samples_list[-1]
         min_val = min(samples_list)
         max_val = max(samples_list)
@@ -312,7 +342,7 @@ class HealthMonitor:
             "max_mb": round(max_val, 1),
             "avg_mb": round(avg, 1),
             "trend": "increasing" if current > avg * 1.1 else "stable",
-            "sample_count": len(self._vram_samples),
+            "sample_count": len(samples_list),
         }
 
     def record_generation(self, success: bool = True) -> None:
@@ -321,17 +351,20 @@ class HealthMonitor:
         Args:
             success: 生成是否成功完成。True 增加成功计数，False 同时增加错误计数。
         """
-        self._total_generations += 1
-        if not success:
-            self._total_errors += 1
+        with self._lock:
+            self._total_generations += 1
+            if not success:
+                self._total_errors += 1
 
     def record_oom_retry(self) -> None:
         """记录一次 OOM 发生后的自动重试事件。"""
-        self._total_oom_retries += 1
+        with self._lock:
+            self._total_oom_retries += 1
 
     def record_oom_auto_recovery(self) -> None:
         """记录一次 OOM 后受控自动重载成功（运维稳定性评估 P1-4）。"""
-        self._total_oom_auto_recoveries += 1
+        with self._lock:
+            self._total_oom_auto_recoveries += 1
 
     def get_vram_usage_percent(self) -> float:
         """获取当前 GPU 显存占用百分比。
@@ -380,7 +413,9 @@ class HealthMonitor:
         # VRAM_CIRCUIT_BREAKER_PCT=90%：为什么不是更高 95%——CUDA 驱动/内核会预留 3~5% 做页表/内部工作，
         # 实际用户可用只有 95%，90% 触发留 5% 安全裕度让当前推理优雅退出而非内核崩溃
         if usage_pct > self.VRAM_CIRCUIT_BREAKER_PCT:
-            self._circuit_breaker_trips += 1
+            with self._lock:
+                self._circuit_breaker_trips += 1
+                trips = self._circuit_breaker_trips
             # SRE P0-2：熔断触发即发告警（去重由 AlertManager 处理）
             try:
                 from .observability.alerting import Alert, AlertSeverity, get_alert_manager
@@ -399,7 +434,7 @@ class HealthMonitor:
                 pass
             reason = (
                 f"VRAM 占用 {usage_pct:.1f}% 超过阈值 {self.VRAM_CIRCUIT_BREAKER_PCT}%，"
-                f"累计熔断触发 {self._circuit_breaker_trips} 次。请立即终止推理并清理显存。"
+                f"累计熔断触发 {trips} 次。请立即终止推理并清理显存。"
             )
             logger.error(f"[显存熔断] {reason}")
             try:
@@ -499,8 +534,11 @@ class HealthMonitor:
         Args:
             status: 新的模型状态，建议取值：loaded / unloading / ready / error / unknown。
         """
-        self._model_status = status
-        self._model_last_check = time.time()
+        # status 与 last_check 必须成对更新：否则并发读者会看到
+        # "新状态 + 旧时间戳"，前端据此误判状态多久没刷新过。
+        with self._lock:
+            self._model_status = status
+            self._model_last_check = time.time()
 
     def run_model_self_check(self) -> tuple[bool, str]:
         """执行模型自检：对一小段测试文本进行干推理（不输出音频），验证模型能否正常运行。
@@ -518,8 +556,7 @@ class HealthMonitor:
 
         current_engine = registry.current_engine
         if current_engine is None:
-            self._model_status = "error"
-            self._model_last_check = time.time()
+            self.set_model_status("error")
             return (False, "无已加载的引擎，无法执行自检")
 
         try:
@@ -529,8 +566,7 @@ class HealthMonitor:
             else:
                 _test_result = True
 
-            self._model_status = "ready"
-            self._model_last_check = time.time()
+            self.set_model_status("ready")
             return (True, "模型自检通过：干推理执行成功，无 OOM 与异常。")
         except RuntimeError as e:
             if "out of memory" in str(e).lower() or "OOM" in str(e):
@@ -538,14 +574,12 @@ class HealthMonitor:
             else:
                 msg = f"模型自检失败：RuntimeError 推理执行异常。异常: {e}"
             logger.error(f"[模型自检] {msg}")
-            self._model_status = "error"
-            self._model_last_check = time.time()
+            self.set_model_status("error")
             return (False, msg)
         except Exception as e:
             msg = f"模型自检失败：未预期异常 {type(e).__name__}: {e}"
             logger.error(f"[模型自检] {msg}")
-            self._model_status = "error"
-            self._model_last_check = time.time()
+            self.set_model_status("error")
             return (False, msg)
 
     def get_metrics(self) -> dict[str, Any]:
@@ -557,58 +591,44 @@ class HealthMonitor:
             dict[str, Any]: 汇总指标字典，包含 uptime / 生成统计 / 成功率 / 熔断次数 / GPU 信息等。
         """
         result: dict[str, Any] = {}
+        # 一次性取计数器快照：下面 total_generations / total_errors / success_rate 若分开读，
+        # 并发写入会让 success_rate 用"新的分母 + 旧的分子"算出 >100% 或虚低的成功率。
+        with self._lock:
+            snap = {
+                "total_generations": self._total_generations,
+                "total_errors": self._total_errors,
+                "total_oom_retries": self._total_oom_retries,
+                "circuit_breaker_trips": self._circuit_breaker_trips,
+                "total_oom_auto_recoveries": self._total_oom_auto_recoveries,
+                "model_status": self._model_status,
+                "model_last_check": self._model_last_check,
+                "error_type_counts": dict(self._error_type_counts),
+                "latency_buckets": dict(self._latency_buckets),
+                "latency_sum_seconds": self._latency_sum_seconds,
+                "latency_count": self._latency_count,
+            }
         try:
             result["uptime_seconds"] = round(time.time() - self._start_time, 1)
         except Exception:
             result["uptime_seconds"] = 0.0
 
-        try:
-            result["total_generations"] = self._total_generations
-        except Exception:
-            result["total_generations"] = 0
-
-        try:
-            result["total_errors"] = self._total_errors
-        except Exception:
-            result["total_errors"] = 0
-
-        try:
-            result["total_oom_retries"] = self._total_oom_retries
-        except Exception:
-            result["total_oom_retries"] = 0
-
-        try:
-            result["circuit_breaker_trips"] = self._circuit_breaker_trips
-        except Exception:
-            result["circuit_breaker_trips"] = 0
-
-        try:
-            result["total_oom_auto_recoveries"] = self._total_oom_auto_recoveries
-        except Exception:
-            result["total_oom_auto_recoveries"] = 0
-
-        try:
-            result["model_status"] = self._model_status
-        except Exception:
-            result["model_status"] = "unknown"
-
-        try:
-            result["model_last_check"] = self._model_last_check
-        except Exception:
-            result["model_last_check"] = 0.0
+        result["total_generations"] = snap["total_generations"]
+        result["total_errors"] = snap["total_errors"]
+        result["total_oom_retries"] = snap["total_oom_retries"]
+        result["circuit_breaker_trips"] = snap["circuit_breaker_trips"]
+        result["total_oom_auto_recoveries"] = snap["total_oom_auto_recoveries"]
+        result["model_status"] = snap["model_status"]
+        result["model_last_check"] = snap["model_last_check"]
 
         try:
             success_rate = 0.0
-            if self._total_generations > 0:
-                success_rate = (self._total_generations - self._total_errors) / self._total_generations * 100
+            if snap["total_generations"] > 0:
+                success_rate = (snap["total_generations"] - snap["total_errors"]) / snap["total_generations"] * 100
             result["success_rate_pct"] = round(success_rate, 1)
         except Exception:
             result["success_rate_pct"] = 0.0
 
-        try:
-            result["error_type_counts"] = dict(self._error_type_counts)
-        except Exception:
-            result["error_type_counts"] = {}
+        result["error_type_counts"] = snap["error_type_counts"]
 
         try:
             result["latency_p95_seconds"] = round(self.latency_quantile(0.95), 3)
@@ -617,14 +637,9 @@ class HealthMonitor:
             result["latency_p95_seconds"] = 0.0
             result["latency_p50_seconds"] = 0.0
 
-        try:
-            result["latency_buckets"] = dict(self._latency_buckets)
-            result["latency_sum_seconds"] = round(self._latency_sum_seconds, 3)
-            result["latency_count"] = self._latency_count
-        except Exception:
-            result["latency_buckets"] = {}
-            result["latency_sum_seconds"] = 0.0
-            result["latency_count"] = 0
+        result["latency_buckets"] = snap["latency_buckets"]
+        result["latency_sum_seconds"] = round(snap["latency_sum_seconds"], 3)
+        result["latency_count"] = snap["latency_count"]
 
         try:
             from .gpu_backend import GPUBackend, GPUBackendManager
@@ -729,19 +744,24 @@ class HealthMonitor:
             if raw and self._total_generations > 0:
                 ext = _json.loads(raw)
                 counts = ext.get("error_types", {})
-                for k in self._error_type_counts:
-                    v = counts.get(k)
-                    if isinstance(v, int) and v > self._error_type_counts[k]:
-                        self._error_type_counts[k] = v
                 buckets = ext.get("latency_buckets", {})
-                for k in self._latency_buckets:
-                    v = buckets.get(k)
-                    if isinstance(v, int) and v > self._latency_buckets[k]:
-                        self._latency_buckets[k] = v
-                if isinstance(ext.get("latency_sum"), (int, float)) and ext["latency_sum"] > self._latency_sum_seconds:
-                    self._latency_sum_seconds = float(ext["latency_sum"])
-                if isinstance(ext.get("latency_count"), int) and ext["latency_count"] > self._latency_count:
-                    self._latency_count = ext["latency_count"]
+                latency_sum = ext.get("latency_sum")
+                latency_count = ext.get("latency_count")
+                with self._lock:
+                    # 单调合并（只抬不降）必须在锁内：与 record_* 的并发 += 竞争同一批键，
+                    # 放锁外会覆盖掉刚记入的计数。
+                    for k in self._error_type_counts:
+                        v = counts.get(k)
+                        if isinstance(v, int) and v > self._error_type_counts[k]:
+                            self._error_type_counts[k] = v
+                    for k in self._latency_buckets:
+                        v = buckets.get(k)
+                        if isinstance(v, int) and v > self._latency_buckets[k]:
+                            self._latency_buckets[k] = v
+                    if isinstance(latency_sum, (int, float)) and latency_sum > self._latency_sum_seconds:
+                        self._latency_sum_seconds = float(latency_sum)
+                    if isinstance(latency_count, int) and latency_count > self._latency_count:
+                        self._latency_count = latency_count
         except Exception as exc:  # noqa: BLE001
             logger.debug("[HealthMonitor] 扩展计数器恢复跳过: %s", exc)
 
@@ -753,29 +773,27 @@ class HealthMonitor:
             db = get_history_db()
             if db is None:
                 return
-            db.save_metric_counters(
-                {
+            # 快照在锁内取、I/O 在锁外做：db.save_kv 走 SQLite，持锁等磁盘会把所有
+            # record_* 的写入串行化到一次落库上。
+            with self._lock:
+                counters = {
                     "total_generations": self._total_generations,
                     "total_errors": self._total_errors,
                     "total_oom_retries": self._total_oom_retries,
                     "circuit_breaker_trips": self._circuit_breaker_trips,
                     "total_oom_auto_recoveries": self._total_oom_auto_recoveries,
                 }
-            )
+                ext_counters = {
+                    "error_types": dict(self._error_type_counts),
+                    "latency_buckets": dict(self._latency_buckets),
+                    "latency_sum": round(self._latency_sum_seconds, 3),
+                    "latency_count": self._latency_count,
+                }
+            db.save_metric_counters(counters)
             # 扩展计数器：JSON 单键（值可为 float，与 int-only 的 save_metric_counters 区分）
             import json as _json
 
-            db.save_kv(
-                "metric:ext_counters",
-                _json.dumps(
-                    {
-                        "error_types": self._error_type_counts,
-                        "latency_buckets": self._latency_buckets,
-                        "latency_sum": round(self._latency_sum_seconds, 3),
-                        "latency_count": self._latency_count,
-                    }
-                ),
-            )
+            db.save_kv("metric:ext_counters", _json.dumps(ext_counters))
         except Exception as exc:  # noqa: BLE001
             logger.debug("[HealthMonitor] 持久化计数器保存跳过: %s", exc)
 
