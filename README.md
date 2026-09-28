@@ -47,15 +47,13 @@ A powerful open-source multi-engine Text-to-Speech platform with voice cloning, 
 | **剧本配音** | **LoRA 管理** | **系统设置** |
 | ![剧本配音](docs/screenshots/voxcpm2_04_script_workshop_viewport.png) | ![LoRA 管理](docs/screenshots/voxcpm2_06_lora_viewport.png) | ![系统设置](docs/screenshots/voxcpm2_08_settings_viewport.png) |
 
-> 文件名编号 05/07 缺位是有意为之，不代表有截图待补；`.gitignore` 里对这 6 个文件名做了显式白名单。
-
 > 欢迎在 [Discussions](https://github.com/ReSerendipity/TTS_MultiModel/discussions) 中分享你的使用体验！
 
 ## 功能亮点
 
 | 功能 | 描述 |
 |---|---|
-| **五引擎架构** | VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX，灵活切换（引擎注册见 `app/integrated_app/engines/`） |
+| **五引擎架构** | VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX，灵活切换 |
 | **声音克隆** | 仅需少量音频样本即可克隆声音（可控克隆 + 极致克隆） |
 | **声音设计** | 通过文字描述生成目标音色的语音 |
 | **剧本配音** | 多角色对话剧本自动分配说话人，批量生成配音 |
@@ -64,11 +62,11 @@ A powerful open-source multi-engine Text-to-Speech platform with voice cloning, 
 | **Web 界面** | FastAPI + HTMX + Jinja2 现代化响应式 Web UI |
 | **批量处理** | 支持批量音频生成，任务断点续跑 |
 | **历史管理** | SQLite 历史记录，支持搜索、筛选、分页 |
-| **多语言界面** | 支持中文（简/繁）、英文、日文、韩文界面切换（`app/integrated_app/locales/`，5 份语言文件） |
+| **多语言界面** | 支持中文（简/繁）、英文、日文、韩文界面切换 |
 | **多 GPU 后端** | NVIDIA CUDA / Apple MPS / CPU |
 | **自定义音色库** | 支持用户保存和管理自定义音色 |
 
-> **实验特性说明（LoRA 微调 / 训练链路）**：训练代码已实现（数据加载、LoRA 注入、混合精度、断点续训、TensorBoard 日志），单元测试 57 项全部通过；但 `lora/` 与 `checkpoints/` 下无真机训练产物，CI 无 GPU 训练冒烟测试；训练依赖为 optional extra（`pip install -e .[training]`）。12GB 显存上训练前必须先卸载推理引擎，否则 OOM。
+> **实验特性说明（LoRA 微调 / 训练链路）**：LoRA 微调训练链路已随项目提供（训练依赖需另行安装：`pip install -e .[training]`），但当前未经真机训练验证，请以实验特性评估使用。12GB 显存上训练前必须先卸载推理引擎，否则会因显存不足（OOM）失败。
 
 ## 环境要求
 
@@ -98,8 +96,6 @@ install.bat
 start.bat
 ```
 
-> 多个项目（如 SeedVR2、TTS_MultiModel）可共享一套系统 Python 与依赖，避免每个项目 1~2GB 的重复 WinPython 环境。
-
 **方式二：使用便携 WinPython（完全隔离，无需系统 Python）**
 
 ```bash
@@ -113,7 +109,7 @@ cd TTS_MultiModel
 # 4. 下载模型 → 5. start.bat
 ```
 
-> `install.bat` / `start.bat` 的 Python 查找优先级：常见系统安装路径 → PATH 注册的 `python` → 项目内 WinPython。
+> `install.bat` / `start.bat` 会自动检测 Python（系统 Python 或项目内 WinPython）。
 
 ### Linux 安装
 
@@ -195,12 +191,11 @@ python scripts/download_models.py --all --no-verify            # 跳过 SHA256 �
 
 ## 安全与可靠性
 
-- **配置原子写入**：`save_config()` 使用 tempfile + `os.replace`，避免写入中断导致配置半写损坏（源自 Seedvr2）
-- **配置验证失败回退**：Pydantic 验证失败自动回退原始 YAML 加载，保证应用不因格式错误无法启动
-- **核心模块完整性自校验**：启动时对 16 个核心文件做 SHA-256 比对（`app/integrated_app/security/integrity_manifest.json`），检测篡改（CWE-912 防御），失败只告警不阻塞
+- **配置安全写入**：配置保存采用原子写入与校验回退，写入中断或配置格式错误都不会导致应用无法启动
+- **完整性自校验**：启动时对核心文件做完整性比对，检测文件被篡改；失败仅告警不阻塞使用
 - **模型路径 shared / portable 双模式**：`config.yaml → models.model_source_mode`（`portable` 项目内 `model/` / `shared` 外部共享目录）
 - **断点续跑**：批量配音 / 克隆任务中断后重启可跳过已完成子任务（`data/checkpoints/`）
-- **差异化静态文件缓存**：CSS/JS `no-cache`、字体 30 天、图片 1 天
+- **前端资源缓存策略**：CSS/JS 不缓存、字体 30 天、图片 1 天，兼顾更新及时与加载速度
 
 ## 技术栈
 
@@ -233,19 +228,19 @@ python scripts/download_models.py --all --no-verify            # 跳过 SHA256 �
 
 ## 模型许可说明
 
-> 本表为**模型权重**的许可清单（项目代码为 Apache-2.0，见 [LICENSE](LICENSE)）。本项目**只做编排、不打包任何权重**——所有模型权重均来自下表官方仓库、由用户自取，框架分发本身不涉及再分发权重风险；但使用各模型仍须遵守其各自许可，商用前请逐项核对。**接入新引擎时：更新本表 + `config.yaml` 中对应引擎的 `license` 字段。**
+> 本表为**模型权重**的许可清单（项目代码为 Apache-2.0，见 [LICENSE](LICENSE)）。本项目**只做编排、不打包任何权重**——所有模型权重均来自下表官方仓库、由用户自取，框架分发本身不涉及再分发权重风险；但使用各模型仍须遵守其各自许可，商用前请逐项核对。
 
 | 模型 / 权重 | 归属引擎 | 权重许可 | 商用提示 |
 |---|---|---|---|
 | VoxCPM2 | voxcpm2 | Apache-2.0 | 可商用（默认推荐引擎） |
 | SenseVoiceSmall | voxcpm2（ASR） | 自定义 model-license | 可商用（遵循模型许可；FunASR 标注可商用） |
-| speech_zipenhancer | voxcpm2（降噪） | Apache-2.0 | 可商用（2026-09-15 经 ModelScope API 核实） |
+| speech_zipenhancer | voxcpm2（降噪） | Apache-2.0 | 可商用 |
 | IndexTTS 2.5 | indextts2 | bilibili Model Use License Agreement | 商用须事先向 bilibili 登记并取得书面授权 |
 | IndexTTS 2.0 | indextts20 | bilibili Model Use License Agreement | 同上 |
-| OpenVoice | voicebox | MIT | 可商用（2026-09-16 经 HF API 核实 V1/V2 卡均 MIT） |
-| Step-Audio-EditX | step-audio-editx | Apache-2.0 | 代码经 GitHub API 实证（2026-09-16）；权重使用前留意官方更新 |
+| OpenVoice | voicebox | MIT | 可商用 |
+| Step-Audio-EditX | step-audio-editx | Apache-2.0 | 权重使用前留意官方更新 |
 
-> 历史 / 参考引擎（非默认分发）：CosyVoice2 / ChatTTS / F5-TTS 等曾出现在 `data/` 参考实现中，其中 ChatTTS、F5-TTS 模型为**非商用**许可，仅作研究参考或标注后使用，不得作为商用发行默认引擎。
+> 历史 / 参考引擎（CosyVoice2 / ChatTTS / F5-TTS 等）不随默认分发，其中部分模型许可为非商用，仅作研究参考。
 
 ### 免责声明
 
