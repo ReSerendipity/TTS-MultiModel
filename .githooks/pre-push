@@ -3,17 +3,85 @@
 #   1) 仓库提供 precheck.ps1 -> 执行它（家族既有门禁口径）
 #   2) 否则 -> 退回根目录守卫 structure-guard
 if [ -f ./precheck.ps1 ]; then
-    echo "[pre-push] 运行本地预检 precheck.ps1 ..."
-    if command -v powershell.exe >/dev/null 2>&1; then
-        if ! powershell.exe -NoProfile -ExecutionPolicy Bypass -File "./precheck.ps1"; then
-            echo "[pre-push] 预检未通过。绕过：git push --no-verify" >&2
+    echo "[pre-push] running local gate precheck.ps1 ..."
+
+    # fail-closed: precheck.ps1 present but no PowerShell -> cannot run the gate.
+    # Do NOT degrade to a silent pass; bypass needs an explicit --no-verify.
+    if ! command -v powershell.exe >/dev/null 2>&1; then
+        echo "[pre-push] powershell.exe not found; cannot execute precheck.ps1" >&2
+        echo "          bypass: git push --no-verify (explicit authorization required)" >&2
+        exit 1
+    fi
+
+    # Mechanical encoding assertion (fail-open guard).
+    # Windows PowerShell 5.1 decodes a BOM-less script with the ANSI codepage (GBK here);
+    # the resulting mojibake can eat a closing quote and SILENTLY DROP the `if ($Full)`
+    # block, so precheck.ps1 would print "all green" WITHOUT running pytest. This guard
+    # runs in sh -- independent of PowerShell decoding -- and blocks the push when the
+    # invariant breaks. Safe states: UTF-8 WITH BOM, OR pure ASCII (no byte > 0x7F).
+    _bom="$(od -An -tx1 -N3 ./precheck.ps1 2>/dev/null | tr -d ' \n\t')"
+    if [ "$_bom" != "efbbbf" ]; then
+        # No BOM: block only if a real non-ASCII byte (0x80..0xFF) is present.
+        if LC_ALL=C od -An -tx1 ./precheck.ps1 2>/dev/null \
+            | tr ' ' '\n' | LC_ALL=C grep -qiE '^(8[0-9a-f]|[9a-f][0-9a-f])$'; then
+            echo "[pre-push] precheck.ps1 has non-ASCII bytes but NO UTF-8 BOM:" >&2
+            echo "          PowerShell 5.1 would silently drop the -Full gate block (fake pass)." >&2
+            echo "          Re-save precheck.ps1 as UTF-8 WITH BOM (or pure ASCII)." >&2
+            echo "          bypass: git push --no-verify (explicit authorization required)" >&2
             exit 1
         fi
-        exit 0
     fi
-    echo "[pre-push] 未找到 powershell.exe，无法执行 precheck.ps1" >&2
-    echo "          绕过：git push --no-verify" >&2
-    exit 1
+
+    # Escalation rule (closes the documented AGENTS.md "run -Full after touching
+    # business code" gap): if the to-be-pushed diff touches business source
+    # (app/ scripts/ tests/), force the -Full gate (pytest + coverage >=45% hard
+    # gate); pure docs/config keep the fast path (ruff + mypy ratchet here, pytest
+    # in CI). Undecidable cases fail-closed toward -Full. ruff/mypy and CI layering
+    # are intentionally left unchanged.
+    _zero="0000000000000000000000000000000000000000"
+    need_full=0
+    saw_ref=0
+    while read -r local_ref local_sha remote_ref remote_sha; do
+        [ -z "$local_sha" ] && continue
+        saw_ref=1
+        [ "$local_sha" = "$_zero" ] && continue   # branch deletion: nothing to test
+        if [ "$remote_sha" = "$_zero" ]; then
+            # New remote branch: base on merge-point vs a known default; else full.
+            _base=""
+            for _d in origin/HEAD origin/main origin/master; do
+                if git rev-parse --verify --quiet "$_d" >/dev/null 2>&1; then
+                    _base="$(git merge-base "$local_sha" "$_d" 2>/dev/null)"
+                    [ -n "$_base" ] && break
+                fi
+            done
+            if [ -z "$_base" ]; then
+                need_full=1
+                continue
+            fi
+            _changed="$(git diff --name-only "$_base" "$local_sha" 2>/dev/null)"
+        else
+            _changed="$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)"
+        fi
+        if printf '%s\n' "$_changed" | grep -qE '^(app|scripts|tests)/'; then
+            need_full=1
+        fi
+    done
+    # No ref lines consumed at all -> fail-closed (run the full gate).
+    [ "$saw_ref" -eq 0 ] && need_full=1
+
+    full_arg=""
+    if [ "$need_full" -eq 1 ]; then
+        full_arg="-Full"
+        echo "[pre-push] business-code change detected -> running precheck.ps1 -Full (pytest + coverage gate)"
+    else
+        echo "[pre-push] docs/config-only change -> fast path (ruff + mypy ratchet; pytest runs in CI)"
+    fi
+
+    if ! powershell.exe -NoProfile -ExecutionPolicy Bypass -File "./precheck.ps1" $full_arg; then
+        echo "[pre-push] precheck failed. bypass: git push --no-verify (explicit authorization required)" >&2
+        exit 1
+    fi
+    exit 0
 fi
 
 PY=""
