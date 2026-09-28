@@ -594,7 +594,9 @@ class HealthMonitor:
         # 一次性取计数器快照：下面 total_generations / total_errors / success_rate 若分开读，
         # 并发写入会让 success_rate 用"新的分母 + 旧的分子"算出 >100% 或虚低的成功率。
         with self._lock:
-            snap = {
+            # 异构计数器快照：显式标注 dict[str, Any]，避免 mypy 推断为 dict[str, object]
+            # 导致下方 total_generations 算术 / round(latency_sum_seconds) 报 arg-type 错（#171 引入回归）。
+            snap: dict[str, Any] = {
                 "total_generations": self._total_generations,
                 "total_errors": self._total_errors,
                 "total_oom_retries": self._total_oom_retries,
