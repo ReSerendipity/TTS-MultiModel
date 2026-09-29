@@ -180,7 +180,21 @@ echo [OK] Required directories created
 
 echo.
 echo ============================================================
-echo   Step 3: Model Download Guide
+echo   Step 3: Enabling Git Hooks
+echo ============================================================
+echo.
+
+if exist ".githooks\install.sh" (
+    git config core.hooksPath .githooks
+    echo [OK] Git hooks enabled (core.hooksPath = .githooks)
+    echo      Active hooks: pre-commit, pre-push, commit-msg, post-checkout
+) else (
+    echo [SKIP] .githooks directory not found, skipping hook setup
+)
+
+echo.
+echo ============================================================
+echo   Step 4: Model Download Guide
 echo ============================================================
 echo.
 echo IMPORTANT: You need to download the following models before using this app.
@@ -211,7 +225,7 @@ if exist "scripts\download_indextts2.py" (
 
 echo.
 echo ============================================================
-echo   Step 4: Verification
+echo   Step 5: Verification
 echo ============================================================
 echo.
 

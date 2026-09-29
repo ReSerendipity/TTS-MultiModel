@@ -8,6 +8,8 @@ git config core.hooksPath .githooks      # 或执行 ./.githooks/install.sh
 
 启用后钩子直接从本目录读取，**改这里立即生效**，不需要再往 `.git/hooks` 复制文件。
 
+> **自动 Bootstrap**：`install.sh` / `install.bat` 会自动执行上述配置；`post-checkout` 钩子在首次克隆时也会自动检测并设置 `core.hooksPath`（若尚未配置）。
+
 | 钩子 | 作用 |
 | --- | --- |
 | `pre-commit` | 分发器按「.venv → PATH python → 控制台 pre-commit → pre-commit-lite」四级回退执行框架检查（见下方说明） |
