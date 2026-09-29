@@ -1,6 +1,19 @@
 #!/bin/sh
 # 切换分支后提醒依赖漂移。$3=1 表示分支检出（0 为单文件检出，跳过）。
 [ "$3" = "1" ] || exit 0
+
+# ── Auto-bootstrap: 首次克隆后自动启用 .githooks ──
+# core.hooksPath 是本地配置，不随仓库传播；首次 clone 后自动设置一次。
+_current_hooks_path="$(git config --get core.hooksPath 2>/dev/null || true)"
+if [ -z "$_current_hooks_path" ]; then
+    git config core.hooksPath .githooks
+    echo ""
+    echo "[githooks] 首次检出，已自动启用 .githooks (core.hooksPath = .githooks)"
+    echo "[githooks] 生效钩子：pre-commit / pre-push / commit-msg / post-checkout"
+    echo "[githooks] 详情见 .githooks/README.md"
+    echo ""
+fi
+
 . "$(dirname "$0")/lib-depwatch.sh"
 depwatch "$1" "$2"
 exit 0

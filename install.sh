@@ -38,6 +38,13 @@ echo "Installing dependencies..."
 pip install --upgrade pip -q
 pip install -e . -q
 
+# Enable git hooks (hooksPath is local config, safe to set automatically)
+if [ -f .githooks/install.sh ]; then
+    echo "Enabling git hooks..."
+    sh .githooks/install.sh
+    echo ""
+fi
+
 echo ""
 echo "=== Installation Complete ==="
 echo ""
