@@ -1085,13 +1085,23 @@ def main():
         5. 若无子命令（旧版用法），调用 _dispatch_legacy 自动分发
     """
     # P2: CLI 品牌化 — stderr 输出版本归属，增加剥离成本
+    # 版本单一来源为 pyproject.toml（pip install -e . 后由 importlib.metadata 读取），
+    # 未安装（源码直跑）时降级为 dev，避免横幅硬编码版本与实际发布漂移。
     import sys as _sys
 
+    try:
+        from importlib.metadata import PackageNotFoundError
+        from importlib.metadata import version as _pkg_version
+
+        _ver = _pkg_version("tts-multimodel")
+    except PackageNotFoundError:
+        _ver = "dev"
+
     _sys.stderr.write(
-        "TTS_MultiModel CLI v2.1.0 © ReSerendipity, Apache 2.0\n"
+        f"TTS_MultiModel CLI v{_ver} © ReSerendipity, Apache 2.0\n"
         "Official: https://github.com/ReSerendipity/TTS_MultiModel\n"
         "⚠️  Legal: 请勿用于诈骗、伪造身份等非法活动。\n"
-        "   $schema: https://github.com/ReSerendipity/TTS_MultiModel/v2.1.0/schema/output.json\n"
+        f"   $schema: https://github.com/ReSerendipity/TTS_MultiModel/{_ver}/schema/output.json\n"
     )
     _sys.stderr.flush()
 
