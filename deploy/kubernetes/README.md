@@ -16,7 +16,7 @@
 
 - 集群已安装 [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) 或 `nvidia-container-toolkit`，
   提供 `nvidia.com/gpu` 可分配资源。
-- 镜像已推送到 `ghcr.io/reserendipity/tts_multimodel`（**下划线**：名字由 `${{ github.repository }}` 整体小写得到，`_` 原样保留，见 `.github/workflows/docker-publish.yml`；`tests/test_image_name_consistency.py` 就是把这条引用与工作流钉成同源的闸）。
+- 镜像推送到 `ghcr.io/reserendipity/tts-multimodel`（名字由 `${{ github.repository }}` 整体小写得到，见 `.github/workflows/docker-publish.yml`；`tests/test_image_name_consistency.py` 就是把这条引用与工作流钉成同源的闸。2026-09-30 注：仓库由 `TTS_MultiModel` 改名 `TTS-MultiModel` 后，`${{ github.repository }}` 随之变为连字符，2.4.0 起的新镜像推到 `tts-multimodel`；改名前的旧包 `tts_multimodel` 仍留在 ghcr 供旧版本拉取）。
 - **拉这个镜像要有凭证**：上面那个包不是匿名可拉的（实测匿名 token 无 grant、manifest GET 回 404）。
   先建 `tts` 命名空间，再建 registry secret：
 

@@ -41,10 +41,11 @@ pub enum UpdateSource {
 
 impl Default for UpdateSource {
     fn default() -> Self {
-        // 默认指向本仓库（与 origin 一致）
+        // 默认指向本仓库（与 origin 一致）。2026-09-30 仓库改名 TTS_MultiModel → TTS-MultiModel，
+        // 更新源同步改到新名（GitHub API 对旧名虽会 301 重定向，但不依赖重定向）。
         UpdateSource::Github {
             owner: "ReSerendipity".into(),
-            repo: "TTS_MultiModel".into(),
+            repo: "TTS-MultiModel".into(),
         }
     }
 }
@@ -199,7 +200,7 @@ mod tests {
         match back.update_source {
             UpdateSource::Github { owner, repo } => {
                 assert_eq!(owner, "ReSerendipity");
-                assert_eq!(repo, "TTS_MultiModel");
+                assert_eq!(repo, "TTS-MultiModel");
             }
             UpdateSource::Custom { .. } => panic!("default should be github"),
         }
