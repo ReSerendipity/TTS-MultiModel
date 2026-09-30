@@ -130,12 +130,12 @@ chmod +x start.sh && ./start.sh
 docker compose up -d
 
 # 或直接拉取 GHCR 镜像（随版本发布：v2.2.1 对应 tag 2.2.1）
-docker pull ghcr.io/reserendipity/tts_multimodel:2.2.1
+docker pull ghcr.io/reserendipity/tts-multimodel:2.2.1
 docker run -d --gpus all -p 7869:7869 \
   -v ./model:/app/model \
   -v ./outputs:/app/outputs \
   -v ./personas:/app/personas \
-  ghcr.io/reserendipity/tts_multimodel:2.2.1
+  ghcr.io/reserendipity/tts-multimodel:2.2.1
 
 # 或手动构建
 docker build -t tts-multimodel .
