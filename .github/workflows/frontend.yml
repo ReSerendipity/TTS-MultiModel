@@ -84,6 +84,11 @@ jobs:
       - name: Run tab-switch dirty-guard test (jsdom)
         run: node tests/frontend/tts_form_guard.js
 
+      # 2026-10-01：历史表行渲染回归 —— renderRows 曾把记录 id 当文件名传
+      # inferEngine，任何原地刷新后历史表全空（异常被 promise 静默吞掉）。
+      - name: Run history rows render test (jsdom)
+        run: node tests/frontend/history_render.js
+
       - name: Upload rendered pages (debug artifact)
         if: failure()
         uses: actions/upload-artifact@v4
