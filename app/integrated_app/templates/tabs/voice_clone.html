@@ -88,7 +88,7 @@
                             </div>
                             {# P0-1 声音克隆授权：上传参考音频必须显式声明拥有使用权/已获授权 #}
                             <div class="fg" style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
-                                <input type="checkbox" name="has_consent" id="vc-has-consent" value="true" style="margin-top:2px" required>
+                                <input type="checkbox" name="has_consent" id="vc-has-consent" value="true" style="margin-top:2px">
                                 <label for="vc-has-consent" class="fl" style="font-size:12px;margin:0;line-height:1.5">{{ "consent_declare"|t(lang) }}</label>
                             </div>
                             <div class="fg">
@@ -301,6 +301,10 @@
     // Voice Clone specific: reference audio validation and segment confirmation
     document.getElementById('vc-form').addEventListener('submit', function(e) {
         // Reference audio validation: check if upload tab is active and no file selected
+        // 注意：has_consent 勾选框在本面板内且本面板默认隐藏 —— 不能用 HTML required 表达
+        // "仅上传路径必勾"：隐藏的 required 控件会让 requestSubmit() 因约束校验
+        // （invalid control is not focusable）静默拒绝，"已保存音色"路径整条发不出请求。
+        // 所以这里改为面板可见时由 JS 校验（服务端 400 仍是最终闸）。
         var uploadTab = document.getElementById('vc-tab-upload');
         if (uploadTab && uploadTab.style.display !== 'none' && uploadTab.style.display !== '') {
             var fileInput = this.querySelector('input[type="file"][name="ref_audio_upload"]');
@@ -310,6 +314,16 @@
                 if (statusEl) {
                     statusEl.className = 'status-message error';
                     statusEl.textContent = '{{ "select_ref_audio"|t(lang) }}';
+                }
+                return false;
+            }
+            var consentEl = document.getElementById('vc-has-consent');
+            if (consentEl && !consentEl.checked) {
+                e.preventDefault();
+                var consentStatusEl = document.getElementById('vc-status');
+                if (consentStatusEl) {
+                    consentStatusEl.className = 'status-message error';
+                    consentStatusEl.textContent = '{{ "consent_required"|t(lang) }}';
                 }
                 return false;
             }

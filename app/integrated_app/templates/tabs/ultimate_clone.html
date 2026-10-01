@@ -83,7 +83,7 @@
                             </div>
                             {# P0-1 声音克隆授权：上传参考音频必须显式声明拥有使用权/已获授权 #}
                             <div class="fg" style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
-                                <input type="checkbox" name="has_consent" id="uc-has-consent" value="true" style="margin-top:2px" required>
+                                <input type="checkbox" name="has_consent" id="uc-has-consent" value="true" style="margin-top:2px">
                                 <label for="uc-has-consent" class="fl" style="font-size:12px;margin:0;line-height:1.5">{{ "consent_declare"|t(lang) }}</label>
                             </div>
                             <div class="fg">
@@ -329,6 +329,34 @@
                 statusEl.textContent = '{{ "enter_text"|t(lang) }}';
             }
             return false;
+        }
+
+        // 上传参考路径的客户端校验：文件 + 授权勾选（服务端 400 仍是最终闸）。
+        // has_consent 勾选框在本面板内且面板默认隐藏 —— 不能用 HTML required 表达
+        // "仅上传路径必勾"：隐藏的 required 控件会让 requestSubmit() 因约束校验
+        // 静默拒绝，"已保存音色"路径整条发不出请求。
+        var uploadTab = document.getElementById('uc-tab-upload');
+        if (uploadTab && uploadTab.style.display !== 'none' && uploadTab.style.display !== '') {
+            var fileInput = this.querySelector('input[type="file"][name="ref_audio_upload"]');
+            if (fileInput && (!fileInput.files || fileInput.files.length === 0)) {
+                e.preventDefault();
+                var fileStatusEl = document.getElementById('uc-status');
+                if (fileStatusEl) {
+                    fileStatusEl.className = 'status-message error';
+                    fileStatusEl.textContent = '{{ "select_ref_audio"|t(lang) }}';
+                }
+                return false;
+            }
+            var consentEl = document.getElementById('uc-has-consent');
+            if (consentEl && !consentEl.checked) {
+                e.preventDefault();
+                var consentStatusEl = document.getElementById('uc-status');
+                if (consentStatusEl) {
+                    consentStatusEl.className = 'status-message error';
+                    consentStatusEl.textContent = '{{ "consent_required"|t(lang) }}';
+                }
+                return false;
+            }
         }
 
         var info = window.getUcSegmentInfo();

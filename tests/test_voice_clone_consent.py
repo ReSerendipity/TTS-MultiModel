@@ -140,3 +140,63 @@ def test_openai_speech_rejects_unknown_voice_for_voxcpm2(client):
     )
     assert r.status_code == 400
     assert "未知音色" in r.text or "音色" in r.text
+
+
+# ---------------------------------------------------------------------------
+# 4. 模板层：隐藏面板里的授权勾选框不得用 HTML required 表达（2026-10-01）
+# ---------------------------------------------------------------------------
+# 背景：voice_clone / ultimate_clone 的 has_consent 勾选框位于默认隐藏的
+# 「上传参考」tab 面板内。曾有 `required` 属性 —— 隐藏的 required 控件让
+# form.checkValidity() 恒为 False，requestSubmit() 走"invalid control is not
+# focusable"静默拒绝，"已保存音色"路径从 UI 整条发不出请求且无任何可见报错。
+# 正确形态：required 摘除，改为提交处理器在「上传面板可见」时做 JS 校验
+# （服务端 400 仍是最终闸，见上面 §2/§3）。
+
+
+def _template_path(name: str):
+    from pathlib import Path
+
+    return Path(__file__).resolve().parent.parent / "app" / "integrated_app" / "templates" / "tabs" / name
+
+
+def _input_line(template: str, input_id: str) -> str:
+    for line in template.splitlines():
+        if f'id="{input_id}"' in line and "checkbox" in line:
+            return line
+    raise AssertionError(f"{input_id} 不存在于模板中")
+
+
+@pytest.mark.parametrize(
+    ("template_name", "input_id", "panel_id", "form_prefix"),
+    [
+        ("voice_clone.html", "vc-has-consent", "vc-tab-upload", "vc"),
+        ("ultimate_clone.html", "uc-has-consent", "uc-tab-upload", "uc"),
+    ],
+)
+def test_hidden_panel_consent_checkbox_must_not_use_html_required(template_name, input_id, panel_id, form_prefix):
+    """授权勾选框在默认隐藏面板内时禁止 required —— 那会让 persona 路径静默发不出请求。"""
+    tpl = _template_path(template_name).read_text(encoding="utf-8")
+    line = _input_line(tpl, input_id)
+    assert "required" not in line, (
+        f"{template_name} 的 {input_id} 又挂上了 required：它在默认隐藏的 {panel_id} 面板里，"
+        "隐藏 required 控件会让 requestSubmit() 静默拒绝（invalid control is not focusable），"
+        "已保存音色路径整条发不出请求"
+    )
+
+
+@pytest.mark.parametrize(
+    ("template_name", "input_id", "panel_id", "status_id"),
+    [
+        ("voice_clone.html", "vc-has-consent", "vc-tab-upload", "vc-status"),
+        ("ultimate_clone.html", "uc-has-consent", "uc-tab-upload", "uc-status"),
+    ],
+)
+def test_consent_checked_client_side_when_upload_panel_visible(template_name, input_id, panel_id, status_id):
+    """上传面板可见时必须由 JS 校验授权勾选（required 摘除后的替代闸）。"""
+    tpl = _template_path(template_name).read_text(encoding="utf-8")
+    assert panel_id in tpl, f"{panel_id} 面板不在场"
+    # 面板可见性判断 + consent 元素读取 + 状态回显三件套必须在提交处理器里
+    assert f"getElementById('{panel_id}')" in tpl, f"提交处理器没有判断 {panel_id} 可见性"
+    assert f"getElementById('{input_id}')" in tpl, f"提交处理器没有读取 {input_id}"
+    assert f"getElementById('{status_id}')" in tpl, "校验失败没有回显状态"
+    assert "consent_required" in tpl, "未使用 consent_required i18n key（5 语言词表已备）"
