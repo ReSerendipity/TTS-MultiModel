@@ -78,6 +78,12 @@ jobs:
       - name: Run generation-result wiring test (jsdom)
         run: node tests/frontend/wire_generation_result.js
 
+      # 2026-10-01：切页守卫行为测试 —— 脏表单 /tab/ 切页改走页内 ConfirmDialog
+      # （原 window.confirm 渲染在宿主层，桌面壳/内嵌浏览器无法定制且卡自动化），
+      # 确认后 htmx.ajax 重发原请求；生成请求的响应交换不受守卫影响。
+      - name: Run tab-switch dirty-guard test (jsdom)
+        run: node tests/frontend/tts_form_guard.js
+
       - name: Upload rendered pages (debug artifact)
         if: failure()
         uses: actions/upload-artifact@v4
