@@ -117,6 +117,20 @@ dependencies = [
     "psutil>=5.9.0",
     # === 繁简转换（纯 Python 替代 opencc 源码编译）===
     "opencc-python-reimplemented>=0.1.0",
+    # wetext / inflect 被 vendored VoxCPM 的文本正则化在**生成期懒导入**
+    # （vendor/voxcpm/utils/text_normalize.py:4-5 顶层 import，无守卫），
+    # 服务启动 / 引擎加载都不经过它 —— 2026-10-01 全流程 UI 模拟第一次真实
+    # voice_design 生成即报 `No module named 'wetext'`（生成失败，audit 记 failure）。
+    # 本机旧 .venv 从未暴露是因为 wetext 只作为环境存量存在，三份依赖清单均无声明；
+    # 测试全矩阵 mock 引擎，同样探不到。显式声明（与 einops / librosa 同理由 D5 守住）。
+    "wetext>=0.1.8",
+    "inflect>=7.0.0",
+    # noisereduce：克隆/降噪路径在启用"参考音频降噪"时懒导入（engines/voxcpm2/clone.py:437、
+    # audio_processing.py:72），缺失时该 UI 可达路径直接 RuntimeError 而非优雅降级。
+    # pynvml：routes/system/gpu.py 的 GPU 统计懒导入（有守卫，缺失仅降级为 "--"），
+    # 但 GPU 页是常驻功能，显式声明避免静默劣化。
+    "noisereduce>=3.0.0",
+    "pynvml>=12.0.0",
     # === 数据校验 ===
     "pydantic>=2.0",
 ]
