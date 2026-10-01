@@ -131,6 +131,16 @@ dependencies = [
     # 但 GPU 页是常驻功能，显式声明避免静默劣化。
     "noisereduce>=3.0.0",
     "pynvml>=12.0.0",
+    # accelerate / descript-audiotools 被 indextts.infer_v2_5 在**引擎加载路径**上
+    # 懒导入（device_map / 分块工具链），缺失即 503 "requires accelerate" /
+    # "No module named 'audiotools'"（2026-10-01 全流程 UI 模拟实测）。
+    # 旧环境因传递依赖侥幸可用，三份清单均无声明；与 einops 同型缺口。
+    "accelerate>=1.8.1",
+    "descript-audiotools>=0.7.2",
+    # fugashi + unidic-lite：indextts 文本前端的日文分词链，引擎加载期即导入
+    # （缺失报 "请安装 fugashi: pip install fugashi unidic-lite"，2026-10-01 实测）。
+    "fugashi>=1.3.0",
+    "unidic-lite>=1.0.8",
     # === 数据校验 ===
     "pydantic>=2.0",
 ]
@@ -139,10 +149,12 @@ dependencies = [
 dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "pytest-cov>=4.0", "ruff>=0.4", "mypy>=1.0"]
 vllm = ["vllm>=0.6.0"]
 watermark = []  # No extra deps needed, uses numpy/scipy only
-# IndexTTS 情感「文本描述」模式（emo_text）需要 QwenEmotion 子模型，
-# 其用 device_map 加载、依赖 accelerate。未安装时引擎仍可正常加载与合成
-# （克隆 / 8 维向量情感模式均可用），仅该模式会被明确拒绝。
-emotion = ["accelerate>=0.30.0"]
+# IndexTTS 情感「文本描述」模式（emo_text）需要 QwenEmotion 子模型（device_map 加载）。
+# 2026-10-01 实测修正：accelerate 已不只是 emo_text 的前置——indextts.infer_v2_5 模块
+# 顶层即有 device_map 加载路径，引擎**加载本身**就会抛 "requires accelerate"
+# （旧注释"未安装时引擎仍可正常加载与合成"已过时），故升入核心依赖；
+# 1.8.1 为 GOTCHAS #348 的 vendored indextts 钉版口径。
+emotion = []
 # LoRA 训练管线（app/integrated_app/training/）。API 服务启动路径绝不 import 它
 # （AGENTS.md（本地维护、不随仓库分发） 硬约束 #3），因此不进主依赖。datasets/argbind 已改为 training.data
 # 内的可选懒加载（缺包时模块仍可 import，仅 legacy HF 路径函数抛 ImportError），

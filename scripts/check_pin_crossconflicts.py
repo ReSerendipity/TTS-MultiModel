@@ -33,6 +33,22 @@ _ROOT = Path(__file__).resolve().parent.parent
 LOCK_FILES = ("requirements-lock.txt", "launcher/requirements-small.txt")
 _CACHE: dict[str, list[str]] = {}
 
+# 已接受的元数据冲突（与 SECURITY_DEPENDABOT_TRIAGE.md 的"已接受风险"同一治理模式）。
+# 键 = (钉版包, 其约束的依赖包) 小写；值 = (登记理由, 复审日期)。
+# 新增豁免必须在此登记理由与复审日期——本闸不给"静默白名单"留口子。
+# 复审到期时本闸按日期比对转红（防"登记一次、永久遗忘"）。
+ACCEPTED_CONFLICTS: dict[tuple[str, str], tuple[str, str]] = {
+    # descript-audiotools 0.7.2 的元数据声明 protobuf<3.20 已过时：它自己的
+    # generated proto 是新 builder 风格，实测在 protobuf 7.36.2 下导入与运行均正常
+    # （indextts 的 DAC 声码器链 hard-import audiotools，无法绕开该依赖）。
+    # 上游 index-tts pyproject 也钉 descript-audiotools==0.7.2。
+    # 复审：升级 descript-audiotools（若上游放开 protobuf 上界即可摘除本豁免）。
+    ("descript-audiotools", "protobuf"): (
+        "descript 0.7.2 元数据 <3.20 过时，实测 7.36.2 兼容；indextts DAC 链硬依赖",
+        "2027-03-31",
+    ),
+}
+
 
 def _ver(s: str) -> tuple:
     """版本 → 定长 4 元组；剥掉本地版本段与预发布尾标（与 check_pin_floors 同一口径）。"""
@@ -165,6 +181,19 @@ def check(path: Path) -> tuple[list[str], list[str]]:
             got = pins[dep][0]
             for op, want in _OP_RE.findall(m.group(2)):
                 if not _satisfies(op, got, want):
+                    accepted = ACCEPTED_CONFLICTS.get((_norm(name), dep))
+                    if accepted:
+                        import datetime as _dt
+
+                        review = _dt.date.fromisoformat(accepted[1])
+                        if _dt.date.today() > review:
+                            conflicts.append(
+                                f"{path.name}: {name}=={ver} 要求 {dep}{op}{want}，锁里是 {dep}=={got}"
+                                f" —— 本冲突在 ACCEPTED_CONFLICTS 已登记但复审日期 {accepted[1]} 已过，"
+                                "请重新评估理由或延期（防'登记一次、永久遗忘'）"
+                            )
+                        else:
+                            continue
                     conflicts.append(f"{path.name}: {name}=={ver} 要求 {dep}{op}{want}，锁里是 {dep}=={got}")
     return conflicts, unchecked
 
