@@ -7,6 +7,7 @@
 """
 
 import io
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -200,3 +201,51 @@ def test_consent_checked_client_side_when_upload_panel_visible(template_name, in
     assert f"getElementById('{input_id}')" in tpl, f"提交处理器没有读取 {input_id}"
     assert f"getElementById('{status_id}')" in tpl, "校验失败没有回显状态"
     assert "consent_required" in tpl, "未使用 consent_required i18n key（5 语言词表已备）"
+
+
+# ---------------------------------------------------------------------------
+# 5. 全站禁用原生 confirm()（2026-10-01，切页守卫迁移后的收口闸）
+# ---------------------------------------------------------------------------
+# 原生 confirm 渲染在宿主层、不属于页面 DOM（桌面壳/内嵌浏览器里无法定制、
+# 会卡无头自动化）。2026-10-01 已把全部调用点迁到 ConfirmDialog（页内）。
+# 本闸防回潮：模板与 static js 里不得再出现原生 confirm 调用。
+
+
+def _scan_native_confirm() -> list[str]:
+    import re
+
+    root = Path(__file__).resolve().parent.parent / "app" / "integrated_app"
+    offenders: list[str] = []
+    patterns = list((root / "templates" / "tabs").glob("*.html")) + list((root / "static" / "js").glob("*.js"))
+    for f in patterns:
+        # confirm_dialog.js 是替代实现本体，其 confirm() 定义不算原生调用
+        if f.name == "confirm_dialog.js":
+            continue
+        for lineno, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            code = re.sub(r"//.*$", "", line)
+            if "ConfirmDialog" in code or "confirm_dialog" in code:
+                continue
+            # 显式豁免：行内标记 NATIVE-CONFIRM-FALLBACK 表示有意保留的原生兜底
+            # （仅允许 ConfirmDialog 不可用时的降级分支；新代码不得新增此标记）
+            if "NATIVE-CONFIRM-FALLBACK" in line:
+                continue
+            # 原生形态：裸 confirm(...) / window.confirm(...)（排除定义与注释）
+            if re.search(r"(?<![\w.])confirm\s*\(", code) or "window.confirm(" in code:
+                offenders.append(f"{f.name}:{lineno}: {line.strip()[:80]}")
+    return offenders
+
+
+def test_no_native_confirm_calls_remain():
+    """原生 confirm() 已全站迁到页内 ConfirmDialog —— 本闸防回潮。"""
+    offenders = _scan_native_confirm()
+    assert not offenders, "发现原生 confirm 调用（应改用 ConfirmDialog.show/.confirm）：\n  " + "\n  ".join(offenders)
+
+
+def test_confirm_dialog_promise_api_exists():
+    """ConfirmDialog.confirm(msg) -> Promise<boolean> 是各站点的迁移依赖。"""
+    js = (
+        Path(__file__).resolve().parent.parent / "app" / "integrated_app" / "static" / "js" / "confirm_dialog.js"
+    ).read_text(encoding="utf-8")
+    assert "function confirm(message, options)" in js
+    assert "resolve(true)" in js and "resolve(false)" in js
+    assert "onCancel" in js, "取消/点遮罩路径必须能 resolve(false)"

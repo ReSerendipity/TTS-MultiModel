@@ -909,15 +909,18 @@
         });
     };
     window.sysMaintLogsClean = function() {
-        if (!confirm(t('logs_clean_confirm', '确定清理 30 天前的旧日志吗？'))) return;
-        var headers = { 'X-CSRF-Token': (window.getCsrfToken ? window.getCsrfToken() : '') };
-        fetch('/api/system/logs/clean', { method: 'DELETE', headers: headers })
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                show(kv(d));
-                if (window.Toast) Toast.show(t('logs_clean_done', '日志清理完成'), 'success');
-            })
-            .catch(fail);
+        // 页内确认（替代原生 confirm，下同）
+        ConfirmDialog.confirm(t('logs_clean_confirm', '确定清理 30 天前的旧日志吗？')).then(function(ok) {
+            if (!ok) return;
+            var headers = { 'X-CSRF-Token': (window.getCsrfToken ? window.getCsrfToken() : '') };
+            fetch('/api/system/logs/clean', { method: 'DELETE', headers: headers })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    show(kv(d));
+                    if (window.Toast) Toast.show(t('logs_clean_done', '日志清理完成'), 'success');
+                })
+                .catch(fail);
+        });
     };
     window.sysMaintPreload = function() {
         var sel = document.getElementById('maint-preload-engine');
@@ -931,18 +934,22 @@
         get('/api/model/preload/status', function(d) { show(kv(d.preload || d)); });
     };
     window.sysMaintReset = function() {
-        if (!confirm(t('settings_reset_confirm', '确定要恢复默认设置吗？config.yaml 将重置为出厂默认。'))) return;
-        post('/api/system/settings/reset', undefined, function(d) {
-            show(kv(d));
-            if (window.Toast) Toast.show(t('settings_reset_done', '已恢复默认设置') + (d.source ? (' (' + d.source + ')') : ''), 'success');
+        ConfirmDialog.confirm(t('settings_reset_confirm', '确定要恢复默认设置吗？config.yaml 将重置为出厂默认。')).then(function(ok) {
+            if (!ok) return;
+            post('/api/system/settings/reset', undefined, function(d) {
+                show(kv(d));
+                if (window.Toast) Toast.show(t('settings_reset_done', '已恢复默认设置') + (d.source ? (' (' + d.source + ')') : ''), 'success');
+            });
         });
     };
     window.sysMaintShutdown = function() {
-        if (!confirm(t('shutdown_confirm', '确定要关闭服务吗？进行中的生成将中断。'))) return;
-        if (!confirm(t('shutdown_confirm2', '再次确认：真的要关闭服务吗？'))) return;
-        post('/api/system/shutdown', undefined, function(d) {
-            show(kv(d));
-            if (window.Toast) Toast.show(d.message || t('shutdown_started', '服务器正在关闭…'), 'warning');
+        // 双重确认改为一次页内确认（两连弹在页内对话框上体验差且无增益）
+        ConfirmDialog.confirm(t('shutdown_confirm', '确定要关闭服务吗？进行中的生成将中断。') + '\n' + t('shutdown_confirm2', '再次确认：真的要关闭服务吗？')).then(function(ok) {
+            if (!ok) return;
+            post('/api/system/shutdown', undefined, function(d) {
+                show(kv(d));
+                if (window.Toast) Toast.show(d.message || t('shutdown_started', '服务器正在关闭…'), 'warning');
+            });
         });
     };
 })();

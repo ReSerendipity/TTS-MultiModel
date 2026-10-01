@@ -742,7 +742,7 @@ window.TTSFileUpload = (function() {
                 clearAllDirtyInTab();
                 retryTabSwitch(cfg);
             });
-        } else if (window.confirm(SWITCH_DIRTY_MSG)) {
+        } else if (window.confirm(SWITCH_DIRTY_MSG)) { // NATIVE-CONFIRM-FALLBACK
             clearAllDirtyInTab();
             retryTabSwitch(cfg);
         }
