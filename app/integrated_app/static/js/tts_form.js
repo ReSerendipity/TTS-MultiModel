@@ -705,13 +705,46 @@ window.TTSFileUpload = (function() {
         markDirty(target, isSuper);
     }
 
-    function onHtmxSwap(e) {
-        if (!hasAnyDirty()) return;
-        var msg = '当前表单有未生成的修改，切换页面将丢失内容。\n\n确定继续切换吗？';
-        if (!window.confirm(msg)) {
-            if (e.preventDefault) e.preventDefault();
-            if (e.stopPropagation) e.stopPropagation();
+    var SWITCH_DIRTY_MSG = '当前表单有未生成的修改，切换页面将丢失内容。\n\n确定继续切换吗？';
+
+    function clearAllDirtyInTab() {
+        var tc = getTabContent();
+        if (!tc) return;
+        var forms = tc.querySelectorAll('form');
+        for (var i = 0; i < forms.length; i++) clearDirtyFromContainer(forms[i]);
+        clearDirtyFromContainer(tc);
+    }
+
+    function retryTabSwitch(requestConfig) {
+        if (!window.htmx || !requestConfig || !requestConfig.path) return false;
+        try {
+            window.htmx.ajax((requestConfig.verb || 'get').toLowerCase(), requestConfig.path, '#tab-content');
+            return true;
+        } catch (err) {
             return false;
+        }
+    }
+
+    function onHtmxSwap(e) {
+        // 只拦「切页」请求（/tab/...）：生成请求的响应交换不算切换页面。
+        // （生成点击已被 onGenerateClick 清脏，但按钮类名不匹配时会漏清，
+        //  此处按 path 收窄语义，避免把生成结果交换误判成切页。）
+        var cfg = (e.detail && e.detail.requestConfig) || null;
+        var path = cfg ? String(cfg.path || '') : '';
+        if (!hasAnyDirty() || path.indexOf('/tab/') !== 0) return;
+        // 页内 ConfirmDialog 取代 window.confirm：原生对话框渲染在宿主层、
+        // 不属于页面 DOM（桌面壳/内嵌浏览器里无法定制，也会卡住无头自动化）。
+        // 确认后用 htmx.ajax 重发被拦下的原请求。
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
+        if (window.ConfirmDialog && typeof window.ConfirmDialog.show === 'function') {
+            window.ConfirmDialog.show(SWITCH_DIRTY_MSG, function() {
+                clearAllDirtyInTab();
+                retryTabSwitch(cfg);
+            });
+        } else if (window.confirm(SWITCH_DIRTY_MSG)) {
+            clearAllDirtyInTab();
+            retryTabSwitch(cfg);
         }
     }
 
