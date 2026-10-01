@@ -60,6 +60,7 @@ numba==0.67.0
 noisereduce==3.0.3
 numpy==2.5.2
 omegaconf==2.3.1
+openai-whisper==20250625
 opencc-python-reimplemented==0.1.7
 oss2==2.19.1
 packaging==26.3

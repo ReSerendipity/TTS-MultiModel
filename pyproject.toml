@@ -141,6 +141,9 @@ dependencies = [
     # （缺失报 "请安装 fugashi: pip install fugashi unidic-lite"，2026-10-01 实测）。
     "fugashi>=1.3.0",
     "unidic-lite>=1.0.8",
+    # openai-whisper：indextts.utils.tokenizer 顶层 from whisper.tokenizer import
+    # Tokenizer（2026-10-01 runtime 实装时暴露，与上面同批）。
+    "openai-whisper>=20231117",
     # === 数据校验 ===
     "pydantic>=2.0",
 ]
