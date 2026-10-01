@@ -37,17 +37,10 @@ _CACHE: dict[str, list[str]] = {}
 # 键 = (钉版包, 其约束的依赖包) 小写；值 = (登记理由, 复审日期)。
 # 新增豁免必须在此登记理由与复审日期——本闸不给"静默白名单"留口子。
 # 复审到期时本闸按日期比对转红（防"登记一次、永久遗忘"）。
-ACCEPTED_CONFLICTS: dict[tuple[str, str], tuple[str, str]] = {
-    # descript-audiotools 0.7.2 的元数据声明 protobuf<3.20 已过时：它自己的
-    # generated proto 是新 builder 风格，实测在 protobuf 7.36.2 下导入与运行均正常
-    # （indextts 的 DAC 声码器链 hard-import audiotools，无法绕开该依赖）。
-    # 上游 index-tts pyproject 也钉 descript-audiotools==0.7.2。
-    # 复审：升级 descript-audiotools（若上游放开 protobuf 上界即可摘除本豁免）。
-    ("descript-audiotools", "protobuf"): (
-        "descript 0.7.2 元数据 <3.20 过时，实测 7.36.2 兼容；indextts DAC 链硬依赖",
-        "2027-03-31",
-    ),
-}
+# 使用前先确认钻石是否真无解：2026-10-01 的 descript-audiotools(protobuf<3.20)
+# × tensorboardX(>=3.20) 钻石，最终以 tensorboardX==2.6.0（约束 <4,>=3.8、未 yank）
+# 真解掉——豁免是最后手段，不是首选。
+ACCEPTED_CONFLICTS: dict[tuple[str, str], tuple[str, str]] = {}
 
 
 def _ver(s: str) -> tuple:
