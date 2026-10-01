@@ -232,7 +232,8 @@
     border: 1px solid var(--p200);
     white-space: nowrap;
 }
-.pv-theme .engine-badge[data-engine="indextts2"] {
+.pv-theme .engine-badge[data-engine="indextts2"],
+.pv-theme .engine-badge[data-engine="indextts20"] {
     background: #dcfce7;
     color: #166534;
     border-color: #86efac;
@@ -406,11 +407,12 @@
     var _SVG_HISTORY_HIDE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
     var _SVG_HISTORY_DELETE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 
-    // 根据 filename 推断引擎
+    // 根据 filename 推断引擎（输出文件命名为 <engine>_<ts>.wav）
     function inferEngine(filename) {
-        if (!filename) return 'voxcpm2';
+        if (!filename || typeof filename !== 'string') return 'voxcpm2';
         var lower = filename.toLowerCase();
-        if (lower.indexOf('idx') === 0 || lower.indexOf('it2') === 0 || lower.indexOf('dur') === 0) return 'indextts2';
+        if (lower.indexOf('indextts20') === 0 || lower.indexOf('it20') === 0) return 'indextts20';
+        if (lower.indexOf('indextts') === 0 || lower.indexOf('idx') === 0 || lower.indexOf('it2') === 0 || lower.indexOf('dur') === 0) return 'indextts2';
         return 'voxcpm2';
     }
 
@@ -443,11 +445,14 @@
 
             var tdEngine = document.createElement('td');
             tdEngine.setAttribute('data-label', '{{ "engine"|t(lang, default="引擎") }}');
-            var engine = inferEngine(r[0]);
+            // r[1] 才是文件名（r[0] 是记录 id）——传错曾让 inferEngine 在 forEach 里
+            // 抛 TypeError，tbody 已清空、整批渲染失败且异常被 promise 静默吞掉，
+            // 表现为"任何原地刷新（隐藏/显示/搜索）后历史表全空"（2026-10-01 真机实测）。
+            var engine = inferEngine(r[1]);
             var engineSpan = document.createElement('span');
             engineSpan.className = 'engine-badge';
             engineSpan.setAttribute('data-engine', engine);
-            engineSpan.textContent = engine === 'indextts2' ? 'IndexTTS 2.5' : 'VoxCPM2';
+            engineSpan.textContent = engine === 'indextts2' ? 'IndexTTS 2.5' : (engine === 'indextts20' ? 'IndexTTS 2.0' : 'VoxCPM2');
             tdEngine.appendChild(engineSpan);
 
             var tdTime = document.createElement('td');
@@ -851,7 +856,8 @@
     };
 
     window.showAllHistory = function() {
-        if (!confirm('{{ "confirm_show_all"|t(lang, default="确定要恢复显示所有被隐藏的记录吗？") }}')) return;
+        ConfirmDialog.confirm('{{ "confirm_show_all"|t(lang, default="确定要恢复显示所有被隐藏的记录吗？") }}').then(function(ok) {
+        if (!ok) return;
         var showAllHeaders = { 'Content-Type': 'application/json' };
         var showAllCsrf = window.getCsrfToken ? window.getCsrfToken() : '';
         if (showAllCsrf) showAllHeaders['X-CSRF-Token'] = showAllCsrf;
@@ -871,6 +877,7 @@
         })
         .catch(function(){
             if (window.Toast) Toast.show('{{ "network_error"|t(lang, default="网络错误，请重试") }}', 'error');
+        });
         });
     };
 
@@ -923,14 +930,44 @@
             if (window.Toast) Toast.show('{{ "select_rows_alert"|t(lang, default="请先选择要删除的记录") }}', 'error');
             return;
         }
-        if (!confirm('{{ "confirm_batch_delete"|t(lang, default="确定要删除选中的记录吗？此操作不可撤销。") }}')) return;
         var ids = [];
         selected.forEach(function(cb) { ids.push(parseInt(cb.getAttribute('data-history-id'), 10)); });
+        // 页内确认（替代原生 confirm）后再执行删除
+        ConfirmDialog.confirm('{{ "confirm_batch_delete"|t(lang, default="确定要删除选中的记录吗？此操作不可撤销。") }}').then(function(ok) {
+            if (ok) window.batchDeleteHistoryConfirmed(ids);
+        });
+    };
 
+    window.batchDeleteHistoryConfirmed = function(ids) {
         var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
         var headers = { 'Content-Type': 'application/json' };
         if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
 
+        fetch('/api/batch_delete_history', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ ids: ids, delete_files: true })
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            if (data.status === 'ok') {
+                if (window.Toast) Toast.show(ids.length + ' {{ "records_deleted"|t(lang, default="条记录已删除") }}', 'success');
+                document.querySelectorAll('.history-row-checkbox').forEach(function(cb) { cb.checked = false; });
+                var headerCheckbox = document.querySelector('.history-header-checkbox');
+                if (headerCheckbox) headerCheckbox.checked = false;
+                refreshHistory();
+            } else {
+                if (window.Toast) Toast.show(data.message || '{{ "delete_failed"|t(lang, default="删除失败") }}', 'error');
+            }
+        }).catch(function() {
+            if (window.Toast) Toast.show('{{ "delete_failed"|t(lang, default="删除失败") }}', 'error');
+        });
+    };
+
+    window.batchDeleteHistoryConfirmed = function(ids) {
+        var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
         fetch('/api/batch_delete_history', {
             method: 'POST',
             headers: headers,
@@ -980,29 +1017,31 @@
     // 删除历史音频（按记录 id）：调用 /api/batch_delete_history 真正删除记录及文件
     window.deleteHistoryAudio = function(recordId, filename, btn) {
         if (recordId === undefined || recordId === null) return;
-        if (!confirm('{{ "confirm_delete"|t(lang) }}: ' + (filename || ('#' + recordId)) + '?')) return;
+        // 页内确认（替代原生 confirm）后再执行删除
+        ConfirmDialog.confirm('{{ "confirm_delete"|t(lang) }}: ' + (filename || ('#' + recordId)) + '?').then(function(ok) {
+            if (!ok) return;
+            var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+            var headers = { 'Content-Type': 'application/json' };
+            if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
 
-        var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
-        var headers = { 'Content-Type': 'application/json' };
-        if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
-
-        fetch('/api/batch_delete_history', {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ ids: [parseInt(recordId, 10)], delete_files: true })
-        })
-            .then(function(r){ return r.json(); })
-            .then(function(data){
-                if (data.status === 'ok') {
-                    if (window.Toast) Toast.show('{{ "delete_success"|t(lang, default="删除成功") }}', 'success');
-                    refreshHistory();
-                } else {
-                    if (window.Toast) Toast.show(data.message || '{{ "delete_failed"|t(lang, default="删除失败") }}', 'error');
-                }
+            fetch('/api/batch_delete_history', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({ ids: [parseInt(recordId, 10)], delete_files: true })
             })
-            .catch(function(){
-                if (window.Toast) Toast.show('{{ "delete_failed"|t(lang, default="删除失败") }}', 'error');
-            });
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    if (data.status === 'ok') {
+                        if (window.Toast) Toast.show('{{ "delete_success"|t(lang, default="删除成功") }}', 'success');
+                        refreshHistory();
+                    } else {
+                        if (window.Toast) Toast.show(data.message || '{{ "delete_failed"|t(lang, default="删除失败") }}', 'error');
+                    }
+                })
+                .catch(function(){
+                    if (window.Toast) Toast.show('{{ "delete_failed"|t(lang, default="删除失败") }}', 'error');
+                });
+        });
     };
 
     // 隐藏单条记录：POST /api/history/hide（可在“显示隐藏记录”中恢复）
@@ -1052,7 +1091,9 @@
 
     // 清空全部记录：POST /api/history/clear_all（默认仅隐藏，可恢复显示）
     window.clearAllHistoryRecords = function() {
-        if (!confirm('{{ "history_clear_all_confirm"|t(lang, default="确定要清空全部历史记录吗？仅隐藏，可在“显示隐藏记录”中恢复。") }}')) return;
+        // 页内确认（替代原生 confirm）后再执行
+        ConfirmDialog.confirm('{{ "history_clear_all_confirm"|t(lang, default="确定要清空全部历史记录吗？仅隐藏，可在“显示隐藏记录”中恢复。") }}').then(function(ok) {
+        if (!ok) return;
         var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
         var headers = { 'Content-Type': 'application/json' };
         if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
@@ -1073,6 +1114,7 @@
         })
         .catch(function(){
             if (window.Toast) Toast.show('{{ "network_error"|t(lang, default="网络错误，请重试") }}', 'error');
+        });
         });
     };
 })();
