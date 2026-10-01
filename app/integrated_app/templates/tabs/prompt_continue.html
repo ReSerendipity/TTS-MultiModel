@@ -197,13 +197,17 @@
         var info = window.getPcSegmentInfo();
         if (info && info.segmentCount > 1) {
             e.preventDefault();
-            var confirmed = confirm(
+            // 页内确认（替代原生 confirm，与其他 tab 的分段确认同款交互）
+            ConfirmDialog.show(
                 '{{ "confirm_split"|t(lang) }}' + info.segmentCount + '{{ "segments"|t(lang) }}\n' +
                 '{{ "total_chars"|t(lang) }}' + info.textLength + '{{ "chars"|t(lang) }}\n' +
                 '{{ "max_chars_per_seg"|t(lang) }}' + info.maxLen + '{{ "chars"|t(lang) }}\n\n' +
-                '{{ "confirm_continue"|t(lang) }}'
+                '{{ "confirm_continue"|t(lang) }}',
+                function() {
+                    document.getElementById('pc-form').submit();
+                }
             );
-            if (!confirmed) return false;
+            return false;
         }
     });
 

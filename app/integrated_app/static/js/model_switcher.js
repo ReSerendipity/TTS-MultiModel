@@ -576,12 +576,25 @@ window.ModelSwitcher = {
     var _originalModelSwitcherSwitch = window.ModelSwitcher ? window.ModelSwitcher.switch : null;
 
     function _wrappedSwitchModel(modelName) {
+        var args = arguments;
         if (_isGenerating()) {
-            var ok = window.confirm('当前正在生成语音，切换引擎将终止当前任务且无法恢复。\n\n确定要切换吗？');
+            // 页内确认（替代原生 confirm）：确认后继续切换
+            if (window.ConfirmDialog && typeof window.ConfirmDialog.confirm === 'function') {
+                window.ConfirmDialog.confirm('当前正在生成语音，切换引擎将终止当前任务且无法恢复。\n\n确定要切换吗？').then(function(ok) {
+                    if (!ok) return;
+                    _doSwitch(modelName, args);
+                });
+                return;
+            }
+            var ok = window.confirm('当前正在生成语音，切换引擎将终止当前任务且无法恢复。\n\n确定要切换吗？'); // NATIVE-CONFIRM-FALLBACK
             if (!ok) return;
         }
+        return _doSwitch(modelName, args);
+    }
+
+    function _doSwitch(modelName, args) {
         _showEngineSwitchProgress();
-        var ret = _originalSwitchModel.apply(this, arguments);
+        var ret = _originalSwitchModel.apply(this, args);
         return ret;
     }
 

@@ -4,6 +4,10 @@
  *
  * Usage:
  *   ConfirmDialog.show('Are you sure?', onConfirmCallback);
+ *   ConfirmDialog.confirm('Are you sure?').then(function(ok) { ... });  // Promise 风格
+ *
+ * 2026-10-01：全站原生确认框改走本模块 —— 原生对话框
+ * 渲染在宿主层、不属于页面 DOM（桌面壳/内嵌浏览器里无法定制，也会卡住无头自动化）。
  */
 var ConfirmDialog = (function() {
     'use strict';
@@ -48,10 +52,23 @@ var ConfirmDialog = (function() {
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
 
-        cancelBtn.onclick = function() { document.body.removeChild(overlay); };
-        okBtn.onclick = function() { document.body.removeChild(overlay); if (onConfirm) onConfirm(); };
-        overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
+        function close() { if (overlay.parentNode) document.body.removeChild(overlay); }
+        cancelBtn.onclick = function() { close(); if (options.onCancel) options.onCancel(); };
+        okBtn.onclick = function() { close(); if (onConfirm) onConfirm(); };
+        overlay.onclick = function(e) { if (e.target === overlay) { close(); if (options.onCancel) options.onCancel(); } };
     }
 
-    return { show: show };
+    // Promise 风格：确定 → true；取消 / 点遮罩 → false。用于替换原生 confirm()。
+    function confirm(message, options) {
+        return new Promise(function(resolve) {
+            var settled = false;
+            var opts = {};
+            var src = options || {};
+            for (var k in src) { if (Object.prototype.hasOwnProperty.call(src, k)) opts[k] = src[k]; }
+            opts.onCancel = function() { if (!settled) { settled = true; resolve(false); } };
+            show(message, function() { if (!settled) { settled = true; resolve(true); } }, opts);
+        });
+    }
+
+    return { show: show, confirm: confirm };
 })();

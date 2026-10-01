@@ -288,12 +288,15 @@
         });
 
         document.getElementById('btn-restore-defaults').addEventListener('click', () => {
-            if (!confirm('确定要把所有设置恢复为默认值吗？此操作不可撤销。')) return;
-            document.querySelectorAll('.srow input, .srow select, .srow textarea').forEach(input => {
-                const def = input.dataset.default ?? input.getAttribute('value') ?? (input.type === 'checkbox' ? false : '');
-                if (input.type === 'checkbox') input.checked = def === 'true' || def === true;
-                else input.value = def;
-                input.dispatchEvent(new Event('change', { bubbles: true }));
+            // 页内确认（替代原生 confirm）
+            ConfirmDialog.confirm('确定要把所有设置恢复为默认值吗？此操作不可撤销。').then((ok) => {
+                if (!ok) return;
+                document.querySelectorAll('.srow input, .srow select, .srow textarea').forEach(input => {
+                    const def = input.dataset.default ?? input.getAttribute('value') ?? (input.type === 'checkbox' ? false : '');
+                    if (input.type === 'checkbox') input.checked = def === 'true' || def === true;
+                    else input.value = def;
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                });
             });
         });
 
@@ -311,7 +314,12 @@
         document.addEventListener('htmx:beforeSwap', (e) => {
             const nModified = document.querySelectorAll('.srow--modified').length;
             if (nModified > 0) {
-                if (!confirm(`您有 ${nModified} 项设置修改尚未保存，离开本页将丢失修改。\n\n确定继续？`)) e.preventDefault();
+                // 页内确认（替代原生 confirm）：拦下本次交换，确认后放行同类交换
+                e.preventDefault();
+                ConfirmDialog.confirm(`您有 ${nModified} 项设置修改尚未保存，离开本页将丢失修改。\n\n确定继续？`).then((ok) => {
+                    if (!ok) return;
+                    document.querySelectorAll('.srow--modified').forEach(el => el.classList.remove('srow--modified'));
+                });
             }
         });
     }
