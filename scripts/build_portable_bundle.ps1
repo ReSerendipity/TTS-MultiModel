@@ -429,6 +429,14 @@ function Start-TTSMultiModelRuntimePrepare {
             throw "便携解释器依赖安装失败：$($res.Text.Split("`n")[-6..-1] -join ' | ')"
         }
     }
+    # AUDIOTOOLS_NO_DEPS 约定（pyproject 注释与 GOTCHAS 有完整理由）：
+    # descript-audiotools 元数据钉 protobuf<3.20，而 3.19.x 带 4 个 HIGH CVE 不可降级；
+    # --no-deps 安装 + 锁内现有依赖即完整可用（tensorboard/ipython 等非导入路径所需）。
+    Write-Host "  安装 descript-audiotools（--no-deps，indextts DAC 链硬导入）..."
+    $res = Invoke-TTSMultiModelNative -Exe $py -Arguments @('-m', 'pip', 'install', '--no-deps', 'descript-audiotools==0.7.2')
+    if ($res.ExitCode -ne 0) {
+        throw "descript-audiotools 安装失败：$($res.Text.Split("`n")[-6..-1] -join ' | ')"
+    }
     Write-Host "  摘除 torch 家族（归入独立 torch 组件）..."
     Invoke-TTSMultiModelNative -Exe $py -Arguments @('-m', 'pip', 'uninstall', '-y', 'torch', 'torchvision', 'torchaudio') | Out-Null
     # 期望 import 失败（证明已摘干净），因此必须走 Invoke-TTSMultiModelNative：
