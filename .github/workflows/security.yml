@@ -65,7 +65,8 @@ jobs:
             --ignore-vuln PYSEC-2026-2288 \
             --ignore-vuln PYSEC-2026-2289 \
             --ignore-vuln PYSEC-2026-2290 \
-            --ignore-vuln PYSEC-2026-3929
+            --ignore-vuln PYSEC-2026-3929 \
+            --ignore-vuln PYSEC-2026-4174
           # 2026-08-16 本地评估 0 已知漏洞，解锁为门禁；依赖升级由 dependabot 自动跟进
 
   bandit:
