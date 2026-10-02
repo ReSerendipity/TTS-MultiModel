@@ -124,9 +124,6 @@
         spotlight.style.top = (r.top - 8) + 'px';
         spotlight.style.width = r.width + 'px';
         spotlight.style.height = r.height + 'px';
-        const below = r.bottom + 18 + 220 < window.innerHeight;
-        card.style.left = Math.max(24, Math.min(window.innerWidth - 444, r.left)) + 'px';
-        card.style.top = (below ? (r.bottom + 18) : (Math.max(24, r.top - 240))) + 'px';
         card.innerHTML = `
             <div style="font-size:var(--font-size-xs,12px);color:var(--accent-primary);font-weight:600;letter-spacing:.08em;
                 text-transform:uppercase;margin-bottom:6px;">第 ${idx + 1} / ${steps.length} 步</div>
@@ -146,6 +143,17 @@
                 ${steps.map((_, i) => `<span style="width:6px;height:6px;border-radius:50%;
                     background:${i === idx ? 'var(--accent-primary)' : 'var(--border-medium)'};"></span>`).join('')}
             </div>`;
+        // 定位：先渲染内容拿到真实尺寸，再把卡片双向夹紧到视口内。
+        // 旧实现「先按目标定位、事后右移补救」在窄视口/侧栏动画中会把卡片推到
+        // 负坐标（2026-10-01 实测 1280×720 下跳过按钮落在 x=-321，鼠标完全点不到）。
+        const cr = card.getBoundingClientRect();
+        const below = r.bottom + 18 + cr.height + 8 < window.innerHeight;
+        let left = Math.max(24, Math.min(window.innerWidth - 444, r.left));
+        left = Math.min(Math.max(left, 8), Math.max(8, window.innerWidth - cr.width - 8));
+        let top = below ? (r.bottom + 18) : Math.max(24, r.top - cr.height - 18);
+        top = Math.min(Math.max(top, 8), Math.max(8, window.innerHeight - cr.height - 8));
+        card.style.left = left + 'px';
+        card.style.top = top + 'px';
         const closeAll = () => document.getElementById('onboarding-overlay')?.click();
         card.querySelector('#ob-skip').onclick = closeAll;
         card.querySelector('#ob-prev').onclick = () => idx > 0 && renderStep(steps, idx - 1, card, spotlight);
@@ -153,8 +161,5 @@
             if (idx === steps.length - 1) return closeAll();
             renderStep(steps, idx + 1, card, spotlight);
         };
-        const cr = card.getBoundingClientRect();
-        if (cr.right > window.innerWidth - 24) card.style.left = (window.innerWidth - cr.width - 24) + 'px';
-        if (cr.bottom > window.innerHeight - 24) card.style.top = (r.top - cr.height - 18) + 'px';
     }
 })();

@@ -128,6 +128,15 @@ def _common_context(request: Request, tab_name: str = "") -> dict[str, Any]:
         engine_key = registry.current_engine
     engine_max_chars = get_engine_text_limit(engine_key)
 
+    # app_version 是主模板实例（app_server 的 templates.env.globals）的全局，
+    # 本模块自建 Jinja2Templates 拿不到——帮助页「版本」字段曾因此渲染成空。
+    # 与 ?v= 缓存参数同源：config.yaml 顶层 version。
+    try:
+        app_version = str(get_config().version)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("读取 app_version 失败，回退空串: %s", exc)
+        app_version = ""
+
     return {
         "request": request,
         "current_engine": registry.current_engine,
@@ -136,6 +145,7 @@ def _common_context(request: Request, tab_name: str = "") -> dict[str, Any]:
         "lang": lang,
         "gen_split_max_chars": split_chars,
         "engine_max_total_chars": engine_max_chars,
+        "app_version": app_version,
     }
 
 
