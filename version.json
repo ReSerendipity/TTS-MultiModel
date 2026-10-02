@@ -1,5 +1,5 @@
 {
-  "version": "2.3.0",
+  "version": "2.4.0",
   "release_date": "2026-09-25",
   "minimum_shell_version": "2.2.2",
   "changelog": "2.3.0：这一版的主干是极致克隆的 prompt_text 链路与 2.5 参数面落地，外加两条上游同步探针（#142）；安全面做了三处收敛——路径包含性与对外错误面各收成一处（#155）、step-audio-editx / voicebox 成功页的请求可控插值改为转义（#153）、16 处内联事件属性不再把服务器值拼进 JS 字符串并加了全仓闸（#130）。口径要说清三件事：GPU 真机推理链路本轮没有覆盖（self-hosted runner 数为 0，release-gate 只跑过 fixture）；CI 侧新增的 DCO 自证与并发去重属门禁改动，不改运行行为；以及 release-please 自己打的 tag 不会级联触发 docker-publish，所以 2.3.0 的容器镜像需要显式发布（手工 git tag 或 dispatch），k8s 清单的镜像 tag 在那之前只是目标值而非已存在值。"
