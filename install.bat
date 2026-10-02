@@ -159,6 +159,12 @@ if exist "requirements.txt" (
         exit /b 1
     )
     echo [OK] Dependencies installed successfully
+    echo.
+    echo Installing descript-audiotools (AUDIOTOOLS_NO_DEPS convention - see pyproject comment / GOTCHAS)...
+    "%PYTHON_CMD%" -m pip install --no-deps "descript-audiotools==0.7.2" --timeout 300 --retries 3
+    if errorlevel 1 (
+        echo [WARNING] descript-audiotools install failed - IndexTTS engines will not load
+    )
 ) else (
     echo [WARNING] requirements.txt not found, skipping dependency installation
 )

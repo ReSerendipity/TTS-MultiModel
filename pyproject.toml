@@ -131,12 +131,15 @@ dependencies = [
     # 但 GPU 页是常驻功能，显式声明避免静默劣化。
     "noisereduce>=3.0.0",
     "pynvml>=12.0.0",
-    # accelerate / descript-audiotools 被 indextts.infer_v2_5 在**引擎加载路径**上
-    # 懒导入（device_map / 分块工具链），缺失即 503 "requires accelerate" /
-    # "No module named 'audiotools'"（2026-10-01 全流程 UI 模拟实测）。
+    # accelerate 被 indextts.infer_v2_5 在**引擎加载路径**上懒导入（device_map），
+    # 缺失即 503 "requires accelerate"（2026-10-01 全流程 UI 模拟实测）。
     # 旧环境因传递依赖侥幸可用，三份清单均无声明；与 einops 同型缺口。
     "accelerate>=1.8.1",
-    "descript-audiotools>=0.7.2",
+    # descript-audiotools（indextts DAC 声码器链硬导入 audiotools）**故意不进本清单**：
+    # 其元数据钉 protobuf<3.20，而 protobuf 3.19.x 带 4 个 HIGH CVE（CVE-2025-4565 等，
+    # Trivy 闸实证不可降级）；实测 --no-deps 安装 + 现有依赖即完整可用（tensorboard/
+    # ipython/matplotlib 等重依赖均非导入路径所需）。安装步骤见 Dockerfile /
+    # install.bat / build_portable_bundle.ps1 的 AUDIOTOOLS_NO_DEPS 约定与 GOTCHAS。
     # fugashi + unidic-lite：indextts 文本前端的日文分词链，引擎加载期即导入
     # （缺失报 "请安装 fugashi: pip install fugashi unidic-lite"，2026-10-01 实测）。
     "fugashi>=1.3.0",
