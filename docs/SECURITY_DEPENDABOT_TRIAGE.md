@@ -32,10 +32,11 @@ A1–A8 有 GHSA 记录（= Dependabot 那 16 条告警的来源）；A9–A16 �
 | A14 | CVE-2025-14928 | PYSEC-2025-216 / 无 GHSA | 同上 | **无** | HuBERT `convert_config` 代码注入 | 同 A9（`HuBERT` 0 命中）；ASR 侧走 funasr 自有权重格式 | 同 A9 |
 | A15 | CVE-2025-14929 | PYSEC-2025-217 / 无 GHSA | 同上 | **无** | X-CLIP checkpoint 转换反序列化 | 同 A9（`XCLIP` 0 命中）；CLIP 在本仓只做安全判定、且用 `AutoTokenizer` 不换 checkpoint | 同 A9 |
 | A16 | CVE-2025-14930 | PYSEC-2025-218 / 无 GHSA | 同上 | **无** | GLM4 反序列化 | 同 A9；本仓无 LLM 对话模型 | 同 A9 |
+| A17 | 无 CVE（PYSEC-only） | PYSEC-2026-4174 / 暂无 GHSA | HIGH（影响 4.49.0–5.8.1） | 5.8.2（被引擎 pin `<4.53` 挡住，同 §2 A5–A8 口径） | `GenerativePreTrainedModel.load_custom_generate()` 在 trust 校验前把远端 `custom_generate/generate.py` 写入 `~/.cache/huggingface/modules`（文件写不可逆；执行仍受 trust 门控） | `grep -rn "load_custom_generate\|custom_generate\|GenerativePreTrainedModel" app/ scripts/` → **0 命中**；本仓只加载 TTS/ASR 权重与 tokenizer，从不走 generative 自定义加载路径；且 `clean_launch.py` 设 `TRANSFORMERS_OFFLINE=1`/`HF_HUB_OFFLINE=1`，离线模式下远端模块拉取本身被禁 | 已接受风险（pip-audit 豁免，2026-10-02 登记；随批量升级至 5.x 消解） |
 | P1 | CVE-2025-4565 | PYSEC-2026-1806 / GHSA-8qvm-5x2c-j2w7 | high | 4.25.8（另有 5.29.5 / 6.31.1 两条并行修复线） | protobuf JSON 解析 DoS | **无人挡住**：95 个钉版包里对 protobuf 的 13 条约束全是 extra 门控，我们没请求任何 extra（§3a 实测表）；本仓 `grep google.protobuf app/` 零命中，服务端不解析来自网络/wire 的数据 | 待复算 + 真机复验后随批量升级一起抬（§7） |
 | P2 | CVE-2026-0994 | PYSEC-2026-1805 / GHSA-7gcm-g887-7qv7 | high | 5.29.6（另有 6.33.5） | protobuf JSON 递归深度绕过 | 同 P1 | 同 P1 |
 
-一句话：**16 个 transformers 公告里没有一个能靠"升个版"现在就消掉** —— A1–A4 要 4.53（被
+一句话：**17 个 transformers 公告里没有一个能靠"升个版"现在就消掉** —— A1–A4 要 4.53（被
 IndexTTS 的精确 pin 挡住，§2），A5–A8 要 5.x 大版本，A9–A16 **上游根本没有修复版本**，
 只能在 5.x 之后才可能出现。P1/P2 另说。
 
