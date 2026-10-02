@@ -1,6 +1,6 @@
 {
-  "version": "2.3.0",
-  "release_date": "2026-09-25",
+  "version": "2.4.0",
+  "release_date": "2026-10-01",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.3.0：这一版的主干是极致克隆的 prompt_text 链路与 2.5 参数面落地，外加两条上游同步探针（#142）；安全面做了三处收敛——路径包含性与对外错误面各收成一处（#155）、step-audio-editx / voicebox 成功页的请求可控插值改为转义（#153）、16 处内联事件属性不再把服务器值拼进 JS 字符串并加了全仓闸（#130）。口径要说清三件事：GPU 真机推理链路本轮没有覆盖（self-hosted runner 数为 0，release-gate 只跑过 fixture）；CI 侧新增的 DCO 自证与并发去重属门禁改动，不改运行行为；以及 release-please 自己打的 tag 不会级联触发 docker-publish，所以 2.3.0 的容器镜像需要显式发布（手工 git tag 或 dispatch），k8s 清单的镜像 tag 在那之前只是目标值而非已存在值。"
+  "changelog": "2.4.0：这一版的主干是发布前真机全流程模拟（浏览器 GUI 黑盒走完 16 个 tab + 三引擎真机推理）挖出的九处修复——VoxCPM 生成路径缺失依赖（wetext/inflect/noisereduce/pynvml）补声明、indextts 加载链六个缺口（munch/accelerate/audiotools/fugashi/unidic-lite/openai-whisper）补声明并真解 tensorboardX×protobuf 钻石、隐藏面板里的授权勾选框摘除 required（已保存音色克隆此前从 UI 静默发不出请求）、切页脏表单守卫与全站 9 处原生确认框迁到页内 ConfirmDialog（宿主层对话框桌面壳里无法定制且卡自动化）、历史表原地刷新后全空（renderRows 把记录 id 当文件名传 inferEngine）、ghcr 镜像引用同步仓库改名、新手引导卡片双向夹紧到视口（窄屏下按钮曾被推出屏幕不可点）、关于页版本从硬编码 v2.0 改为随 config.yaml 动态渲染。门禁侧：githooks pre-push fail-closed、引擎规格按粒度分级、HealthMonitor 并发加锁、Pin 交叉约束闸新增已接受冲突登记机制（本轮以真解代替豁免）。口径要说清两件事：IndexTTS 2.5/2.0 的真机生成为脚本层验证（内嵌浏览器无文件上传能力，UI 行链路已遍历）；容器镜像 2.4.0 需显式 dispatch docker-publish 后 k8s 清单 tag 才是真值。"
 }

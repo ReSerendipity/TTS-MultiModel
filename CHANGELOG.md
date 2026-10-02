@@ -2,6 +2,37 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.4.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.3.0...v2.4.0) (2026-10-02)
+
+
+### Features
+
+* **devx:** git hooks 自动 bootstrap——post-checkout 首次克隆自动设置 core.hooksPath，install.bat/sh 安装时自动启用 .githooks，README 补充说明 ([5453769](https://github.com/ReSerendipity/TTS-MultiModel/commit/545376954cb3e91e38ce02a356164381e68690a5))
+
+
+### Bug Fixes
+
+* **cli:** 版本横幅从 pyproject 动态读取，消除 v2.1.0 硬编码漂移 ([0dd7c56](https://github.com/ReSerendipity/TTS-MultiModel/commit/0dd7c5654ddfbe0578fa2e63199b7aaf821e0502))
+* **deploy:** ghcr 镜像引用同步仓库改名——TTS_MultiModel→TTS-MultiModel 后 metadata-action 推送名变为 tts-multimodel ([8a406ad](https://github.com/ReSerendipity/TTS-MultiModel/commit/8a406ad255d7e6b0f971b35ae9244e07a938f9f9))
+* **deps:** descript-audiotools 改 --no-deps 约定安装——撤销 protobuf 降级（Trivy 实证 3.19.6 带 4 个 HIGH CVE） ([f212700](https://github.com/ReSerendipity/TTS-MultiModel/commit/f212700c0e75e36fc0e6fe5f2328760f48f35bda))
+* **deps:** 真解 descript-audiotools × tensorboardX 钻石——tensorboardX 2.6.0 + protobuf 3.19.6 ([1bc627a](https://github.com/ReSerendipity/TTS-MultiModel/commit/1bc627a34c3c009702d435dc670309c28103c4fe))
+* **deps:** 补声明 indextts 加载链五个缺失依赖 + Pin 闸增加已接受冲突登记机制 ([e5db772](https://github.com/ReSerendipity/TTS-MultiModel/commit/e5db7729bb73256126fad8da63f934ba11b9eee4))
+* **deps:** 补声明 openai-whisper——indextts.utils.tokenizer 顶层硬导入（runtime 实装第 6 个缺口） ([e6000e2](https://github.com/ReSerendipity/TTS-MultiModel/commit/e6000e242c1eff277aefb50e9ef0776f970bf601))
+* **deps:** 补声明 wetext/inflect/noisereduce/pynvml——VoxCPM 生成路径首跑即崩的缺失依赖 ([933834d](https://github.com/ReSerendipity/TTS-MultiModel/commit/933834d495e9185a18484fe325b38dcea0c1429a))
+* **githooks:** check-engine-specs 按引擎粒度分级 —— 部分权重开发机不再结构性假红 ([#174](https://github.com/ReSerendipity/TTS-MultiModel/issues/174)) ([a310d2c](https://github.com/ReSerendipity/TTS-MultiModel/commit/a310d2c46bb46dabe3848019bf744462ddb4d590))
+* **githooks:** pre-push 门禁 fail-closed —— 编码断言 + 业务代码触碰强制 -Full ([#172](https://github.com/ReSerendipity/TTS-MultiModel/issues/172)) ([e24b510](https://github.com/ReSerendipity/TTS-MultiModel/commit/e24b51056ba63d244bac4b3caaca210da4e1ba8f))
+* **monitor:** get_metrics 快照字典显式标注 dict[str, Any]——修复 [#171](https://github.com/ReSerendipity/TTS-MultiModel/issues/171) 引入的 3 个 mypy 新错（snap 被推断为 dict[str, object]） ([17bc234](https://github.com/ReSerendipity/TTS-MultiModel/commit/17bc234c5dd13f17cf53b148963cbb94d91c7482))
+* **monitor:** HealthMonitor 共享状态加锁 + 并发守护用例（含一次"测试没有鉴别力"的实测纠正） ([#171](https://github.com/ReSerendipity/TTS-MultiModel/issues/171)) ([73c198e](https://github.com/ReSerendipity/TTS-MultiModel/commit/73c198ef700ad53309280f56af7b1fb1759669b8))
+* **ui:** 切页脏表单守卫改走页内 ConfirmDialog——window.confirm 渲染在宿主层 ([1881598](https://github.com/ReSerendipity/TTS-MultiModel/commit/18815989a54910228c939f2e2e81c02e70d40eba))
+* **ui:** 历史表原地刷新后全空——renderRows 把记录 id 当文件名传 inferEngine ([47db8d5](https://github.com/ReSerendipity/TTS-MultiModel/commit/47db8d5236c4fb4d1ea37e2f1766b1a3352955c9))
+* **ui:** 引导卡片双向夹紧到视口 + 关于页版本改动态（tabs 上下文补 app_version） ([9474279](https://github.com/ReSerendipity/TTS-MultiModel/commit/9474279bad2a6163f74b75ce38d3dc99806fd55d))
+* **ui:** 隐藏面板里的授权勾选框摘除 required——persona 路径从 UI 整条发不出请求 ([d92c159](https://github.com/ReSerendipity/TTS-MultiModel/commit/d92c159a3829e5262a1390cf7df1c3d1c65af34c))
+
+
+### Documentation
+
+* 修订 README 并补充内部文档（README.internal.md） ([#176](https://github.com/ReSerendipity/TTS-MultiModel/issues/176)) ([e6feee4](https://github.com/ReSerendipity/TTS-MultiModel/commit/e6feee4d292dbc696310f022d2cf96afcc26cb07))
+
 ## [2.3.0](https://github.com/ReSerendipity/TTS_MultiModel/compare/v2.2.6...v2.3.0) (2026-09-25)
 
 
