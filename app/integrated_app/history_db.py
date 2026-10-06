@@ -706,6 +706,11 @@ class HistoryDatabase:
             "添加 deleted_at 列（回收站保留时间戳，支持按保留期清理）",
             "_migrate_add_deleted_at_column",
         ),
+        (
+            "v008_feedback",
+            "添加反馈字段（feedback_rating/feedback_liked/feedback_note/feedback_at）",
+            "_migrate_add_feedback_columns",
+        ),
     ]
 
     def _ensure_migrations_table(self) -> None:
@@ -741,6 +746,54 @@ class HistoryDatabase:
         并参与按保留期（默认 30 天）的物理清理。
         """
         self._migrate_add_column("deleted_at", "TEXT DEFAULT NULL")
+
+    def _migrate_add_feedback_columns(self) -> None:
+        """P2-#8：添加用户反馈字段（rating/liked/note/at）。
+
+        记录生成音频后用户的主观反馈（点赞/点踩/星级/备注），用于后续质量回归
+        与 bad-case 挖掘。四列均可空，旧记录默认 NULL/''，不影响既有查询与写入。
+        """
+        self._migrate_add_column("feedback_rating", "INTEGER")
+        self._migrate_add_column("feedback_liked", "INTEGER")
+        self._migrate_add_column("feedback_note", "TEXT DEFAULT ''")
+        self._migrate_add_column("feedback_at", "TEXT")
+
+    def set_feedback(
+        self,
+        record_id: int,
+        rating: int | None = None,
+        liked: int | None = None,
+        note: str | None = None,
+    ) -> bool:
+        """为指定历史记录写入/更新用户反馈。
+
+        Args:
+            record_id: generation_history.id。
+            rating: 可选星级 1..5（或 -1/+1）；None 表示不修改该列。
+            liked: 可选 0=踩 / 1=赞；None 表示不修改。
+            note: 可选文字备注；None 表示不修改。
+
+        Returns:
+            True 表示命中并更新了一行；False 表示记录不存在。
+        """
+        sets: list[str] = ["feedback_at = datetime('now')"]
+        params: list[Any] = []
+        if rating is not None:
+            sets.append("feedback_rating = ?")
+            params.append(rating)
+        if liked is not None:
+            sets.append("feedback_liked = ?")
+            params.append(liked)
+        if note is not None:
+            sets.append("feedback_note = ?")
+            params.append(note)
+        params.append(record_id)
+        with self._transaction() as conn:
+            cur = conn.execute(
+                f"UPDATE generation_history SET {', '.join(sets)} WHERE id = ?",  # nosec B608: sets 全部由内部字面量拼出
+                params,
+            )
+            return cur.rowcount > 0
 
     def _run_versioned_migrations(self) -> None:
         """按版本顺序执行未执行的迁移，并记录到 _schema_migrations 表。
