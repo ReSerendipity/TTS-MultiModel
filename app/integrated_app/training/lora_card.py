@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints, field_validator
@@ -75,8 +75,11 @@ class LoraTrainCard(BaseModel):
     @classmethod
     def _no_absolute_or_parent(cls, v: list[str]) -> list[str]:
         for item in v:
-            p = Path(item)
-            if p.is_absolute() or ".." in p.parts:
+            # 双风格校验：POSIX 与 Windows 语义都查。只用运行平台的 Path 时，
+            # Windows 上 "/etc/passwd" 不算绝对、Linux 上 "C:/x" 不算绝对，
+            # 卡片是可移植 YAML，任何一端漏判都会让防穿越失效（CI 全矩阵实测）。
+            pp, pw = PurePosixPath(item), PureWindowsPath(item)
+            if pp.is_absolute() or pw.is_absolute() or ".." in pp.parts or ".." in pw.parts:
                 raise ValueError(f"artifacts 必须是相对路径，拒绝: {item}")
         return v
 
