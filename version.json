@@ -1,6 +1,6 @@
 {
   "version": "2.5.0",
-  "release_date": "2026-10-01",
+  "release_date": "2026-10-06",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.4.0：这一版的主干是发布前真机全流程模拟（浏览器 GUI 黑盒走完 16 个 tab + 三引擎真机推理）挖出的九处修复——VoxCPM 生成路径缺失依赖（wetext/inflect/noisereduce/pynvml）补声明、indextts 加载链六个缺口（munch/accelerate/audiotools/fugashi/unidic-lite/openai-whisper）补声明并真解 tensorboardX×protobuf 钻石、隐藏面板里的授权勾选框摘除 required（已保存音色克隆此前从 UI 静默发不出请求）、切页脏表单守卫与全站 9 处原生确认框迁到页内 ConfirmDialog（宿主层对话框桌面壳里无法定制且卡自动化）、历史表原地刷新后全空（renderRows 把记录 id 当文件名传 inferEngine）、ghcr 镜像引用同步仓库改名、新手引导卡片双向夹紧到视口（窄屏下按钮曾被推出屏幕不可点）、关于页版本从硬编码 v2.0 改为随 config.yaml 动态渲染。门禁侧：githooks pre-push fail-closed、引擎规格按粒度分级、HealthMonitor 并发加锁、Pin 交叉约束闸新增已接受冲突登记机制（本轮以真解代替豁免）。口径要说清两件事：IndexTTS 2.5/2.0 的真机生成为脚本层验证（内嵌浏览器无文件上传能力，UI 行链路已遍历）；容器镜像 2.4.0 需显式 dispatch docker-publish 后 k8s 清单 tag 才是真值。"
+  "changelog": "2.5.0：这一版的主干是评估落地的第一批结构性补强——模型治理新增 docs/model-cards/ 权重元数据卡（5+1 引擎可追溯）与 LoRA 训练产物 card.yaml 强制 schema（Pydantic v2 钉死 git_commit/manifest sha256/persona 命名/产物相对路径防穿越，跨平台双风格校验）；数据反馈闭环新增 history.db v008 迁移（feedback_rating/liked/note/at 四列，幂等脚本+备份指纹+181 行零丢失）；CI 修复 datasets 新版把 huggingface-hub 拉到 2.x 与钉死 transformers 4.52.x 的解析冲突（hub<1.0 显式入图），并新增 gpu_golden_baseline.py 固定 10 条文本真实合成基线（RTF/音频 sha256 回归锚点，实测 mean RTF 1.626）。口径：golden 基线在 RTX 5070 Ti Laptop 本机实测，quality.yml 周跑建议挂 self-hosted GPU runner；容器镜像 2.5.0 由 tag v2.5.0 推送自动触发 docker-publish。"
 }
