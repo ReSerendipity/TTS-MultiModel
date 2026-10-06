@@ -2,6 +2,21 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.5.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.4.0...v2.5.0) (2026-10-06)
+
+
+### Features
+
+* **ci:** 新增 scripts/gpu_golden_baseline.py 固定10条文本真实合成基线（GPU补验 P1-[#5](https://github.com/ReSerendipity/TTS-MultiModel/issues/5)） ([8a160c7](https://github.com/ReSerendipity/TTS-MultiModel/commit/8a160c7e0f63458e5f01d25c43770ff7a5c929b6))
+* **db:** history.db 反馈字段迁移 v008（P2-[#8](https://github.com/ReSerendipity/TTS-MultiModel/issues/8)） ([de89067](https://github.com/ReSerendipity/TTS-MultiModel/commit/de890671d3fc7890ffb5a7d02af9f131647a965e))
+* **mlops:** 模型卡目录 + LoRA 训练产物 card.yaml schema（评估 P0-[#2](https://github.com/ReSerendipity/TTS-MultiModel/issues/2)/[#3](https://github.com/ReSerendipity/TTS-MultiModel/issues/3)） ([36b8632](https://github.com/ReSerendipity/TTS-MultiModel/commit/36b86321668a26f003c9ac5847b44e1edac9305e))
+
+
+### Bug Fixes
+
+* **ci:** 训练层依赖安装显式约束 huggingface-hub&lt;1.0 ([e81b98e](https://github.com/ReSerendipity/TTS-MultiModel/commit/e81b98e61e5e80506eda00228345fbad0485d67e))
+* **training:** lora_card artifacts 路径校验改双风格（POSIX+Windows） ([8b31fb1](https://github.com/ReSerendipity/TTS-MultiModel/commit/8b31fb13fb349596f3a7efdfc9a7ec07180920ca))
+
 ## [2.4.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.3.0...v2.4.0) (2026-10-02)
 
 
