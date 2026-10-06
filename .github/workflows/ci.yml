@@ -140,7 +140,10 @@ jobs:
           # 训练层测试依赖（= pyproject.toml [training] extra）：缺失时
           # tests/training/* 因 skipif 整体跳过 → training/{data,packers,state}.py
           # 覆盖率 0%，覆盖率预算门禁结构性假红（2026-09-11 修复）。
-          pip install datasets einops argbind tensorboard
+          # hub<1.0 显式入图（2026-10-06）：datasets 新版把 huggingface-hub 拉到 2.x，
+          # 与钉死的 transformers 4.52.x（要求 hub<1.0）冲突，pip check 直接红——
+          # 同图约束让解析器自动回溯到与 hub<1.0 兼容的 datasets 版本。
+          pip install "huggingface-hub<1.0" datasets einops argbind tensorboard
           pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
 
@@ -153,7 +156,8 @@ jobs:
           # 训练层测试依赖（= pyproject.toml [training] extra）：缺失时
           # tests/training/* 因 skipif 整体跳过 → training/{data,packers,state}.py
           # 覆盖率 0%，覆盖率预算门禁结构性假红（2026-09-11 修复）。
-          pip install datasets einops argbind tensorboard
+          # hub<1.0 显式入图（2026-10-06）：同 Linux 块注释。
+          pip install "huggingface-hub<1.0" datasets einops argbind tensorboard
           pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
 
@@ -166,7 +170,8 @@ jobs:
           # 训练层测试依赖（= pyproject.toml [training] extra）：缺失时
           # tests/training/* 因 skipif 整体跳过 → training/{data,packers,state}.py
           # 覆盖率 0%，覆盖率预算门禁结构性假红（2026-09-11 修复）。
-          pip install datasets einops argbind tensorboard
+          # hub<1.0 显式入图（2026-10-06）：同 Linux 块注释。
+          pip install "huggingface-hub<1.0" datasets einops argbind tensorboard
           pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
         shell: pwsh
