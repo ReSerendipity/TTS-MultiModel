@@ -1,0 +1,18 @@
+card_schema_version: "1.0"
+model_dir: speech_zipenhancer
+display_name: Speech ZipEnhancer
+engine_adapter: 未接入（降噪增强辅助，经 funasr 调用）
+upstream_source: 未登记（funasr 生态，本次未读取核实）
+license_upstream: 上游声明，未在本仓固化
+integrity:
+  manifest: configs/model_integrity_manifest.json
+  files:
+    - speech_zipenhancer/onnx_model.onnx
+    - speech_zipenhancer/pytorch_model.bin
+file_count: 2
+owner: ReSerendipity
+status: auxiliary
+notes: |
+  参考音频降噪辅助模型。pyproject.toml:77-79 注释：引擎切换路径
+  （_load_voxcpm2_engine 强制 include_denoiser=True）会走到它，
+  缺 addict 时降噪降级关闭。提供 onnx 与 pytorch 双格式权重。

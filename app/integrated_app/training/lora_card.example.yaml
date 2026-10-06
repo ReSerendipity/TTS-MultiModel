@@ -1,0 +1,27 @@
+# LoRA 训练产物卡片示例（模板）
+# 真实训练完成后由 write_card() 落盘到 lora/{persona_name}/card.yaml。
+# 字段约束见 app/integrated_app/training/lora_card.py。
+
+schema_version: "1.0"
+persona_name: example_persona
+base_model_dir: model/VoxCPM2
+base_model_card: docs/model-cards/VoxCPM2.yaml
+# git_commit 必须是 40 位 SHA；train/val manifest sha256 必须 64 位十六进制。
+# 注意必须加引号，否则 YAML 把前导 0 的数字串解析成整数 0。
+git_commit: "0000000000000000000000000000000000000000"
+train_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+val_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+hyperparams:
+  learning_rate: 0.0001
+  batch_size: 1
+  grad_accum_steps: 8
+  max_steps: 2000
+  lora_r: 8
+  lora_alpha: 16
+  sample_rate: 48000
+  max_grad_norm: 1.0
+trained_at: 2026-10-06T00:00:00Z
+artifacts:
+  - adapter.safetensors
+  - lora_config.json
+notes: 示例占位，非真实训练产物。

@@ -1,0 +1,16 @@
+card_schema_version: "1.0"
+model_dir: SenseVoiceSmall
+display_name: SenseVoiceSmall
+engine_adapter: 未接入（ASR 辅助模型，经 funasr 调用）
+upstream_source: 未登记（funasr/modelscope 生态，本次未读取核实）
+license_upstream: 上游声明，未在本仓固化
+integrity:
+  manifest: configs/model_integrity_manifest.json
+  files:
+    - SenseVoiceSmall/model.pt
+file_count: 1
+owner: ReSerendipity
+status: auxiliary
+notes: |
+  ASR 辅助模型，用于参考音频转录 / 脚本配音对齐，非独立 TTS 引擎。
+  经 funasr（requirements.txt:7）加载，无独立 engines/ 适配文件。

@@ -1,0 +1,19 @@
+card_schema_version: "1.0"
+model_dir: VoxCPM2
+display_name: VoxCPM2
+engine_adapter: app/integrated_app/engines/voxcpm2_engine.py
+upstream_source: openbmb/VoxCPM2  # 见 configs/lora_config.yaml:83 hf_model_id
+license_upstream: 上游声明，未在本仓固化
+integrity:
+  manifest: configs/model_integrity_manifest.json
+  files:
+    - VoxCPM2/audiovae.pth
+    - VoxCPM2/model.safetensors
+file_count: 2
+owner: ReSerendipity
+status: active
+notes: |
+  核心引擎权重。AudioVAE (audiovae.pth) + 主模型 (model.safetensors)。
+  推理侧由 vendored 代码 app/integrated_app/vendor/voxcpm/ 加载；
+  LoRA 微调以本目录为基座（configs/lora_config.yaml pretrained_path: model/VoxCPM2）。
+  显存需求约 8-12GB（app/integrated_app/engines/__init__.py 自述）。
