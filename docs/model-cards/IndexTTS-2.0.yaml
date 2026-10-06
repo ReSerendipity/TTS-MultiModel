@@ -1,0 +1,15 @@
+card_schema_version: "1.0"
+model_dir: IndexTTS-2.0
+display_name: IndexTTS 2.0
+engine_adapter: app/integrated_app/engines/indextts2_engine.py
+upstream_source: 未登记（见 docs/MODEL_DOWNLOADS.md，本次未读取核实）
+license_upstream: 上游声明，未在本仓固化
+integrity:
+  manifest: configs/model_integrity_manifest.json
+  file_count: 12
+owner: ReSerendipity
+status: active
+notes: |
+  IndexTTS 2.0 权重集。与 2.5 共享 hf_cache/ 下多数子模型
+  （bigvgan、campplus、semantic_codec、w2v-bert-2.0 等 SHA 一致），
+  差异在 gpt.pth / s2mel.pth。同样受 transformers<4.53 钉版约束。

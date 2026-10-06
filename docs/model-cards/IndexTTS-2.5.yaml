@@ -1,0 +1,18 @@
+card_schema_version: "1.0"
+model_dir: IndexTTS-2.5
+display_name: IndexTTS 2.5
+engine_adapter: app/integrated_app/engines/indextts2_engine.py
+upstream_source: 未登记（见 docs/MODEL_DOWNLOADS.md，本次未读取核实）
+license_upstream: 上游声明，未在本仓固化
+integrity:
+  manifest: configs/model_integrity_manifest.json
+  file_count: 13
+owner: ReSerendipity
+status: active
+notes: |
+  情感控制引擎权重。依赖 transformers==4.52.1 / tokenizers==0.21.0
+  （pyproject.toml:58-72 钉版原因：4.57.6 下 infer_v2_5 导入失败）。
+  子文件含 codec.pth、gpt.pth、s2mel.pth、wav2vec2bert_stats.pt、
+  hf_cache/（bigvgan、campplus_cn_common、semantic_codec、w2v-bert-2.0）、
+  qwen0.6bemo4-merge（情感子模型）。
+  真实合成由 .github/workflows/gpu-smoke.yml 周跑覆盖。
