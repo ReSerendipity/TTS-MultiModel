@@ -41,6 +41,7 @@ def _csrf_headers(base: str) -> dict:
         raise RuntimeError("响应里没有 csrf_token cookie")
     return {"Cookie": f"csrf_token={token}", "X-CSRF-Token": token}
 
+
 GOLDEN_TEXTS = [
     "你好，这是一条 TTS 质量基线测试文本。",
     "今天天气不错，适合出门散步。",
@@ -57,8 +58,7 @@ GOLDEN_TEXTS = [
 
 def _post_speech(base: str, model: str, text: str, headers: dict, timeout: float):
     url = f"{base}/v1/audio/speech"
-    body = {"model": model, "input": text, "voice": "alloy",
-            "response_format": "wav", "speed": 1.0}
+    body = {"model": model, "input": text, "voice": "alloy", "response_format": "wav", "speed": 1.0}
     data = json.dumps(body).encode("utf-8")
     h = {"Content-Type": "application/json", **headers}
     req = urllib.request.Request(url, data=data, method="POST", headers=h)
@@ -99,16 +99,20 @@ def main() -> int:
         dur = _wav_duration(raw) if raw[:4] == b"RIFF" else 0.0
         sha = hashlib.sha256(raw).hexdigest()[:16]
         rtf = (wall / dur) if dur > 0 else None
-        results.append({
-            "idx": i, "text": text, "status": status,
-            "wall_time_sec": round(wall, 3),
-            "audio_bytes": len(raw), "audio_sha256": sha,
-            "audio_duration_sec": round(dur, 3),
-            "rtf": round(rtf, 3) if rtf else None,
-        })
+        results.append(
+            {
+                "idx": i,
+                "text": text,
+                "status": status,
+                "wall_time_sec": round(wall, 3),
+                "audio_bytes": len(raw),
+                "audio_sha256": sha,
+                "audio_duration_sec": round(dur, 3),
+                "rtf": round(rtf, 3) if rtf else None,
+            }
+        )
         rtf_s = f"{rtf:.3f}" if rtf else "n/a"
-        print(f"[{i}/{len(GOLDEN_TEXTS)}] status={status} wall={wall:.2f}s dur={dur:.2f}s "
-              f"rtf={rtf_s} bytes={len(raw)}")
+        print(f"[{i}/{len(GOLDEN_TEXTS)}] status={status} wall={wall:.2f}s dur={dur:.2f}s rtf={rtf_s} bytes={len(raw)}")
 
     summary = {
         "model": args.model,
