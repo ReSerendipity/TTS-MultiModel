@@ -31,6 +31,9 @@ LIVE_CTX = [
     "Test (pytest) (3.12, ubuntu-latest)",
     "Typecheck (mypy ratchet) / Typecheck (mypy ratchet)",
     "DCO Check",
+    # 2026-10-07 起 live 第 5 条：release-gate 以 check-suite（workflow name）匹配，
+    # PR 上实测 pass（#183），见 docs/ci/branch-protection.json 的 _measured_at 注。
+    "release-gate",
 ]
 REVIEWS_1 = {
     "dismiss_stale_reviews": False,
@@ -85,7 +88,7 @@ def test_annotation_keys_never_reach_the_request_body():
     "live_ctx, want_ctx, expect_add, expect_drop",
     [
         (LIVE_CTX, LIVE_CTX, [], []),
-        (LIVE_CTX, LIVE_CTX[:-1], [], ["DCO Check"]),
+        (LIVE_CTX, LIVE_CTX[:-1], [], ["release-gate"]),
         (["Lint (ruff)"], LIVE_CTX, sorted(set(LIVE_CTX) - {"Lint (ruff)"}), []),
     ],
 )
@@ -246,7 +249,10 @@ def test_main_apply_proceeds_when_drop_is_approved_verbatim(tmp_path, monkeypatc
     fake = _FakeGh()
     monkeypatch.setattr(bpp, "CFG", str(stale))
     monkeypatch.setattr(bpp, "gh", fake)
-    monkeypatch.setattr(sys, "argv", ["apply_branch_protection.py", "--apply", "--allow-drop-contexts", "DCO Check"])
+    monkeypatch.setattr(
+        sys, "argv",
+        ["apply_branch_protection.py", "--apply", "--allow-drop-contexts", "release-gate"],
+    )
 
     rc = bpp.main()
 
