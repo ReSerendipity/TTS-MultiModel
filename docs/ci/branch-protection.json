@@ -1,9 +1,9 @@
 {
   "_comment": "分支保护【声明镜像】。口径：live 为准，本文件是 live 的镜像，不是愿望清单。改远端设置属 owner 的决定；本文件只跟着 live 更新，然后跑 docs/ci/apply_branch_protection.py（默认只读）确认无漂移。别用 --apply 把旧 JSON 压回 live —— 2026-09-27 实测过一次：这里少一条 DCO Check，--apply 就会把这条必需检查静默摘掉。",
-  "_measured_at": "2026-09-28T10:25Z（gh api repos/ReSerendipity/TTS_MultiModel/branches/main/protection，启用 PR 要求 + enforce_admins=false）",
+  "_measured_at": "2026-09-28T10:25Z 首测；2026-10-07 按 live 复核镜像：① repo 字段旧名 TTS_MultiModel → TTS-MultiModel。仓库已改名，读接口会跟随 307 重定向所以只读漂移检测看起来正常，但 PUT 不跟随重定向——同族 Image-MultiModel 实测 --apply 因此返回 HTTP 307、静默写不进去。② contexts 补 `release-gate`（live 第 5 条）。我一度怀疑它是幻影检查（在 push 类提交的 check-run 名单里找不到同名项），实测 gh pr checks 183/184 后推翻：release-gate 与 DCO Check 在 PR 上都 pass（#183 已合并），必需检查可以按 check-suite（workflow 的 name）匹配，不必等于 job 名。故按本文件口径把它镜像进来，不动 live。",
   "_meets_reality": "live 已改为：require PR(1 approval) + enforce_admins=false；owner/admin 直推 main 免 PR，其余账号强制 PR。",
   "owner": "ReSerendipity",
-  "repo": "TTS_MultiModel",
+  "repo": "TTS-MultiModel",
   "branch": "main",
   "policy": {
     "required_approving_review_count": 1,
@@ -27,7 +27,8 @@
     "Lint (ruff)",
     "Test (pytest) (3.12, ubuntu-latest)",
     "Typecheck (mypy ratchet) / Typecheck (mypy ratchet)",
-    "DCO Check"
+    "DCO Check",
+    "release-gate"
   ],
   "required_conversation_resolution": false
 }
