@@ -1,0 +1,21 @@
+{
+  "_comment": "VoxCPM2 golden set 参考基线（2026-10-07, RTX 5070 Ti Laptop, seed=42, temp=0.9）。供 .github/workflows/quality.yml 对比。duration 稳健→硬阈值；sha256/bytes 受 CUDA/driver 浮点影响→软信号（warn 不红）。",
+  "engine": "voxcpm2",
+  "model": "tts-1",
+  "ref_device": "RTX 5070 Ti Laptop",
+  "mean_rtf_baseline": 1.626,
+  "rtf_regression_warn_pct": 30.0,
+  "duration_drift_hard_pct": 20.0,
+  "items": [
+    {"idx": 1, "audio_sha256": "1767e1b063513cff", "audio_bytes": 374558, "audio_duration_sec": 3.901},
+    {"idx": 2, "audio_sha256": "22c9c7608044c610", "audio_bytes": 230444, "audio_duration_sec": 2.400},
+    {"idx": 3, "audio_sha256": "d67d3a46312251d9", "audio_bytes": 395818, "audio_duration_sec": 4.123},
+    {"idx": 4, "audio_sha256": "14f635a0da14d029", "audio_bytes": 311420, "audio_duration_sec": 3.244},
+    {"idx": 5, "audio_sha256": "394d7129e04e34b1", "audio_bytes": 366538, "audio_duration_sec": 3.818},
+    {"idx": 6, "audio_sha256": "b1cbadf8bf879f9d", "audio_bytes": 461328, "audio_duration_sec": 4.805},
+    {"idx": 7, "audio_sha256": "7dea17ff0699f134", "audio_bytes": 331960, "audio_duration_sec": 3.457},
+    {"idx": 8, "audio_sha256": "92fd291170ddd6da", "audio_bytes": 370438, "audio_duration_sec": 3.858},
+    {"idx": 9, "audio_sha256": "b3df81f4415426e5", "audio_bytes": 308690, "audio_duration_sec": 3.215},
+    {"idx": 10, "audio_sha256": "6e7c0300fa5d5584", "audio_bytes": 257738, "audio_duration_sec": 2.684}
+  ]
+}
