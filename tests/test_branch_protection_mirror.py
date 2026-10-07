@@ -250,7 +250,8 @@ def test_main_apply_proceeds_when_drop_is_approved_verbatim(tmp_path, monkeypatc
     monkeypatch.setattr(bpp, "CFG", str(stale))
     monkeypatch.setattr(bpp, "gh", fake)
     monkeypatch.setattr(
-        sys, "argv",
+        sys,
+        "argv",
         ["apply_branch_protection.py", "--apply", "--allow-drop-contexts", "release-gate"],
     )
 
