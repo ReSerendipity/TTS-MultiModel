@@ -62,24 +62,25 @@ def main() -> int:
             drift = abs(m_dur - ref_dur) / ref_dur
             if drift > dur_tol:
                 hard_failures.append(
-                    f"#{i} 时长漂移 {drift*100:.1f}%（ref={ref_dur}s measured={m_dur}s，阈值 {dur_tol*100:.0f}%）"
+                    f"#{i} 时长漂移 {drift * 100:.1f}%（ref={ref_dur}s measured={m_dur}s，阈值 {dur_tol * 100:.0f}%）"
                 )
         # sha/bytes 软信号（CUDA/driver 浮点会微动，不红）
         if m.get("audio_sha256") != item["audio_sha256"]:
-            soft_warnings.append(
-                f"#{i} sha256 漂移（ref={item['audio_sha256']} measured={m.get('audio_sha256')}）"
-            )
+            soft_warnings.append(f"#{i} sha256 漂移（ref={item['audio_sha256']} measured={m.get('audio_sha256')}）")
 
     m_rtf = meas.get("mean_rtf", 0.0)
     if rtf_base > 0 and m_rtf > rtf_base * (1 + rtf_warn):
-        hard_failures.append(
-            f"mean RTF 劣化 {m_rtf:.3f} vs 基线 {rtf_base}（阈值 +{rtf_warn*100:.0f}%）"
-        )
+        hard_failures.append(f"mean RTF 劣化 {m_rtf:.3f} vs 基线 {rtf_base}（阈值 +{rtf_warn * 100:.0f}%）")
 
     # junit
-    ts = ET.Element("testsuite", name="golden-baseline", tests=str(len(ref["items"]) + 1),
-                    failures=str(len(hard_failures)), warnings=str(len(soft_warnings)),
-                    timestamp=datetime.now(timezone.utc).isoformat())
+    ts = ET.Element(
+        "testsuite",
+        name="golden-baseline",
+        tests=str(len(ref["items"]) + 1),
+        failures=str(len(hard_failures)),
+        warnings=str(len(soft_warnings)),
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
     tc = ET.SubElement(ts, "testcase", name="content-drift", classname="golden")
     if hard_failures:
         ET.SubElement(tc, "failure", message="content drift").text = "\n".join(hard_failures)
