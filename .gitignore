@@ -446,3 +446,33 @@ tts_test/
 /.venv-relock/
 /requirements-lock.relock.txt
 /output/
+
+# --- 敏感信息防泄露（Git 版本控制安全工程与防泄露最佳实践指南 v1.1 第二章/第八章）---
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+credentials.json
+credentials.yaml
+credentials.yml
+secrets.json
+secrets.yaml
+secrets.yml
+*.sqlite
+*.sqlite3
+*.db
+# 私钥与证书：本仓跟踪 manifest_signing_public_key.pem（公钥，须入库），
+# 故不写 *.pem / *.key 通配，按私钥命名精确拦截。
+
+# --- 敏感信息防泄露 v1.1 补充（2026-10-07，修 *.db 畸形行 + 指南第二章/第八章）---
+*.env
+service-account.json
+.aws/
+.gcloud/
