@@ -43,6 +43,13 @@ EXPECTED_FEATURES: dict[str, set[str]] = {
         "style_control",
         "paralinguistic",
     },
+    # NEXT 评估 P2-2 落地：Edge-TTS CPU 兜底降级引擎（ENGINE_EVALUATION.md 评估结论）。
+    # 仅声明 tts（信息性能力）+ streaming（有 generate_streaming 实现）；
+    # voice_design/clone/script 等未声明（未声明能力不得冒充实现）。
+    "edge-tts": {
+        "tts",
+        "streaming",
+    },
 }
 
 # 能力 → 对应方法名映射（用于验证声明的能力有真实实现）

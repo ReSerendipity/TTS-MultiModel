@@ -3,7 +3,7 @@ model_dir: VoxCPM2
 display_name: VoxCPM2
 engine_adapter: app/integrated_app/engines/voxcpm2_engine.py
 upstream_source: openbmb/VoxCPM2  # 见 configs/lora_config.yaml:83 hf_model_id
-license_upstream: 上游声明，未在本仓固化
+license_upstream: Apache-2.0（2026-10-11 联网核实 openbmb/VoxCPM 仓库：权重与代码均以 Apache-2.0 开源，可商用，见 https://github.com/openbmb/VoxCPM；与 config.yaml engines.voxcpm2.license 声明一致）
 integrity:
   manifest: configs/model_integrity_manifest.json
   files:
@@ -17,3 +17,6 @@ notes: |
   推理侧由 vendored 代码 app/integrated_app/vendor/voxcpm/ 加载；
   LoRA 微调以本目录为基座（configs/lora_config.yaml pretrained_path: model/VoxCPM2）。
   显存需求约 8-12GB（app/integrated_app/engines/__init__.py 自述）。
+  音频水印（NEXT 评估 P2-2）：输出保存路径默认嵌入 FFT 频域水印
+  （config.yaml security.audio_watermark_enabled: true 为唯一默认开关；设为 false
+  仅影响其后保存的输出，已嵌入产物不受影响；source_id 为代码常量不可篡改）。

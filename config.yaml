@@ -101,6 +101,23 @@ models:
       gpu_memory_utilization: 0.5  # vLLM 显存利用率
       max_model_len: 3072  # 最大序列长度
       dtype: "bfloat16"  # 模型数据类型
+    edge-tts:
+      name: "edge-tts"
+      display_name: "Edge-TTS"
+      model_dir: "Edge-TTS"  # 无本地权重（在线服务，网络依赖）
+      vram_gb: 0.0
+      ram_gb: 0.0
+      languages: ["zh", "en", "ja", "ko", "es", "fr", "de", "ar", "ru", "pt"]
+      quality: "high"
+      license: "LGPL-3.0（edge-tts 库动态链接；上游 TTS 服务为微软在线接口，商用前自行核实条款）"
+      supported_features: ["tts", "streaming"]
+      sample_rate: 24000
+      requires_gpu: false
+      # NEXT 评估 P2-2 落地：Edge-TTS 为 CPU 兜底降级引擎（ENGINE_EVALUATION.md 评估结论）。
+      # ⚠️ edge-tts 包**不随仓库分发**（可选依赖）：缺失时引擎存在性守卫安全降级
+      #    （EngineUnavailableError 提示安装），不影响其它引擎（与 step-audio-editx 同模式）。
+      #    启用：pip install edge-tts；需外网访问微软 Edge TTS 服务。
+      pip_extra: "edge-tts>=6.1,<8"
 ui:
   theme: dark
   language: zh-CN
@@ -167,6 +184,7 @@ rate_limit:
 
 # ── 安全 / PII / 内容安全 / 审计（H3 / M3 / M7 整改） ──
 security:
+  audio_watermark_enabled: true          # P2-1（NEXT P2-2 明确默认开关）：输出音频自动嵌入可溯源水印（保存/后处理/流式序列化三条路径统一消费；false 仅影响其后产出，source_id 仍为代码常量）
   content_safety_enabled: true          # M3：生成前文本安全检测网关
   pii_encryption_enabled: true          # P1：历史记录 PII 列级加密默认开启（存量明文行可运行 scripts/migrate_pii_encryption.py 迁移）
                                          # 加密范围：仅 generation_history.text_preview（用户输入文本，enc: 前缀 Fernet）。

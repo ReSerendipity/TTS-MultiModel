@@ -113,14 +113,16 @@ def save_audio(wav: np.ndarray, sr: int, prefix: str = "audio", format: str = "w
         # 确保父目录存在
         Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
-        # P0 安全修复：写盘前强制嵌入水印，用于生成内容来源追溯
+        # P0 安全修复：写盘前嵌入水印，用于生成内容来源追溯。
+        # NEXT 评估 P2-2：开关显式化为 security.audio_watermark_enabled（默认 True，
+        # 行为不变）；source_id 仍为代码常量，不可通过配置篡改。
         try:
-            from .watermark import watermark_audio
+            from .watermark import watermark_audio, watermark_enabled
 
             wav, wm_meta = watermark_audio(
                 wav.astype(np.float32) if wav.dtype != np.float32 else wav,
                 sr,
-                enable=True,
+                enable=watermark_enabled(),
                 source_id=WATERMARK_SOURCE_ID,
             )
             # 低采样率输入会被上采样后再嵌水印，写盘必须跟随新采样率

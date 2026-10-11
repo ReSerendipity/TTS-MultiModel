@@ -934,6 +934,24 @@ def _register_builtin_engines() -> None:
         quality="high",
     )
 
+    # Edge-TTS - CPU 兜底降级引擎（NEXT 评估 P2-2 落地，ENGINE_EVALUATION.md 评估结论）。
+    # 纯懒导入：edge-tts 为可选轻量依赖（微软在线 TTS 客户端，网络依赖），仓库不随附；
+    # 缺失时引擎存在性守卫安全降级（EdgeTTSEngine.is_ready()=False / EngineUnavailableError），
+    # 与 step-audio-editx「仓库未附带 → 安全降级」同一模式。
+    # 注意：仅实现 generate_streaming（文本→语音流式），不做 voice_design/clone/script
+    # （能力契约测试按 declared features 校验；未声明能力不得冒充实现）。
+    engine_registry.register(
+        "edge-tts",
+        lazy_module=".engines.edge_tts_engine:EdgeTTSEngine",
+        display_name="Edge-TTS",
+        vram_requirement=0.0,
+        languages=["zh", "en", "ja", "ko", "es", "fr", "de", "ar", "ru", "pt"],
+        supported_features=["tts", "streaming"],
+        sample_rate=24000,
+        requires_gpu=False,
+        quality="high",
+    )
+
 
 _register_builtin_engines()
 
