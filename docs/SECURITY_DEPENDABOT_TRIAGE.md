@@ -32,8 +32,8 @@ A1–A8 有 GHSA 记录（= Dependabot 那 16 条告警的来源）；A9–A16 �
 | A14 | CVE-2025-14928 | PYSEC-2025-216 / 无 GHSA | 同上 | **无** | HuBERT `convert_config` 代码注入 | 同 A9（`HuBERT` 0 命中）；ASR 侧走 funasr 自有权重格式 | 同 A9 |
 | A15 | CVE-2025-14929 | PYSEC-2025-217 / 无 GHSA | 同上 | **无** | X-CLIP checkpoint 转换反序列化 | 同 A9（`XCLIP` 0 命中）；CLIP 在本仓只做安全判定、且用 `AutoTokenizer` 不换 checkpoint | 同 A9 |
 | A16 | CVE-2025-14930 | PYSEC-2025-218 / 无 GHSA | 同上 | **无** | GLM4 反序列化 | 同 A9；本仓无 LLM 对话模型 | 同 A9 |
-| A17 | 无 CVE（PYSEC-only） | PYSEC-2026-4174 / GHSA-x9r9-c232-4q39（2026-10-11 起 dependabot 告警 #23/#24 open） | HIGH（影响 4.49.0–5.8.1） | 5.8.2（被引擎 pin `<4.53` 挡住，同 §2 A5–A8 口径） | `GenerativePreTrainedModel.load_custom_generate()` 在 trust 校验前把远端 `custom_generate/generate.py` 写入 `~/.cache/huggingface/modules`（文件写不可逆；执行仍受 trust 门控） | `grep -rn "load_custom_generate\|custom_generate\|GenerativePreTrainedModel" app/ scripts/` → **0 命中**；本仓只加载 TTS/ASR 权重与 tokenizer，从不走 generative 自定义加载路径；且 `clean_launch.py` 设 `TRANSFORMERS_OFFLINE=1`/`HF_HUB_OFFLINE=1`，离线模式下远端模块拉取本身被禁 | 已接受风险（pip-audit 豁免，2026-10-02 登记；随批量升级至 5.x 消解）；2026-10-11 复核：dependabot 告警 #23/#24 保持 open **待人工决策**（升 5.8.2 会破坏 IndexTTS，§2 实测），dismiss 与否由 owner 定 |
-| A18 | 无 CVE（GHSA/PYSEC-only） | GHSA-4j2p-28q2-5m79 / PYSEC-2026-3804（dependabot 告警 #25/#26 open，2026-10-11） | MEDIUM | **无官方修复版本**（OSV `last_affected=1.14.0` 无 fixed 事件；GitHub 咨询 `patched_versions` 为空；PyPI 最新 1.15.0 未获官方 fixed 标记） | `load_checkpoint_in_model` / `load_checkpoint_and_dispatch` 对 sharded checkpoint 索引 `weight_map` 条目不做路径清洗（`../`/绝对路径 → 任意文件读；命名管道 → DoS） | 函数经 indextts `maskgct/codec_inference.py:291`（`load_checkpoint_and_dispatch`）**可达**，但输入是 `model/` 本地目录权重（入库前人工确认 + SHA-256 复验，LOCAL_RULES 禁区流程），无不可信输入路径；本仓 `app/` 无直调（仅自研 checkpoint.py 同名方法）。**升级阻断**：`accelerate==1.8.1` 为 vendored indextts 精确 pin（index-tts-main/pyproject.toml:31，GOTCHAS #348），升版即破坏引擎依赖图（同 A1–A8 口径）；且无官方修复版本可升 | **需人工决策**（2026-10-11 记：告警 #25/#26 保持 open，不强行升级；pip-audit 豁免 PYSEC-2026-3804 已入 security.yml，复审 2026-12-31 同批） |
+| A17 | 无 CVE（PYSEC-only） | PYSEC-2026-4174 / GHSA-x9r9-c232-4q39（2026-10-11 dependabot 告警 #23/#24 已 dismiss） | HIGH（影响 4.49.0–5.8.1） | 5.8.2（被引擎 pin `<4.53` 挡住，同 §2 A5–A8 口径） | `GenerativePreTrainedModel.load_custom_generate()` 在 trust 校验前把远端 `custom_generate/generate.py` 写入 `~/.cache/huggingface/modules`（文件写不可逆；执行仍受 trust 门控） | `grep -rn "load_custom_generate\|custom_generate\|GenerativePreTrainedModel" app/ scripts/` → **0 命中**；本仓只加载 TTS/ASR 权重与 tokenizer，从不走 generative 自定义加载路径；且 `clean_launch.py` 设 `TRANSFORMERS_OFFLINE=1`/`HF_HUB_OFFLINE=1`，离线模式下远端模块拉取本身被禁 | 已接受风险（pip-audit 豁免，2026-10-02 登记）；2026-10-11 owner 授权 dismiss #23/#24（tolerable_risk，判据入 comment）；**复点维持**：indextts 放开 pin 后升 5.8.2 消解（§4-6） |
+| A18 | 无 CVE（GHSA/PYSEC-only） | GHSA-4j2p-28q2-5m79 / PYSEC-2026-3804（2026-10-11 dependabot 告警 #25/#26 已 dismiss） | MEDIUM | **无官方修复版本**（OSV `last_affected=1.14.0` 无 fixed 事件；GitHub 咨询 `patched_versions` 为空；PyPI 最新 1.15.0 未获官方 fixed 标记） | `load_checkpoint_in_model` / `load_checkpoint_and_dispatch` 对 sharded checkpoint 索引 `weight_map` 条目不做路径清洗（`../`/绝对路径 → 任意文件读；命名管道 → DoS） | 函数经 indextts `maskgct/codec_inference.py:291`（`load_checkpoint_and_dispatch`）**可达**，但输入是 `model/` 本地目录权重（入库前人工确认 + SHA-256 复验，LOCAL_RULES 禁区流程），无不可信输入路径；本仓 `app/` 无直调（仅自研 checkpoint.py 同名方法）。**升级阻断**：`accelerate==1.8.1` 为 vendored indextts 精确 pin（index-tts-main/pyproject.toml:31，GOTCHAS #348），升版即破坏引擎依赖图（同 A1–A8 口径）；且无官方修复版本可升 | 2026-10-11 owner 授权 dismiss #25/#26（tolerable_risk，判据入 comment；pip-audit 豁免 PYSEC-2026-3804 已入 security.yml）；**复点维持**：上游发布官方修复并经真机复验 indextts 加载链后升 ≥1.15.0（§4-6），复审 2026-12-31 同批 |
 | P1 | CVE-2025-4565 | PYSEC-2026-1806 / GHSA-8qvm-5x2c-j2w7 | high | 4.25.8（另有 5.29.5 / 6.31.1 两条并行修复线） | protobuf JSON 解析 DoS | **无人挡住**：95 个钉版包里对 protobuf 的 13 条约束全是 extra 门控，我们没请求任何 extra（§3a 实测表）；本仓 `grep google.protobuf app/` 零命中，服务端不解析来自网络/wire 的数据 | 待复算 + 真机复验后随批量升级一起抬（§7） |
 | P2 | CVE-2026-0994 | PYSEC-2026-1805 / GHSA-7gcm-g887-7qv7 | high | 5.29.6（另有 6.33.5） | protobuf JSON 递归深度绕过 | 同 P1 | 同 P1 |
 
@@ -230,16 +230,19 @@ Dockerfile:38  RUN python3.12 -m pip install --no-cache-dir --user -r requiremen
 本轮经所有者明确授权后代做，并在试跑 1 条确认语义后才批量。
 
 **2026-10-11 状态更新（追加任务）**：GitHub 当前 `?state=open` 有 **4 条新告警**，均为 09-21
-那批之后新开：
+那批之后新开。逐项评估均无安全升级路径（A17 修复版 5.8.2 被引擎 pin 阻断 / A18 无官方修复版本），
+经所有者授权于 2026-10-11 **全部 dismiss（dismissed_reason=tolerable_risk，逐条带判据 comment）**，
+`?state=open` 现为 **0 条**：
 
-| 告警号 | 公告 | 对应 §1 | 严重度 | 处置 |
+| 告警号 | 公告 | 对应 §1 | 严重度 | 处置（2026-10-11，owner 授权） |
 |---|---|---|---|---|
-| 23、24 | GHSA-x9r9-c232-4q39（transformers 4.52.1，A17，两份清单各计一次） | A17 | HIGH | **需人工决策**：修复版 5.8.2 被引擎 pin `<4.53` 阻断（§2 实测破坏 IndexTTS）；保持 open，dismiss 与否由 owner 定 |
-| 25、26 | GHSA-4j2p-28q2-5m79（accelerate 1.8.1，A18，两份清单各计一次） | A18 | MEDIUM | **需人工决策**：无官方修复版本 + `accelerate==1.8.1` 为 vendored indextts 精确 pin（GOTCHAS #348）；保持 open，不强行升级 |
+| 23、24 | GHSA-x9r9-c232-4q39（transformers 4.52.1，A17，两份清单各计一次） | A17 | HIGH | **已 dismiss（tolerable_risk）**：修复版 5.8.2 被引擎 pin `<4.53` 阻断（§2 实测破坏 IndexTTS），代码路径 0 命中；复点记录维持（indextts 放开 pin 后升 5.8.2） |
+| 25、26 | GHSA-4j2p-28q2-5m79（accelerate 1.8.1，A18，两份清单各计一次） | A18 | MEDIUM | **已 dismiss（tolerable_risk）**：无官方修复版本 + `accelerate==1.8.1` 为 vendored indextts 精确 pin（GOTCHAS #348）；复点记录维持（上游发布官方修复并经真机复验后升 ≥1.15.0） |
 
 处置依据与可达性判定见 §1 A17/A18 行；pip-audit 侧 A18 已豁免（PYSEC-2026-3804，security.yml），
-A17 的 PYSEC-2026-4174 此前已豁免。**告警保持 open ≠ 登记缺失**：账本在本页 §1 与
-next-ledger/TTS-MultiModel.md「dependabot 4 漏洞处置」节。
+A17 的 PYSEC-2026-4174 此前已豁免。dismiss comment 均含「告警号+判据+日期 2026-10-11」；
+执行明细（含首次 comment 清单名错配后按 §5 流程 open→dismiss 修正）见
+next-ledger/TTS-MultiModel.md「dependabot 4 漏洞处置」节 8.3。
 
 三条**只有实测才知道**的 API 事实（下次别照着 GitHub 文档页直接抄）：
 
