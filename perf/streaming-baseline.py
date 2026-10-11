@@ -56,6 +56,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--repeats", type=int, default=5, help="采样轮数（>=5 才有意义算 P95）")
     p.add_argument("--chars", type=int, default=200, help="正文字符数（重复语料拼到该长度）")
     p.add_argument("--prefix-len", type=int, default=None, help="streaming_prefix_len，留空用服务端默认")
+    p.add_argument(
+        "--segment-chars",
+        type=int,
+        default=0,
+        help="segment_chars（每段目标字符数，0=服务端默认 100；50~500）。服务端已接线该参数（NEXT P0-2）",
+    )
     p.add_argument("--persona", default="", help="音色名，留空走默认音色")
     p.add_argument("--timeout", type=float, default=300.0)
     return p.parse_args()
@@ -82,9 +88,10 @@ def parse_sse_line(line: str) -> tuple[str, str]:
 def run_once(client: httpx.Client, base_url: str, args: argparse.Namespace, text: str) -> dict[str, Any]:
     """跑一轮流式请求，返回该轮指标。
 
-    注意：分段长度**不是**请求参数——服务端 ``split_text_for_tts`` 自己决定
-    （``_STREAMING_DEFAULT_SEGMENT_CHARS`` 是个从未被引用的死常量）。所以本脚本
-    只能通过 ``--chars`` 改正文长度来间接影响段数。
+    注意：分段长度是请求参数 ``segment_chars``（NEXT 评估 P0-2 后已接线：
+    ``split_text_for_tts`` 按该值分片，0=服务端默认 100 字符）。修复前该参数
+    不存在、服务端把 200 字文本合成单段，首包延迟≈整段生成时长。本脚本通过
+    ``--segment-chars`` 直接控制段数。
     """
     form: dict[str, Any] = {
         "text": text,
@@ -96,6 +103,8 @@ def run_once(client: httpx.Client, base_url: str, args: argparse.Namespace, text
     }
     if args.prefix_len is not None:
         form["streaming_prefix_len"] = str(args.prefix_len)
+    if args.segment_chars:
+        form["segment_chars"] = str(args.segment_chars)
 
     headers = {"X-CSRF-Token": client.cookies.get("csrf_token", "")}
     start = time.perf_counter()
@@ -219,6 +228,7 @@ def main() -> int:
             "chars": args.chars,
             "repeats": args.repeats,
             "streaming_prefix_len": args.prefix_len,
+            "segment_chars": args.segment_chars,
             "persona": args.persona or "(default)",
         },
         "runs_ok": len(ok),

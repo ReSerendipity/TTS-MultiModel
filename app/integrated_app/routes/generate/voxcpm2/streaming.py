@@ -120,6 +120,22 @@ _STREAMING_MIN_SEGMENT_CHARS: int = 50
 _STREAMING_MAX_SEGMENT_CHARS: int = 500
 _STREAMING_MAX_TOTAL_CHARS: int = 20000  # 超过此值强制引导用户使用剧本工坊/分段生成
 
+
+def _resolve_segment_chars(requested: int) -> int:
+    """解析 per-request 分段字符数：0 表示用默认值，否则夹紧到合法区间。
+
+    NEXT 评估 P0-2 修复：``_STREAMING_DEFAULT_SEGMENT_CHARS`` 此前是死常量——
+    ``split_text_for_tts(text)`` 未接收 ``max_chars``，默认 ``split_max_chars`` 把
+    200 字文本合成单段，首包延迟≈整段生成时长（实测 P95 91.6s、segments=1）。
+    这里把「默认 100 字符」真正接进分段，使首个 ``event: audio`` 在首段完成后
+    即下发；用户可经 ``segment_chars`` 表单参数 per-request override（对齐上方
+    「该值仅为默认，用户可通过高级参数 per-request override」的设计注释）。
+    """
+    if requested <= 0:
+        return _STREAMING_DEFAULT_SEGMENT_CHARS
+    return max(_STREAMING_MIN_SEGMENT_CHARS, min(_STREAMING_MAX_SEGMENT_CHARS, requested))
+
+
 # Why：同时支持 SSE（text/event-stream）与 binary-chunked 两种输出模式。
 #   - SSE: 浏览器 EventSource 原生支持，前端用 new Audio(base64片段) 拼接播放，
 #          适合 WebUI；缺点是 base64 有 33% 带宽浪费
@@ -396,6 +412,7 @@ async def streaming_sse_generation(
     inference_timesteps: int = Form(10, ge=1, le=200),
     denoise: str = Form("true"),
     streaming_prefix_len: int = Form(_STREAMING_DEFAULT_PREFIX_LEN, ge=1, le=32),
+    segment_chars: int = Form(0, ge=0, le=_STREAMING_MAX_SEGMENT_CHARS),
 ) -> StreamingResponse:
     """VoxCPM2 SSE 流式生成路由（逐段推送音频 + 进度）。
 
@@ -418,6 +435,7 @@ async def streaming_sse_generation(
         cfg_value: CFG 强度。
         inference_timesteps: 每段推理步数。
         denoise: 是否对参考音频降噪（"true"/"false"）。
+        segment_chars: 每段目标字符数（0=服务端默认 100；50~500）。
 
     Returns:
         StreamingResponse: media_type=text/event-stream，携带 no-cache / keep-alive。
@@ -481,7 +499,10 @@ async def streaming_sse_generation(
         # E4: finally 中释放信号量，确保异常路径 / 客户端断开 / CancelledError
         # 场景下都不会造成信号量泄漏，导致后续请求永远排队。
         try:
-            segments: list[str] = split_text_for_tts(text)
+            # NEXT 评估 P0-2：把 _STREAMING_DEFAULT_SEGMENT_CHARS（默认 100）真正接进
+            # 分段，按段下发首个 audio 事件；修复前此常量是死常量，长文本合成单段、
+            # 首包延迟≈整段生成时长（实测 P95 91.6s）。
+            segments: list[str] = split_text_for_tts(text, max_chars=_resolve_segment_chars(segment_chars))
             total: int = len(segments)
             stream_sr: int = _resolve_stream_sample_rate()
 

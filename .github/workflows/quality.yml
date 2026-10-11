@@ -95,13 +95,27 @@ jobs:
             Write-Host "service ready，跑 golden set..."
             & ${{ steps.py.outputs.python }} ../scripts/gpu_golden_baseline.py `
               --base-url "http://127.0.0.1:$env:QUALITY_PORT" `
-              --model tts-1 --output ../golden_baseline.json --timeout 120
+              --model tts-1 --output ../golden_baseline.json --timeout 120 `
+              --save-wav-dir ../golden_wavs
             if ($LASTEXITCODE -ne 0) {
               Write-Host "::warning::golden 脚本未全部 200（环境/运行问题，黄，不阻断内容对比）"
               echo "ENV_PROBLEM=1" | Out-File -FilePath $env:GITHUB_ENV -Encoding ascii -Append
             }
           } finally {
             if (-not $p.HasExited) { $p.Kill() }
+          }
+
+      - name: MOS 离线评分（可选口径，缺 UTMOS=黄 skip，NEXT 评估 P0-1）
+        if: env.ENV_PROBLEM != '1'
+        shell: pwsh
+        run: |
+          & ${{ steps.py.outputs.python }} scripts/gpu_golden_mos.py `
+            --wav-dir golden_wavs --output golden_mos.json --merge golden_baseline.json
+          $rc = $LASTEXITCODE
+          if ($rc -eq 3) {
+            Write-Host "::warning::UTMOS2 未安装，MOS 感知评分跳过（黄，不阻断；基线待积累）"
+          } elseif ($rc -ne 0) {
+            throw "MOS 评分异常 rc=$rc"
           }
 
       - name: Compare against baseline（内容漂移=红，fail）
@@ -114,6 +128,35 @@ jobs:
             --junit golden_baseline.junit.xml
           if ($LASTEXITCODE -eq 2) { throw "内容漂移（红）：见上方 [RED] 列表" }
           if ($LASTEXITCODE -ne 0) { throw "对比脚本异常 rc=$LASTEXITCODE" }
+
+      - name: Streaming TTFB gate（首包延迟回归=红，环境=黄，NEXT 评估 P0-2）
+        if: env.ENV_PROBLEM != '1'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          cd app
+          $env:PYTHONPATH = (Get-Location).Path
+          $p = Start-Process -NoNewWindow -PassThru -FilePath ${{ steps.py.outputs.python }} `
+            -ArgumentList "-u","-m","integrated_app.app_server","--host","127.0.0.1","--port","$env:QUALITY_PORT" `
+            -RedirectStandardOutput $env:RUNNER_TEMP/qt_stream.log -RedirectStandardError $env:RUNNER_TEMP/qt_stream.err
+          try {
+            $ok = $false
+            for ($i=1; $i -le 200; $i++) {
+              try { $r = Invoke-WebRequest -Uri "http://127.0.0.1:$env:QUALITY_PORT/readyz" -UseBasicParsing -TimeoutSec 5; if ($r.StatusCode -eq 200) { $ok=$true; break } } catch {}
+              Start-Sleep -Seconds 3
+            }
+            if (-not $ok) { throw "服务 600s 未就绪（流式门禁）" }
+            & ${{ steps.py.outputs.python }} ../perf/streaming-baseline.py `
+              --host 127.0.0.1 --port $env:QUALITY_PORT --repeats 5 --chars 200
+            if ($LASTEXITCODE -ne 0) { throw "streaming-baseline 测量失败 rc=$LASTEXITCODE" }
+            $latest = Get-ChildItem ../perf/results/streaming-baseline_*.json |
+              Sort-Object LastWriteTime | Select-Object -Last 1
+            & ${{ steps.py.outputs.python }} ../scripts/streaming_ttfb_gate.py `
+              $latest.FullName --baseline ../baselines/streaming-ttfb-baseline.json
+            if ($LASTEXITCODE -ne 0) { throw "流式首包延迟回归（红）" }
+          } finally {
+            if (-not $p.HasExited) { $p.Kill() }
+          }
 
       - name: Summary
         if: always()

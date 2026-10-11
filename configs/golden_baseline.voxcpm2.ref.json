@@ -1,11 +1,12 @@
 {
-  "_comment": "VoxCPM2 golden set 参考基线（2026-10-07, RTX 5070 Ti Laptop, seed=42, temp=0.9）。供 .github/workflows/quality.yml 对比。duration 稳健→硬阈值；sha256/bytes 受 CUDA/driver 浮点影响→软信号（warn 不红）。",
+  "_comment": "VoxCPM2 golden set 参考基线（2026-10-07, RTX 5070 Ti Laptop, seed=42, temp=0.9）。供 .github/workflows/quality.yml 对比。duration 稳健→硬阈值；sha256/bytes 受 CUDA/driver 浮点影响→软信号（warn 不红）。MOS 感知评分口径（NEXT 评估 P0-1）已就绪：本文件可声明 mean_mos_baseline / mos_regression_hard_pct / 逐条 mos_score（经 scripts/gpu_golden_mos.py 对落盘 wav 打分积累）；在未实测前不填数值，compare 侧缺基线不阻断、只软警告。",
   "engine": "voxcpm2",
   "model": "tts-1",
   "ref_device": "RTX 5070 Ti Laptop",
   "mean_rtf_baseline": 1.626,
   "rtf_regression_warn_pct": 30.0,
   "duration_drift_hard_pct": 20.0,
+  "mos_regression_hard_pct": 10.0,
   "items": [
     {"idx": 1, "audio_sha256": "1767e1b063513cff", "audio_bytes": 374558, "audio_duration_sec": 3.901},
     {"idx": 2, "audio_sha256": "22c9c7608044c610", "audio_bytes": 230444, "audio_duration_sec": 2.400},
