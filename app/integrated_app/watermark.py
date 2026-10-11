@@ -37,6 +37,27 @@ import numpy as np
 logger = logging.getLogger("tts_multimodel.watermark")
 
 
+def watermark_enabled() -> bool:
+    """输出路径水印开关（NEXT 评估 P2-2：把默认开关显式化）。
+
+    History：三条保存/序列化路径（generation._save_wav_compatible、
+    routes/generate/utils.py 后处理、voxcpm2/streaming.py 序列化）此前硬编码
+    ``enable=True``，config 里的 ``security.audio_watermark_enabled`` 从未被消费。
+    现统一走本开关：默认 True（行为不变，写盘仍强制嵌入可溯源水印），
+    运维可在 config.yaml 显式关闭。source_id 仍是代码常量，不可通过配置篡改。
+
+    Returns:
+        bool: True=保存路径嵌入水印（默认）；False=跳过嵌入（仅影响其后产出）。
+    """
+    try:
+        from .config import get_config
+
+        return bool(get_config().pydantic_config.security.audio_watermark_enabled)
+    except Exception:  # noqa: BLE001 - 配置缺失/未初始化时按最安全口径（开启）处理
+        logger.debug("读取 audio_watermark_enabled 失败，按默认开启处理")
+        return True
+
+
 #: 水印嵌入失败时抛出的受控异常（桌面分发与安全加固 P0：block 档阻断产出）。
 #: 调用点不得用裸 ``except Exception`` 吞掉——block 档语义是"产出被阻断"。
 class WatermarkEmbedError(RuntimeError):

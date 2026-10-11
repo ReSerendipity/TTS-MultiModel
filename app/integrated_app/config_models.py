@@ -596,9 +596,10 @@ class SecurityConfig(BaseModel):
     P2-1 改造：新增音频水印开关配置。
 
     Attributes:
-        audio_watermark_enabled: 是否在输出音频中自动嵌入可溯源水印。
-            注意：底层水印嵌入由代码常量 ``WATERMARK_SOURCE_ID`` 强制启用，
-            此字段仅控制文件级水印的额外嵌入（用于批量后处理场景）。
+        audio_watermark_enabled: 输出音频是否自动嵌入可溯源水印（默认 True）。
+            保存/后处理/流式序列化三条路径统一经 ``watermark.watermark_enabled()``
+            消费本开关（NEXT 评估 P2-2 之前仅作字段存在、未被消费）；
+            ``WATERMARK_SOURCE_ID`` 为代码常量，不可通过配置篡改。
     """
 
     model_config = ConfigDict(extra="ignore")

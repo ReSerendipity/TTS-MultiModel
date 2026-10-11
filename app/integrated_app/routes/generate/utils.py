@@ -981,9 +981,10 @@ def _apply_post_processing_to_file(
         # 导出的音频仍可溯源。水印失败仅记录 warning，不阻塞后处理（与主路径一致）。
         # 包装通用熔断器（BACKEND_DESIGN_ASSESSMENT §反模式 #6）：水印是「可选依赖」，
         # 其持续失败（如底层算子异常）会触发熔断，快速跳过水印而非反复重试拖慢主路径。
+        # 开关 security.audio_watermark_enabled（默认 True，NEXT 评估 P2-2）。
         try:
             from ...circuit_breaker import CircuitBreakerOpenError, get_circuit_breaker
-            from ...watermark import WATERMARK_SOURCE_ID, WatermarkEmbedError, watermark_audio
+            from ...watermark import WATERMARK_SOURCE_ID, WatermarkEmbedError, watermark_audio, watermark_enabled
 
             _cb = get_circuit_breaker("watermark_svc")
 
@@ -991,7 +992,7 @@ def _apply_post_processing_to_file(
                 return watermark_audio(
                     audio.astype(np.float32),
                     sr,
-                    enable=True,
+                    enable=watermark_enabled(),
                     source_id=WATERMARK_SOURCE_ID,
                     output_path=new_path,
                 )
