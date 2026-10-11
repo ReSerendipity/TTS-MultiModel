@@ -3,7 +3,7 @@
 
 每次改动 ``app/integrated_app/`` 下任一核心模块（_CORE_MODULES）后，
 ``security/integrity_manifest.json`` 中的期望哈希就会过期——若未重新生成，
-运行时 enforce 自检会拒绝启动（见 docs/agents/GOTCHAS.md #77）。
+运行时 enforce 自检会拒绝启动（见 docs/agents/GOTCHAS.md #77；该台账为本地维护、不随仓库分发，clone 读者无需查找）。
 本脚本在提交/推送/CI 阶段提前发现「代码已改、清单未同步」的状态，
 避免把问题留到启动时。
 

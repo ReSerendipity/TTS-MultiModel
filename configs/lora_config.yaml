@@ -12,7 +12,7 @@
 # "上手前必须改的三处" 替换占位值。
 
 # ── 上手前必须改的三处 ──────────────────────────────────────────────
-# 1) 基座模型目录（需已下载；model/ 是 AGENTS.md 禁区，不要手改内容）
+# 1) 基座模型目录（需已下载；model/ 是 AGENTS.md 禁区，不要手改内容；AGENTS.md 为本地维护、不随仓库分发）
 pretrained_path: model/VoxCPM2
 
 # 2) 数据清单：HuggingFace datasets 的 jsonl，字段 audio / text / duration

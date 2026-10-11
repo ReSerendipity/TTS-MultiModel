@@ -13,7 +13,7 @@ Three explicit I/O tiers — nothing touches the network until you ask for it:
 Why a local copy is the only option: security_headers.py pins
 ``style-src 'self' 'unsafe-inline'`` and ``font-src 'self' data:``, so a Google Fonts
 ``<link>`` is CSP-blocked and the 14 families in the menu could never render — the menu
-used to advertise them anyway (see docs/agents/GOTCHAS.md).
+used to advertise them anyway (see docs/agents/GOTCHAS.md — that ledger is maintained locally, not distributed with the repo).
 
 Sizes matter: a CJK family is split into ~100 unicode-range subsets totalling several MB.
 Use --only to install a subset of the families.
