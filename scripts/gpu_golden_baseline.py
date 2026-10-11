@@ -25,6 +25,7 @@ import struct
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 
 def _csrf_headers(base: str) -> dict:
@@ -90,12 +91,20 @@ def main() -> int:
     ap.add_argument("--token", default=None)
     ap.add_argument("--output", default="golden_baseline.json")
     ap.add_argument("--timeout", type=float, default="120")
+    ap.add_argument(
+        "--save-wav-dir",
+        default=None,
+        help="保存每条 200 响应 WAV 到目录（golden_<idx>.wav），供离线 MOS/相似度评分（NEXT 评估 P0-1）",
+    )
     args = ap.parse_args()
 
     headers = _csrf_headers(args.base_url)
     results = []
     for i, text in enumerate(GOLDEN_TEXTS, 1):
         wall, raw, status = _post_speech(args.base_url, args.model, text, headers, args.timeout)
+        if args.save_wav_dir and status == 200 and raw[:4] == b"RIFF":
+            Path(args.save_wav_dir).mkdir(parents=True, exist_ok=True)
+            (Path(args.save_wav_dir) / f"golden_{i:02d}.wav").write_bytes(raw)
         dur = _wav_duration(raw) if raw[:4] == b"RIFF" else 0.0
         sha = hashlib.sha256(raw).hexdigest()[:16]
         rtf = (wall / dur) if dur > 0 else None

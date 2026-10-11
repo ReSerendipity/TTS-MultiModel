@@ -72,6 +72,26 @@ def main() -> int:
     if rtf_base > 0 and m_rtf > rtf_base * (1 + rtf_warn):
         hard_failures.append(f"mean RTF 劣化 {m_rtf:.3f} vs 基线 {rtf_base}（阈值 +{rtf_warn * 100:.0f}%）")
 
+    # MOS 感知评分（可选口径，NEXT 评估 P0-1）：ref 声明 mean_mos_baseline 且
+    # measured 提供 mean_mos 时才硬判定；任一侧缺失只给软警告，不编造数值。
+    # MOS 基线由 gpu_golden_mos.py 对落盘 wav 打分积累（机制已就绪，基线待积累）。
+    mos_base = ref.get("mean_mos_baseline")
+    mos_hard = ref.get("mos_regression_hard_pct", 10.0) / 100.0
+    m_mos = meas.get("mean_mos")
+    if mos_base is not None and m_mos is not None:
+        if m_mos < mos_base * (1 - mos_hard):
+            hard_failures.append(f"mean MOS 劣化 {m_mos:.3f} vs 基线 {mos_base}（阈值 -{mos_hard * 100:.0f}%）")
+        elif m_mos < mos_base:
+            soft_warnings.append(f"mean MOS 略降 {m_mos:.3f} vs 基线 {mos_base}")
+    elif mos_base is not None and m_mos is None:
+        soft_warnings.append("ref 声明了 mean_mos_baseline 但 measured 无 mean_mos（MOS 评分未跑或缺失）")
+    for item in ref["items"]:
+        ref_mos = item.get("mos_score")
+        m = by_idx.get(item["idx"])
+        m_mos_i = (m or {}).get("mos_score")
+        if ref_mos is not None and m_mos_i is not None and m_mos_i < ref_mos * (1 - mos_hard):
+            soft_warnings.append(f"#{item['idx']} MOS 下降 {m_mos_i:.3f} vs ref {ref_mos}（软警告，均值口径才硬）")
+
     # junit
     ts = ET.Element(
         "testsuite",

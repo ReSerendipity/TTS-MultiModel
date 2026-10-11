@@ -1,0 +1,17 @@
+{
+  "_comment": "流式首包延迟基线（scripts/streaming_ttfb_gate.py 消费）。为 2026-09-23 分片修复前的实测值（200 字文本合成单段、P95≈91.6s）；NEXT P0-2 修复后须在真机重测更新（GPU 真跑按 skip 台账约定记受阻）。",
+  "tolerance_ratio": 1.5,
+  "endpoint": "/api/generate/streaming_sse",
+  "config": {
+    "chars": 200,
+    "repeats": 5,
+    "streaming_prefix_len": null,
+    "segment_chars": 0
+  },
+  "measured_at": "2026-09-23T08:34:52+08:00",
+  "ttfb_ms": {
+    "p50": 72661.7,
+    "p95": 91611.6,
+    "mean": 75178.6
+  }
+}
