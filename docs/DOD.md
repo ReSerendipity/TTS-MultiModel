@@ -2,7 +2,7 @@
 
 > **来源**：家族通用 DOD 模板 `.spec_audit/family_DOD.md`（源自 SpiritPal definition-of-done.md 泛化；该家族模板已归档，2026-09-17 起按本仓本地化内容维护），本仓本地化。
 > **适用范围**：TTS_MultiModel 全项目所有功能开发任务。
-> **关于 `AGENTS.md`**：下文多处引用的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略），clone 本仓的读者无需查找该文件，相关约束以本文条目正文为准。
+> **关于 `AGENTS.md` 与代理指引资产层**：下文多处引用的 `AGENTS.md`、`docs/agents/**`（含 `GOTCHAS.md` / `SOPS.md` / `CODE_STYLE.md` / `REVISION_LOG.md`）、`.qoder/{rules,skills,commands}`、`LOCAL_RULES.md`、`FIX_LOG.md`、`precheck.ps1` 均为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略，`git ls-files` 查不到），clone 本仓的读者无需查找这些文件，相关约束以本文条目正文为准；它们缺失属预期，不是文档链失效。
 
 ---
 

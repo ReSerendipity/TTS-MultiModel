@@ -154,6 +154,19 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
+      # 铁律 #5 的台账门禁（AGENTS.md 自进化修订记录表的追加不变量）**故意不挂在本文件里**，
+      # 理由记在此以免后来人再补一个假闸。涉及的三个文件 AGENTS.md、docs/agents/REVISION_LOG.md、
+      # precheck.ps1 均为「本地维护、不随仓库分发」的资产（.gitignore 的「AGENTS.md」L388、
+      # 「docs/agents/」L408、「precheck.ps1」L399 三条规则；`git ls-files` 查不到即证据），只在本机存在：
+      #   · pre-commit 的待检文件列表只来自被 add 的入库路径，所以
+      #     写成 `files: ^(AGENTS\.md|docs/agents/REVISION_LOG\.md)$` 永远不命中（死闸）；
+      #     写成 `always_run: true` 在干净克隆与 CI 上恒为「台账不存在 → skip 退出 0」（假闸），
+      #     还会给本地每次提交添一条与本次改动无关的输出。
+      #   · 实际闸位 = 推送层钩子：`.githooks/pre-push`（入库）每次 push 调用 `precheck.ps1`（本地维护）。
+      #     其快检新增一步执行 `python scripts/check_revision_log.py`（脚本本身入库，CI 可复用同一口径）。
+      #   · 缺失即 skip 的退码惯例与 scripts/check_spec_refs.py 一致。
+      #   · 判据只查机械不变量（版本列唯一 / 日期单调不减 / 每行列数一致）；**不查**行内容的历史
+      #     真实性，也不查「每次版本号递增是否都有对应行」（这类漏账只能靠人工自检）。
 
 # Configuration
 

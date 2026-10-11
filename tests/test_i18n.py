@@ -48,8 +48,8 @@ class TestI18n:
 class TestVocabConsistency:
     """5 份词表 key 集合必须一致。
 
-    ``docs/agents/CODE_STYLE.md`` §8.3 第 3 步原先写"本仓暂无自动校验脚本，
-    需人工比对"，而 AGENTS.md 自检清单又要求"新增 key 已完成 5 种语言同步"——
+    ``docs/agents/CODE_STYLE.md``（本地维护、不随仓库分发，clone 读者无需查找）§8.3 第 3 步原先写"本仓暂无自动校验脚本，
+    需人工比对"，而 AGENTS.md（同样本地维护）自检清单又要求"新增 key 已完成 5 种语言同步"——
     即一条没有机器判据的铁律。本类就是补上的那条判据。
     """
 

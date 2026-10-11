@@ -1,6 +1,6 @@
 [
   {
-    "project": "TTS_MultiModel",
+    "project": "tts-multimodel",
     "spec_files": [
       "adr/0001-remove-gptsovits.md",
       "adr/0002-consolidate-into-app-integrated-app.md",

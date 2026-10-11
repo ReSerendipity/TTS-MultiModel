@@ -1,7 +1,62 @@
 #!/bin/sh
 # 通用 pre-push（无机器特定路径，可随仓库分发）。
-#   1) 仓库提供 precheck.ps1 -> 执行它（家族既有门禁口径）
-#   2) 否则 -> 退回根目录守卫 structure-guard
+#   1) 检出里有 precheck.ps1 -> 执行它（家族既有门禁口径）。注意 precheck.ps1 被
+#      .gitignore 排除，是「本机文件」，新克隆 / 新工作树天然没有它。
+#   2) 否则 -> 仍然跑根目录守卫 structure-guard，并向 stderr 打印**显式降级声明**：
+#      逐条列出本次没跑的门禁层、兜底者（CI）、以及继续推送属人工授权这一事实。
+#      GUARD_STRICT=1 可把「降级」升级为「阻断」，与 pre-commit-lite 同一口径。
+#
+# 为什么第 2 分支不改为直接调用 scripts/check_local.py（评估后选定「显式声明」方案）：
+#   check_local.py 的快检层对**全仓**执行 `ruff format --check .`，而本仓 lint/格式
+#   门禁的权威范围是 `^(app/integrated_app|scripts|tests)/`（见 .pre-commit-config.yaml
+#   里 ruff / ruff-format 的 files 过滤，以及 precheck.ps1 的 Step 参数）。范围不一致
+#   会把仓外既有偏差（实测 docs/ci/apply_branch_protection.py 未格式化）变成误报阻断；
+#   且它在 ruff format 返回 1 时回退去调 black（本仓 venv 未装 black），报错会是
+#   「No module named black」而不是「格式待修」。接进来只是把一种不一致换成另一种，
+#   并给干净克隆凭空加一道会误红的闸，故此处保持「行为可见 + 人工授权」的边界。
+#   本钩子不引入任何需要网络或本机专属路径的步骤。
+
+# ---- 变更感知升级规则（两条分支共用：决定要不要跑 pytest / -Full 那层）----
+# Escalation rule (closes the documented AGENTS.md "run -Full after touching
+# business code" gap): if the to-be-pushed diff touches business source
+# (app/ scripts/ tests/), force the -Full gate (pytest + coverage >=45% hard
+# gate); pure docs/config keep the fast path (ruff + mypy ratchet here, pytest
+# in CI). Undecidable cases fail-closed toward -Full. ruff/mypy and CI layering
+# are intentionally left unchanged.
+_zero="0000000000000000000000000000000000000000"
+need_full=0
+saw_ref=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ -z "$local_sha" ] && continue
+    saw_ref=1
+    [ "$local_sha" = "$_zero" ] && continue   # branch deletion: nothing to test
+    if [ "$remote_sha" = "$_zero" ]; then
+        # New remote branch: base on merge-point vs a known default; else full.
+        _base=""
+        for _d in origin/HEAD origin/main origin/master; do
+            if git rev-parse --verify --quiet "$_d" >/dev/null 2>&1; then
+                _base="$(git merge-base "$local_sha" "$_d" 2>/dev/null)"
+                [ -n "$_base" ] && break
+            fi
+        done
+        if [ -z "$_base" ]; then
+            need_full=1
+            continue
+        fi
+        _changed="$(git diff --name-only "$_base" "$local_sha" 2>/dev/null)" || need_full=1
+    else
+        # `git diff` 本身跑不动（git 缺席 / 对象丢失）= 不可判 -> fail-closed 到 -Full，
+        # 与本文件顶部「Undecidable cases fail-closed toward -Full」保持一致；
+        # 旧写法把空输出当成「docs/config 改动」，会静默降级到快路径。
+        _changed="$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)" || need_full=1
+    fi
+    if printf '%s\n' "$_changed" | grep -qE '^(app|scripts|tests)/'; then
+        need_full=1
+    fi
+done
+# No ref line consumed at all -> fail-closed (the heavy gate).
+[ "$saw_ref" -eq 0 ] && need_full=1
+
 if [ -f ./precheck.ps1 ]; then
     echo "[pre-push] running local gate precheck.ps1 ..."
 
@@ -32,43 +87,6 @@ if [ -f ./precheck.ps1 ]; then
         fi
     fi
 
-    # Escalation rule (closes the documented AGENTS.md "run -Full after touching
-    # business code" gap): if the to-be-pushed diff touches business source
-    # (app/ scripts/ tests/), force the -Full gate (pytest + coverage >=45% hard
-    # gate); pure docs/config keep the fast path (ruff + mypy ratchet here, pytest
-    # in CI). Undecidable cases fail-closed toward -Full. ruff/mypy and CI layering
-    # are intentionally left unchanged.
-    _zero="0000000000000000000000000000000000000000"
-    need_full=0
-    saw_ref=0
-    while read -r local_ref local_sha remote_ref remote_sha; do
-        [ -z "$local_sha" ] && continue
-        saw_ref=1
-        [ "$local_sha" = "$_zero" ] && continue   # branch deletion: nothing to test
-        if [ "$remote_sha" = "$_zero" ]; then
-            # New remote branch: base on merge-point vs a known default; else full.
-            _base=""
-            for _d in origin/HEAD origin/main origin/master; do
-                if git rev-parse --verify --quiet "$_d" >/dev/null 2>&1; then
-                    _base="$(git merge-base "$local_sha" "$_d" 2>/dev/null)"
-                    [ -n "$_base" ] && break
-                fi
-            done
-            if [ -z "$_base" ]; then
-                need_full=1
-                continue
-            fi
-            _changed="$(git diff --name-only "$_base" "$local_sha" 2>/dev/null)"
-        else
-            _changed="$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)"
-        fi
-        if printf '%s\n' "$_changed" | grep -qE '^(app|scripts|tests)/'; then
-            need_full=1
-        fi
-    done
-    # No ref lines consumed at all -> fail-closed (run the full gate).
-    [ "$saw_ref" -eq 0 ] && need_full=1
-
     full_arg=""
     if [ "$need_full" -eq 1 ]; then
         full_arg="-Full"
@@ -84,6 +102,7 @@ if [ -f ./precheck.ps1 ]; then
     exit 0
 fi
 
+# ---- 回退分支：本检出没有 precheck.ps1 ----
 PY=""
 for cand in ".venv/Scripts/python.exe" ".venv/bin/python"; do
     [ -x "$cand" ] && PY="$cand" && break
@@ -93,9 +112,44 @@ if [ -z "$PY" ]; then
         command -v "$c" >/dev/null 2>&1 && PY="$c" && break
     done
 fi
+
+# 根目录守卫照旧执行（这一层是两条分支共有的、唯一还会真跑的本地检查）。
+# 它自己的 FAIL 仍然是硬阻断，不因下面的降级声明而被稀释。
+LAYOUT_RAN=0
+LAYOUT_NOTE=""
 if [ -z "$PY" ]; then
-    echo "[pre-push] 无 precheck.ps1 且未找到 python，跳过推送前检查" >&2
-    exit 0
+    LAYOUT_NOTE="未找到 Python 解释器"
+elif [ ! -f .github/scripts/check_layout.py ]; then
+    LAYOUT_NOTE=".github/scripts/check_layout.py 缺席"
 fi
-$PY .github/scripts/check_layout.py || exit 1
+if [ -n "$PY" ] && [ -f .github/scripts/check_layout.py ]; then
+    if ! $PY .github/scripts/check_layout.py; then
+        echo "[pre-push] structure-guard failed. bypass: git push --no-verify (explicit authorization required)" >&2
+        exit 1
+    fi
+    LAYOUT_RAN=1
+fi
+
+# 显式降级声明：走 stderr，避免与「门禁全绿」的输出混淆。
+echo "[pre-push] [WARN] 降级声明：本检出没有 precheck.ps1（被 .gitignore 排除的本机文件），推送前门禁已降级。" >&2
+if [ "$LAYOUT_RAN" -eq 1 ]; then
+    echo "          已执行：structure-guard 根目录守卫" >&2
+else
+    echo "          已执行：无（$LAYOUT_NOTE —— structure-guard 也没跑）—— 本次推送未经过任何本地校验" >&2
+fi
+echo "          未执行：ruff lint / ruff format --check（precheck.ps1 硬门禁层）" >&2
+echo "          未执行：mypy 棘轮（configs/mypy_baseline.json 基线门禁）" >&2
+echo "          未执行：REVISION_LOG 台账校验（scripts/check_revision_log.py）" >&2
+if [ "$need_full" -eq 1 ]; then
+    echo "          未执行：pytest + 覆盖率 >=45% —— 改动命中 app|scripts|tests，或不可判（按必须走 -Full 处理）" >&2
+else
+    echo "          不适用：pytest -Full 层（改动判为 docs/config，快路径下本就交给 CI）" >&2
+fi
+echo "          完整门禁由 CI 承担；在上述层缺席的情况下继续推送 = 人工授权行为。" >&2
+echo "          唯一显式绕过：git push --no-verify" >&2
+echo "          把降级视为失败：GUARD_STRICT=1 git push ..." >&2
+if [ "$GUARD_STRICT" = "1" ]; then
+    echo "[pre-push] GUARD_STRICT=1：门禁降级视为失败，推送已阻断。" >&2
+    exit 1
+fi
 exit 0
