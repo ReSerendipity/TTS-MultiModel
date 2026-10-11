@@ -57,9 +57,9 @@ GOLDEN_TEXTS = [
 ]
 
 
-def _post_speech(base: str, model: str, text: str, headers: dict, timeout: float):
+def _post_speech(base: str, model: str, text: str, voice: str, headers: dict, timeout: float):
     url = f"{base}/v1/audio/speech"
-    body = {"model": model, "input": text, "voice": "alloy", "response_format": "wav", "speed": 1.0}
+    body = {"model": model, "input": text, "voice": voice, "response_format": "wav", "speed": 1.0}
     data = json.dumps(body).encode("utf-8")
     h = {"Content-Type": "application/json", **headers}
     req = urllib.request.Request(url, data=data, method="POST", headers=h)
@@ -70,6 +70,39 @@ def _post_speech(base: str, model: str, text: str, headers: dict, timeout: float
             return time.perf_counter() - t0, raw, r.status
     except urllib.error.HTTPError as e:
         return time.perf_counter() - t0, e.read(), e.code
+
+
+def load_cases(path: str | None, default_model: str, voice_override: str) -> list[dict]:
+    """解析 golden 用例清单（NEXT 评估 P1-1 多引擎/多音色/中英扩展）。
+
+    Args:
+        path: 用例 JSON 路径；None 时回退到内置 GOLDEN_TEXTS（默认 10 条中文）。
+        default_model: 未在用例里显式指定时的模型（OpenAI 兼容名，tts-1= voxcpm2）。
+        voice_override: 命令行 --voice 覆盖（非空时优先于用例内 voice）。
+
+    Returns:
+        list[dict]，每项含 text/voice/model/engine（engine 为信息字段，不参与请求）。
+    """
+    if path is None:
+        return [
+            {"text": t, "voice": voice_override or "alloy", "model": default_model, "engine": "voxcpm2"}
+            for t in GOLDEN_TEXTS
+        ]
+    with open(path, encoding="utf-8") as f:
+        payload = json.load(f)
+    cases = payload.get("cases", [])
+    resolved = []
+    for i, c in enumerate(cases, 1):
+        resolved.append(
+            {
+                "idx": c.get("idx", i),
+                "text": c["text"],
+                "voice": voice_override or c.get("voice", "alloy"),
+                "model": c.get("model", default_model),
+                "engine": c.get("engine", ""),
+            }
+        )
+    return resolved
 
 
 def _wav_duration(raw: bytes) -> float:
@@ -88,6 +121,10 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-url", default="http://127.0.0.1:7869")
     ap.add_argument("--model", default="tts-1")
+    ap.add_argument("--voice", default="", help="全局音色覆盖（非空时优先于用例内 voice）")
+    ap.add_argument(
+        "--cases", default=None, help="用例 JSON 路径（NEXT P1-1 多引擎/多音色/中英扩展）；缺省用内置 10 条"
+    )
     ap.add_argument("--token", default=None)
     ap.add_argument("--output", default="golden_baseline.json")
     ap.add_argument("--timeout", type=float, default="120")
@@ -98,10 +135,12 @@ def main() -> int:
     )
     args = ap.parse_args()
 
+    cases = load_cases(args.cases, args.model, args.voice)
     headers = _csrf_headers(args.base_url)
     results = []
-    for i, text in enumerate(GOLDEN_TEXTS, 1):
-        wall, raw, status = _post_speech(args.base_url, args.model, text, headers, args.timeout)
+    for c in cases:
+        i = c["idx"]
+        wall, raw, status = _post_speech(args.base_url, c["model"], c["text"], c["voice"], headers, args.timeout)
         if args.save_wav_dir and status == 200 and raw[:4] == b"RIFF":
             Path(args.save_wav_dir).mkdir(parents=True, exist_ok=True)
             (Path(args.save_wav_dir) / f"golden_{i:02d}.wav").write_bytes(raw)
@@ -111,7 +150,9 @@ def main() -> int:
         results.append(
             {
                 "idx": i,
-                "text": text,
+                "text": c["text"],
+                "voice": c["voice"],
+                "engine": c["engine"],
                 "status": status,
                 "wall_time_sec": round(wall, 3),
                 "audio_bytes": len(raw),
@@ -121,10 +162,13 @@ def main() -> int:
             }
         )
         rtf_s = f"{rtf:.3f}" if rtf else "n/a"
-        print(f"[{i}/{len(GOLDEN_TEXTS)}] status={status} wall={wall:.2f}s dur={dur:.2f}s rtf={rtf_s} bytes={len(raw)}")
+        print(
+            f"[{i}/{len(cases)}] status={status} wall={wall:.2f}s dur={dur:.2f}s rtf={rtf_s} bytes={len(raw)} voice={c['voice']}"
+        )
 
     summary = {
         "model": args.model,
+        "cases_source": "file" if args.cases else "default",
         "n": len(results),
         "mean_rtf": round(sum(r["rtf"] for r in results if r["rtf"]) / max(1, sum(1 for r in results if r["rtf"])), 3),
         "mean_wall_sec": round(sum(r["wall_time_sec"] for r in results) / len(results), 3),

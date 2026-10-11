@@ -17,6 +17,11 @@
 # 运行前提：self-hosted runner 标签 [self-hosted, Windows, GPU]，
 # Python venv 经仓库变量 QUALITY_PYTHON 指定（否则回退仓库内 .venv\Scripts\python.exe），
 # model/VoxCPM2 权重就位。
+#
+# runner 可用性（NEXT 评估 P1-2）：runner-precheck 查询在线 GPU runner；无 runner /
+# 无 REPO_ADMIN_TOKEN 时优雅跳过并落 neutral check run（名字自带 ASCII 原因码），
+# 避免 gpu-smoke 曾出现过的「3 次 schedule 全 skip 而 run 结论 success」教训
+# （docs/DOD.md:225）。quality-status 才是「本周到底有没有跑成真合成」的权威结论。
 
 name: Quality golden baseline (self-hosted Windows GPU)
 
@@ -27,9 +32,54 @@ on:
 
 permissions:
   contents: read
+  # quality-status 要把"本周有没有真跑 golden"写成一条独立 check run（neutral 而非红）
+  checks: write
 
 jobs:
+  runner-precheck:
+    runs-on: ubuntu-latest
+    outputs:
+      # verdict ∈ {available, no-repo-admin-token-secret, no-registered-gpu-runner, runner-query-denied}
+      verdict: ${{ steps.probe.outputs.verdict }}
+    steps:
+      - name: Probe GPU runner availability
+        id: probe
+        env:
+          GH_TOKEN: ${{ secrets.REPO_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "verdict=no-repo-admin-token-secret" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          COUNT=$(gh api "repos/${{ github.repository }}/actions/runners" \
+            --jq '[.runners[] | select(.status == "online") | select(any(.labels[]; (.name | ascii_downcase) == "gpu"))] | length' 2>/dev/null || echo "")
+          if [ -z "$COUNT" ]; then
+            echo "verdict=runner-query-denied" >> "$GITHUB_OUTPUT"
+          elif [ "${COUNT}" -gt 0 ]; then
+            echo "online gpu-labelled runners: ${COUNT}"
+            echo "verdict=available" >> "$GITHUB_OUTPUT"
+          else
+            echo "verdict=no-registered-gpu-runner" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Skip reason: no-repo-admin-token-secret"
+        if: steps.probe.outputs.verdict == 'no-repo-admin-token-secret'
+        run: |
+          echo "::notice::本次没有任何 GPU 真合成：secret REPO_ADMIN_TOKEN 未配置，precheck 无法查询 runner 在线状态。"
+          echo "### 周度 golden 未执行" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`verdict=no-repo-admin-token-secret\` —— precheck 拿不到管理员级 token，无法判断有没有在线的 \`gpu\` runner。" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Skip reason: no-registered-gpu-runner"
+        if: steps.probe.outputs.verdict == 'no-registered-gpu-runner'
+        run: |
+          echo "::notice::本次没有任何 GPU 真合成：仓库里没有在线且带 gpu 标签的 self-hosted runner。"
+          echo "### 周度 golden 未执行" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`verdict=no-registered-gpu-runner\` —— 查询成功，但在线的 \`gpu\` runner 数为 0。" >> "$GITHUB_STEP_SUMMARY"
+
   quality-golden:
+    needs: runner-precheck
+    if: needs.runner-precheck.outputs.verdict == 'available'
     runs-on: [self-hosted, Windows, GPU]
     timeout-minutes: 45
     env:
@@ -100,6 +150,16 @@ jobs:
             if ($LASTEXITCODE -ne 0) {
               Write-Host "::warning::golden 脚本未全部 200（环境/运行问题，黄，不阻断内容对比）"
               echo "ENV_PROBLEM=1" | Out-File -FilePath $env:GITHUB_ENV -Encoding ascii -Append
+            }
+            # 多模型 measure-only pass（NEXT 评估 P1-1：中英 × 多音色）。
+            # 不参与红黄判定（ref 未积累），只落 artifact 供后续积累基线。
+            & ${{ steps.py.outputs.python }} ../scripts/gpu_golden_baseline.py `
+              --base-url "http://127.0.0.1:$env:QUALITY_PORT" `
+              --cases ../configs/golden_cases.multimodel.json `
+              --output ../golden_baseline.multimodel.json --timeout 120 `
+              --save-wav-dir ../golden_wavs_multimodel
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "::warning::多模型 pass 未全部 200（多为 persona 未授权 403，见用例文件 _comment）"
             }
           } finally {
             if (-not $p.HasExited) { $p.Kill() }
@@ -180,7 +240,59 @@ jobs:
           path: |
             golden_baseline.json
             golden_baseline.junit.xml
+            golden_baseline.multimodel.json
             ${{ runner.temp }}/qt_server.log
             ${{ runner.temp }}/qt_server.err
           if-no-files-found: ignore
           retention-days: 14
+
+  quality-status:
+    # 把"这一轮到底有没有跑成 golden 真合成"落成一眼可读的结论：一条独立的 check run
+    # （名字自带 ASCII 原因码）。用 neutral 而不是 exit 1 —— 注册 runner 属基础设施决策，
+    # 每周红一次不是目标；但 success + warning 也不行。check 名用 ASCII（本仓在 Windows
+    # 控制台与文档里多次栽过非 ASCII 编码）。
+    name: Quality golden baseline attestation
+    needs: [runner-precheck, quality-golden]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish verdict as a neutral check run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERDICT: ${{ needs.runner-precheck.outputs.verdict }}
+          GOLDEN: ${{ needs.quality-golden.result }}
+          HEAD_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          VERDICT="${VERDICT:-precheck-did-not-report}"
+          GOLDEN="${GOLDEN:-unknown}"
+          case "${GOLDEN}/${VERDICT}" in
+            success/*)                          CONCL=success;   NAME="[quality-golden] REAL synthesis executed and passed" ;;
+            failure/*)                          CONCL=failure;   NAME="[quality-golden] REAL synthesis executed and FAILED" ;;
+            cancelled/*)                        CONCL=cancelled; NAME="[quality-golden] real synthesis cancelled" ;;
+            skipped/no-repo-admin-token-secret) CONCL=neutral;   NAME="[quality-golden] NO REAL SYNTHESIS - no-repo-admin-token-secret" ;;
+            skipped/no-registered-gpu-runner)   CONCL=neutral;   NAME="[quality-golden] NO REAL SYNTHESIS - no-registered-gpu-runner" ;;
+            skipped/runner-query-denied)        CONCL=neutral;   NAME="[quality-golden] NO REAL SYNTHESIS - runner-query-denied (token lacks rights)" ;;
+            skipped/*)                          CONCL=neutral;   NAME="[quality-golden] NO REAL SYNTHESIS - ${VERDICT}" ;;
+            *)                                  CONCL=neutral;   NAME="[quality-golden] status unknown (${GOLDEN}/${VERDICT})" ;;
+          esac
+
+          {
+            echo "## 周度 golden 真合成结论：${NAME}"
+            echo ""
+            echo "| 项 | 值 |"
+            echo "|---|---|"
+            echo "| quality-golden job 结果 | ${GOLDEN} |"
+            echo "| precheck verdict | ${VERDICT} |"
+            echo "| check conclusion | ${CONCL} |"
+            echo ""
+            echo "整条 run 的 Success 不代表真合成跑过 —— 本条 check 才是结论。"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if ! gh api -X POST "repos/${{ github.repository }}/check-runs"               -f "name=${NAME}"               -f "head_sha=${HEAD_SHA}"               -f status=completed               -f "conclusion=${CONCL}"               -f "html_url=${RUN_URL}"               -f "external_id=quality-golden-${{ github.run_id }}-${{ github.run_attempt }}"               -f "title=Quality golden baseline - real synthesis attestation"               -f "summary=${NAME} | verdict=${VERDICT} | quality-golden=${GOLDEN} | run=${RUN_URL}" >/dev/null; then
+            echo "::error::check run 写入失败：需要 permissions.checks=write。自证链路断了，必须显眼。"
+            exit 1
+          fi
+          echo "已发布 check run：${NAME} -> conclusion=${CONCL}"
