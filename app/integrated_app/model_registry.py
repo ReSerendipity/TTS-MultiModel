@@ -91,6 +91,9 @@ class EngineName(str, Enum):
         STEP_AUDIO_EDITX (str): "step-audio-editx" —— Step-Audio-EditX 音频编辑
             引擎（音频→音频），支持情感/风格/副语言编辑控制，
             由 /api/generate/step-audio-editx/edit 路由调用。
+        EDGE_TTS (str): "edge-tts" —— Edge-TTS CPU 兜底降级引擎（NEXT 评估 P2-2），
+            微软在线 TTS 客户端（网络依赖，edge-tts 包不随仓库分发），
+            仅声明 tts + streaming 能力，无本地权重，不参与模型加载路由。
 
     使用示例::
 
@@ -104,6 +107,7 @@ class EngineName(str, Enum):
     INDEXTTS20 = "indextts20"
     VOICEBOX = "voicebox"
     STEP_AUDIO_EDITX = "step-audio-editx"
+    EDGE_TTS = "edge-tts"
 
 
 #: IndexTTS 家族成员集合。2.5（indextts2）与 2.0（indextts20）是同一推理
@@ -122,6 +126,7 @@ ENGINE_DISPLAY_NAMES: dict[str, str] = {
     EngineName.INDEXTTS20.value: "IndexTTS 2.0",
     EngineName.VOICEBOX.value: "Voicebox VC",
     EngineName.STEP_AUDIO_EDITX.value: "Step-Audio-EditX",
+    EngineName.EDGE_TTS.value: "Edge-TTS",
 }
 
 #: 各引擎的基线显存需求字典（单位 GB，浮点数）。
@@ -135,6 +140,7 @@ ENGINE_VRAM_REQUIREMENTS: dict[str, float] = {
     EngineName.INDEXTTS20.value: 5.5,
     EngineName.VOICEBOX.value: 4.0,
     EngineName.STEP_AUDIO_EDITX.value: 8.0,
+    EngineName.EDGE_TTS.value: 0.0,
 }
 
 #: 配置读取失败时使用的默认显存安全裕度倍数。
