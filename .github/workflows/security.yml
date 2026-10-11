@@ -66,7 +66,15 @@ jobs:
             --ignore-vuln PYSEC-2026-2289 \
             --ignore-vuln PYSEC-2026-2290 \
             --ignore-vuln PYSEC-2026-3929 \
-            --ignore-vuln PYSEC-2026-4174
+            --ignore-vuln PYSEC-2026-4174 \
+            --ignore-vuln PYSEC-2026-3804
+          # 2026-10-11 追加（A18，accelerate==1.8.1，GHSA-4j2p-28q2-5m79）：无官方修复版本
+          # （OSV last_affected=1.14.0、GitHub 咨询 patched_versions 为空、PyPI 最新 1.15.0
+          #  未获官方 fixed 标记），且 1.8.1 为 vendored indextts 精确 pin（index-tts-main/
+          #  pyproject.toml:31，GOTCHAS #348），升版破坏引擎依赖图。可达性：漏洞函数经
+          #  indextts codec 加载路径可达，但输入为 model/ 本地权重（人工确认 + SHA-256 复验）。
+          #  判据与复点条件见 docs/SECURITY_DEPENDABOT_TRIAGE.md §1 A18 / §4-6；
+          #  复审截止 2026-12-31 同批。
           # 2026-08-16 本地评估 0 已知漏洞，解锁为门禁；依赖升级由 dependabot 自动跟进
 
   bandit:
