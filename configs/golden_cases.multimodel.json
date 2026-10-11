@@ -1,0 +1,13 @@
+{
+  "_comment": "多模型 golden 扩展用例（NEXT 评估 P1-1：单引擎单音色单语种 → 中英 × 多音色）。仅作 measure-only 基线积累（compare 只对默认 10 条 set 生效，本文件不参与红黄判定）。注意：voice=persona 名需在运行机器完成授权声明（openai_api.py 815-827 对 unverified 拒绝，403）；未声明时该条会 403，属环境准备项而非模型退化。engine 为信息字段：tts-1-hd(indextts2) 经 /v1/audio/speech 上游设计不可用（openai_api.py 872-882），落地时走 indextts2 原生端点或跳过该条。",
+  "cases": [
+    {"idx": 1, "text": "你好，这是一条多模型质量基线测试文本。", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"},
+    {"idx": 2, "text": "Hello, this is an English quality baseline sentence.", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"},
+    {"idx": 3, "text": "今天讲一个关于江南水乡的短故事，测试叙事语气。", "voice": "韩立", "model": "tts-1", "engine": "voxcpm2"},
+    {"idx": 4, "text": "The quick brown fox jumps over the lazy dog.", "voice": "韩立", "model": "tts-1", "engine": "voxcpm2"},
+    {"idx": 5, "text": "这段语音用于验证多音色覆盖与稳定性。", "voice": "御姐", "model": "tts-1", "engine": "voxcpm2"},
+    {"idx": 6, "text": "Speech synthesis needs stable acoustic modeling and text frontend.", "voice": "御姐", "model": "tts-1", "engine": "voxcpm2"},
+    {"idx": 7, "text": "语音合成需要稳定的声学建模与文本前端配合。", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"},
+    {"idx": 8, "text": "Emotion control and duration control are key differentiators.", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"}
+  ]
+}
