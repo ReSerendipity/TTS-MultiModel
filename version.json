@@ -1,6 +1,6 @@
 {
   "version": "2.6.0",
-  "release_date": "2026-10-06",
+  "release_date": "2026-10-12",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.5.0：这一版的主干是评估落地的第一批结构性补强——模型治理新增 docs/model-cards/ 权重元数据卡（5+1 引擎可追溯）与 LoRA 训练产物 card.yaml 强制 schema（Pydantic v2 钉死 git_commit/manifest sha256/persona 命名/产物相对路径防穿越，跨平台双风格校验）；数据反馈闭环新增 history.db v008 迁移（feedback_rating/liked/note/at 四列，幂等脚本+备份指纹+181 行零丢失）；CI 修复 datasets 新版把 huggingface-hub 拉到 2.x 与钉死 transformers 4.52.x 的解析冲突（hub<1.0 显式入图），并新增 gpu_golden_baseline.py 固定 10 条文本真实合成基线（RTF/音频 sha256 回归锚点，实测 mean RTF 1.626）。口径：golden 基线在 RTX 5070 Ti Laptop 本机实测，quality.yml 周跑建议挂 self-hosted GPU runner；容器镜像 2.5.0 由 tag v2.5.0 推送自动触发 docker-publish。"
+  "changelog": "2.6.0：评估落地（NEXT 阶段 0-4）完整交付——P0 感知评分口径（scripts/gpu_golden_mos.py，UTMOS2 离线 MOS 打分、--merge 回写 ref.json）与流式真分片（streaming 路由接线 segment_chars 参数夹紧 [50,500] + TTFB 门禁，修复前实测 P95=91611.6ms）与训练台账（docs/TRAINING_LEDGER.md）；P1 golden 多引擎多音色基线（configs/golden_cases.multimodel.json，8 条×3 音色）+ quality.yml runner 探针与 skip 台账；P2 模型卡 license 授权钉住（VoxCPM2 Apache-2.0）、水印默认开关（security.audio_watermark_enabled fail-closed）、Edge-TTS CPU 兜底注册（懒依赖安全降级，不冒充未声明能力）；安全侧登记 dependabot 4 漏洞处置（A17 transformers / A18 accelerate，均需人工决策，判据见 docs/SECURITY_DEPENDABOT_TRIAGE.md）。口径：main 直推（admin 豁免）为既定工作流；GPU 真跑受 runner/REPO_ADMIN_TOKEN 缺失约束按台账 skip。"
 }
