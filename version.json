@@ -1,5 +1,5 @@
 {
-  "version": "2.5.0",
+  "version": "2.6.0",
   "release_date": "2026-10-06",
   "minimum_shell_version": "2.2.2",
   "changelog": "2.5.0：这一版的主干是评估落地的第一批结构性补强——模型治理新增 docs/model-cards/ 权重元数据卡（5+1 引擎可追溯）与 LoRA 训练产物 card.yaml 强制 schema（Pydantic v2 钉死 git_commit/manifest sha256/persona 命名/产物相对路径防穿越，跨平台双风格校验）；数据反馈闭环新增 history.db v008 迁移（feedback_rating/liked/note/at 四列，幂等脚本+备份指纹+181 行零丢失）；CI 修复 datasets 新版把 huggingface-hub 拉到 2.x 与钉死 transformers 4.52.x 的解析冲突（hub<1.0 显式入图），并新增 gpu_golden_baseline.py 固定 10 条文本真实合成基线（RTF/音频 sha256 回归锚点，实测 mean RTF 1.626）。口径：golden 基线在 RTX 5070 Ti Laptop 本机实测，quality.yml 周跑建议挂 self-hosted GPU runner；容器镜像 2.5.0 由 tag v2.5.0 推送自动触发 docker-publish。"
