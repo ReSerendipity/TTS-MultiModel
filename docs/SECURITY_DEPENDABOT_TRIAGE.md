@@ -32,7 +32,7 @@ A1–A8 有 GHSA 记录（= Dependabot 那 16 条告警的来源）；A9–A16 �
 | A14 | CVE-2025-14928 | PYSEC-2025-216 / 无 GHSA | 同上 | **无** | HuBERT `convert_config` 代码注入 | 同 A9（`HuBERT` 0 命中）；ASR 侧走 funasr 自有权重格式 | 同 A9 |
 | A15 | CVE-2025-14929 | PYSEC-2025-217 / 无 GHSA | 同上 | **无** | X-CLIP checkpoint 转换反序列化 | 同 A9（`XCLIP` 0 命中）；CLIP 在本仓只做安全判定、且用 `AutoTokenizer` 不换 checkpoint | 同 A9 |
 | A16 | CVE-2025-14930 | PYSEC-2025-218 / 无 GHSA | 同上 | **无** | GLM4 反序列化 | 同 A9；本仓无 LLM 对话模型 | 同 A9 |
-| A17 | 无 CVE（PYSEC-only） | PYSEC-2026-4174 / GHSA-x9r9-c232-4q39（2026-10-11 dependabot 告警 #23/#24 已 dismiss） | HIGH（影响 4.49.0–5.8.1） | 5.8.2（被引擎 pin `<4.53` 挡住，同 §2 A5–A8 口径） | `GenerativePreTrainedModel.load_custom_generate()` 在 trust 校验前把远端 `custom_generate/generate.py` 写入 `~/.cache/huggingface/modules`（文件写不可逆；执行仍受 trust 门控） | `grep -rn "load_custom_generate\|custom_generate\|GenerativePreTrainedModel" app/ scripts/` → **0 命中**；本仓只加载 TTS/ASR 权重与 tokenizer，从不走 generative 自定义加载路径；且 `clean_launch.py` 设 `TRANSFORMERS_OFFLINE=1`/`HF_HUB_OFFLINE=1`，离线模式下远端模块拉取本身被禁 | 已接受风险（pip-audit 豁免，2026-10-02 登记）；2026-10-11 owner 授权 dismiss #23/#24（tolerable_risk，判据入 comment）；**复点维持**：indextts 放开 pin 后升 5.8.2 消解（§4-6） |
+| A17 | 无 CVE（PYSEC-only） | PYSEC-2026-4174 / GHSA-x9r9-c232-4q39（2026-10-11 dependabot 告警 #23/#24 已 dismiss） | HIGH（影响 4.49.0–5.8.1） | 5.8.2（被引擎 pin `<4.53` 挡住，同 §2 A5–A8 口径） | `GenerativePreTrainedModel.load_custom_generate()` 在 trust 校验前把远端 `custom_generate/generate.py` 写入 `~/.cache/huggingface/modules`（文件写不可逆；执行仍受 trust 门控） | `grep -rn "load_custom_generate\|custom_generate\|GenerativePreTrainedModel" app/ scripts/` → **0 命中**；本仓只加载 TTS/ASR 权重与 tokenizer，从不走 generative 自定义加载路径；且 `clean_launch.py` 设 `TRANSFORMERS_OFFLINE=1`/`HF_HUB_OFFLINE=1`，离线模式下远端模块拉取本身被禁 | 已接受风险（pip-audit 豁免，2026-10-02 登记）；2026-10-11 owner 授权 dismiss #23/#24（tolerable_risk，判据入 comment）；**复点维持**：indextts 放开 pin 后升 5.8.2 消解（§4-6）。**2026-10-12 上游复核（本轮实测）**：index-tts/index-tts main @ `d9e41aa`（2026-09-29，#806）pyproject.toml **仍钉 `transformers==4.52.1`**，releases 最新 v2.5.0（2026-08-13）未放开；PyPI 无 `indextts` 包（404，vendored editable 接入）→ **升级路径仍被阻塞**，维持复点 |
 | A18 | 无 CVE（GHSA/PYSEC-only） | GHSA-4j2p-28q2-5m79 / PYSEC-2026-3804（2026-10-11 dependabot 告警 #25/#26 已 dismiss） | MEDIUM | **无官方修复版本**（OSV `last_affected=1.14.0` 无 fixed 事件；GitHub 咨询 `patched_versions` 为空；PyPI 最新 1.15.0 未获官方 fixed 标记） | `load_checkpoint_in_model` / `load_checkpoint_and_dispatch` 对 sharded checkpoint 索引 `weight_map` 条目不做路径清洗（`../`/绝对路径 → 任意文件读；命名管道 → DoS） | 函数经 indextts `maskgct/codec_inference.py:291`（`load_checkpoint_and_dispatch`）**可达**，但输入是 `model/` 本地目录权重（入库前人工确认 + SHA-256 复验，LOCAL_RULES 禁区流程），无不可信输入路径；本仓 `app/` 无直调（仅自研 checkpoint.py 同名方法）。**升级阻断**：`accelerate==1.8.1` 为 vendored indextts 精确 pin（index-tts-main/pyproject.toml:31，GOTCHAS #348），升版即破坏引擎依赖图（同 A1–A8 口径）；且无官方修复版本可升 | 2026-10-11 owner 授权 dismiss #25/#26（tolerable_risk，判据入 comment；pip-audit 豁免 PYSEC-2026-3804 已入 security.yml）；**复点维持**：上游发布官方修复并经真机复验 indextts 加载链后升 ≥1.15.0（§4-6），复审 2026-12-31 同批 |
 | P1 | CVE-2025-4565 | PYSEC-2026-1806 / GHSA-8qvm-5x2c-j2w7 | high | 4.25.8（另有 5.29.5 / 6.31.1 两条并行修复线） | protobuf JSON 解析 DoS | **无人挡住**：95 个钉版包里对 protobuf 的 13 条约束全是 extra 门控，我们没请求任何 extra（§3a 实测表）；本仓 `grep google.protobuf app/` 零命中，服务端不解析来自网络/wire 的数据 | 待复算 + 真机复验后随批量升级一起抬（§7） |
 | P2 | CVE-2026-0994 | PYSEC-2026-1805 / GHSA-7gcm-g887-7qv7 | high | 5.29.6（另有 6.33.5） | protobuf JSON 递归深度绕过 | 同 P1 | 同 P1 |
@@ -217,8 +217,11 @@ Dockerfile:38  RUN python3.12 -m pip install --no-cache-dir --user -r requiremen
    2026-12-31 之前要么按条件 1 抬版本消掉，要么把这份表带着做一次显式再确认。
    那个"人守"的载体是 issue **#158**（`tracking: transformers 16 条 pip-audit 豁免跟踪（复审截止 2026-12-31）`）：
    它是本文 §1 表的摘要，判据以本文为准，本文改动需同步到它。到期那次显式再确认在它下面留结论。
-6. **A17/A18（2026-10-11 追加）**：a) IndexTTS 官方放开 `transformers`/`accelerate` 精确 pin（或
-   vendored 拷贝适配）→ A17 升 5.8.2、A18 升 ≥1.15.0（若上游把 1.15.0 标记为 fixed）可消；
+6. **A17/A18（2026-10-11 追加；2026-10-12 复核 A17）**：a) IndexTTS 官方放开 `transformers`/`accelerate`
+   精确 pin（或 vendored 拷贝适配）→ A17 升 5.8.2、A18 升 ≥1.15.0（若上游把 1.15.0 标记为 fixed）
+   可消。**2026-10-12 实测上游未放开**：index-tts/index-tts main @ d9e41aa（2026-09-29）pyproject
+   仍钉 `transformers==4.52.1` / `accelerate==1.8.1` / `tokenizers==0.21.0`，releases 最新 v2.5.0
+   （2026-08-13）→ 复点触发条件维持不变：上游放开 pin 或我们做 vendored 适配；
    b) A18 若上游发布**官方修复版本**并经真机复验 indextts device_map 加载链，即可解除
    "需人工决策"直接升级；c) 若本服务将来接受**用户指定模型路径/HF 仓库**，A18 的"本地权重
    + 完整性核验"前提立即失效，必须重判。
