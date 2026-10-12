@@ -2,6 +2,24 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.6.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.5.0...v2.6.0) (2026-10-12)
+
+
+### Features
+
+* **edge-tts,watermark:** NEXT 落地 P2 —— 授权钉住/水印默认开关/Edge-TTS CPU 兜底注册 ([4556a17](https://github.com/ReSerendipity/TTS-MultiModel/commit/4556a17b6764187688e5a7558e193226085257b5))
+* **quality:** NEXT 落地 P0 —— 感知评分口径 / 流式真分片 / 训练台账（评估 70/100 → P0 三项） ([ebf3231](https://github.com/ReSerendipity/TTS-MultiModel/commit/ebf3231b60b5001e0df01a601146a38db9f61cb8))
+
+
+### Bug Fixes
+
+* **engine-registry:** edge-tts 补入 EngineName 枚举（P2 后续修正） ([0aaa1e3](https://github.com/ReSerendipity/TTS-MultiModel/commit/0aaa1e3a44b6acc0375e021a941087cdbecf7729))
+
+
+### Documentation
+
+* **security:** 登记 dependabot 4 漏洞处置（A17/A18，均需人工决策） ([e6fe25f](https://github.com/ReSerendipity/TTS-MultiModel/commit/e6fe25f7415b0d0d49abacbe1dbce134b771854d))
+
 ## [2.5.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.4.0...v2.5.0) (2026-10-06)
 
 
