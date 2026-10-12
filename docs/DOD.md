@@ -244,6 +244,13 @@
     **仍未消掉**：runner 不存在 → IndexTTS 2.5/2.0 的真推理与"两个 IndexTTS 变体的导入"在 CI 上
     依然零覆盖，只有本机能验；要让这条变成 CI 事实，需要注册一台带 `gpu` 标签的
     self-hosted runner 并配 `REPO_ADMIN_TOKEN`（归所有者）。
+    **2026-10-12 收口（口径变更）**：曾短暂注册过一台 Windows 仓库级 runner
+    （`Doro-GPU-win`，标签 `self-hosted,Windows,X64,GPU`，真跑过 1 次 `quality-golden`，
+    `gpu-smoke` 一次都没执行过），现已从 GitHub 注销、本机安装目录与自启入口删除。
+    `gpu-smoke.yml` / `quality.yml` / `stress.yml` 的 `gpu-baseline-gate` 一并移除，
+    `REPO_ADMIN_TOKEN` 始终未配置。**结论**：这一层不是"待补"而是**正式放弃 CI 覆盖**，
+    退回本机验证；`scripts/gpu_golden_mos.py`、`configs/golden_cases.multimodel.json`、
+    `baselines/gpu-mttr-baseline.json`、`scripts/gpu_baseline_gate.py` 保留但无任何 CI 承载。
   * **真机跑冒烟时定位并修掉一个 CUDA 崩溃（原以为是"第二次切换"，其实是预热抢占）**：
     症状 `CUDA error: device-side assert triggered`，且**整个 CUDA context 被毒化** ——
     之后同进程所有推理连带失败，连切换的回滚重载都报 503。服务端时间线是决定性证据：

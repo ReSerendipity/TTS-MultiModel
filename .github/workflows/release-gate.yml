@@ -5,20 +5,12 @@ name: release-gate
 #   ④ 篡改模拟（改 1 字节 → 校验失败） ⑤ 冒烟启动（自检 + Ed25519 验签）
 # 实现：scripts/release_gate.ps1 + scripts/diag_integrity.py
 #
-# 两种模式：
-#   fixture（默认，ubuntu/windows-latest）：小样本快速验证脚本逻辑与签名机制，~2min
-#   real（self-hosted）：真实 WinPython + torch wheels + model/ 27GB，需 ≥60GB 磁盘
-#
-# 触发：workflow_dispatch（可选 fixture/real）/ 推送 tag v*（自动 fixture）。
+# 触发：workflow_dispatch / 推送 tag v*。
+# 2026-10-12：仓库的 self-hosted runner 已下线，real 模式（依赖本机 D:\model 权重与
+# D:\tts-wheels、需 ≥60GB 磁盘）一并移除，门禁只在 windows-latest 上跑 fixture 模式。
 
 on:
   workflow_dispatch:
-    inputs:
-      mode:
-        description: '门禁模式'
-        type: choice
-        options: [fixture, real]
-        default: fixture
   push:
     tags:
       - 'v*'
@@ -28,9 +20,9 @@ permissions:
 
 jobs:
   gate:
-    name: Release gate (${{ github.event.inputs.mode || 'fixture' }})
-    runs-on: ${{ github.event.inputs.mode == 'real' && 'self-hosted' || 'windows-latest' }}
-    timeout-minutes: ${{ github.event.inputs.mode == 'real' && 90 || 10 }}
+    name: Release gate (fixture)
+    runs-on: windows-latest
+    timeout-minutes: 10
     defaults:
       run:
         shell: pwsh
@@ -51,24 +43,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install cryptography
 
-      - name: '①-⑤ 发布门禁（fixture 模式）'
-        if: ${{ github.event.inputs.mode != 'real' }}
+      - name: '①-⑤ 发布门禁'
         run: |
           .\scripts\release_gate.ps1 -PythonExe (Get-Command python).Source
-        shell: pwsh
-
-      - name: '①-⑤ 发布门禁（真实模式，self-hosted）'
-        if: ${{ github.event.inputs.mode == 'real' }}
-        run: |
-          # 真实模式要求 self-hosted runner 上已有：
-          #   model/ 目录（27GB 权重）、dist/real-wheels/（torch cu132 wheels）
-          # 磁盘要求：≥60GB 空闲（分卷 28GB + 解包 30GB 共存）
-          .\scripts\release_gate.ps1 `
-            -PythonExe (Get-Command python).Source `
-            -ModelDir 'D:\model' `
-            -TorchWheelDir 'D:\tts-wheels' `
-            -MaxPartBytes 1992294400 `
-            -Version ${{ github.ref_name }}
         shell: pwsh
 
       - name: '⑤ 补充：diag 对仓库 app 输出（可二分定位）'
