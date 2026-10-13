@@ -476,3 +476,6 @@ secrets.yml
 service-account.json
 .aws/
 .gcloud/
+
+# 对内项目说明（docs/README.internal.md）：仅本地维护者，不入库（2026-10-13 README 双版本制度）
+docs/README.internal.md
