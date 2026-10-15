@@ -72,25 +72,33 @@ def _post_speech(base: str, model: str, text: str, voice: str, headers: dict, ti
         return time.perf_counter() - t0, e.read(), e.code
 
 
-def load_cases(path: str | None, default_model: str, voice_override: str) -> list[dict]:
+def load_cases(
+    path: str | None,
+    default_model: str,
+    voice_override: str,
+    extra_path: str | None = None,
+) -> list[dict]:
     """解析 golden 用例清单（NEXT 评估 P1-1 多引擎/多音色/中英扩展）。
 
     Args:
         path: 用例 JSON 路径；None 时回退到内置 GOLDEN_TEXTS（默认 10 条中文）。
         default_model: 未在用例里显式指定时的模型（OpenAI 兼容名，tts-1= voxcpm2）。
         voice_override: 命令行 --voice 覆盖（非空时优先于用例内 voice）。
+        extra_path: multimodel 扩展用例 JSON 路径（GOLDEN_REFLOW 扩展集）；
+                    合并时扩展集 idx 统一 +100 偏移，与主集不冲突。
 
     Returns:
-        list[dict]，每项含 text/voice/model/engine（engine 为信息字段，不参与请求）。
+        list[dict]，每项含 idx/text/voice/model/engine（engine 为信息字段，不参与请求）。
     """
     if path is None:
-        return [
+        cases = [
             {"text": t, "voice": voice_override or "alloy", "model": default_model, "engine": "voxcpm2"}
             for t in GOLDEN_TEXTS
         ]
-    with open(path, encoding="utf-8") as f:
-        payload = json.load(f)
-    cases = payload.get("cases", [])
+    else:
+        with open(path, encoding="utf-8") as f:
+            payload = json.load(f)
+        cases = payload.get("cases", [])
     resolved = []
     for i, c in enumerate(cases, 1):
         resolved.append(
@@ -102,6 +110,19 @@ def load_cases(path: str | None, default_model: str, voice_override: str) -> lis
                 "engine": c.get("engine", ""),
             }
         )
+    if extra_path:
+        with open(extra_path, encoding="utf-8") as f:
+            extra_payload = json.load(f)
+        for i, c in enumerate(extra_payload.get("cases", []), 1):
+            resolved.append(
+                {
+                    "idx": int(c.get("idx", i)) + 100,
+                    "text": c["text"],
+                    "voice": voice_override or c.get("voice", "alloy"),
+                    "model": c.get("model", default_model),
+                    "engine": c.get("engine", ""),
+                }
+            )
     return resolved
 
 

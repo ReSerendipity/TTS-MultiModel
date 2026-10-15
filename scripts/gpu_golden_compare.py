@@ -28,6 +28,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--measured", required=True)
     ap.add_argument("--ref", required=True)
+    ap.add_argument("--ref-multimodel", default=None, help="multimodel 扩展集参考基线；缺省 measure-only（只测量不判定）")
     ap.add_argument("--junit", default="golden_baseline.junit.xml")
     args = ap.parse_args()
 
@@ -71,6 +72,42 @@ def main() -> int:
     m_rtf = meas.get("mean_rtf", 0.0)
     if rtf_base > 0 and m_rtf > rtf_base * (1 + rtf_warn):
         hard_failures.append(f"mean RTF 劣化 {m_rtf:.3f} vs 基线 {rtf_base}（阈值 +{rtf_warn * 100:.0f}%）")
+
+    # multimodel 扩展集判定（GOLDEN_REFLOW 步骤 4）：
+    # - 未提供 --ref-multimodel：measure-only，只测量不判定；
+    # - 提供后与主集同口径红黄判定，唯一例外是 403（音色未授权声明）
+    #   按 env-skip 软警告处理，不冒充质量退化。
+    if args.ref_multimodel:
+        with open(args.ref_multimodel, encoding="utf-8") as f:
+            ref_mm = json.load(f)
+        mm_items = ref_mm.get("items", [])
+        print(f"[compare] multimodel ref items={len(mm_items)}")
+        for item in mm_items:
+            i = item["idx"]
+            m = by_idx.get(i)
+            if m is None:
+                hard_failures.append(f"#{i} multimodel 缺失实测记录")
+                continue
+            if m.get("status") == 403:
+                soft_warnings.append(f"#{i} multimodel env-skip（403 音色未授权声明，不判定质量退化）")
+                continue
+            if m.get("status") != 200:
+                hard_failures.append(f"#{i} multimodel status={m.get('status')}")
+                continue
+            ref_dur = item["audio_duration_sec"]
+            m_dur = m.get("audio_duration_sec") or 0.0
+            if ref_dur > 0:
+                drift = abs(m_dur - ref_dur) / ref_dur
+                if drift > dur_tol:
+                    hard_failures.append(
+                        f"#{i} multimodel 时长漂移 {drift * 100:.1f}%（ref={ref_dur}s measured={m_dur}s，阈值 {dur_tol * 100:.0f}%）"
+                    )
+            if m.get("audio_sha256") != item["audio_sha256"]:
+                soft_warnings.append(
+                    f"#{i} multimodel sha256 漂移（ref={item['audio_sha256']} measured={m.get('audio_sha256')}）"
+                )
+    else:
+        print("[compare] measure-only：未提供 --ref-multimodel，multimodel 扩展集只测量不判定")
 
     # MOS 感知评分（可选口径，NEXT 评估 P0-1）：ref 声明 mean_mos_baseline 且
     # measured 提供 mean_mos 时才硬判定；任一侧缺失只给软警告，不编造数值。

@@ -1,0 +1,18 @@
+{
+  "_comment": "护栏拦截率实测基线（LLM 应用工程评估 P1-1）；由 tests/test_content_safety_adversarial.py 门禁比对（不低于此基线）。keyword 模式（CLIP 未启用）。",
+  "generated_at": "2026-10-15",
+  "detector_mode": "keyword",
+  "threshold": 0.3,
+  "corpus": {
+    "harmful": 20,
+    "benign": 12,
+    "variant": 3
+  },
+  "harmful_interception_rate": 1.0,
+  "variant_interception_rate": 1.0,
+  "benign_false_positive_rate": 0.0,
+  "gate": {
+    "harmful_interception_rate_min": 0.9,
+    "benign_false_positive_rate_max": 0.0
+  }
+}
