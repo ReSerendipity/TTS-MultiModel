@@ -40,6 +40,51 @@ from typing import Any
 
 logger = logging.getLogger("tts_multimodel")
 
+# ---------------------------------------------------------------------------
+# 进程级累计命中统计（后端服务设计评估 P1：缓存命中率可观测基线）
+# ---------------------------------------------------------------------------
+# GenerationResultCache 默认关闭（config.yaml generation.cache_enabled=false），
+# 但开启后的命中/未命中同样需要进入可观测基线；此处维护进程生命周期内的
+# 累计值（只增不减），由 observability/metrics.py 按 family=generation 导出。
+
+_GEN_GLOBAL_LOCK = threading.Lock()
+_GEN_GLOBAL_HITS = 0
+_GEN_GLOBAL_MISSES = 0
+
+
+def _bump_gen_global(hit: bool) -> None:
+    """累计一次生成缓存命中/未命中（进程级，线程安全）。"""
+    global _GEN_GLOBAL_HITS, _GEN_GLOBAL_MISSES
+    with _GEN_GLOBAL_LOCK:
+        if hit:
+            _GEN_GLOBAL_HITS += 1
+        else:
+            _GEN_GLOBAL_MISSES += 1
+
+
+def reset_global_generation_cache_stats() -> None:
+    """清零进程级生成缓存累计统计（仅供测试隔离使用）。"""
+    global _GEN_GLOBAL_HITS, _GEN_GLOBAL_MISSES
+    with _GEN_GLOBAL_LOCK:
+        _GEN_GLOBAL_HITS = 0
+        _GEN_GLOBAL_MISSES = 0
+
+
+def get_global_generation_cache_stats() -> dict[str, Any]:
+    """返回进程级生成缓存累计命中统计。
+
+    Returns:
+        dict: ``{"hits": int, "misses": int, "hit_rate_percent": float}``。
+    """
+    with _GEN_GLOBAL_LOCK:
+        total = _GEN_GLOBAL_HITS + _GEN_GLOBAL_MISSES
+        rate = (_GEN_GLOBAL_HITS / total * 100.0) if total > 0 else 0.0
+        return {
+            "hits": _GEN_GLOBAL_HITS,
+            "misses": _GEN_GLOBAL_MISSES,
+            "hit_rate_percent": round(rate, 2),
+        }
+
 
 class GenerationResultCache:
     """生成结果的内存缓存（TTL + LRU 双重淘汰，线程安全）。
@@ -104,15 +149,18 @@ class GenerationResultCache:
             entry = self._store.get(key)
             if entry is None:
                 self._misses += 1
+                _bump_gen_global(False)
                 return None
             expire_at, value = entry
             if time.monotonic() >= expire_at:
                 # 过期：删除并记为未命中
                 self._store.pop(key, None)
                 self._misses += 1
+                _bump_gen_global(False)
                 return None
             self._store.move_to_end(key)
             self._hits += 1
+            _bump_gen_global(True)
             return value
 
     def put(self, key: str, value: Any) -> None:

@@ -44,7 +44,7 @@ import os
 import sqlite3
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any
@@ -233,6 +233,49 @@ _ALLOWED_ORDER_BY: frozenset[str] = frozenset(
 )
 
 
+class _TimedConnection(sqlite3.Connection):
+    """带慢查询计时的连接工厂（后端服务设计评估 P1：慢查询可度量基线）。
+
+    通过 ``sqlite3.connect(..., factory=_TimedConnection)`` 启用。阈值与回调
+    由 HistoryDatabase 在创建连接后注入实例属性（``_slow_query_ms`` /
+    ``_on_slow_query``）；属性缺失时本类为纯透传（零行为差异）。
+    覆盖 execute / executemany / executescript 三条执行路径，读写在内。
+    """
+
+    _slow_query_ms: int
+    _on_slow_query: Any
+
+    def execute(self, sql: str, parameters: tuple = ()) -> sqlite3.Cursor:  # type: ignore[override]
+        """计时执行单条 SQL。"""
+        start = time.perf_counter()
+        cursor = super().execute(sql, parameters)
+        self._record_slow(sql, (time.perf_counter() - start) * 1000.0)
+        return cursor
+
+    def executemany(self, sql: str, seq_of_parameters: Iterable[Any]) -> sqlite3.Cursor:
+        """计时执行批量 SQL。"""
+        start = time.perf_counter()
+        cursor = super().executemany(sql, seq_of_parameters)
+        self._record_slow(sql, (time.perf_counter() - start) * 1000.0)
+        return cursor
+
+    def executescript(self, sql_script: str) -> None:  # type: ignore[override]
+        """计时执行脚本 SQL。"""
+        start = time.perf_counter()
+        super().executescript(sql_script)
+        self._record_slow(sql_script, (time.perf_counter() - start) * 1000.0)
+
+    def _record_slow(self, sql: str, elapsed_ms: float) -> None:
+        """超阈值时回调 HistoryDatabase 记录（阈值 <=0 或未注入时为纯透传）。"""
+        threshold = getattr(self, "_slow_query_ms", 0)
+        if not threshold or threshold <= 0 or elapsed_ms < threshold:
+            return
+        callback = getattr(self, "_on_slow_query", None)
+        if callback is not None:
+            with contextlib.suppress(Exception):
+                callback(elapsed_ms, sql)
+
+
 class HistoryDatabase:
     """基于 SQLite 的生成历史记录索引，替代低效的 glob 文件扫描 + JSON 侧录方案。
 
@@ -292,6 +335,16 @@ class HistoryDatabase:
         # 改为普通 set + 显式 close()/close_all() 清理，由调用方负责生命周期。
         self._all_connections: set[sqlite3.Connection] = set()
         self._connections_lock = threading.Lock()
+        # 慢查询可度量基线（后端服务设计评估 P1）：阈值来自 config.yaml
+        # history.slow_query_log_ms（默认 200ms，<=0 关闭）；进程内累计计数。
+        try:
+            from .config import get_slow_query_log_ms
+
+            self._slow_query_log_ms = get_slow_query_log_ms()
+        except Exception:  # noqa: BLE001 — 配置不可用时退回内置默认值
+            self._slow_query_log_ms = 200
+        self._slow_query_count = 0
+        self._slow_query_lock = threading.Lock()
         # H-R6: FTS5 可用性在 _ensure_fts() 中探测并缓存；False 时搜索回退 LIKE。
         self._fts_enabled = False
         self._ensure_table()
@@ -341,8 +394,9 @@ class HistoryDatabase:
         conn = getattr(self._thread_local, "connection", None)
         if conn is None:
             try:
-                conn = sqlite3.connect(self._db_path)
+                conn = sqlite3.connect(self._db_path, factory=_TimedConnection)
                 conn.row_factory = sqlite3.Row
+                self._install_slow_query_hooks(conn)
                 self._apply_pragmas(conn)  # H-R3: 统一 PRAGMA
             except sqlite3.DatabaseError:
                 logger.warning(f"数据库已损坏: {self._db_path}，尝试自动重建")
@@ -375,8 +429,9 @@ class HistoryDatabase:
                     # 两种方式都失败，提示用户手动处理
                     raise RuntimeError("无法处理损坏数据库，请手动删除 " + corrupted_path) from None
                 # Create fresh connection with unified PRAGMAs (H-R3)
-                conn = sqlite3.connect(self._db_path)
+                conn = sqlite3.connect(self._db_path, factory=_TimedConnection)
                 conn.row_factory = sqlite3.Row
+                self._install_slow_query_hooks(conn)
                 self._apply_pragmas(conn)
                 # Re-run table and index creation for the fresh database
                 self._ensure_table()
@@ -388,6 +443,27 @@ class HistoryDatabase:
                 self._all_connections.add(conn)
             self._thread_local.connection = conn
         return conn
+
+    def _install_slow_query_hooks(self, conn: _TimedConnection) -> None:
+        """向新连接注入慢查询阈值与回调（_TimedConnection 专用）。"""
+        conn._slow_query_ms = self._slow_query_log_ms
+        conn._on_slow_query = self._record_slow_query
+
+    def _record_slow_query(self, elapsed_ms: float, sql: str) -> None:
+        """慢查询回调：进程内累计计数并记录 WARNING（阈值见 history.slow_query_log_ms）。"""
+        with self._slow_query_lock:
+            self._slow_query_count += 1
+        logger.warning(
+            "[history_db] 慢查询 %.1fms >= %dms: %s",
+            elapsed_ms,
+            self._slow_query_log_ms,
+            " ".join(sql.split())[:120],
+        )
+
+    @property
+    def slow_query_count(self) -> int:
+        """进程内累计慢查询条数（供 metrics 导出 tts_slow_queries_total）。"""
+        return self._slow_query_count
 
     def close(self) -> None:
         """关闭当前线程持有的数据库连接（如果已打开）。

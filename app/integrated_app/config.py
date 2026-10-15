@@ -271,6 +271,24 @@ def get_history_keep_days() -> int:
         return 0
 
 
+def get_slow_query_log_ms() -> int:
+    """返回历史库慢查询日志阈值（毫秒，后端服务设计评估 P1）。
+
+    读取 ``config.yaml -> history.slow_query_log_ms``；缺省 200ms；
+    ``0`` 表示关闭慢查询记录。单条 SQL 执行耗时 >= 该值时记录 WARNING
+    并累计 ``tts_slow_queries_total`` 指标（见 history_db.HistoryDB）。
+
+    Returns:
+        int: 阈值毫秒数（负值按 0 处理，即关闭）。
+    """
+    try:
+        cfg = _load_yaml_config()
+        raw = int((cfg.get("history") or {}).get("slow_query_log_ms", 200) or 0)
+    except Exception:
+        raw = 200
+    return max(0, raw)
+
+
 def get_effective_retention_days() -> int:
     """返回统一的历史记录留存天数（消除 keep_days 与 pii_retention_days 冲突）。
 

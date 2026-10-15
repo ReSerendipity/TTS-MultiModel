@@ -30,6 +30,52 @@ from typing import Any
 
 logger = logging.getLogger("tts_multimodel")
 
+# ---------------------------------------------------------------------------
+# 进程级累计命中统计（后端服务设计评估 P1：缓存命中率可观测基线）
+# ---------------------------------------------------------------------------
+# 实例级 _hits/_misses 会随 clear()/reset_stats() 清零，无法支撑跨生命周期的
+# 命中率看板与告警；这里维护进程生命周期内的累计值（只增不减，reset_stats()
+# 不影响本统计），由 observability/metrics.py 采集导出为 tts_cache_* 指标族。
+
+_LRU_GLOBAL_LOCK = threading.Lock()
+_LRU_GLOBAL_HITS = 0
+_LRU_GLOBAL_MISSES = 0
+
+
+def _bump_lru_global(hit: bool) -> None:
+    """累计一次 LRU 缓存命中/未命中（进程级，线程安全）。"""
+    global _LRU_GLOBAL_HITS, _LRU_GLOBAL_MISSES
+    with _LRU_GLOBAL_LOCK:
+        if hit:
+            _LRU_GLOBAL_HITS += 1
+        else:
+            _LRU_GLOBAL_MISSES += 1
+
+
+def reset_global_cache_stats() -> None:
+    """清零进程级 LRU 累计统计（仅供测试隔离使用）。"""
+    global _LRU_GLOBAL_HITS, _LRU_GLOBAL_MISSES
+    with _LRU_GLOBAL_LOCK:
+        _LRU_GLOBAL_HITS = 0
+        _LRU_GLOBAL_MISSES = 0
+
+
+def get_global_cache_stats() -> dict[str, Any]:
+    """返回进程级 LRU 缓存累计命中统计。
+
+    Returns:
+        dict: ``{"hits": int, "misses": int, "hit_rate_percent": float}``；
+            样本为 0 时命中率为 0.0。
+    """
+    with _LRU_GLOBAL_LOCK:
+        total = _LRU_GLOBAL_HITS + _LRU_GLOBAL_MISSES
+        rate = (_LRU_GLOBAL_HITS / total * 100.0) if total > 0 else 0.0
+        return {
+            "hits": _LRU_GLOBAL_HITS,
+            "misses": _LRU_GLOBAL_MISSES,
+            "hit_rate_percent": round(rate, 2),
+        }
+
 
 class LRUCache:
     """定容量最近最少使用（LRU）缓存。
@@ -72,8 +118,10 @@ class LRUCache:
             if key in self._cache:
                 self._cache.move_to_end(key)
                 self._hits += 1
+                _bump_lru_global(True)
                 return self._cache[key]
             self._misses += 1
+            _bump_lru_global(False)
             return None
 
     def put(self, key: str, value: Any) -> None:

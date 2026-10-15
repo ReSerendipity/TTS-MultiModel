@@ -132,6 +132,9 @@ history:
   # 本字段仅在 pii_retention_days <= 0 时作为回退；0=永久保留。
   # 实现见 config.py::get_effective_retention_days()，由 get_history_db() 单例创建时调用一次。
   keep_days: 0
+  # 慢查询日志阈值（毫秒，后端服务设计评估 P1）：单条 SQL 执行耗时 >= 该值
+  # 记录 WARNING 并累计 tts_slow_queries_total 指标；0=关闭。默认 200ms。
+  slow_query_log_ms: 200
 
 # ── 生成版本谱系（数据治理评估 P2-9：实验性功能，默认未接入生成流程） ──
 # generation_versioning.py 模块完整实现了版本谱系 CRUD，但 service_layer.save_generation_version
@@ -238,6 +241,7 @@ observability:
   alerting:
     enabled: true
     min_success_rate: 95.0        # 成功率低于此值触发 CRITICAL（样本 >=10 时）
+    min_cache_hit_rate: 50.0      # LRU 缓存命中率低于此值（样本 >=20 次）触发 WARNING（后端设计评估 P1）
     vram_usage_warn_pct: 85.0     # 显存占用 >= 此值触发 WARNING（接近 90% 熔断线）
     webhook_url: ""               # 可选：企业微信/飞书/Slack 兼容 incoming webhook（留空仅写日志）
   # 容量采样后台任务（P2-3）：固定频率采集 GPU/CPU/内存时序

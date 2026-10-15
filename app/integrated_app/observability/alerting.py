@@ -288,4 +288,21 @@ def evaluate_rules(metrics: dict[str, Any], cfg: dict[str, Any] | None = None) -
             )
         )
 
+    # 5. 缓存命中率过低（后端服务设计评估 P1：命中率阈值告警）
+    # 主缓存 = 常驻的 Persona 嵌入 LRU；样本量下限 20 次，避免低流量误报。
+    hit_rate = metrics.get("tts_cache_hit_rate_percent")
+    samples = metrics.get("tts_cache_hit_rate_samples", 0.0)
+    if hit_rate is not None and samples >= 20:
+        cache_threshold = float(cfg.get("min_cache_hit_rate", 50.0))
+        if hit_rate < cache_threshold:
+            alerts.append(
+                Alert(
+                    severity=AlertSeverity.WARNING,
+                    title="缓存命中率低于阈值",
+                    detail=f"命中率 {hit_rate:.1f}% < 阈值 {cache_threshold:.1f}%（样本 {int(samples)} 次）",
+                    source="cache_hit_rate_slo",
+                    labels={"rule": "min_cache_hit_rate"},
+                )
+            )
+
     return alerts

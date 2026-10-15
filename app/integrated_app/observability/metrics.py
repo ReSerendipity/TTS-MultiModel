@@ -56,6 +56,9 @@ _HELP: dict[str, str] = {
     "tts_alerts_total": "累计发出的告警次数（按 severity 分维）",
     "tts_errors_by_type_total": "累计生成失败次数（按类型分维：timeout/oom/param/safety/other）",
     "tts_request_latency_seconds": "生成耗时直方图（秒，支撑 p95 与 30s SLO 尾部判定）",
+    "tts_cache_hit_rate_percent": "进程内 LRU 缓存命中率（%，主缓存=Persona 嵌入 LRU；后端设计评估 P1）",
+    "tts_cache_requests_total": "进程内缓存命中/未命中累计（family=lru|generation，result=hit|miss）",
+    "tts_slow_queries_total": "累计慢查询条数（>= history.slow_query_log_ms 阈值的 SQL）",
 }
 
 # 指标类型
@@ -80,6 +83,9 @@ _TYPE: dict[str, str] = {
     "tts_alerts_total": "counter",
     "tts_errors_by_type_total": "counter",
     "tts_request_latency_seconds": "histogram",
+    "tts_cache_hit_rate_percent": "gauge",
+    "tts_cache_requests_total": "counter",
+    "tts_slow_queries_total": "counter",
 }
 
 # 无 label 指标的渲染顺序（保证 scrape 输出稳定，利于 diff 与单测）
@@ -118,6 +124,7 @@ def _history_aggregate() -> dict[str, float]:
         "tts_degraded_total": 0.0,
         "tts_rtf_avg": 0.0,
         "tts_avg_gen_time_ms": 0.0,
+        "tts_slow_queries_total": 0.0,
     }
     try:
         from ..history_db import get_history_db
@@ -137,8 +144,36 @@ def _history_aggregate() -> dict[str, float]:
             out["tts_rtf_avg"] = round(avg_rtf, 4)
             # 生成耗时 = rtf × 音频时长；rtf 缺省（老记录为 NULL）时该值自然为 0
             out["tts_avg_gen_time_ms"] = round(avg_rtf * avg_duration * 1000.0, 3)
+            # 慢查询计数为 HistoryDB 实例内存计数（后端设计评估 P1：慢查询基线）
+            out["tts_slow_queries_total"] = _safe_float(getattr(db, "slow_query_count", 0.0))
     except Exception as exc:  # noqa: BLE001 — 指标采集失败绝不阻断 /metrics
         logger.debug("[metrics] 历史库聚合失败（返回零值）: %s", exc)
+    return out
+
+
+def collect_cache_stats() -> dict[str, dict[str, float]]:
+    """采集进程级缓存命中统计（按 family 分维）。
+
+    Returns:
+        dict: ``family -> {"hits": float, "misses": float}``；
+            family 取 ``lru``（cache.py）与 ``generation``（generation_cache.py）；
+            采集失败返回空字典（fail-open，绝不阻断 /metrics）。
+    """
+    out: dict[str, dict[str, float]] = {}
+    try:
+        from ..cache import get_global_cache_stats
+
+        stats = get_global_cache_stats()
+        out["lru"] = {"hits": _safe_float(stats.get("hits")), "misses": _safe_float(stats.get("misses"))}
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[metrics] LRU 缓存统计采集失败: %s", exc)
+    try:
+        from ..generation_cache import get_global_generation_cache_stats
+
+        stats = get_global_generation_cache_stats()
+        out["generation"] = {"hits": _safe_float(stats.get("hits")), "misses": _safe_float(stats.get("misses"))}
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[metrics] 生成缓存统计采集失败: %s", exc)
     return out
 
 
@@ -190,6 +225,18 @@ def collect_metrics() -> dict[str, float]:
     # --- 3. 队列深度（P1-3：task_queue 已移除，生成走 per-engine 信号量；
     #     此指标恒为 0，保留以兼容已有 dashboard，后续版本可删除）---
     collected["tts_queue_size"] = 0.0
+
+    # --- 3.5 缓存命中率（后端服务设计评估 P1：命中率可观测基线） ---
+    # 主缓存 = 常驻的 Persona 嵌入 LRU（generation 缓存默认关闭）。
+    # tts_cache_hit_rate_samples 仅供告警规则做样本量下限判定，
+    # 刻意不进 _HELP/_ORDER，因此不会渲染到 /metrics（与 p95 同口径）。
+    cache_stats = collect_cache_stats()
+    lru = cache_stats.get("lru") or {}
+    lru_total = lru.get("hits", 0.0) + lru.get("misses", 0.0)
+    collected["tts_cache_hit_rate_percent"] = (
+        round(lru.get("hits", 0.0) / lru_total * 100.0, 2) if lru_total > 0 else 0.0
+    )
+    collected["tts_cache_hit_rate_samples"] = lru_total
 
     # --- 4. 历史库聚合（跨重启维度） ---
     collected.update(_history_aggregate())
@@ -322,6 +369,19 @@ def build_metrics_text() -> str:
     else:
         # 与 alerts 同理：零值也输出有界全集，避免 absent() 误报
         lines.append(_emit("tts_errors_by_type_total", 0.0, {"type": "other"}))
+
+    # 缓存命中计数按 family/result 分维渲染（后端服务设计评估 P1）
+    cache_stats = collect_cache_stats()
+    lines.append(f"# HELP tts_cache_requests_total {_HELP['tts_cache_requests_total']}")
+    lines.append(f"# TYPE tts_cache_requests_total {_TYPE['tts_cache_requests_total']}")
+    if cache_stats:
+        for family in sorted(cache_stats):
+            for result in ("hit", "miss"):
+                value = float(cache_stats[family].get(result, 0.0))
+                lines.append(_emit("tts_cache_requests_total", value, {"family": family, "result": result}))
+    else:
+        # 零值全集：缺失时间序列会让 absent() 类告警误报
+        lines.append(_emit("tts_cache_requests_total", 0.0, {"family": "lru", "result": "miss"}))
 
     # 生成耗时直方图（cumulative 桶 + sum + count，Prometheus histogram 规范）
     buckets, lat_sum, lat_count = collect_latency_hist()
