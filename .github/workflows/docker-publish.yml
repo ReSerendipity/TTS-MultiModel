@@ -59,11 +59,14 @@ jobs:
 
       # 注意：镜像不含模型权重（.dockerignore 已排除 model/），
       # 运行时必须挂载权重（见 deploy/kubernetes/ 与 docker-compose.yml）。
-      - name: Build and push image
+      # 供应链 P1-2：先构建不推送（load 到本地 daemon 供 Trivy 扫描），
+      # 门禁通过后再单独 push，避免带洞镜像先发布再红门禁。
+      - name: Build image (no push)
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: true
+          push: false
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # 层缓存的配额账（2026-09-22 实测，别再改回去）：
@@ -88,11 +91,13 @@ jobs:
       # 扫描根本没开始，表现为「HIGH/CRITICAL 门禁失败」的假象（见 run 33526733250）。
       # 另一个隐藏 bug：metadata-action 的 type=sha,format=long 推出的 tag 带 "sha-" 前缀，
       # 直接拼 ":${{ github.sha }}" 指向的是一个并不存在的 tag。
+      # P1-2 后镜像已 load 到本地 daemon（tags 含大写仓库名），这里打小写别名供 Trivy 解析。
       - name: Resolve immutable scan ref (lowercase)
         id: scanref
         run: |
           ref="$(printf '%s' "${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}" | tr '[:upper:]' '[:lower:]')"
           echo "resolved scan ref: $ref"
+          docker tag "${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}" "$ref"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
       # Trivy 会先把镜像整体导出到 $TMPDIR 再逐层解包分析。本项目镜像约 10.8GB（压缩层）
@@ -130,3 +135,11 @@ jobs:
           # "semaphore acquire: context deadline exceeded"（run 34766431887），
           # 与 docker-build.yml 同步拉长到 20m。
           timeout: "20m"
+
+      # 供应链 P1-2：Trivy HIGH/CRITICAL 门禁通过后才推送全部发布 tag。
+      # 直接用本地已构建镜像 push（避免二次构建），provenance 属性随构建时配置。
+      - name: Push image after scan gate
+        run: |
+          while IFS= read -r t; do
+            [ -n "$t" ] && docker push "$t"
+          done <<< "${{ steps.meta.outputs.tags }}"
