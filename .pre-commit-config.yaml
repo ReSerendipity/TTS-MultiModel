@@ -118,10 +118,12 @@ repos:
         stages: [pre-commit, pre-push]
       # P1-2 测试体系改进：OpenAPI 契约快照测试（防止路由/响应结构非预期变更）
       # 仅在路由/应用入口/引擎接口相关文件变更时触发，避免每次提交都跑全量测试。
-      # 必须用项目 venv 的 python（含 pytest + 项目依赖），系统 python 无 pytest。
+      # 解释器口径与本文件其它 python 钩子一致（裸 python）：需解析到装有 pytest 与项目
+      # 依赖的解释器（venv 已激活即为 venv）。旧写法写死 Windows 的 .venv/Scripts 路径，
+      # 非 Windows 克隆上钩子以「入口不存在」失败而不是给出契约结论；CI 无 .venv 同样落空。
       - id: openapi-contract-snapshot
         name: OpenAPI Contract Snapshot Test
-        entry: .venv/Scripts/python.exe -m pytest tests/test_openapi_snapshot.py -q --tb=short
+        entry: python -m pytest tests/test_openapi_snapshot.py -q --tb=short
         language: system
         pass_filenames: false
         # 目录与文件混合匹配：routes 匹配目录前缀（含全部子路由），其余分支匹配具体文件；
