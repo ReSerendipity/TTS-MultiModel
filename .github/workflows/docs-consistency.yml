@@ -15,4 +15,6 @@ jobs:
         with:
           python-version: '3.12'
       - name: Audit spec references
-        run: python scripts/check_spec_refs.py
+        # 与 structure-guard.yml 共用同一个消费者：按 SPEC_REFS STATE= 标记行判定，
+        # 不让「审计器缺失 → 本轮没查」以退出码 0 的形式显示成通过。
+        run: bash .github/scripts/spec_refs_gate.sh

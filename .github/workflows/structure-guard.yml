@@ -18,10 +18,8 @@ jobs:
           python-version: "3.11"
       - name: Check repository root layout
         run: python .github/scripts/check_layout.py
-      - name: Check spec references (if present)
-        run: |
-          if [ -f scripts/check_spec_refs.py ]; then
-            python scripts/check_spec_refs.py
-          else
-            echo "scripts/check_spec_refs.py not present; skipping"
-          fi
+      - name: Check spec references (state-bound)
+        # 判定口径集中在 .github/scripts/spec_refs_gate.sh（docs-consistency.yml 用同一个消费者）：
+        # 退出码 0 同时表示「已审计且无新增 HARD 项」与「审计器缺失、本轮没查」，
+        # 所以这里不能只看退出码，必须消费脚本专门输出的 SPEC_REFS STATE= 标记行。
+        run: bash .github/scripts/spec_refs_gate.sh

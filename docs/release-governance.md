@@ -215,7 +215,7 @@
 - [ ] CHANGELOG `[Unreleased]` 已改版本 + 日期
 - [ ] 全量 pytest 通过（门禁实测：非 GPU 回归 0 failed）
 - [ ] `ruff` 全绿；mypy 遵守 `.ci/mypy_baseline.txt` 棘轮
-- [ ] `python scripts/check_spec_refs.py` 退出码 0
+- [ ] `python scripts/check_spec_refs.py` 输出 `SPEC_REFS STATE=CHECKED`（SKIPPED 也退 0，见 `.github/scripts/spec_refs_gate.sh`）
 - [ ] 镜像 digest 钉版 + Trivy 关键/高危扫描绿
 - [ ] 完整性自检 16/16 通过
 - [ ] tag 已推送，且 `gh release view v<版本>` 能看到 Release（**推 tag 本身不会建 Release**：
