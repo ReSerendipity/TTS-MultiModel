@@ -36,8 +36,8 @@
 - [ ] 功能已实现，覆盖 PRD / Spec 定义的所有验收标准（AC）
 - [ ] `ruff` / `ruff-format` 通过（0 error）；mypy 命中 `.ci/mypy_baseline` 无新增
 - [ ] 无调试残留（`print()` / `breakpoint()` / `pdb`，诊断日志除外需标记 `[diag]`）
-- [ ] 未引入跨层违规引用（遵守本地 AGENTS.md §3 模块边界 + 禁区表）
-- [ ] 涉及引擎改动遵守本地 AGENTS.md SOP / `docs/project/MULTI_ENGINE_DESIGN.md` + `DI_SINGLETONS.md`
+- [ ] 未引入跨层违规引用（服务路径不得 import `training` 模块；机械执行体 `scripts/check_training_isolation.py`，已挂 CI）
+- [ ] 涉及引擎改动遵守 `docs/project/MULTI_ENGINE_DESIGN.md` + `DI_SINGLETONS.md`（一致性由 `scripts/check_engine_specs.py`、`scripts/check_engine_compat.py` 校验，已挂 CI）
 - [ ] 新增路由遵守 routes 分层约定（generate / system）
 
 ## 2. 测试覆盖
@@ -51,10 +51,10 @@
 ## 3. 文档同步
 
 - [ ] `AGENTS.md` 已同步（本地维护、不随仓库分发；目录结构 / 模块边界 / 配置 / 环境变量）
-- [ ] 新增模块在本地 AGENTS.md §3 / `docs/project/ARCHITECTURE.md` 有对应条目
+- [ ] 新增模块在 `docs/project/ARCHITECTURE.md` 有对应条目（本地 AGENTS.md §3 是同源副本、不随仓库分发，以本文引用的跟踪文档为准）
 - [ ] 踩坑已追加到 `docs/project/KNOWN_GOTCHAS.md`（触发/现象/做法/日期）
 - [ ] `CHANGELOG.md` 已记录变更（type 对应 Added/Fixed/…）
-- [ ] `python scripts/check_spec_refs.py` 退出码 0（无幻影/死链/假门禁）
+- [ ] `python scripts/check_spec_refs.py` 输出 `SPEC_REFS STATE=CHECKED` 且无新增 HARD 项（判定口径见 `.github/scripts/spec_refs_gate.sh`；`STATE=SKIPPED` 表示本轮一条都没查，退出码同样是 0，不得勾这一项）
 
 ## 4. 公共服务 / SRE
 

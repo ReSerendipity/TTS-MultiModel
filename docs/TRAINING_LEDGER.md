@@ -20,7 +20,7 @@
 
 ## 真跑前检查清单
 
-- [ ] `pretrained_path` 目录存在且非空（`model/` 为 AGENTS.md 禁区，只读不改内容）
+- [ ] `pretrained_path` 目录存在且非空（`model/` 是禁区、只读不改内容；条文原载于本地维护的 AGENTS.md，不随仓库分发，本行已内联该约束）
 - [ ] train/val manifest 存在（`data/lora/` 不随仓库分发，需自备）
 - [ ] 显存口径：batch_size=1 + grad_accum_steps=8 起步（RTX 5070 Ti Laptop 12GB）
 - [ ] 记录复现四要素后再开始训练
