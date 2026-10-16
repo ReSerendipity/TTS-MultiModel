@@ -85,6 +85,31 @@ jobs:
         run: |
           python scripts/check_integrity_manifest_sync.py
 
+      - name: No-hardcoded-paths gate (portability)
+        # 与 .githooks/pre-commit 的第 0 步同口径：本机用户目录下的绝对路径不得入库。
+        # 该规则此前只在提交钩子里跑，而 core.hooksPath 是本机配置、不随仓库传播，
+        # 所以新克隆与 CI 上没有任何步骤执行它；流水线为绿不等于路径可移植性成立。
+        # 必须带 --all：脚本默认只扫 `git diff --cached`（暂存区），CI 检出没有暂存变更，
+        # 不带该参数就等于对空集合判定、恒为绿（实测：空暂存区退 0，带一条违例的暂存文件退 1）。
+        run: |
+          python scripts/check_no_hardcoded_paths.py --all
+
+      - name: Training isolation AST gate (architecture boundary)
+        # AGENTS.md 模块边界禁区的机械执行体：服务路径不得 import training 模块。
+        # 纯 stdlib（ast/json）判定，不需要项目运行时依赖，故可挂在 lint 作业上。
+        # 同样只有提交钩子在跑，CI 侧此前零孪生。
+        run: |
+          python scripts/check_training_isolation.py
+
+      - name: Upstream vendor registration gate (offline)
+        # 抓「改了 vendor/reference_repos 却没在 SOURCE.md + upstream_sync_state.json 登记」。
+        # 参数与本地钩子完全同源：--offline 不联网（~0.2s，断网与 CI 行为一致）、
+        # --selftest 先跑已知答案自检（探测链路坏了就退 2，绝不当成"无差异"）、
+        # --strict 只判定、--no-report 不在流水线里落报告文件。
+        # 联网比对仍属手动/SOP 范畴，不放进 CI。
+        run: |
+          python scripts/check_upstream_sync.py --offline --selftest --strict --no-report
+
   # 类型门禁（mypy ratchet，家族底线；2026-09-03 接入组织级 reusable workflow）
   # 门禁逻辑统一维护在 ReSerendipity/.github 的 python-quality-baseline.yml，
   # 本仓只传参数。模板口径与历史内联实现完全一致（mypy==2.3.1、
@@ -175,6 +200,19 @@ jobs:
           pip check
           pip install pytest pytest-asyncio pytest-cov pytest-timeout httpx pytest-github-actions-annotate-failures
         shell: pwsh
+
+      - name: Engine compatibility gate (architecture boundary)
+        # 只在 ubuntu + 3.11 这一条腿跑：该检查逐引擎 import，成本与矩阵无关，
+        # 12 条腿重复跑只是把同一结论付 12 遍。
+        # 必须落在 test 作业而不是 lint：import 失败在本脚本里判 FAIL（退 1），
+        # 而 lint 作业只装 ruff，放过去会把「缺依赖」显示成「引擎不兼容」的假红。
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        env:
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_OFFLINE: "1"
+          CUDA_VISIBLE_DEVICES: ""
+        run: |
+          python scripts/check_engine_compat.py
 
       - name: Run tests with coverage
         env:
