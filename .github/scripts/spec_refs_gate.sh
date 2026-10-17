@@ -37,8 +37,11 @@ fi
 # 只认「行首即 SPEC_REFS STATE=」的行。包装器另会往 stderr 打若干 "probed, not found:"
 # 行、正文里也可能复述该字样，用「出现过」判定会被无关行满足；抽不到标记时绝不按通过处理
 # ——缺失的期望值不算命中。
-STATE_LINES=$(printf '%s\n' "$OUT" | grep -c '^SPEC_REFS STATE=' || true)
-STATE=$(printf '%s\n' "$OUT" | grep -m1 '^SPEC_REFS STATE=' | sed -n 's/^SPEC_REFS STATE=\([A-Z]*\).*/\1/p' || true)
+# LC_ALL=C 是必需的：STATE 行尾随的是中文说明，包装器按宿主 locale 编码，
+# 在多字节 locale 下 sed 可能因该行的非 ASCII 字节整行失配，把「明明抽到了」误判成
+# 「状态不可证」而退非 0（本机实测踩过一次假红）。按字节处理只认 ASCII 前缀才与 locale 无关。
+STATE_LINES=$(printf '%s\n' "$OUT" | LC_ALL=C grep -c '^SPEC_REFS STATE=' || true)
+STATE=$(printf '%s\n' "$OUT" | LC_ALL=C grep -m1 '^SPEC_REFS STATE=' | LC_ALL=C sed -n 's/^SPEC_REFS STATE=\([A-Z]*\).*/\1/p' || true)
 
 if [ "$STATE_LINES" != "1" ] || [ -z "$STATE" ]; then
     echo "::error title=规范引用审计状态不可证::退出码 0 但行首 STATE 标记行数为 ${STATE_LINES}（期望恰好 1），无法判定本轮是否真审计过，拒绝按通过处理"
