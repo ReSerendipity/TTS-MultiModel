@@ -28,7 +28,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--measured", required=True)
     ap.add_argument("--ref", required=True)
-    ap.add_argument("--ref-multimodel", default=None, help="multimodel 扩展集参考基线；缺省 measure-only（只测量不判定）")
+    ap.add_argument(
+        "--ref-multimodel", default=None, help="multimodel 扩展集参考基线；缺省 measure-only（只测量不判定）"
+    )
     ap.add_argument("--junit", default="golden_baseline.junit.xml")
     args = ap.parse_args()
 

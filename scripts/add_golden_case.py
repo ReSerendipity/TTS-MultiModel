@@ -20,16 +20,15 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 from pathlib import Path
 
 for _stream in (sys.stdout, sys.stderr):
     if _stream is not None and hasattr(_stream, "reconfigure"):
-        try:
+        with contextlib.suppress(OSError, ValueError):
             _stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
 
 DEFAULT_FILE = Path(__file__).resolve().parents[1] / "configs" / "golden_cases.multimodel.json"
 

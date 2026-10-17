@@ -10,8 +10,6 @@
 
 import json
 
-import pytest
-
 from integrated_app.security.audit import (
     _chain_entry,
     _get_audit_hmac_secret,

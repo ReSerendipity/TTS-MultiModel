@@ -74,7 +74,7 @@ def _get_audit_hmac_secret() -> bytes:
                 f.write(new_key)
             with contextlib.suppress(OSError):
                 os.chmod(key_path, 0o600)
-        with open(key_path, "r", encoding="utf-8") as f:
+        with open(key_path, encoding="utf-8") as f:
             return f.read().strip().encode("utf-8")
     except OSError:
         # 仅文件系统不可用时的降级（同 history_db 口径）
@@ -216,7 +216,7 @@ def verify_audit_chain(path: str | None = None) -> dict[str, Any]:
     legacy = 0
     first_error: str | None = None
     line_no = 0
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:

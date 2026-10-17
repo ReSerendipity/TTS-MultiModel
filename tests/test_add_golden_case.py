@@ -20,7 +20,9 @@ class TestAppendGoldenCase:
     def test_append_assigns_next_idx(self, tmp_path):
         f = tmp_path / "cases.json"
         _write(f, [{"idx": 3, "text": "旧", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"}])
-        ok, msg = add_golden_case.append_case(f, {"text": "坏案例", "voice": "韩立", "model": "tts-1", "engine": "voxcpm2"})
+        ok, msg = add_golden_case.append_case(
+            f, {"text": "坏案例", "voice": "韩立", "model": "tts-1", "engine": "voxcpm2"}
+        )
         assert ok, msg
         data = json.loads(f.read_text(encoding="utf-8"))
         assert len(data["cases"]) == 2
@@ -32,7 +34,9 @@ class TestAppendGoldenCase:
         case = {"idx": 1, "text": "重复", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"}
         _write(f, [case])
         before = f.read_text(encoding="utf-8")
-        ok, _msg = add_golden_case.append_case(f, {"text": "重复", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"})
+        ok, _msg = add_golden_case.append_case(
+            f, {"text": "重复", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"}
+        )
         assert not ok
         assert f.read_text(encoding="utf-8") == before
 
@@ -49,7 +53,9 @@ class TestAppendGoldenCase:
     def test_empty_text_rejected(self, tmp_path):
         f = tmp_path / "cases.json"
         _write(f, [])
-        ok, _msg = add_golden_case.append_case(f, {"text": "  ", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"})
+        ok, _msg = add_golden_case.append_case(
+            f, {"text": "  ", "voice": "alloy", "model": "tts-1", "engine": "voxcpm2"}
+        )
         assert not ok
 
     def test_main_writes_note(self, tmp_path, monkeypatch, capsys):
