@@ -70,7 +70,7 @@ dependencies = [
     # 抬这个上界之前必须先确认 IndexTTS 侧已适配。
     # tests/test_dependency_consistency.py 会核对：本声明与 requirements-lock.txt 的钉版互相满足。
     "transformers>=4.52.1,<4.53",
-    "tokenizers>=0.21.0,<0.22",
+    "tokenizers>=0.21.0,<0.24",
     # === AI 生态 ===
     "funasr>=1.0.0",
     "modelscope>=1.9.0",
