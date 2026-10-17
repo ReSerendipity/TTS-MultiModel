@@ -1,22 +1,15 @@
-# 历史身份归并：所有别名统一到主身份 ReSerendipity <zengyangc@outlook.com>
+# 历史身份归并：所有别名统一到主身份 ReSerendipity <259081123+ReSerendipity@users.noreply.github.com>
 # 见 https://git-scm.com/docs/gitmailmap
 
 # —— 个人别名（同一邮箱，不同 git config user.name）——
-ReSerendipity <zengyangc@outlook.com> Mavis <zengyangc@outlook.com>
-ReSerendipity <zengyangc@outlook.com> Doro <zengyangc@outlook.com>
-ReSerendipity <zengyangc@outlook.com> PetPal Dev <zengyangc@outlook.com>
-ReSerendipity <zengyangc@outlook.com> DraftPeek Dev <zengyangc@outlook.com>
 
 # —— 本地/其他邮箱变体 ——
-ReSerendipity <zengyangc@outlook.com> <mavis@local>
-ReSerendipity <zengyangc@outlook.com> Doro <ReSerendipity@outlook.com>
 
 # —— GitHub bot（不代表真人，归并到主身份以保持 shortlog 干净）——
-ReSerendipity <zengyangc@outlook.com> <41898282+github-actions[bot]@users.noreply.github.com>
-ReSerendipity <zengyangc@outlook.com> <49699333+dependabot[bot]@users.noreply.github.com>
+ReSerendipity <259081123+ReSerendipity@users.noreply.github.com> <41898282+github-actions[bot]@users.noreply.github.com>
+ReSerendipity <259081123+ReSerendipity@users.noreply.github.com> <49699333+dependabot[bot]@users.noreply.github.com>
 
 # —— 仓库脚手架/脚本提交用的本地身份（2026-09-22 实测补，`git log --all --format='%an <%ae>'`）——
 # `TTS MultiModel Dev` 两个变体合计 249 个提交（135 + 114），是这份 .mailmap 之前漏掉的
 # 最大一块：shortlog 上会出现第三个"贡献者"。
-ReSerendipity <zengyangc@outlook.com> TTS MultiModel Dev <dev@tts-multimodel.local>
-ReSerendipity <zengyangc@outlook.com> TTS MultiModel Dev <zengyangc@outlook.com>
+ReSerendipity <259081123+ReSerendipity@users.noreply.github.com> <dev@tts-multimodel.local>
