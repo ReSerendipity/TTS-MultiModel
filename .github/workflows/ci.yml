@@ -202,11 +202,14 @@ jobs:
         shell: pwsh
 
       - name: Engine compatibility gate (architecture boundary)
-        # 只在 ubuntu + 3.11 这一条腿跑：该检查逐引擎 import，成本与矩阵无关，
+        # 只在 ubuntu + 3.12 这一条腿跑：该检查逐引擎 import，成本与矩阵无关，
         # 12 条腿重复跑只是把同一结论付 12 遍。
+        # 版本必须钉 3.12 而不是别的：分支保护的必需检查是矩阵组合名
+        # 「Test (pytest) (3.12, ubuntu-latest)」，而必需检查按 job 名匹配、不按步骤名。
+        # 挂到 3.11 那条腿上时，本步骤红了自己也不会挡住合并（2026-10-17 自查发现）。
         # 必须落在 test 作业而不是 lint：import 失败在本脚本里判 FAIL（退 1），
         # 而 lint 作业只装 ruff，放过去会把「缺依赖」显示成「引擎不兼容」的假红。
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         env:
           TRANSFORMERS_OFFLINE: "1"
           HF_HUB_OFFLINE: "1"
