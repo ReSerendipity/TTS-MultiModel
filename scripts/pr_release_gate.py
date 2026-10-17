@@ -26,10 +26,20 @@ stdout 协议（两行，调用方按行读）：
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import subprocess
 import sys
 from pathlib import Path
+
+# 本脚本 stdout 是机器可读的两行协议（state + JSON description），且描述含中文。
+# 写方若按宿主区域编码（本机 cp936）落字节、读方按 UTF-8 解，就会互相打脸：本机实测
+# 不设 PYTHONUTF8 时 tests/test_pr_release_gate.py 拿到的 stdout 直接是 None。
+# 钉成 UTF-8 后协议与宿主区域无关，与 scripts/add_golden_case.py 同口径。
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        with contextlib.suppress(OSError, ValueError):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
 
 # release-please-action 开 PR 时用的固定分支名
 RELEASE_BRANCH = "release-please--branches--main"
@@ -56,6 +66,7 @@ def run_readiness(root: Path) -> tuple[bool, str]:
         [sys.executable, str(Path(__file__).resolve().parent / "check_release_readiness.py"), "--root", str(root)],
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     output = (proc.stdout + proc.stderr).strip()
     return proc.returncode == 0, output

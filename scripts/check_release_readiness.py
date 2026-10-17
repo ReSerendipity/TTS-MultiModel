@@ -20,11 +20,19 @@ release 分支的 head 上（`release-please.yml` 的 release-gate 步骤负责�
 from __future__ import annotations
 
 import argparse
+import contextlib
 import importlib.util
 import json
 import sys
 import traceback
 from pathlib import Path
+
+# 输出会被 scripts/pr_release_gate.py 按 UTF-8 捕获再拼进它的两行协议，故这里同样钉死
+# UTF-8，不让判据文本的编码取决于宿主的区域设置（与 add_golden_case.py 同口径）。
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        with contextlib.suppress(OSError, ValueError):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
 
 # 与 release-please 的 extra-files 无关、必须由人补的版本位（说明见 docs/release-governance.md §1）
 HAND_SYNCED = (

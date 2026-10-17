@@ -42,6 +42,7 @@ def test_main_stdout_protocol_on_non_release_ref(monkeypatch):
         [sys.executable, str(repo_root / "scripts" / "pr_release_gate.py"), "--root", str(repo_root)],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=True,
     )
     lines = proc.stdout.strip().splitlines()
