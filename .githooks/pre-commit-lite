@@ -71,7 +71,7 @@ else
 fi
 
 if [ "$FAILED" -ne 0 ]; then
-    echo "[pre-commit] 未通过。紧急绕过：git commit --no-verify" >&2
+    echo "[pre-commit] 未通过。唯一显式绕过：git commit --no-verify（需仓库所有者授权）" >&2
     exit 1
 fi
 echo "[pre-commit] 通过"

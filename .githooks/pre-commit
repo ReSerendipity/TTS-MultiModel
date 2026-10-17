@@ -10,7 +10,7 @@ if [ -f scripts/check_no_hardcoded_paths.py ]; then
     done
     if [ -n "$PY_BIN" ]; then
         if ! "$PY_BIN" scripts/check_no_hardcoded_paths.py; then
-            echo "[pre-commit] 检测到本机绝对路径（C:\Users\... 等），提交已拒绝。绕过：git commit --no-verify" >&2
+            echo "[pre-commit] 检测到本机绝对路径（C:\Users\... 等），提交已拒绝。唯一显式绕过：git commit --no-verify（需仓库所有者授权）" >&2
             exit 1
         fi
     fi
@@ -28,7 +28,7 @@ if [ -f .pre-commit-config.yaml ]; then
     if [ -n "$PY" ] && $PY -m pre_commit --version >/dev/null 2>&1; then
         echo "[pre-commit] 使用 pre-commit 框架（.pre-commit-config.yaml）"
         if ! $PY -m pre_commit run --config .pre-commit-config.yaml; then
-            echo "[pre-commit] 框架检查未通过。紧急绕过：git commit --no-verify" >&2
+            echo "[pre-commit] 框架检查未通过。唯一显式绕过：git commit --no-verify（需仓库所有者授权）" >&2
             exit 1
         fi
         exit 0
@@ -37,7 +37,7 @@ if [ -f .pre-commit-config.yaml ]; then
     if command -v pre-commit >/dev/null 2>&1; then
         echo "[pre-commit] 使用 pre-commit 框架（控制台命令）"
         if ! pre-commit run --config .pre-commit-config.yaml; then
-            echo "[pre-commit] 框架检查未通过。紧急绕过：git commit --no-verify" >&2
+            echo "[pre-commit] 框架检查未通过。唯一显式绕过：git commit --no-verify（需仓库所有者授权）" >&2
             exit 1
         fi
         exit 0

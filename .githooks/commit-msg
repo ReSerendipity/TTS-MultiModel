@@ -10,7 +10,7 @@ esac
 if ! grep -qi '^[[:space:]]*Signed-off-by: ' "$MSG"; then
     echo "[commit-msg] 缺少 DCO 签名，CI 的 DCO 门禁会失败。" >&2
     echo "  修复：git commit -s        (补签上一个提交: git commit --amend -s)" >&2
-    echo "  绕过：git commit --no-verify (不推荐)" >&2
+    echo "  唯一显式绕过：git commit --no-verify（需仓库所有者授权）" >&2
     exit 1
 fi
 LEN=$(printf '%s' "$SUBJECT" | wc -m | tr -d ' ')
