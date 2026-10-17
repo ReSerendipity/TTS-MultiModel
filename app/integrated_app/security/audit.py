@@ -159,7 +159,7 @@ def log_audit(
         outcome: success / blocked / failure。
         request_id: 关联请求 ID（可选）。
     """
-    entry = {
+    entry: dict[str, Any] = {
         "ts": time.time(),
         "iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "action": action,
