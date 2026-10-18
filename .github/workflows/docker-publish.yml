@@ -19,7 +19,7 @@ permissions:
 # 还要读写同一份 Actions 层缓存（配额只有 10 GiB，曾经就是被这里的缓存吃满的，见 #133）。
 # 按 ref 分组的方案我否掉了：实测重叠的两条恰好是**不同 ref**（refs/heads/main 与
 # refs/tags/v2.2.5），分组等于没管住。cancel-in-progress 关掉：被中途取消会留下半份层缓存，
-# 还可能让 :latest 停在中间态，而 release 那条尤其不能事后取消。
+# 还可能让发布 tag 停在中间态，而 release 那条尤其不能事后取消。
 concurrency:
   group: docker-publish
   cancel-in-progress: false
@@ -55,7 +55,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=long
-            type=raw,value=latest,enable={{is_default_branch}}
+            # 2026-10-18 §10.3 收敛：已移除 type=raw,value=latest（不再发布 floating latest）
 
       # 注意：镜像不含模型权重（.dockerignore 已排除 model/），
       # 运行时必须挂载权重（见 deploy/kubernetes/ 与 docker-compose.yml）。
