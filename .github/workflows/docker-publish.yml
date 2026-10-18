@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
   packages: write
+  # 治理规范 §10.4（2026-10-18 收敛）：provenance / SBOM 以 attestation 形式绑定已推送 digest
+  id-token: write
+  attestations: write
 
 # 同一时刻只跑一条镜像构建（2026-09-22 实测的浪费）：13:29 的 main push、14:03 的 main push
 # 与 14:12 我为 v2.2.5 手工 dispatch 的那条在同一天里并行 —— 单次构建 20+ 分钟，
@@ -82,7 +85,9 @@ jobs:
           #   不缓存中间产物；固定 scope 让 push/PR/tag 共用一个桶而不是各自开新桶。
           cache-from: type=gha,scope=tts-mm
           cache-to: type=gha,mode=min,scope=tts-mm
-          # provenance=false：跳过 SBOM/provenance 内联，缩小镜像并避免与单架构冲突
+          # provenance=false：本步是 build(push: false) + load 到本地 daemon 供 Trivy 扫描，
+          # docker exporter 不承载 attestation（写 true 会直接报错）。
+          # 镜像的 provenance / SBOM 改由文件末尾两步针对「已推送 digest」的 attestation 承担。
           provenance: false
 
       # 镜像引用必须全小写：${{ github.repository }} 展开为 "ReSerendipity/TTS_MultiModel"，
@@ -137,9 +142,47 @@ jobs:
           timeout: "20m"
 
       # 供应链 P1-2：Trivy HIGH/CRITICAL 门禁通过后才推送全部发布 tag。
-      # 直接用本地已构建镜像 push（避免二次构建），provenance 属性随构建时配置。
+      # 直接用本地已构建镜像 push（避免二次构建）。
       - name: Push image after scan gate
+        id: push
         run: |
+          set -euo pipefail
+          digest=""
           while IFS= read -r t; do
-            [ -n "$t" ] && docker push "$t"
+            [ -n "$t" ] || continue
+            out="$(docker push "$t")"
+            printf '%s\n' "$out"
+            d="$(printf '%s' "$out" | sed -n 's/.*digest: \(sha256:[0-9a-f]*\) size:.*/\1/p' | tail -1)"
+            if [ -n "$d" ]; then digest="$d"; fi
           done <<< "${{ steps.meta.outputs.tags }}"
+          if [ -z "$digest" ]; then
+            echo "::error::failed to capture the pushed image digest"
+            exit 1
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "pushed digest: $digest"
+
+      # 治理规范 §10.4（2026-10-18 收敛）：镜像链须有 provenance + SBOM。
+      # 本仓发布链刻意「先构建不推送 → Trivy 门禁 → 再推送」，attestation 只能在推送后按
+      # digest 绑定，故用官方 attest-action 而不是 buildx 内联字段（后者会与 load 冲突）。
+      - name: Generate dependency SBOM (CycloneDX)
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet cyclonedx-bom
+          cyclonedx-py requirements --spec-version 1.6 --output-format JSON --output-file sbom-cyclonedx.json requirements.txt
+          head -c 200 sbom-cyclonedx.json
+
+      - name: Attest SBOM for the pushed image
+        uses: actions/attest-sbom@10926c72720ffc3f7b666661c8e55b1344e2a365 # v2
+        with:
+          subject-name: ghcr.io/reserendipity/tts_multimodel
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: sbom-cyclonedx.json
+          push-to-registry: true
+
+      - name: Attest build provenance (SLSA) for the pushed image
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-name: ghcr.io/reserendipity/tts_multimodel
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
