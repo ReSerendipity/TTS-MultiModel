@@ -152,7 +152,7 @@ jobs:
             [ -n "$t" ] || continue
             out="$(docker push "$t")"
             printf '%s\n' "$out"
-            d="$(printf '%s' "$out" | sed -n 's/^digest: \(sha256:[0-9a-f]*\) size:.*$/\1/p' | tail -1)"
+            d="$(printf '%s' "$out" | sed -n 's/.*digest: \(sha256:[0-9a-f]*\) size:.*/\1/p' | tail -1)"
             if [ -n "$d" ]; then digest="$d"; fi
           done <<< "${{ steps.meta.outputs.tags }}"
           if [ -z "$digest" ]; then
