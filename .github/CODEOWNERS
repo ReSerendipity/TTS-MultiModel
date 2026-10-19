@@ -50,8 +50,8 @@ desktop/src-tauri/ @ReSerendipity
 .pre-commit-config.yaml @ReSerendipity
 
 # 安全策略与审查流程文档
-SECURITY.md @ReSerendipity
-SECURITY_MATRIX.md @ReSerendipity
+docs/SECURITY.md @ReSerendipity
+docs/SECURITY_MATRIX.md @ReSerendipity
 docs/SECURITY_DEPENDABOT_TRIAGE.md @ReSerendipity
 docs/SECURITY_CODEQL_TRIAGE.md @ReSerendipity
 docs/release-governance.md @ReSerendipity

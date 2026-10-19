@@ -111,18 +111,18 @@ cd TTS_MultiModel
 
 > `install.bat` / `start.bat` 会自动检测 Python（系统 Python 或项目内 WinPython）。
 >
-> **Git 钩子**：`install.bat` / `install.sh` 会自动启用 `.githooks/`（pre-commit / pre-push 等）。若未使用安装脚本，请手动执行 `git config core.hooksPath .githooks`（或 `.githooks/install.sh`）。
+> **Git 钩子**：`install.bat` / `scripts/install.sh` 会自动启用 `.githooks/`（pre-commit / pre-push 等）。若未使用安装脚本，请手动执行 `git config core.hooksPath .githooks`（或 `.githooks/install.sh`）。
 
 ### Linux 安装
 
 ```bash
 git clone https://github.com/ReSerendipity/TTS_MultiModel.git
 cd TTS_MultiModel
-chmod +x install.sh && ./install.sh
-chmod +x start.sh && ./start.sh
+chmod +x scripts/install.sh && ./scripts/install.sh
+chmod +x scripts/start.sh && ./scripts/start.sh
 ```
 
-> `install.sh` 会自动启用 `.githooks/`（pre-commit / pre-push 等）。首次克隆后 `post-checkout` 钩子也会自动检测并设置。
+> `scripts/install.sh` 会自动启用 `.githooks/`（pre-commit / pre-push 等）。首次克隆后 `post-checkout` 钩子也会自动检测并设置。
 
 ### Docker 部署
 

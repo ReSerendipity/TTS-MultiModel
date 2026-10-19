@@ -22,7 +22,7 @@ if [ "$1" = "--download" ]; then
     echo "IndexTTS2:"
     echo "  modelscope download IndexTeam/IndexTTS-2 --local_dir model/IndexTTS2"
     echo ""
-    echo "After downloading, run: ./start.sh"
+    echo "After downloading, run: ./scripts/start.sh"
     exit 0
 fi
 
@@ -37,7 +37,7 @@ fi
 
 if [ -n "$MISSING" ]; then
     echo "[WARNING] Missing models:$MISSING"
-    echo "  Run './start.sh --download' for download instructions."
+    echo "  Run './scripts/start.sh --download' for download instructions."
     echo ""
 fi
 

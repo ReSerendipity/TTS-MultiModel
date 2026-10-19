@@ -55,7 +55,7 @@
 | 西文艺术 | Dancing Script | `"Dancing Script"` | OFL 1.1 |
 
 OFL 允许随发行包再分发，条件是：不得单独售卖字体本身、保留版权声明、改名需申请保留字体名（ Reserved Font Name）。
-因此新增字体必须同步在仓库根目录 `THIRD_PARTY_NOTICES.md` 追加一条（家族名 / 作者 / OFL 1.1 / 上游 URL / 文件清单与 SHA-256）。
+因此新增字体必须同步在 `docs/THIRD_PARTY_NOTICES.md` 追加一条（家族名 / 作者 / OFL 1.1 / 上游 URL / 文件清单与 SHA-256）。
 
 ## 怎么重生成（联网那一步由你决定何时执行）
 
