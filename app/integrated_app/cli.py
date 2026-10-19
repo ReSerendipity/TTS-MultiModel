@@ -144,10 +144,10 @@ def validate_ranges(args, parser):
 def warn_legacy_mode():
     """输出旧版 CLI 参数模式的弃用警告。
 
-    提醒用户优先使用子命令语法（voxcpm design|clone|batch）而不是
+    提醒用户优先使用子命令语法（tts-multimodel design|clone|batch）而不是
     根级参数，根级参数将在未来版本中移除。
     """
-    logger.warning("Legacy root CLI arguments are deprecated. Prefer `voxcpm design|clone|batch ...`.")
+    logger.warning("Legacy root CLI arguments are deprecated. Prefer `tts-multimodel design|clone|batch ...`.")
 
 
 def build_final_text(text: str, control: str | None) -> str:
@@ -961,10 +961,10 @@ def _build_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  voxcpm design --text "Hello world" --output out.wav
-  voxcpm design --text "Hello world" --control "warm female voice" --output out.wav
-  voxcpm clone --text "Hello" --reference-audio ref.wav --output out.wav
-  voxcpm batch --input texts.txt --output-dir ./outs --reference-audio ref.wav
+  tts-multimodel design --text "Hello world" --output out.wav
+  tts-multimodel design --text "Hello world" --control "warm female voice" --output out.wav
+  tts-multimodel clone --text "Hello" --reference-audio ref.wav --output out.wav
+  tts-multimodel batch --input texts.txt --output-dir ./outs --reference-audio ref.wav
         """,
     )
 
