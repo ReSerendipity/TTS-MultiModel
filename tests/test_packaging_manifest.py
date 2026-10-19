@@ -60,7 +60,10 @@ def _foreach_string_array(text: str, must_contain: str) -> list[str]:
 
 
 def _missing_license_docs(listed: list[str]) -> list[str]:
-    return [doc for doc in _LICENSE_DOCS if doc not in listed]
+    # §12.2 后白名单条目可以是带目录的源路径（如 docs\THIRD_PARTY_NOTICES.md），
+    # 按叶名比对，契约是「叶名必须随包」而非「条目必须在仓库根」。
+    listed_leaves = {Path(f.replace("\\", "/")).name for f in listed}
+    return [doc for doc in _LICENSE_DOCS if doc not in listed_leaves]
 
 
 def _whitelist_loop_hardfails(text: str, loop_header: str) -> bool:
@@ -199,7 +202,7 @@ def test_license_docs_are_listed_by_every_packaging_path():
     assert _whitelist_loop_hardfails(bundle_script, "foreach ($f in $CoreIncludeFiles)"), (
         "build_portable_bundle.ps1 的根文件循环不再对缺失项 throw —— 静默少发文件的老 bug 会复现"
     )
-    assert _whitelist_loop_hardfails(staging_script, "foreach ($f in @('start_portable.py'")
+    assert _whitelist_loop_hardfails(staging_script, "foreach ($f in @('scripts\\start_portable.py'")
 
 
 def test_license_doc_guard_is_not_vacuous():
@@ -228,7 +231,7 @@ _MUST_SHIP = (
     "LICENSE",
     "NOTICE",
     "README.md",
-    "THIRD_PARTY_NOTICES.md",
+    "docs/THIRD_PARTY_NOTICES.md",
     "app/integrated_app/static/css/fonts.local.css",
     "app/integrated_app/static/fonts/NotoSansSC-0.woff2",
     "app/integrated_app/static/fonts/licenses/NotoSansSC.OFL.txt",
@@ -238,7 +241,7 @@ _MUST_SHIP = (
 )
 _MUST_NOT_SHIP = (
     ".env",
-    "SECURITY.md",
+    "docs/SECURITY.md",
     "tests/test_packaging_manifest.py",
     "docs/DOD.md",
     "model/whatever.bin",
@@ -262,11 +265,11 @@ def test_docker_context_blocks_runtime_and_private_paths(rel: str):
 
 
 def test_dockerignore_guard_is_not_vacuous():
-    """变异自证：删掉 ``!THIRD_PARTY_NOTICES.md`` 这一行，许可声明就该被挡住。"""
+    """变异自证：删掉 ``!docs/THIRD_PARTY_NOTICES.md`` 这一行，许可声明就该被挡住。"""
     rules = _dockerignore_rules()
-    assert not _docker_excluded("THIRD_PARTY_NOTICES.md", rules), "当前规则下就已排除，断言无意义"
-    without_exception = [(p, n) for p, n in rules if not (p == "THIRD_PARTY_NOTICES.md" and n)]
-    assert _docker_excluded("THIRD_PARTY_NOTICES.md", without_exception), "例外行不是承重的——守卫空转"
+    assert not _docker_excluded("docs/THIRD_PARTY_NOTICES.md", rules), "当前规则下就已排除，断言无意义"
+    without_exception = [(p, n) for p, n in rules if not (p == "docs/THIRD_PARTY_NOTICES.md" and n)]
+    assert _docker_excluded("docs/THIRD_PARTY_NOTICES.md", without_exception), "例外行不是承重的——守卫空转"
     # 剪枝语义：被整目录排除时，子路径的例外也救不回来（Docker 走目录树时直接跳过）。
     pruned = _dockerignore_rules() + [("!docs/DOD.md", True)]
     assert _docker_excluded("docs/DOD.md", pruned), "父目录剪枝语义未生效，复演器与 Docker 不一致"

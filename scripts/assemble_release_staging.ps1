@@ -4,7 +4,7 @@
 #
 #   staging\
 #     TTSMultiModel.exe      <- 壳二进制（默认 desktop\src-tauri\target\release\tts-multimodel-desktop.exe）
-#     start_portable.py      <- 壳启动入口（仓库根）
+#     start_portable.py      <- 壳启动入口（打包后平铺到安装根；仓库源已随 §12.2 下沉 scripts/）
 #     config.yaml            <- 运行时配置（安装根，更新器 PRESERVE_ROOT_FILES 保留）
 #     version.json           <- 版本单源（壳本地版本识别）
 #     app\                   <- 后端代码（仓库 app/，排除运行时状态/密钥/缓存）
@@ -64,12 +64,14 @@ Copy-Item -LiteralPath $ShellExe -Destination (Join-Path $OutDir 'TTSMultiModel.
 $total += (Get-Item -LiteralPath (Join-Path $OutDir 'TTSMultiModel.exe')).Length
 Write-Host ("  · TTSMultiModel.exe（{0}）" -f (Format-TTSMultiModelSize (Get-Item -LiteralPath (Join-Path $OutDir 'TTSMultiModel.exe')).Length))
 # 2) 根文件：start_portable.py / config.yaml / version.json / 许可与说明
-foreach ($f in @('start_portable.py', 'config.yaml', 'version.json', 'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md', 'README.md', 'start.bat')) {
+#    §12.2 后 start_portable.py 与 THIRD_PARTY_NOTICES.md 的仓库源路径已下沉，
+#    但打包后一律以叶名平铺到 staging 根（壳启动契约与镜像契约不变）。
+foreach ($f in @('scripts\start_portable.py', 'config.yaml', 'version.json', 'LICENSE', 'NOTICE', 'docs\THIRD_PARTY_NOTICES.md', 'README.md', 'start.bat')) {
     $src = Join-Path $root $f
     if (-not (Test-Path -LiteralPath $src -PathType Leaf)) {
         throw "staging root file missing: $f"
     }
-    Copy-Item -LiteralPath $src -Destination (Join-Path $OutDir $f) -Force
+    Copy-Item -LiteralPath $src -Destination (Join-Path $OutDir (Split-Path -Leaf $f)) -Force
 }
 # 3) app/（后端代码，排除运行时状态/密钥/缓存）
 $appExclude = @(

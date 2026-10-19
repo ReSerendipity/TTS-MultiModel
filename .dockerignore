@@ -17,12 +17,14 @@ coverage/
 
 # ---- 测试 / 文档 / 演示 ----
 tests
-docs
+docs/**
 demo
 *.md
 !README.md
 !NOTICE
-!THIRD_PARTY_NOTICES.md
+# §12.2：THIRD_PARTY_NOTICES.md 已移入 docs/，仍须随镜像分发（OFL 字体许可随包义务）
+# 用 docs/** 而非 docs 整目录排除，否则父目录剪枝会让下面这条例外失效（GOTCHAS #134）
+!docs/THIRD_PARTY_NOTICES.md
 
 # ---- 本地运行态（不应烤入镜像）----
 logs

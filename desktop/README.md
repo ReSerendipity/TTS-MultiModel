@@ -49,7 +49,7 @@ cd desktop/src-tauri
 
 配置解析顺序（`resolve_runtime_dir` / `resolve_app_dir`）：
 1. 打包后：exe 旁 `app/`（应用代码）+ `app/runtime/`（Python 运行时）
-2. 开发模式：项目根（`start_portable.py` 所在）+ 项目根 `.venv/Scripts`
+2. 开发模式：项目根（`scripts/start_portable.py` 所在）+ 项目根 `.venv/Scripts`
 
 ## 测试与静态检查
 

@@ -340,7 +340,6 @@ docs/LOGGING_AUDIT_REPORT.md
 docs/MODEL_DOWNLOADS.md
 docs/MODEL_DOWNLOAD_GUIDE.md
 docs/OPENAI_COMPATIBLE_API.md
-docs/SECURITY.md
 docs/SHA256SUMS.models
 docs/TRAINING_GUIDE.md
 docs/WATERMARK_LIMITATIONS.md
@@ -388,6 +387,8 @@ tests/frontend/_rendered/
 
 # AI 规范与内部工作文档（仅本地保留，不上传远程，2026-08-27）
 AGENTS.md
+# §12.2 结构收敛：local/ 为私有内部文档目录（本仓私有，内容不入库）
+/local/
 FIX_LOG.md
 docs/FILEMAP.md
 docs/README.md

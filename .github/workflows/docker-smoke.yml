@@ -7,7 +7,7 @@
 #   3) 验证只读根 fs 生效（/app 写失败）且挂载卷可写（/app/outputs 写成功）
 #   4) 验证鉴权安全网（无 token→401，Bearer→200）与 SIGTERM 优雅退出（非 137）
 #   5) docker compose config 语法/合并校验 + k8s 清单静态校验（守护 P0-1 挂载面回归）
-#   6) 验证镜像真的带着许可文本（LICENSE/NOTICE/THIRD_PARTY_NOTICES.md）与自托管
+#   6) 验证镜像真的带着许可文本（LICENSE/NOTICE/docs/THIRD_PARTY_NOTICES.md）与自托管
 #      标题字体（fonts.local.css + ≥700 woff2 + ≥12 份 OFL）—— .dockerignore 用的是
 #      根级通配 + `!` 例外行，少一条就静默少发（GOTCHAS #134）
 name: Docker Smoke (boot + read-only + probes)
@@ -80,7 +80,7 @@ jobs:
       - name: Image carries license texts and self-hosted fonts
         run: |
           docker run --rm --entrypoint sh "$IMAGE" -c '
-            for f in LICENSE NOTICE README.md THIRD_PARTY_NOTICES.md; do
+            for f in LICENSE NOTICE README.md docs/THIRD_PARTY_NOTICES.md; do
               test -f "/app/$f" || { echo "镜像缺 /app/$f（.dockerignore 例外行被删了？）"; exit 1; }
             done
             css=/app/app/integrated_app/static/css/fonts.local.css

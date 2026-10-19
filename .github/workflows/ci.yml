@@ -348,7 +348,7 @@ jobs:
         run: |
           HITS=$(grep -rn --include='*.py' --include='*.bat' --include='*.sh' --include='*.yml' \
             -E "host[[:space:]]*=[[:space:]]*['\"]0\.0\.0\.0|--host[[:space:]]+0\.0\.0\.0" \
-            app config.yaml start.bat start.sh 2>/dev/null | grep -v tests || true)
+            app config.yaml start.bat scripts/install.sh scripts/start.sh 2>/dev/null | grep -v tests || true)
           if [ -n "$HITS" ]; then echo "FAIL: 发现 0.0.0.0 监听配置"; echo "$HITS"; exit 1; fi
           echo "PASS: 无 0.0.0.0 监听配置"
       - name: 入口文件一致性

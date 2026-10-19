@@ -175,8 +175,10 @@ function Get-TTSMultiModelModelDirs {
 # --------------------------------------------------- 组件 payload 组装 ----
 
 $CoreIncludeDirs = @('app', 'launcher')
+# §12.2 后 start_portable.py / THIRD_PARTY_NOTICES.md / SECURITY.md 的仓库源路径已下沉；
+# 打包时 Copy-TTSMultiModelTree 仍以叶名平铺到便携包根（壳启动契约与许可随包义务不变）。
 $CoreIncludeFiles = @('config.yaml', 'pyproject.toml', 'requirements.txt', 'requirements-lock.txt',
-    'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md', 'README.md', 'SECURITY.md', 'CHANGELOG.md', 'start.bat', 'start_portable.py', 'version.json')
+    'LICENSE', 'NOTICE', 'docs\THIRD_PARTY_NOTICES.md', 'README.md', 'docs\SECURITY.md', 'CHANGELOG.md', 'start.bat', 'scripts\start_portable.py', 'version.json')
 $CoreExcludePatterns = @(
     '__pycache__\*', '*.pyc', '*.pyo', '.pytest_cache\*',
     'data\*', 'app\integrated_app\data\*', 'logs\*.log', '*.db', '*.db-wal', '*.db-shm', '*.log',
