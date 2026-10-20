@@ -1140,7 +1140,7 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
     # P1: 启动时输出归属信息（增加品牌化剥离成本）
     logger.info(
         "[run_server] TTS_MultiModel v%s © ReSerendipity, Apache 2.0 | "
-        "Official: https://github.com/ReSerendipity/TTS_MultiModel",
+        "Official: https://github.com/ReSerendipity/TTS-MultiModel",
         version,
     )
 

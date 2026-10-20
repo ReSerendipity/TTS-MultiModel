@@ -10,7 +10,7 @@ updates:
     ignore:
       # pydantic pins pydantic-core exactly (2.13.5 -> 2.46.5). Dependabot bumps
       # the two independently in this hand-maintained lock and produced an
-      # uninstallable pair (see DraftPeek#92 / TTS_MultiModel#87). Regenerate the
+      # uninstallable pair (see DraftPeek#92 / TTS-MultiModel#87). Regenerate the
       # lock instead: let pip resolve the pair together.
       - dependency-name: "pydantic-core"
       - dependency-name: "pydantic_core"
