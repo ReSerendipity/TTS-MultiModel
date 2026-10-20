@@ -53,11 +53,12 @@ A powerful open-source multi-engine Text-to-Speech platform with voice cloning, 
 
 | 功能 | 描述 |
 |---|---|
-| **五引擎架构** | VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX，灵活切换 |
+| **五引擎架构** | VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX，灵活切换；另注册 Edge-TTS 在线兜底引擎（CPU 可用，详见下方说明） |
 | **声音克隆** | 仅需少量音频样本即可克隆声音（可控克隆 + 极致克隆） |
 | **声音设计** | 通过文字描述生成目标音色的语音 |
 | **剧本配音** | 多角色对话剧本自动分配说话人，批量生成配音 |
 | **流式生成** | 长文本实时流式音频输出（SSE） |
+| **语音转换与音频编辑** | Voicebox VC 零样本音色转换（音频→音频）、Step-Audio-EditX 情绪/风格/副语言音频编辑 |
 | **LoRA 微调** | 自定义数据集 LoRA 微调训练（实验特性，未经真机验证，见下方说明） |
 | **Web 界面** | FastAPI + HTMX + Jinja2 现代化响应式 Web UI |
 | **批量处理** | 支持批量音频生成，任务断点续跑 |
@@ -67,6 +68,8 @@ A powerful open-source multi-engine Text-to-Speech platform with voice cloning, 
 | **自定义音色库** | 支持用户保存和管理自定义音色 |
 
 > **实验特性说明（LoRA 微调 / 训练链路）**：LoRA 微调训练链路已随项目提供（训练依赖需另行安装：`pip install -e .[training]`），但当前未经真机训练验证，请以实验特性评估使用。12GB 显存上训练前必须先卸载推理引擎，否则会因显存不足（OOM）失败。
+
+> **关于引擎清单**：上述五套引擎均已在实际后端注册（注册名 `voxcpm2` / `indextts2` / `indextts20` / `voicebox` / `step-audio-editx`，见 `app/integrated_app/engine_interface.py` 与 `config.yaml` 的声明式引擎注册表）。此外后端还注册了 **Edge-TTS 在线兜底引擎**（CPU 可用、依赖微软在线服务、可选依赖 `pip install edge-tts`，缺失时自动安全降级），适合无 GPU 环境快速体验；本表所列五套为自带权重的本地引擎。
 
 ## 环境要求
 
@@ -129,13 +132,13 @@ chmod +x scripts/start.sh && ./scripts/start.sh
 ```bash
 docker compose up -d
 
-# 或直接拉取 GHCR 镜像（随版本发布：v2.6.0 对应 tag 2.6.0，以 config.yaml version 为准）
-docker pull ghcr.io/reserendipity/tts-multimodel:2.6.0
+# 或直接拉取 GHCR 镜像（随版本发布：v2.7.0 对应 tag 2.7.0，以 config.yaml version 为准）
+docker pull ghcr.io/reserendipity/tts-multimodel:2.7.0
 docker run -d --gpus all -p 7869:7869 \
   -v ./model:/app/model \
   -v ./outputs:/app/outputs \
   -v ./personas:/app/personas \
-  ghcr.io/reserendipity/tts-multimodel:2.6.0
+  ghcr.io/reserendipity/tts-multimodel:2.7.0
 
 # 或手动构建
 docker build -t tts-multimodel .
@@ -239,15 +242,20 @@ python scripts/download_models.py --all --no-verify            # 跳过 SHA256 �
 | 端点 | 方法 | 说明 |
 |---|---|---|
 | `/api/system/health` | GET | 健康检查 |
-| `/api/system/gpu` | GET | GPU 利用率信息 |
+| `/api/system/gpu/status` | GET | GPU 实时状态（设备名/显存/利用率/温度，无 GPU 时返回 CPU 回退结构） |
 | `/api/generate/voxcpm2/voxcpm_clone` | POST | 声音克隆（VoxCPM2） |
 | `/api/generate/voxcpm2/voxcpm_design` | POST | 声音设计（VoxCPM2） |
 | `/api/generate/voxcpm2/voxcpm_script` | POST | 剧本配音（VoxCPM2） |
 | `/api/generate/voxcpm2/streaming_sse` | POST | 流式生成（SSE） |
 | `/api/generate/indextts2/synthesize` | POST | TTS 合成（IndexTTS 2.5） |
+| `/api/generate/voicebox/convert` | POST | 语音转换（Voicebox VC，音频→音频） |
+| `/api/generate/step-audio-editx/edit` | POST | 音频编辑（Step-Audio-EditX） |
+| `/api/engines` | GET | 只读引擎发现 / 能力查询 |
+| `/api/audio/{filename}` | GET | 获取生成音频文件 |
+| `/api/history/table` | GET | 生成历史记录（分页表格） |
 | `/api/model/load` | POST | 加载模型 |
 | `/api/model/unload` | POST | 卸载模型 |
-| `/api/history` | GET | 生成历史 |
+| `/v1/audio/speech` | POST | OpenAI 兼容语音合成端点（支持 `stream` 参数） |
 
 > 生产环境建议在 `config.yaml` 的 `api_auth` 区域启用 API 认证。
 
@@ -264,8 +272,8 @@ python scripts/download_models.py --all --no-verify            # 跳过 SHA256 �
 | 层级 | 技术 |
 |---|---|
 | Web 框架 | FastAPI + Uvicorn |
-| 前端 | HTMX + Jinja2 + Bootstrap |
-| TTS 引擎 | VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX |
+| 前端 | HTMX + Jinja2 + 原生 CSS（无前端框架依赖） |
+| TTS 引擎 | VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX（另注册 Edge-TTS 在线兜底，可选） |
 | ASR 引擎 | SenseVoiceSmall |
 | 音频处理 | speech_zipenhancer + FFmpeg（系统自带）+ SoX |
 | 深度学习 | PyTorch + Transformers + FunASR |
