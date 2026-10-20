@@ -2,6 +2,13 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.7.1](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.7.0...v2.7.1) (2026-10-20)
+
+
+### Documentation
+
+* **cli:** 补全 CLI 使用文档并统一入口名 + §8 旧位规则清理 ([#193](https://github.com/ReSerendipity/TTS-MultiModel/issues/193)) ([fdb5c11](https://github.com/ReSerendipity/TTS-MultiModel/commit/fdb5c11468ca5d81070b53e7f0b13ea74178e449))
+
 ## [2.7.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.6.0...v2.7.0) (2026-10-17)
 
 
