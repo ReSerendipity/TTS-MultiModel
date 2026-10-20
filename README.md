@@ -2,7 +2,7 @@
 
 # TTS MultiModel
 
-[![gitleaks](https://img.shields.io/badge/secret%20scan-gitleaks%20passing-0080FF?style=for-the-badge)](https://github.com/ReSerendipity/TTS_MultiModel/actions/workflows/gitleaks.yml)
+[![gitleaks](https://img.shields.io/badge/secret%20scan-gitleaks%20passing-0080FF?style=for-the-badge)](https://github.com/ReSerendipity/TTS-MultiModel/actions/workflows/gitleaks.yml)
 
 **多模型语音合成平台 | Multi-Model Text-to-Speech Platform**
 
@@ -10,7 +10,7 @@
 
 A powerful open-source multi-engine Text-to-Speech platform with voice cloning, voice design, LoRA fine-tuning, and multi-character script dubbing
 
-[![CI](https://github.com/ReSerendipity/TTS_MultiModel/actions/workflows/ci.yml/badge.svg)](https://github.com/ReSerendipity/TTS_MultiModel/actions)
+[![CI](https://github.com/ReSerendipity/TTS-MultiModel/actions/workflows/ci.yml/badge.svg)](https://github.com/ReSerendipity/TTS-MultiModel/actions)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -37,7 +37,7 @@ A powerful open-source multi-engine Text-to-Speech platform with voice cloning, 
 
 ## Demo
 
-在线模拟演示（无需 GPU / 模型权重，纯前端仿真）：<https://reserendipity.github.io/TTS_MultiModel/>
+在线模拟演示（无需 GPU / 模型权重，纯前端仿真）：<https://reserendipity.github.io/TTS-MultiModel/>
 
 界面截图（VoxCPM2 引擎，1440×900 视口）已入库 `docs/screenshots/`：
 
@@ -47,7 +47,7 @@ A powerful open-source multi-engine Text-to-Speech platform with voice cloning, 
 | **剧本配音** | **LoRA 管理** | **系统设置** |
 | ![剧本配音](docs/screenshots/voxcpm2_04_script_workshop_viewport.png) | ![LoRA 管理](docs/screenshots/voxcpm2_06_lora_viewport.png) | ![系统设置](docs/screenshots/voxcpm2_08_settings_viewport.png) |
 
-> 欢迎在 [Discussions](https://github.com/ReSerendipity/TTS_MultiModel/discussions) 中分享你的使用体验！
+> 欢迎在 [Discussions](https://github.com/ReSerendipity/TTS-MultiModel/discussions) 中分享你的使用体验！
 
 ## 功能亮点
 
@@ -85,8 +85,8 @@ A powerful open-source multi-engine Text-to-Speech platform with voice cloning, 
 **方式一：使用系统 Python（推荐，节省磁盘空间）**
 
 ```bash
-git clone https://github.com/ReSerendipity/TTS_MultiModel.git
-cd TTS_MultiModel
+git clone https://github.com/ReSerendipity/TTS-MultiModel.git
+cd TTS-MultiModel
 
 # 1. 安装系统 Python 3.10+（推荐 3.12），务必勾选 "Add Python to PATH"
 # 2. 一键安装依赖（会自动检测系统 Python）
@@ -99,8 +99,8 @@ start.bat
 **方式二：使用便携 WinPython（完全隔离，无需系统 Python）**
 
 ```bash
-git clone https://github.com/ReSerendipity/TTS_MultiModel.git
-cd TTS_MultiModel
+git clone https://github.com/ReSerendipity/TTS-MultiModel.git
+cd TTS-MultiModel
 
 # 1. 下载 WinPython 并解压到项目根目录，确保 WPy64-312101\python\python.exe 存在
 #    https://github.com/winpython/winpython/releases
@@ -116,8 +116,8 @@ cd TTS_MultiModel
 ### Linux 安装
 
 ```bash
-git clone https://github.com/ReSerendipity/TTS_MultiModel.git
-cd TTS_MultiModel
+git clone https://github.com/ReSerendipity/TTS-MultiModel.git
+cd TTS-MultiModel
 chmod +x scripts/install.sh && ./scripts/install.sh
 chmod +x scripts/start.sh && ./scripts/start.sh
 ```

@@ -2,9 +2,9 @@ name: Security Scan
 
 on:
   push:
-    branches: [main, master, dev]
+    branches: [main, dev]
   pull_request:
-    branches: [main, master]
+    branches: [main]
   schedule:
     # Run weekly on Sunday at 01:23 UTC
     - cron: '23 1 * * 0'

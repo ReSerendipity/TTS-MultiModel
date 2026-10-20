@@ -2,9 +2,9 @@ name: Secret Scan (gitleaks)
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
   schedule:
     # 每周日 00:47 UTC 全量历史扫描
     - cron: '47 0 * * 0'
