@@ -2,7 +2,7 @@
 
 **生效日期**：2026-09-10 ｜ **版本**：v1.1
 
-TTS MultiModel 是一款自托管的语音合成平台（VoxCPM2 / IndexTTS2，含声音克隆与 LoRA 训练）。我们遵循"本地优先、最小收集"原则，本政策说明数据处理方式。
+TTS MultiModel 是一款自托管的语音合成平台（VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX，含声音克隆与 LoRA 训练）。我们遵循"本地优先、最小收集"原则，本政策说明数据处理方式。
 
 ## 1. 本地数据（默认不上传）
 
@@ -24,7 +24,8 @@ TTS MultiModel 是一款自托管的语音合成平台（VoxCPM2 / IndexTTS2，�
 
 ## 2. 推理引擎的数据流向
 
-- **默认（本地推理）**：VoxCPM2 / IndexTTS2 在本机 GPU 运行，文本与音频均不出设备；
+- **默认（本地推理）**：VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX 均在本机 GPU 运行，文本与音频不出设备；
+- **例外：Edge-TTS（在线引擎，默认不启用）**：`edge-tts` 为可选 CPU 兜底引擎，需 `pip install edge-tts` 且需外网。启用后**输入文本会发送至微软 Edge 在线语音服务**（`config.yaml → edge-tts`，LGPL-3.0），受微软服务条款与隐私政策约束；不启用则该数据流不存在。请勿向其提交敏感个人信息。
 - **可选云端 API**：若您配置了云端模型服务，输入将发送至对应服务商，受其隐私政策约束——请勿提交敏感个人信息。
 
 ## 3. 声音克隆与训练的数据注意

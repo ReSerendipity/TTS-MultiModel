@@ -12,7 +12,10 @@ TTS_MultiModel 项目代码采用 [Apache License 2.0](LICENSE)。
 | 引擎/模型 | 许可 | 商用说明 |
 |---|---|---|
 | VoxCPM2 + SenseVoiceSmall + ZipEnhancer | Apache-2.0 | 可直接商用，保留版权声明 |
-| IndexTTS2 | bilibili Model Use License | **商用需书面授权**，核对 bilibili 官方条款 |
+| IndexTTS 2.5（`indextts2`）/ IndexTTS 2.0（`indextts20`） | bilibili Model Use License | **商用需书面授权**，核对 bilibili 官方条款 |
+| OpenVoice（`voicebox`，ToneColorConverter） | MIT | 可直接商用，保留版权声明 |
+| Step-Audio-EditX（`step-audio-editx`） | Apache-2.0 | 可直接商用，保留版权声明 |
+| Edge-TTS（`edge-tts`，可选在线引擎） | LGPL-3.0（客户端库）/ 上游微软服务条款 | 库必须动态链接（`pip install edge-tts`，源码不随仓库分发）；商用前自行核实上游服务条款 |
 
 ## 主要 Python 依赖（许可类型为常见归类，以各包 LICENSE 为准）
 
@@ -34,12 +37,12 @@ TTS_MultiModel 项目代码采用 [Apache License 2.0](LICENSE)。
 
 ## vendored / vendor 目录
 
-### `vendor/voxcpm`（VoxCPM2 引擎代码）
+### `app/integrated_app/vendor/voxcpm`（VoxCPM2 引擎代码）
 
-- **上游**: OpenBMB/VoxCPM（vendored 目录为本地保留、未随仓库发布；`vendor/voxcpm/SOURCE.md` 源码出处说明为本地文件）
+- **上游**: OpenBMB/VoxCPM（vendored 目录随仓库分发、并进容器镜像；源码出处说明见 `app/integrated_app/vendor/voxcpm/SOURCE.md`）
 - **许可**: Apache-2.0（与项目主许可一致）
 
-### `vendor/tn`（文本规范化，中文/英文）
+### `app/integrated_app/vendor/tn`（文本规范化，中文/英文）
 
 - 常见许可：Apache-2.0 / BSD 类，以包内 LICENSE 与 SOURCE 说明为准
 

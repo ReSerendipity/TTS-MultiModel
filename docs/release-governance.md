@@ -63,13 +63,13 @@
 | 产物 | 构建位置 | 标签 / 命名 | 完整性手段 |
 |---|---|---|---|
 | Python wheel / sdist（`tts_multimodel-*.whl` / `.tar.gz`） | **远端** | 不可变 semver `vX.Y.Z` | `SHA256SUMS.txt` |
-| ghcr 容器镜像 `ghcr.io/reserendipity/tts_multimodel` | **远端** | semver（`:X.Y.Z` / `:X.Y`）+ `:sha-<commit>`；**无 floating `latest`** | Trivy `CRITICAL,HIGH` 阻断；上线按 digest 钉版 |
+| ghcr 容器镜像 `ghcr.io/reserendipity/tts-multimodel` | **远端** | semver（`:X.Y.Z` / `:X.Y`）+ `:sha-<commit>`；**无 floating `latest`** | Trivy `CRITICAL,HIGH` 阻断；上线按 digest 钉版 |
 | 桌面安装包（Tauri v2 壳 / NSIS）与便携分卷 | **远端** | semver | `SHA256SUMS.txt` + Tauri ed25519 更新器签名 |
 
 - 容器镜像：推 `ghcr.io`，`permissions: packages: write`，用 `GITHUB_TOKEN` 登录；tag 取 semver + 构建 `sha`，**不得以 `latest` 作发布基线**（本仓现状：`type=raw,value=latest,enable={{is_default_branch}}` 已于 2026-10-18 移除，§10.3 差异清零；历史 `:latest` tag 仍留在 GHCR 上，但不再更新、不作下游引用基线）。
-- 镜像引用必须全小写（镜像名 `tts_multimodel` 下划线由 `${{ github.repository }}` 小写得来；镜像名与 tag 形状由 `tests/test_image_name_consistency.py` 钉）；镜像内不含模型权重（`.dockerignore` 排除 `model/`），运行时挂载。
+- 镜像引用必须全小写（镜像名 `tts-multimodel` 由 `${{ github.repository }}` 小写得来；2026-09-30 仓库由 `TTS_MultiModel` 改名 `TTS-MultiModel`，2.4.0 起新镜像推 `tts-multimodel`，改名前的旧包 `tts_multimodel` 仅作历史留存、不作引用基线；镜像名与 tag 形状由 `tests/test_image_name_consistency.py` 钉）；镜像内不含模型权重（`.dockerignore` 排除 `model/`），运行时挂载。
 - 镜像发布前须经 Trivy `CRITICAL,HIGH`（`ignore-unfixed`）**阻断**（本仓 `exit-code: '1'`，符合口径）；豁免逐条登记在 `.trivyignore.yaml`（理由 + expiration）。
-- 镜像链 `provenance` / `sbom`：本仓 `provenance: false`、未开 `sbom: true`。两个原因并记：①镜像是单架构（未声明 `platforms`），attestation 会以额外 manifest 进 index，与单架构消费方冲突；②本仓发布链是「build（`push: false`）→ Trivy 扫 → 手动 `docker push`」，而 attestation 只能由 buildx 在其自身 push 时附加，当前结构下即便写 `provenance: true` 也不会真正产出 attestation。属 §10.4 推荐口径的 WARN（未采纳、理由已记录）；是否改结构：待定（仓库所有者）。
+- 镜像链 `provenance` / `sbom`（2026-10-18 §10.4 收敛后**已接入**）：因本仓发布链是「build（`push: false`）→ Trivy 扫 → 手动 `docker push`」，attestation 无法由 buildx 内联附加，故 buildx 侧保持 `provenance: false`，改由推送后的官方 attest-action 按 digest 绑定——`docker-publish.yml` 含 CycloneDX SBOM 生成 + `attest-sbom` + `attest-build-provenance`（`push-to-registry: true`，permissions 已开 `id-token: write` / `attestations: write`）。⚠️ 待修项：该两步的 `subject-name` 仍写改名前的 `ghcr.io/reserendipity/tts_multimodel`，与 2026-09-30 改名后实际推送的 `ghcr.io/reserendipity/tts-multimodel` 不一致（workflow 文件不在本轮 docs 修正范围，已登记待修）。
 - **不使用 GPG 分离签名**（2026-10-18 裁决）；`gpg-signed-release.yml` 已于 2026-10-18 删除（§10.6 欠账清零）。
 
 ## 5. 回滚

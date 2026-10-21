@@ -24,5 +24,14 @@
 ## 红线
 
 - 许可证与上游来源**不得编造**；未核实的字段一律写 `未登记`。
-- 权重文件本身仍在 `model/`（gitignored，约 27 GB），不在本目录。
+- 权重文件本身仍在 `model/`（gitignored），不在本目录（当前实测约 28.2 GB / 30 文件，见 `configs/model_integrity_manifest.json` 的 `total_size_bytes` / `total_files`）。
 - 卡片只登记「这坨权重是什么、从哪来、谁负责、SHA 在哪查」，不替代运行时 `model_registry.py` 的引擎状态总嚎。
+
+## 现有卡片与复验覆盖（2026-10-21 核对）
+
+| 卡片 | 对应权重目录 | 复验覆盖 |
+|---|---|---|
+| `VoxCPM2.yaml` / `SenseVoiceSmall.yaml` / `speech_zipenhancer.yaml` / `IndexTTS-2.5.yaml` / `IndexTTS-2.0.yaml` | 同名目录 | ✅ 均在 `configs/model_integrity_manifest.json` 内（合计 30 文件） |
+| （缺卡片） | `model/OpenVoice/`（引擎 `voicebox`）、`model/Step-Audio-EditX/`（引擎 `step-audio-editx`） | ❌ 两目录**未纳入** `model_integrity_manifest.json`，因而也无 SHA 复验 |
+
+> 上述两个缺口是**待补项**（补卡片 + 纳入完整性清单），不是"已核验"；在补齐前，这两个引擎的权重完整性不在此台账可追溯范围内。

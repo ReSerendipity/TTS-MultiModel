@@ -1,7 +1,7 @@
 # 编码与 Git 规范（Coding & Git Standards）
 
 > 本文件是仓库内所有入库内容的**可移植性、依赖与 Git 卫生**约束。任何修改请在提交前通读并对照检查。
-> 最后更新：2026-09-18（路径可移植性专项修复）。
+> 最后更新：2026-10-21（分支保护必需检查口径对齐 live 镜像）。
 
 ## 1. 路径可移植性（强制）
 
@@ -56,7 +56,7 @@ python scripts/check_no_hardcoded_paths.py --all    # 全库
 
 ## 2. Git 工作流（强制）
 
-- main 受保护：禁止直推。流程：`git fetch` → 从 `origin/main` 建分支 → 修改 → `git commit -s`（DCO）→ push（过 pre-push 门禁）→ GitHub PR。
+- main 受保护（五项必需检查：`Lint (ruff)` / `Test (pytest) (3.12, ubuntu-latest)` / `Typecheck (mypy ratchet)` / `DCO Check` / `release-gate`；口径以 tracked 镜像 `docs/ci/branch-protection.json` 为准，2026-10-07 按 live 复核）。**仓库所有者（admin）直推豁免**（2026-09-28 治理变更，见 `docs/DOD.md` §0b），无需再开 PR；非 owner 协作者走流程：`git fetch` → 从 `origin/main` 建分支 → 修改 → `git commit -s`（DCO）→ push（过 pre-push 门禁）→ GitHub PR。
 - 提交信息使用 Conventional Commits 风格：`feat: / fix: / chore: / docs: / refactor: / test:`；同一仓库内语言保持一致。
 - 钩子存放在 `.githooks/` 并随仓库分发（仓库自包含），克隆后启用：
 

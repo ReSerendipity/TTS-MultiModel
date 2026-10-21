@@ -21,10 +21,10 @@
 
 ### 3. 依赖供应链
 - **✓ 锁文件齐全**：`requirements-lock.txt`（pip-compile 全量 pin）。
-- **✓ vendor 分离**：`vendor/` 为独立目录（voxcpm 引擎、文本规范化），与项目代码隔离。
+- **✓ vendor 分离**：`app/integrated_app/vendor/` 为独立目录（voxcpm 引擎、文本规范化，随仓库分发），与项目代码隔离。
 
 ### 4. 内容滥用风险（克隆能力）
-- **✓ 过滤与溯源**：`security/content_safety.py` + 音频水印（source_id + 哈希）已内置；`USER_AGREEMENT.md` 明确禁止未授权克隆他人声音。
+- **✓ 过滤与溯源**：`app/integrated_app/security/content_safety.py` + 音频水印（source_id + 哈希）已内置；`USER_AGREEMENT.md` 明确禁止未授权克隆他人声音。
 
 ## 待关注点位（非阻断）
 

@@ -1,7 +1,7 @@
 # SRE 运行手册（SLA / SLO / 回滚 / 灾难恢复演练）
 
-> 配套评估：`SRE评估_v2.2.0.md`、`容器化成熟度评估_v2.2.1.md`
-> 适用版本：v2.2.1（与 `config.yaml` / `pyproject.toml` 一致）
+> 配套评估：`docs/_devarchive/SRE评估_v2.2.0.md`、`docs/_devarchive/容器化成熟度评估_v2.2.1.md`（本地归档目录，不随仓库分发）
+> 适用版本：v2.7.0（与 `config.yaml` / `pyproject.toml` 一致）
 
 ---
 
@@ -11,10 +11,10 @@
 
 | 指标 | 目标 | 度量方式 | 数据源 |
 |------|------|----------|--------|
-| 可用性（月度） | ≥ 99.5% | liveness `/api/health/ping` 探活成功率 | k8s liveness + `routes/system/health.py` |
+| 可用性（月度） | ≥ 99.5% | liveness `/api/health/ping` 探活成功率（根路径实现于 `app_server.py`；`routes/system/health.py` 提供同构的 `/api/system/health/ping`） | k8s liveness + `routes/system/health.py` |
 | readiness（模型就绪） | ≥ 99.0% | 启动后 `/api/health/ready` / `/readyz` 返回 `ok` | 同上 |
 | P95 生成时延（短文本 ≤200 字） | ≤ 8s（GPU） | `_execute_generation` 计时 | `GenerationTracker` / `history_db` |
-| 生成成功率 | ≥ 99.0% | 成功/失败计数 | `routes/system/health/stats`（Prometheus `tts_generations_total`） |
+| 生成成功率 | ≥ 99.0% | 成功/失败计数 | `/api/system/stats`（累计统计）+ Prometheus `tts_generations_total` |
 | 鉴权端点 P99 时延 | ≤ 50ms | 中间件耗时 | 访问日志 |
 | 审计日志落盘成功率 | 100% | 文件写入失败计数 | `data/audit.log` + 告警 |
 
@@ -45,7 +45,7 @@ kubectl rollout undo deployment/tts-multimodel
 ```
 
 > 安全红线：生产镜像必须钉版（digest），禁止 `:latest` 漂移。CI 在 `docker-build.yml`
-> 中对关键/高危漏洞用 Trivy 阻断；发布前需在 `CHANGELOG.md` 登记版本与变更。
+> 中对关键/高危漏洞用 Trivy 阻断（`CRITICAL,HIGH` + `ignore-unfixed`，豁免见 `.trivyignore.yaml`）；发布前需在 `CHANGELOG.md` 登记版本与变更。
 
 ### 2.2 配置回滚
 
@@ -126,8 +126,8 @@ SHA-256 复验（`scripts/generate_model_checksums.py` 生成，C1 加载链路�
 
 | 用途 | 命令 / 端点 |
 |------|-------------|
-| 存活探针 | `GET /api/health/ping` |
-| 就绪探针 | `GET /api/health/ready` 或 `GET /readyz` |
+| 存活探针 | `GET /api/health/ping`（同构：`GET /api/system/health/ping`） |
+| 就绪探针 | `GET /api/health/ready` 或 `GET /readyz`（同构：`GET /api/system/health/ready`） |
 | 生成统计 | `GET /api/system/stats` |
 | Prometheus 指标 | `GET /api/system/metrics` |
 | SLO/SLI 报告（错误预算） | `GET /api/system/slo`（observability，报告 C4 补录） |
@@ -139,5 +139,5 @@ SHA-256 复验（`scripts/generate_model_checksums.py` 生成，C1 加载链路�
 ## 治理与勘误速查（2026-09-18）
 
 - **钩子**：`.githooks/pre-commit` 分发器四级回退（.venv → PATH python → 控制台 pre-commit → pre-commit-lite）；`precheck.ps1` 同款 python 回退，依赖缺失打印 `[WARN]` 跳过，完整门禁由 CI 承担。
-- **分支**：`main` 受保护（enforce_admins=true，3 项必查：`Lint (ruff)` / `Test (pytest) (3.12, ubuntu-latest)` / `Typecheck (mypy ratchet)`）→ 本地不可直推，变更走功能分支 + PR；pre-push gitleaks 扫描待推送提交（0 泄露才放行）。
+- **分支**：`main` 受保护（5 项必查：`Lint (ruff)` / `Test (pytest) (3.12, ubuntu-latest)` / `Typecheck (mypy ratchet)` / `DCO Check` / `release-gate`，`strict=false`，口径见 tracked 镜像 `docs/ci/branch-protection.json`）→ 非 owner 协作者不可直推，变更走功能分支 + PR；**仓库所有者 admin 直推豁免**（2026-09-28 治理变更，见 `docs/DOD.md` §0b）。pre-push gitleaks 扫描待推送提交（0 泄露才放行）。
 - **Python 安全注释**：bandit 豁免用纯 `# nosec`（`# nosec B603,B607` 只压 B607 不压 B603）；subprocess 一律列表参数。

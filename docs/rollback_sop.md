@@ -37,22 +37,27 @@ python scripts/rollback_release.py --target v2.2.0
 - 在该提交**之后**的所有提交被打成一个反向 revert（按时间倒序逐个 `git revert --no-edit`），
   保证不破坏历史、可审计、可再 forward；
 - 默认只生成提交，**不自动 push**；需人工 `git push` 后重新部署。
-- 容器镜像同步：部署时镜像 tag 锁定为回退版本（如 `tts-multimodel:v2.2.0`），
+- 容器镜像同步：部署时镜像 tag 锁定为回退版本（如 `tts-multimodel:2.2.0`），
   见 `deploy/kubernetes/deployment.yaml` 的 `image:` 字段。
 
 ## 3. 容器化环境的回滚
 
 ```bash
 # Kubernetes（最干净：直接切镜像版本，无需改代码）
-# 镜像名是下划线、tag 不带 `v`（两个都错过一次，见 tests/test_image_name_consistency.py）
+# 镜像名是连字符 `tts-multimodel`（2026-09-30 仓库由 `TTS_MultiModel` 改名 `TTS-MultiModel` 后，
+# `${{ github.repository }}` 小写化得来；改名前的旧包是下划线 `tts_multimodel`，仅历史留存）、
+# tag 不带 `v`（两个都错过一次，见 tests/test_image_name_consistency.py）
 kubectl -n tts set image deployment/tts-multimodel tts=ghcr.io/reserendipity/tts-multimodel:2.2.0
 kubectl -n tts rollout status deployment/tts-multimodel
 
 # 或回滚到上一个 ReplicaSet
 kubectl -n tts rollout undo deployment/tts-multimodel
 
-# Docker Compose
-TTS_IMAGE_TAG=v2.2.0 docker compose up -d
+# Docker Compose（注意：本仓 `docker-compose.yml` 为 `build: .` 本地构建——没有 `image:` 字段，
+# 也不存在 `TTS_IMAGE_TAG` 这个环境变量，历史写法 `TTS_IMAGE_TAG=<版本> docker compose up -d` 是死引用。
+# 回退 = 完成 §2 的代码回滚后带构建重启，镜像版本随代码走；要直接跑已发布镜像请用
+# `docker run ghcr.io/reserendipity/tts-multimodel:<版本>` 或改用 deploy/kubernetes/）
+docker compose up -d --build
 ```
 
 ## 4. 回滚后验证（闭环）
@@ -64,9 +69,9 @@ TTS_IMAGE_TAG=v2.2.0 docker compose up -d
 
 ## 5. 数据库 / 历史库回滚说明
 
-- 历史库 `data/tts_history.db`（SQLite）**不随代码回滚**；旧版本代码可继续读写既有 schema
+- 历史库 `data/history.db`（SQLite，路径单一事实来源为 `config.yaml → history.db_path`）**不随代码回滚**；旧版本代码可继续读写既有 schema
   （`history_db.py` 有迁移兼容逻辑）。
-- 若回滚版本依赖的 schema 与当前不同，请先备份：`cp data/tts_history.db data/tts_history.db.bak-$(date +%s)`。
+- 若回滚版本依赖的 schema 与当前不同，请先备份：`cp data/history.db data/history.db.bak-$(date +%s)`。
 - 模型权重为外部挂载，与回滚无关（见 §3 禁区目录规则）。
 
 ## 6. 事后（Postmortem）

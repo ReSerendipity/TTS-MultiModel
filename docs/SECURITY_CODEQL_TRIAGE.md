@@ -7,7 +7,7 @@
 ## 0. 重新生成本表的统计口径
 
 ```bash
-gh api --paginate "repos/ReSerendipity/TTS_MultiModel/code-scanning/alerts?state=open&per_page=100" \
+gh api --paginate "repos/ReSerendipity/TTS-MultiModel/code-scanning/alerts?state=open&per_page=100" \
   --jq '.[] | [.number,.rule.id,.rule.security_severity_level,.most_recent_instance.location.path,
                (.most_recent_instance.location.start_line|tostring)] | @tsv'
 ```

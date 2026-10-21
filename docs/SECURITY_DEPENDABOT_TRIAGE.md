@@ -109,13 +109,17 @@ transformers 4.52.1 + tokenizers 0.21.0（引擎元数据要求的组合，最�
    所以"下界≥4.57 会弄坏容器里的两个 IndexTTS"这个说法是**错的**——真实情况是容器部署形态
    只有 1 个引擎可用。受影响的是"源码安装 + 自带 indextts"的环境（正是 `GPU Smoke` 那条路径）。
 2. **过去说"唯一能抓这类运行时断裂的是每周一次的 GPU Smoke"，这句话高估了它**：
-   `gpu-smoke.yml` 至今只有 3 次 schedule run（2026-09-07 / 09-14 / 09-21），
-   **三次的 `gpu-smoke` job 全部是 `skipped`**，而 run 顶层显示 success。原因有两道，各自独立成立：
+  `gpu-smoke.yml` 至今只有 3 次 schedule run（2026-09-07 / 09-14 / 09-21），
+  **三次的 `gpu-smoke` job 全部是 `skipped`**，而 run 顶层显示 success。
+  （2026-10-12 补注：该工作流已随 self-hosted GPU runner 下线删除——commit `2b9fd27`；
+  本节记录的是 09-21 状态，"本轮改动"中针对该工作流的修改随文件删除一并作废，
+  现行每日兜底即下文 `docker-smoke.yml`。）原因有两道，各自独立成立：
    仓库 secrets 里只有 `MANIFEST_SIGNING_KEY_B64`，**`REPO_ADMIN_TOKEN` 从没配过**（precheck 拿不到
    runner 状态就直接判 `available=false`）；且 `GET /actions/runners` 返回**零个注册 runner**。
    也就是说这份"每周兜底"的暴露延迟不是以周计，而是**无穷大 —— 它一次都没跑过**，
-   原先的 `::notice` 又让跳过长得像通过。本轮把两处都改了：precheck 的跳过改为
-   `::warning` + 写进 job summary（见 `ci/engine-import-and-indextts20-smoke`），
+  原先的 `::notice` 又让跳过长得像通过。本轮把两处都改了：precheck 的跳过改为
+  `::warning` + 写进 job summary（原引用的 `ci/engine-import-and-indextts20-smoke` job 在仓内已不存在；
+  现行每日兜底见下文 `docker-smoke.yml`），
    并把引擎导入探针前移成 `gpu_smoke_minimal.py` 的第 0 步（`engine_imports`），
    让"哪天 runner 在线了"这件事一开机就给结论；真正每天都能跑的兜底改由
    `docker-smoke.yml` 的 Engine import probe 承担（GitHub 托管 CPU runner，只需 import 不需 GPU），
@@ -245,7 +249,7 @@ Dockerfile:38  RUN python3.12 -m pip install --no-cache-dir --user -r requiremen
 处置依据与可达性判定见 §1 A17/A18 行；pip-audit 侧 A18 已豁免（PYSEC-2026-3804，security.yml），
 A17 的 PYSEC-2026-4174 此前已豁免。dismiss comment 均含「告警号+判据+日期 2026-10-11」；
 执行明细（含首次 comment 清单名错配后按 §5 流程 open→dismiss 修正）见
-next-ledger/TTS-MultiModel.md「dependabot 4 漏洞处置」节 8.3。
+仓外台账 `next-ledger/TTS-MultiModel.md`「dependabot 4 漏洞处置」节 8.3（不随仓库分发，克隆读者不可见）。
 
 三条**只有实测才知道**的 API 事实（下次别照着 GitHub 文档页直接抄）：
 
@@ -285,14 +289,14 @@ Windows 的 GBK 编码坑）：
 ```bash
 # 单条
 printf '%s' '{"state":"dismissed","dismissed_reason":"not_used","dismissed_comment":"§1 A1（CVE-2025-5197）：… ≤280 字"}' > body.json
-gh api -X PATCH repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/4 --input body.json
+gh api -X PATCH repos/ReSerendipity/TTS-MultiModel/dependabot/alerts/4 --input body.json
 
 # 回滚某一条（改判或复点时要用）
-gh api -X PATCH repos/ReSerendipity/TTS_MultiModel/dependabot/alerts/4 -f state=open
+gh api -X PATCH repos/ReSerendipity/TTS-MultiModel/dependabot/alerts/4 -f state=open
 
 # 核对台账：应为 0 / 应为 21（含早先那条 glib #2）
-gh api 'repos/ReSerendipity/TTS_MultiModel/dependabot/alerts?state=open&per_page=100' --jq '.|length'
-gh api 'repos/ReSerendipity/TTS_MultiModel/dependabot/alerts?state=dismissed&per_page=100' \
+gh api 'repos/ReSerendipity/TTS-MultiModel/dependabot/alerts?state=open&per_page=100' --jq '.|length'
+gh api 'repos/ReSerendipity/TTS-MultiModel/dependabot/alerts?state=dismissed&per_page=100' \
   --jq '.[] | "\(.number)\t\(.security_advisory.cve_id)\t\(.dismissed_reason)\t\(.dismissed_comment[0:14])"'
 ```
 
@@ -357,7 +361,7 @@ PY
 不动 `model/`）。按本仓规矩，这种量级的传输我不擅自跑，命令交给你：
 
 ```bash
-cd /c/Users/Doro/TTS_MultiModel
+cd /c/Users/Doro/APP/repository/TTS-MultiModel
 
 # ① 复算（只重解析，不改 requirements.txt 的声明）
 python -m venv .venv-relock && ./.venv-relock/Scripts/python.exe -m pip install -q pip-tools
