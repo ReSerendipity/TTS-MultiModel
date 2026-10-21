@@ -69,7 +69,7 @@ pooch==1.9.0
 protobuf==7.36.2
 psutil==7.2.2
 pycparser==3.11
-pycryptodome==3.23.0
+pycryptodome==4.0.0
 pydantic==2.14.1
 pydantic-core==2.50.1
 pynvml==13.0.1
