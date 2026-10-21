@@ -21,6 +21,8 @@ A powerful open-source multi-engine Text-to-Speech platform with voice cloning, 
 
 </div>
 
+> 治理规范：[ReSerendipity/.github/governance](https://github.com/ReSerendipity/.github/tree/main/governance)
+
 ***
 
 <a id="中文"></a>
