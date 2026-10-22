@@ -30,4 +30,4 @@ jobs:
     # 由本仓维护者手动核对 ReSerendipity/.github@main 目标 commit 后替换下方 SHA，
     # 并本地跑 `python scripts/check_spec_refs.py` + YAML 解析（如 `python -c "import yaml;yaml.safe_load(open('.github/workflows/self-purify.yml'))"`，有 actionlint 时一并跑）校验；
     # 不自动跟随 main。SHA 解析于 2026-09-18（当时 main HEAD=2c0c5ab，提交日期 2026-09-14）。
-    uses: ReSerendipity/.github/.github/workflows/self-purify.yml@2c0c5abbe2acdb8efb793482b5c79411ed34bde6
+    uses: ReSerendipity/.github/.github/workflows/self-purify.yml@051227229483b9efe65f57a6a81ddcd10cf950fc
