@@ -479,4 +479,3 @@ secrets.yml
 service-account.json
 .aws/
 .gcloud/
-!/AGENTS.md
