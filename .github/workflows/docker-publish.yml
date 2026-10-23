@@ -100,9 +100,16 @@ jobs:
       - name: Resolve immutable scan ref (lowercase)
         id: scanref
         run: |
-          ref="$(printf '%s' "${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}" | tr '[:upper:]' '[:lower:]')"
+          set -euo pipefail
+          # docker/metadata-action 已把 images 名小写化，buildx --load 进 daemon 的 tag 就是
+          # ghcr.io/<owner>/<repo>:sha-<sha>。上一版用含大写的 ${{ github.repository }} 作
+          # docker tag 源参数，docker CLI 解析源引用即 FATAL（run 39910845993：
+          # "repository name (ReSerendipity/TTS-MultiModel) must be lowercase"），且那个源
+          # tag 本就不存在。这里直接用 bash 小写展开得到与本地已 load 镜像一致的不可变 ref。
+          repo_lc="${GITHUB_REPOSITORY,,}"
+          ref="${REGISTRY}/${repo_lc}:sha-${GITHUB_SHA}"
           echo "resolved scan ref: $ref"
-          docker tag "${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}" "$ref"
+          docker image inspect "$ref" >/dev/null
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
       # Trivy 会先把镜像整体导出到 $TMPDIR 再逐层解包分析。本项目镜像约 10.8GB（压缩层）
