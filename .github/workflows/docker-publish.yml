@@ -182,7 +182,7 @@ jobs:
       - name: Attest SBOM for the pushed image
         uses: actions/attest-sbom@10926c72720ffc3f7b666661c8e55b1344e2a365 # v2
         with:
-          subject-name: ghcr.io/reserendipity/tts_multimodel
+          subject-name: ghcr.io/reserendipity/tts-multimodel
           subject-digest: ${{ steps.push.outputs.digest }}
           sbom-path: sbom-cyclonedx.json
           push-to-registry: true
@@ -190,6 +190,6 @@ jobs:
       - name: Attest build provenance (SLSA) for the pushed image
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
-          subject-name: ghcr.io/reserendipity/tts_multimodel
+          subject-name: ghcr.io/reserendipity/tts-multimodel
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
