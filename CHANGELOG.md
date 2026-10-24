@@ -2,6 +2,23 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.7.1](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.7.0...v2.7.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* **ci:** correct attest subject-name to hyphenated lowercase image ref ([1628cff](https://github.com/ReSerendipity/TTS-MultiModel/commit/1628cffe28ef126c09fb1a289ac69f3d7fd7729c))
+* **ci:** correct attest subject-name to hyphenated lowercase image ref ([d3b6465](https://github.com/ReSerendipity/TTS-MultiModel/commit/d3b6465f4f484928c991f1acce49680345da82fb))
+* **ci:** lowercase GHCR scan ref via bash expansion instead of broken docker tag ([9dcaf8c](https://github.com/ReSerendipity/TTS-MultiModel/commit/9dcaf8cf73e075d49786413d9cf40822945c41ef))
+* **ci:** lowercase GHCR scan ref via bash expansion instead of broken docker tag ([4499680](https://github.com/ReSerendipity/TTS-MultiModel/commit/4499680b9bc2060c2ba3712739054f8b0ec1e05e))
+
+
+### Documentation
+
+* **cli:** 补全 CLI 使用文档并统一入口名 + §8 旧位规则清理 ([#193](https://github.com/ReSerendipity/TTS-MultiModel/issues/193)) ([fdb5c11](https://github.com/ReSerendipity/TTS-MultiModel/commit/fdb5c11468ca5d81070b53e7f0b13ea74178e449))
+* **readme:** README 对外/对内双版本更新（§8） ([a91b1a5](https://github.com/ReSerendipity/TTS-MultiModel/commit/a91b1a5e524f527e50ab675d40c9603b251a17cb))
+* **readme:** 增加治理规范引用 ([aa94e11](https://github.com/ReSerendipity/TTS-MultiModel/commit/aa94e11513b3f756c40578d276963945e3dd0b60))
+
 ## [2.7.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.6.0...v2.7.0) (2026-10-17)
 
 

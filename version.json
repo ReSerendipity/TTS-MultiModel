@@ -1,5 +1,5 @@
 {
-  "version": "2.7.0",
+  "version": "2.7.1",
   "release_date": "2026-10-17",
   "minimum_shell_version": "2.2.2",
   "changelog": "2.7.0：本版主干是桌面分发与工程治理的闭环——dist 便携分卷打包/NSIS 安装器/增量更新装配链与发布门禁五步（真实资产模式）、desktop 移植 Tauri v2 桌面壳并适配 TTS 语义；引擎侧新增 Step-Audio-EditX 音频编辑、IndexTTS 2.0 可对比接入与 Voicebox VC 零样本音色转换（OpenVoice ToneColorConverter），C2 voicebox MCP 桥接+引擎适配器；运维侧 /readyz 升级为模型就绪流量闸门、SRE/可观测性能力应用层集成、备份/回滚/部署清单与 k8s 清单落地；数据侧 generation_history 血缘字段扩展+双轨训练架构、模型卡目录与 LoRA card.yaml schema；streaming 统一 wireGenerationResult 接线并新增 /api/audio 路由、/v1/audio/speech 支持 stream 参数；guardrail 护栏对抗语料与拦截基线；质量侧感知评分口径（UTMOS2 离线 MOS）/流式真分片（TTFB 门禁）/训练台账与 golden 多引擎多音色基线；安全侧 CSRF 强 fail-closed、path-injection 收敛、内联事件 XSS 收口、错误脱敏与 CodeQL 110 条分诊；ci 侧 gpu_golden_baseline 真实合成基线、锁集交叉约束闸、DCO 按作者豁免自动化、release-please 静默失效修复。口径：main 直推（admin 豁免）为既定工作流；GPU 真跑受 runner 约束按台账 skip。"
