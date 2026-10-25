@@ -129,6 +129,10 @@
         counterClass: 'tts-char-counter'
     });
 
+    // 初始占位文案在 HTML 上下文渲染（自动转义），这里捕获后回填，
+    // 避免 Jinja 文本进入 JS 字符串再写 DOM（CodeQL DOM-XSS 口径）。
+    var brzrDefaultName = document.getElementById('brzr-ref-audio-name').textContent;
+
     window.updateBrzrFileName = function(input) {
         var nameEl = document.getElementById('brzr-ref-audio-name');
         var previewEl = document.getElementById('brzr-audio-preview');
@@ -139,7 +143,7 @@
             previewAudio.src = url;
             previewEl.style.display = '';
         } else {
-            nameEl.textContent = '{{ "upload_clone_ref"|t(lang) }}';
+            nameEl.textContent = brzrDefaultName;
             previewEl.style.display = 'none';
         }
     };

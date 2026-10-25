@@ -14,7 +14,7 @@ import os
 from fastapi import Request, UploadFile
 from fastapi.responses import HTMLResponse
 
-from ....path_guard import is_bare_filename
+from ....path_guard import ensure_within_dir, is_bare_filename
 from ....persona_manager import PERSONA_DIR, load_persona_embedding
 from ..utils import _error_html, save_uploaded_audio
 
@@ -54,6 +54,12 @@ async def resolve_breeze_ref(
             wav_path = str(persona_data)
         else:
             wav_path = os.path.join(PERSONA_DIR, f"{persona_name}.wav")
+        # 包含校验（CodeQL 路径口径）：persona 数据源可能携带任意路径，
+        # 收敛到 PERSONA_DIR 之内；越界一律拒绝而不是改写后放行。
+        contained = ensure_within_dir(PERSONA_DIR, wav_path or "")
+        if not contained:
+            return None, None, _error_html(request, f"音色音频路径越界，已拒绝: {persona_name}")
+        wav_path = contained
         if not os.path.isfile(wav_path):
             return None, None, _error_html(request, f"音色音频文件缺失: {persona_name}")
 
