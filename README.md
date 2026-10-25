@@ -2,336 +2,266 @@
 
 # TTS MultiModel
 
-[![gitleaks](https://img.shields.io/badge/secret%20scan-gitleaks%20passing-0080FF?style=for-the-badge)](https://github.com/ReSerendipity/TTS-MultiModel/actions/workflows/gitleaks.yml)
+**多模型语音合成平台 · Multi-Model Text-to-Speech Platform**
 
-**多模型语音合成平台 | Multi-Model Text-to-Speech Platform**
+五引擎开源语音合成：声音克隆、声音设计、多角色剧本配音，一个 Web UI 全搞定。
+Five open-source TTS engines — voice cloning, voice design, multi-character script dubbing — behind one web UI.
 
-五引擎开源语音合成平台：声音克隆、声音设计、LoRA 微调与多角色剧本配音
-
-A powerful open-source multi-engine Text-to-Speech platform with voice cloning, voice design, LoRA fine-tuning, and multi-character script dubbing
-
-[![CI](https://github.com/ReSerendipity/TTS-MultiModel/actions/workflows/ci.yml/badge.svg)](https://github.com/ReSerendipity/TTS-MultiModel/actions)
+[![CI](https://github.com/ReSerendipity/TTS-MultiModel/actions/workflows/ci.yml/badge.svg)](https://github.com/ReSerendipity/TTS-MultiModel/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ReSerendipity/TTS-MultiModel?label=release)](https://github.com/ReSerendipity/TTS-MultiModel/releases)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![Last commit](https://img.shields.io/github/last-commit/ReSerendipity/TTS-MultiModel)](https://github.com/ReSerendipity/TTS-MultiModel/commits/main)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![Docker](https://img.shields.io/badge/Docker-Supported-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[中文](#中文) · [功能亮点](#功能亮点) · [快速开始](#快速开始) · [模型下载](#模型下载) · [API](#api-端点) · [许可证](#许可证)
+[中文](#中文) · [English](#english)
 
 </div>
 
-> 治理规范：[ReSerendipity/.github/governance](https://github.com/ReSerendipity/.github/tree/main/governance)
+> 治理规范 / Governance: [ReSerendipity/.github/governance](https://github.com/ReSerendipity/.github/tree/main/governance)
 
-***
+---
 
 <a id="中文"></a>
 
-## Why TTS MultiModel?
+## 中文
 
-| 优势 | 说明 |
-|---|---|
-| **五引擎一站式平台** | 集成 VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX 五套引擎，声音克隆、声音设计、剧本配音，无需在多个工具间切换（LoRA 微调为实验特性，见下方说明） |
-| **极低门槛** | 一键安装脚本 + 便携 WinPython 部署方案，Windows 用户开箱即用；Docker 部署仅需一行命令 |
-| **完整工具链** | 从数据准备到推理部署，覆盖 TTS 全生命周期（训练链路为实验特性，未经真机验证） |
-| **开源透明** | 项目代码 Apache 2.0；**模型权重许可各异**（见「模型许可说明」），商用前请逐项核对 |
-| **多语言界面** | 支持中文（简/繁）、英文、日文、韩文，国际化开箱即用 |
+### 项目简介
 
-## Demo
+**TTS MultiModel** 是一个自托管的多引擎语音合成（TTS）平台。它把 VoxCPM2、IndexTTS 2.5、IndexTTS 2.0、OpenVoice、Step-Audio-EditX 五套本地引擎统一到同一个 FastAPI + HTMX Web 界面里，外加一个 Edge-TTS 在线兜底引擎（CPU 可用），让你在一个工作台里完成声音设计、零样本/极致声音克隆、多角色剧本配音、语音转换与音频编辑，而不必在多个工具之间来回切换。
 
-在线模拟演示（无需 GPU / 模型权重，纯前端仿真）：<https://reserendipity.github.io/TTS-MultiModel/>
+项目**代码以 Apache-2.0 开源，本身不打包任何模型权重**——权重由你从各模型官方仓库自行下载，使用前请核对每个模型的许可（见下方「模型许可」）。
 
-界面截图（VoxCPM2 引擎，1440×900 视口）已入库 `docs/screenshots/`：
+无需 GPU 即可体验界面：<https://reserendipity.github.io/TTS-MultiModel/>（GitHub Pages 纯前端仿真，不执行真实推理）。
 
-| 声音设计 | 声音克隆 | 极致克隆 |
+### 核心特性
+
+- **五引擎统一编排**：声明式引擎注册表，VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX 灵活切换；Edge-TTS 在线引擎在无 GPU 时自动兜底。
+- **声音克隆**：少量参考音频即可零样本克隆；「极致克隆」支持参考音频 + 转写文本做更精细的音色还原。
+- **声音设计**：用自然语言描述目标音色（如「温柔清晰的女声」）直接生成语音，无需参考音频。
+- **剧本配音**：多角色对话剧本自动分配说话人，逐条试听、批量合成。
+- **流式与批量**：长文本 SSE 流式输出；批量任务断点续跑，SQLite 记录全部生成历史。
+- **多后端与多语言界面**：NVIDIA CUDA / Apple MPS / CPU 自动适配；界面支持中文（简/繁）、英文、日文、韩文。
+
+### 界面展示
+
+| 声音设计（主界面） | 声音克隆 | 剧本配音 |
 |---|---|---|
-| ![声音设计](docs/screenshots/voxcpm2_01_voice_design_viewport.png) | ![声音克隆](docs/screenshots/voxcpm2_02_voice_clone_viewport.png) | ![极致克隆](docs/screenshots/voxcpm2_03_ultimate_clone_viewport.png) |
-| **剧本配音** | **LoRA 管理** | **系统设置** |
-| ![剧本配音](docs/screenshots/voxcpm2_04_script_workshop_viewport.png) | ![LoRA 管理](docs/screenshots/voxcpm2_06_lora_viewport.png) | ![系统设置](docs/screenshots/voxcpm2_08_settings_viewport.png) |
+| ![声音设计主界面](docs/assets/readme-tts-multimodel-1.png) | ![声音克隆](docs/assets/readme-tts-multimodel-2.png) | ![剧本配音](docs/assets/readme-tts-multimodel-3.png) |
+| 用文本描述音色，调节语速/音调/情感后合成。 | 上传 3–10 秒参考音频即可克隆音色。 | 多角色台词逐行分配说话人，批量配音。 |
 
-> 欢迎在 [Discussions](https://github.com/ReSerendipity/TTS-MultiModel/discussions) 中分享你的使用体验！
+| 极致克隆 | 系统设置（引擎状态） | 系统架构 |
+|---|---|---|
+| ![极致克隆](docs/assets/readme-tts-multimodel-4.png) | ![系统设置](docs/assets/readme-tts-multimodel-5.png) | ![系统架构](docs/assets/readme-tts-multimodel-6.svg) |
+| 参考音频 + 转写文本，相似度可调。 | 查看各引擎加载状态、显存占用与 GPU 后端。 | 客户端 → FastAPI → 引擎注册表 → 存储分层。 |
 
-## 功能亮点
+> 截图为 Web UI 界面（暗色主题）。完整可交互版本见上方在线演示链接。
 
-| 功能 | 描述 |
-|---|---|
-| **五引擎架构** | VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX，灵活切换；另注册 Edge-TTS 在线兜底引擎（CPU 可用，详见下方说明） |
-| **声音克隆** | 仅需少量音频样本即可克隆声音（可控克隆 + 极致克隆） |
-| **声音设计** | 通过文字描述生成目标音色的语音 |
-| **剧本配音** | 多角色对话剧本自动分配说话人，批量生成配音 |
-| **流式生成** | 长文本实时流式音频输出（SSE） |
-| **语音转换与音频编辑** | Voicebox VC 零样本音色转换（音频→音频）、Step-Audio-EditX 情绪/风格/副语言音频编辑 |
-| **LoRA 微调** | 自定义数据集 LoRA 微调训练（实验特性，未经真机验证，见下方说明） |
-| **Web 界面** | FastAPI + HTMX + Jinja2 现代化响应式 Web UI |
-| **批量处理** | 支持批量音频生成，任务断点续跑 |
-| **历史管理** | SQLite 历史记录，支持搜索、筛选、分页 |
-| **多语言界面** | 支持中文（简/繁）、英文、日文、韩文界面切换 |
-| **多 GPU 后端** | NVIDIA CUDA / Apple MPS / CPU |
-| **自定义音色库** | 支持用户保存和管理自定义音色 |
+### 快速开始
 
-> **实验特性说明（LoRA 微调 / 训练链路）**：LoRA 微调训练链路已随项目提供（训练依赖需另行安装：`pip install -e .[training]`），但当前未经真机训练验证，请以实验特性评估使用。12GB 显存上训练前必须先卸载推理引擎，否则会因显存不足（OOM）失败。
-
-> **关于引擎清单**：上述五套引擎均已在实际后端注册（注册名 `voxcpm2` / `indextts2` / `indextts20` / `voicebox` / `step-audio-editx`，见 `app/integrated_app/engine_interface.py` 与 `config.yaml` 的声明式引擎注册表）。此外后端还注册了 **Edge-TTS 在线兜底引擎**（CPU 可用、依赖微软在线服务、可选依赖 `pip install edge-tts`，缺失时自动安全降级），适合无 GPU 环境快速体验；本表所列五套为自带权重的本地引擎。
-
-## 环境要求
-
-| 项目 | 要求 |
-|---|---|
-| 操作系统 | Windows 10/11 (64-bit) 或 Linux |
-| Python | 系统 Python 3.10+（3.12 最佳），或自行下载 WinPython（`WPy64-312101/`）解压到项目根目录完全隔离 |
-| GPU | NVIDIA (CUDA) / Apple Silicon (MPS)，推荐 6.5GB+ VRAM |
-| VC 运行库 | Windows 需自行下载安装 Visual C++ Redistributable（x64） |
-| SoX（音频效果处理） | Windows 需下载 SoX 14.4.2 并解压到 `app/sox-14.4.2-win32/sox-14.4.2/`（`clean_launch.py` 会自动加入 PATH）；Linux/macOS 用包管理器安装 |
-
-## 快速开始
-
-### Windows 安装
-
-**方式一：使用系统 Python（推荐，节省磁盘空间）**
+**环境要求**：Windows 10/11 (64-bit) 或 Linux；Python 3.10+（推荐 3.12）；本地引擎建议 NVIDIA GPU（6.5 GB+ 显存），无 GPU 时可用 Edge-TTS 在线引擎体验。
 
 ```bash
 git clone https://github.com/ReSerendipity/TTS-MultiModel.git
 cd TTS-MultiModel
+```
 
-# 1. 安装系统 Python 3.10+（推荐 3.12），务必勾选 "Add Python to PATH"
-# 2. 一键安装依赖（会自动检测系统 Python）
-install.bat
-# 3. 下载模型（见下方"模型下载"）
-# 4. 启动应用
+**Windows**：
+
+```bat
+install.bat    :: 自动检测系统 Python 或项目内 WinPython，安装依赖并启用 git 钩子
+:: 按 scripts/download_models.py 说明下载模型权重后：
 start.bat
 ```
 
-**方式二：使用便携 WinPython（完全隔离，无需系统 Python）**
+**Linux**：
 
 ```bash
-git clone https://github.com/ReSerendipity/TTS-MultiModel.git
-cd TTS-MultiModel
-
-# 1. 下载 WinPython 并解压到项目根目录，确保 WPy64-312101\python\python.exe 存在
-#    https://github.com/winpython/winpython/releases
-# 2. 自行下载安装微软官方 Visual C++ Redistributable（x64）
-# 3. install.bat（检测不到系统 Python 时自动回退到 WinPython）
-# 4. 下载模型 → 5. start.bat
-```
-
-> `install.bat` / `start.bat` 会自动检测 Python（系统 Python 或项目内 WinPython）。
->
-> **Git 钩子**：`install.bat` / `scripts/install.sh` 会自动启用 `.githooks/`（pre-commit / pre-push 等）。若未使用安装脚本，请手动执行 `git config core.hooksPath .githooks`（或 `.githooks/install.sh`）。
-
-### Linux 安装
-
-```bash
-git clone https://github.com/ReSerendipity/TTS-MultiModel.git
-cd TTS-MultiModel
 chmod +x scripts/install.sh && ./scripts/install.sh
-chmod +x scripts/start.sh && ./scripts/start.sh
+./scripts/start.sh
 ```
 
-> `scripts/install.sh` 会自动启用 `.githooks/`（pre-commit / pre-push 等）。首次克隆后 `post-checkout` 钩子也会自动检测并设置。
-
-### Docker 部署
+**Docker**：
 
 ```bash
 docker compose up -d
-
-# 或直接拉取 GHCR 镜像（随版本发布：v2.7.0 对应 tag 2.7.0，以 config.yaml version 为准）
+# 或拉取随版本发布的 GHCR 镜像（版本号以 config.yaml 为准，当前 v2.7.0）
 docker pull ghcr.io/reserendipity/tts-multimodel:2.7.0
-docker run -d --gpus all -p 7869:7869 \
-  -v ./model:/app/model \
-  -v ./outputs:/app/outputs \
-  -v ./personas:/app/personas \
-  ghcr.io/reserendipity/tts-multimodel:2.7.0
-
-# 或手动构建
-docker build -t tts-multimodel .
-docker run -d --gpus all -p 7869:7869 \
-  -v ./model:/app/model \
-  -v ./outputs:/app/outputs \
-  -v ./personas:/app/personas \
-  tts-multimodel
 ```
 
-访问 `http://localhost:7869`（默认端口 7869）。Docker 部署需要 nvidia-docker runtime。
+启动后访问 <http://localhost:7869>。最小验证：浏览器打开该地址能看到左侧导航与「声音设计」工作台；或命令行运行 `tts-multimodel --help`（源码直跑为 `python app/integrated_app/cli.py --help`）。
 
-## 命令行使用（CLI）
+> 模型权重需单独下载：`pip install huggingface_hub modelscope` 后运行 `python scripts/download_models.py --all`（国内镜像优先，失败回退 ModelScope）。
 
-除 Web UI 外，项目提供命令行入口，适合批处理与脚本化流水线：
-
-```bash
-pip install -e .              # 或 pip install .
-tts-multimodel --help
-```
-
-未安装（源码直跑）时的等价入口：`python app/integrated_app/cli.py <子命令> ...`。
-
-### 子命令
-
-| 子命令 | 用途 | 必填参数 |
-|---|---|---|
-| `design` | 声音设计：用文本描述直接生成语音，无需参考音频 | `--text/-t`、`--output/-o` |
-| `clone` | 声音克隆：零样本克隆（`--reference-audio`）或 Prompt 延续（`--prompt-audio` + `--prompt-text`/`--prompt-file`） | `--text`、`--output`，以及参考音频或 Prompt 组合之一 |
-| `batch` | 批量生成：读取 TXT/JSON/CSV 逐条合成，支持 WAV/MP3 输出 | `--input/-i`、`--output-dir/-od` |
-
-### 常用参数
-
-| 参数 | 适用命令 | 说明 |
-|---|---|---|
-| `--control` | design / clone / batch | VoxCPM2 语音控制指令（如 `"warm female voice"`），以 `(指令)文本` 形式拼接；与 `--prompt-text` 互斥 |
-| `--cfg-value` | 全部 | CFG 引导强度，默认 2.0（允许 0.1–10.0） |
-| `--inference-timesteps` | 全部 | 推理步数，默认 10（允许 1–100） |
-| `--normalize` | 全部 | 启用文本归一化 |
-| `--denoise` | clone / batch | 对 Prompt/参考音频做语音增强（仅在提供了音频时生效） |
-| `--format` | batch | 输出格式 `wav`（默认）或 `mp3`（MP3 需 pydub + ffmpeg，缺 pydub 时自动回退 WAV） |
-| `--model-path` / `--hf-model-id` | 全部 | 本地模型目录 / Hugging Face 仓库 ID（默认 `openbmb/VoxCPM2`） |
-| `--local-files-only` / `--cache-dir` | 全部 | 禁用联网只读本地文件 / 指定 Hub 缓存目录 |
-| `--no-denoiser` / `--no-optimize` / `--zipenhancer-path` | 全部 | 不加载降噪模型 / 关闭加载优化 / 指定 ZipEnhancer 模型（亦可用环境变量 `ZIPENHANCER_MODEL_PATH`） |
-| `--lora-path`、`--lora-r`、`--lora-alpha`、`--lora-dropout`、`--lora-disable-lm`、`--lora-disable-dit`、`--lora-enable-proj` | 全部 | 加载 LoRA 权重及其 rank / alpha / dropout 与层级开关 |
-
-### 示例
-
-```bash
-# 声音设计
-tts-multimodel design --text "今天天气不错" --control "warm female voice" -o out.wav
-
-# 零样本克隆
-tts-multimodel clone --text "你好，很高兴认识你" --reference-audio ref.wav -o clone.wav
-
-# Prompt 延续（提示音频 + 与其对应的文本）
-tts-multimodel clone --text "接着说下去" --prompt-audio prompt.wav --prompt-file prompt.txt -o cont.wav
-
-# 批量生成并输出 MP3
-tts-multimodel batch --input texts.txt --output-dir ./outs --reference-audio ref.wav --format mp3
-```
-
-批量输入文件按扩展名解析：`.txt` 每行一条文本（空行与 `#` 开头行跳过）；`.json` 支持字符串数组或含 `text` 字段的对象数组（可选 `control`/`output`）；`.csv` 需含 `text` 列（可选 `control`/`output`，首行自动识别表头）。运行中会打印每条进度、耗时与 ETA，结束时汇总成功/失败条数。
-
-### 已知限制（CLI 覆盖范围）
-
-- CLI 目前只覆盖 **VoxCPM2 引擎**的三种模式。Web UI 中的 IndexTTS 2.5 / 2.0 合成、极致克隆（多参考音频）、剧本工坊、音色库（Persona）、音频后处理、语音转换与音频编辑、LoRA 训练、模型热切换、历史记录管理等能力**暂无 CLI 入口**，需改用 Web UI 或 HTTP API。
-- `batch --engine` 参数虽接受 `voxcpm2` / `indextts2`，但当前仅影响日志横幅，实际仍加载 VoxCPM2；`design` / `clone` 未提供该参数。
-- 不带子命令的旧版根级参数（如直接 `--text` + `--output`）仍可用，但会打印弃用警告，建议一律使用子命令写法。
-
-## 模型下载
-
-本项目是**多引擎编排框架（Apache-2.0），本身不含任何模型权重**。所有模型权重需从官方仓库由用户自行下载，放入 `model/` 下对应子目录（详见「模型许可说明」）。
-
-### 统一一键下载（国内镜像优先）
-
-```bash
-pip install huggingface_hub modelscope
-python scripts/download_models.py --all                        # 拉全部 7 个模型集合（HF 镜像优先，失败回退魔搭）
-python scripts/download_models.py --model voxcpm2              # 只拉某一个
-python scripts/download_models.py --all --source modelscope    # 强制只用魔搭
-python scripts/download_models.py --all --no-verify            # 跳过 SHA256 校验
-```
-
-下载完成后可用 `python scripts/verify_model_checksums.py` 校验完整性。
-
-### 各模型存放目录与来源
-
-| 模型目录 | 归属引擎 | 官方仓库（HF / ModelScope） |
-|---|---|---|
-| `model/VoxCPM2/` | voxcpm2 | `openbmb/VoxCPM2` / `OpenBMB/VoxCPM2` |
-| `model/SenseVoiceSmall/` | voxcpm2（ASR） | `FunAudioLLM/SenseVoiceSmall` / `iic/SenseVoiceSmall` |
-| `model/speech_zipenhancer/` | voxcpm2（降噪） | 仅 ModelScope `iic/speech_zipenhancer_ans_multiloss_16k_base` |
-| `model/IndexTTS-2.5/` | indextts2 | `IndexTeam/IndexTTS-2.5` |
-| `model/IndexTTS-2.0/` | indextts20 | `IndexTeam/IndexTTS-2` |
-| `model/OpenVoice/` | voicebox | `myshell-ai/OpenVoice` |
-| `model/Step-Audio-EditX/` | step-audio-editx | `stepfun-ai/Step-Audio-EditX` |
-
-## API 端点
-
-| 端点 | 方法 | 说明 |
-|---|---|---|
-| `/api/system/health` | GET | 健康检查 |
-| `/api/system/gpu/status` | GET | GPU 实时状态（设备名/显存/利用率/温度，无 GPU 时返回 CPU 回退结构） |
-| `/api/generate/voxcpm2/voxcpm_clone` | POST | 声音克隆（VoxCPM2） |
-| `/api/generate/voxcpm2/voxcpm_design` | POST | 声音设计（VoxCPM2） |
-| `/api/generate/voxcpm2/voxcpm_script` | POST | 剧本配音（VoxCPM2） |
-| `/api/generate/voxcpm2/streaming_sse` | POST | 流式生成（SSE） |
-| `/api/generate/indextts2/synthesize` | POST | TTS 合成（IndexTTS 2.5） |
-| `/api/generate/voicebox/convert` | POST | 语音转换（Voicebox VC，音频→音频） |
-| `/api/generate/step-audio-editx/edit` | POST | 音频编辑（Step-Audio-EditX） |
-| `/api/engines` | GET | 只读引擎发现 / 能力查询 |
-| `/api/audio/{filename}` | GET | 获取生成音频文件 |
-| `/api/history/table` | GET | 生成历史记录（分页表格） |
-| `/api/model/load` | POST | 加载模型 |
-| `/api/model/unload` | POST | 卸载模型 |
-| `/v1/audio/speech` | POST | OpenAI 兼容语音合成端点（支持 `stream` 参数） |
-
-> 生产环境建议在 `config.yaml` 的 `api_auth` 区域启用 API 认证。
-
-## 安全与可靠性
-
-- **配置安全写入**：配置保存采用原子写入与校验回退，写入中断或配置格式错误都不会导致应用无法启动
-- **完整性自校验**：启动时对核心文件做完整性比对，检测文件被篡改；失败仅告警不阻塞使用
-- **模型路径 shared / portable 双模式**：`config.yaml → models.model_source_mode`（`portable` 项目内 `model/` / `shared` 外部共享目录）
-- **断点续跑**：批量配音 / 克隆任务中断后重启可跳过已完成子任务（`data/checkpoints/`）
-- **前端资源缓存策略**：CSS/JS 不缓存、字体 30 天、图片 1 天，兼顾更新及时与加载速度
-
-## 技术栈
-
-| 层级 | 技术 |
-|---|---|
-| Web 框架 | FastAPI + Uvicorn |
-| 前端 | HTMX + Jinja2 + 原生 CSS（无前端框架依赖） |
-| TTS 引擎 | VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX（另注册 Edge-TTS 在线兜底，可选） |
-| ASR 引擎 | SenseVoiceSmall |
-| 音频处理 | speech_zipenhancer + FFmpeg（系统自带）+ SoX |
-| 深度学习 | PyTorch + Transformers + FunASR |
-| 数据库 | SQLite |
-| 容器化 | Docker + Docker Compose |
-
-## 故障排除
-
-| 问题 | 解决方案 |
-|---|---|
-| VC 运行库错误 (Windows) | 自行下载安装微软官方 Visual C++ Redistributable（x64） |
-| 模型未找到 | 确保模型下载到 `model/` 且目录结构正确 |
-| GPU 未检测到 | 安装对应 PyTorch 版本 (CUDA/MPS)，更新驱动 |
-| 端口被占用 | 应用会自动选择可用端口，查看控制台输出 |
-| Docker GPU 访问 | 确保安装 nvidia-docker runtime |
-
-详细日志查看 `logs/app.log`。
-
-## 参与贡献
-
-欢迎贡献！报告 Bug（附复现步骤）、功能建议（带 `enhancement` 标签的 Issue）、提交代码（Fork → Branch → Commit → Push → PR）、改进文档。详见 [贡献指南](https://github.com/ReSerendipity/.github/blob/main/CONTRIBUTING.md)（组织默认，Conventional Commits + DCO）。
-
-## 模型许可说明
-
-> 本表为**模型权重**的许可清单（项目代码为 Apache-2.0，见 [LICENSE](LICENSE)）。本项目**只做编排、不打包任何权重**——所有模型权重均来自下表官方仓库、由用户自取，框架分发本身不涉及再分发权重风险；但使用各模型仍须遵守其各自许可，商用前请逐项核对。
-
-| 模型 / 权重 | 归属引擎 | 权重许可 | 商用提示 |
-|---|---|---|---|
-| VoxCPM2 | voxcpm2 | Apache-2.0 | 可商用（默认推荐引擎） |
-| SenseVoiceSmall | voxcpm2（ASR） | 自定义 model-license | 可商用（遵循模型许可；FunASR 标注可商用） |
-| speech_zipenhancer | voxcpm2（降噪） | Apache-2.0 | 可商用 |
-| IndexTTS 2.5 | indextts2 | bilibili Model Use License Agreement | 商用须事先向 bilibili 登记并取得书面授权 |
-| IndexTTS 2.0 | indextts20 | bilibili Model Use License Agreement | 同上 |
-| OpenVoice | voicebox | MIT | 可商用 |
-| Step-Audio-EditX | step-audio-editx | Apache-2.0 | 权重使用前留意官方更新 |
-
-> 历史 / 参考引擎（CosyVoice2 / ChatTTS / F5-TTS 等）不随默认分发，其中部分模型许可为非商用，仅作研究参考。
-
-### 免责声明
-
-- 本项目按 Apache-2.0 提供，不对任何第三方模型权重的许可合规性、适用性、准确性负责；用户须自行核对所下载权重的许可并承担使用后果
-- "IndexTTS" 为 bilibili 的商标/产品名，使用须遵守 **bilibili Model Use License Agreement**（第 5.2 条仅允许合理且符合惯例的描述性引用，不得暗示官方背书；商用须事先登记并取得书面授权）；使用 IndexTTS 引擎还须遵守其 DISCLAIMER，包括禁止合成政治人物、公众人物等声音
-- 请勿将本项目用于侵权、诈骗、伪造等违法用途
-
-## 相关项目
+### 系统要求与兼容性
 
 | 项目 | 说明 |
 |---|---|
-| [VoxCPM](https://github.com/OpenBMB/VoxCPM) | OpenBMB 多语言 TTS，本项目 VoxCPM2 引擎的上游 |
-| [Fish Speech](https://github.com/fishaudio/fish-speech) | Fish Audio 多语言 TTS，80+ 语言支持，RL 对齐 |
-| [OpenVoice](https://github.com/myshell-ai/OpenVoice) | MyShell 即时语音克隆，风格控制 |
-| [CosyVoice](https://github.com/FunAudioLLM/CosyVoice) | 阿里多语言 TTS，Flow Matching + vLLM 加速 |
-| [Chatterbox](https://github.com/resemble-ai/chatterbox) | Resemble AI 低延迟 TTS，模型分级策略 |
+| 操作系统 | Windows 10/11 (64-bit) 或 Linux（macOS 经 MPS 后端可运行，主要在 Windows 上测试） |
+| Python | 3.10+，推荐 3.12；或解压便携 WinPython 到项目根目录完全隔离 |
+| GPU | 本地引擎推荐 NVIDIA CUDA（6.5 GB+ 显存）；Apple Silicon MPS 亦可；纯 CPU 可用 Edge-TTS 在线引擎 |
+| 音频组件 | Windows 需自行安装 Visual C++ Redistributable (x64) 与 SoX；Linux/macOS 用包管理器安装 FFmpeg/SoX |
+| 容器 | 提供 Dockerfile 与 docker-compose.yml，GPU 部署需 nvidia-docker runtime |
 
-## 许可证
+### 使用示例（CLI）
 
-本项目基于 [Apache License 2.0](LICENSE) 开源。Copyright (c) 2026 ReSerendipity。
+```bash
+# 声音设计：文本描述直接生成
+tts-multimodel design --text "今天天气不错" --control "warm female voice" -o out.wav
 
-**如果这个项目对你有帮助，请给个 Star 支持一下！**
+# 零样本声音克隆
+tts-multimodel clone --text "你好，很高兴认识你" --reference-audio ref.wav -o clone.wav
+
+# 批量合成（TXT/JSON/CSV，可输出 MP3）
+tts-multimodel batch --input texts.txt --output-dir ./outs --reference-audio ref.wav --format mp3
+```
+
+CLI 目前覆盖 VoxCPM2 的 design / clone / batch 三种模式；IndexTTS 合成、极致克隆、剧本工坊、音色库、语音转换与音频编辑、LoRA 训练等请使用 Web UI 或 HTTP API（含 OpenAI 兼容的 `POST /v1/audio/speech`）。
+
+### 常见问题（FAQ）
+
+1. **一定要有 GPU 吗？** 本地引擎建议 GPU，但项目注册了 Edge-TTS 在线兜底引擎，无 GPU 也能在 CPU 上体验完整界面与在线合成；要跑 VoxCPM2 / IndexTTS 等本地引擎则建议 6.5 GB+ 显存。
+2. **模型权重从哪里来？** 框架本身不含权重。运行 `python scripts/download_models.py --all` 从官方仓库下载到 `model/` 对应子目录；也可手动下载。
+3. **LoRA 微调现在能用吗？** LoRA 训练链路已随仓库提供（`pip install -e .[training]`），但属实验特性、未经真机训练验证，12 GB 显存上训练前需先卸载推理引擎以免 OOM。
+4. **商用需要注意什么？** 项目代码 Apache-2.0 可商用；但各模型权重许可不同——IndexTTS 2.5/2.0 采用 bilibili Model Use License，商用须事先向 bilibili 登记并取得书面授权，详见 `docs/model-cards/`。
+5. **在线演示会真的合成我的声音吗？** 不会。GitHub Pages 演示是纯前端仿真，合成由浏览器 Web Speech API 模拟，不上传任何音频、不执行真实推理。
+
+### 文档与治理
+
+- 安全策略：[docs/SECURITY.md](docs/SECURITY.md)
+- 模型卡片与许可：[docs/model-cards/](docs/model-cards/README.md)
+- 运行手册与回滚：[docs/SRE_RUNBOOK.md](docs/SRE_RUNBOOK.md)、[docs/rollback_sop.md](docs/rollback_sop.md)
+- 治理规范：[ReSerendipity/.github/governance](https://github.com/ReSerendipity/.github/tree/main/governance)
+
+### 贡献、安全与支持
+
+欢迎报告 Bug（附复现步骤）、提交功能建议或 PR（Fork → 特性分支 → Conventional Commits + DCO `Signed-off-by` → PR）。安全问题请走 [SECURITY.md](docs/SECURITY.md) 披露流程，勿公开开 Issue。使用体验与讨论请到 [Discussions](https://github.com/ReSerendipity/TTS-MultiModel/discussions)。
+
+### 许可证
+
+项目代码基于 [Apache License 2.0](LICENSE)，Copyright (c) 2026 ReSerendipity。模型权重不随代码分发，各自遵循其官方许可；请勿将本项目用于侵权、伪造或诈骗等违法用途。
+
+---
+
+<a id="english"></a>
+
+## English
+
+### Overview
+
+**TTS MultiModel** is a self-hosted, multi-engine Text-to-Speech platform. It unifies five local engines — VoxCPM2, IndexTTS 2.5, IndexTTS 2.0, OpenVoice, and Step-Audio-EditX — behind a single FastAPI + HTMX web UI, with an optional Edge-TTS online fallback engine that runs on CPU. One workbench covers voice design, zero-shot / ultimate voice cloning, multi-character script dubbing, voice conversion, and audio editing.
+
+The **code is Apache-2.0 and ships with no model weights**. You download weights from each model's official repository and comply with that model's own license before use (see "Model licenses" below).
+
+No GPU is required to explore the UI: <https://reserendipity.github.io/TTS-MultiModel/> (a GitHub Pages front-end simulation that performs no real inference).
+
+### Highlights
+
+- **Five engines, one registry**: VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX, switched from a declarative registry; Edge-TTS acts as a CPU-friendly online fallback.
+- **Voice cloning**: zero-shot cloning from a short reference clip; "ultimate clone" pairs reference audio with its transcript for finer timbre fidelity.
+- **Voice design**: describe the target timbre in plain language (e.g. "warm, clear female voice") and synthesize without any reference audio.
+- **Script dubbing**: assign speakers line by line in a multi-character script and batch-render all lines.
+- **Streaming & batching**: SSE streaming for long text; batch jobs resume from checkpoints, with all history kept in SQLite.
+- **Multi-backend, multi-language UI**: NVIDIA CUDA / Apple MPS / CPU auto-detected; UI ships in Simplified/Traditional Chinese, English, Japanese, and Korean.
+
+### Screenshots
+
+| Voice design (main view) | Voice cloning | Script dubbing |
+|---|---|---|
+| ![Voice design main UI](docs/assets/readme-tts-multimodel-1.png) | ![Voice cloning](docs/assets/readme-tts-multimodel-2.png) | ![Script dubbing](docs/assets/readme-tts-multimodel-3.png) |
+| Describe the timbre, tune speed/pitch/emotion, then synthesize. | Upload a 3–10 s reference clip to clone its voice. | Assign speakers per line and batch-render the script. |
+
+| Ultimate clone | Settings (engine status) | Architecture |
+|---|---|---|
+| ![Ultimate clone](docs/assets/readme-tts-multimodel-4.png) | ![Settings](docs/assets/readme-tts-multimodel-5.png) | ![Architecture](docs/assets/readme-tts-multimodel-6.svg) |
+| Reference audio + transcript, adjustable similarity. | Per-engine load status, VRAM, and GPU backend. | Clients → FastAPI → engine registry → storage. |
+
+> Screenshots show the dark-themed web UI. For an interactive version, see the live demo link above.
+
+### Quick start
+
+**Requirements**: Windows 10/11 (64-bit) or Linux; Python 3.10+ (3.12 recommended); a NVIDIA GPU with 6.5 GB+ VRAM for local engines, or Edge-TTS online fallback on CPU.
+
+```bash
+git clone https://github.com/ReSerendipity/TTS-MultiModel.git
+cd TTS-MultiModel
+```
+
+**Windows**:
+
+```bat
+install.bat    :: auto-detects system Python or bundled WinPython, installs deps, enables git hooks
+:: download model weights per scripts/download_models.py, then:
+start.bat
+```
+
+**Linux**:
+
+```bash
+chmod +x scripts/install.sh && ./scripts/install.sh
+./scripts/start.sh
+```
+
+**Docker**:
+
+```bash
+docker compose up -d
+# or pull the versioned GHCR image (tag follows config.yaml, currently v2.7.0)
+docker pull ghcr.io/reserendipity/tts-multimodel:2.7.0
+```
+
+Then open <http://localhost:7869>. Sanity check: the left sidebar and the "Voice design" workbench render in the browser, or run `tts-multimodel --help` (from source: `python app/integrated_app/cli.py --help`).
+
+> Weights are downloaded separately: `pip install huggingface_hub modelscope`, then `python scripts/download_models.py --all` (mirror-first, falling back to ModelScope).
+
+### Requirements & compatibility
+
+| Item | Details |
+|---|---|
+| OS | Windows 10/11 (64-bit) or Linux (macOS runs via the MPS backend; primary testing is on Windows) |
+| Python | 3.10+, 3.12 recommended; or extract portable WinPython into the repo root for full isolation |
+| GPU | Local engines prefer NVIDIA CUDA (6.5 GB+ VRAM); Apple MPS works; Edge-TTS online engine runs on CPU |
+| Audio | Windows needs the VC++ Redistributable (x64) and SoX; Linux/macOS use package-manager FFmpeg/SoX |
+| Containers | Dockerfile + docker-compose.yml provided; GPU deployment needs the nvidia-docker runtime |
+
+### CLI examples
+
+```bash
+# Voice design: synthesize from a text description
+tts-multimodel design --text "Good weather today." --control "warm female voice" -o out.wav
+
+# Zero-shot voice clone
+tts-multimodel clone --text "Nice to meet you." --reference-audio ref.wav -o clone.wav
+
+# Batch synthesis (TXT/JSON/CSV, MP3 output)
+tts-multimodel batch --input texts.txt --output-dir ./outs --reference-audio ref.wav --format mp3
+```
+
+The CLI currently covers VoxCPM2 `design` / `clone` / `batch`. IndexTTS synthesis, ultimate clone, script workshop, personas, voice conversion/audio editing, and LoRA training are available via the web UI or the HTTP API (including the OpenAI-compatible `POST /v1/audio/speech`).
+
+### FAQ
+
+1. **Do I need a GPU?** Local engines prefer one, but the registered Edge-TTS fallback lets you explore the full UI on CPU; run VoxCPM2 / IndexTTS etc. with 6.5 GB+ VRAM.
+2. **Where do model weights come from?** The framework bundles none. Run `python scripts/download_models.py --all` to fetch them into the matching `model/` subdirectories, or download manually.
+3. **Is LoRA training ready?** The training path ships in-repo (`pip install -e .[training]`) but is experimental and not yet validated on real hardware; unload inference engines first on a 12 GB card to avoid OOM.
+4. **Can I use this commercially?** The code is Apache-2.0, but weight licenses differ — IndexTTS 2.5/2.0 use the bilibili Model Use License and require prior written registration for commercial use. See `docs/model-cards/`.
+5. **Does the live demo clone my voice?** No. The GitHub Pages demo is a pure front-end simulation using the browser's Web Speech API; no audio leaves your machine and no real inference runs.
+
+### Docs & governance
+
+- Security policy: [docs/SECURITY.md](docs/SECURITY.md)
+- Model cards & licenses: [docs/model-cards/](docs/model-cards/README.md)
+- Runbook & rollback: [docs/SRE_RUNBOOK.md](docs/SRE_RUNBOOK.md), [docs/rollback_sop.md](docs/rollback_sop.md)
+- Governance: [ReSerendipity/.github/governance](https://github.com/ReSerendipity/.github/tree/main/governance)
+
+### Contributing, security & support
+
+Bug reports (with repro steps), feature requests, and PRs are welcome (Fork → feature branch → Conventional Commits with DCO `Signed-off-by` → PR). For security issues, follow the disclosure process in [SECURITY.md](docs/SECURITY.md) rather than opening a public issue. Questions and show-and-tell belong in [Discussions](https://github.com/ReSerendipity/TTS-MultiModel/discussions).
+
+### License
+
+Project code is licensed under [Apache License 2.0](LICENSE), Copyright (c) 2026 ReSerendipity. Model weights are not bundled and follow their own licenses; please do not use this project for infringement, forgery, fraud, or any unlawful purpose.
+
+---
+
+**如果这个项目对你有帮助 / If this project is useful, please star it.** ⭐
