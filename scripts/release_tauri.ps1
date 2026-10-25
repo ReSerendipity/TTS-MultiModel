@@ -120,6 +120,16 @@ $sumLines += "{0}  {1}" -f $arc.Sha256, "$base.7z"
 [System.IO.File]::WriteAllLines($sumFile, $sumLines)
 
 # ---------- manifest.json ----------
+# 2026-10-25 发布口径（MODEL_DISTRIBUTION_AUDIT.md §六）：桌面分卷不再内置模型权重，
+# manifest 描述按 staging 实际内容动态生成，避免 framework-only 包误标"内置模型"。
+$hasModel = (Test-Path -LiteralPath (Join-Path $StagingDir 'model')) -or (Test-Path -LiteralPath (Join-Path $StagingDir 'checkpoints'))
+if ($hasModel) {
+    $compTitle = 'TTSMultiModel 桌面版完整包（壳 + 应用 + 便携 Python 运行时 + 内置模型）'
+    $compDesc  = 'Tauri 壳 TTSMultiModel.exe + app/（FastAPI 应用 + runtime/ 侧载 Python + model/ 内置模型），解压即用。增量更新仅替换应用代码。'
+} else {
+    $compTitle = 'TTSMultiModel 桌面版框架包（壳 + 应用 + 便携 Python 运行时，不含模型权重）'
+    $compDesc  = 'Tauri 壳 TTSMultiModel.exe + app/（FastAPI 应用 + runtime/ 侧载 Python）。模型权重不随包分发：解压后运行 scripts/download_models.py 按需下载（HF 镜像优先 / ModelScope 回退，见 docs/plans/MODEL_DOWNLOAD_GUIDE.md）。增量更新仅替换应用代码。'
+}
 $manifest = [ordered]@{
     schema = 1
     product = 'TTSMultiModel-Desktop'
@@ -135,8 +145,8 @@ $manifest = [ordered]@{
     components = @(
         [ordered]@{
             id = 'full'
-            title = 'TTSMultiModel 桌面版完整包（壳 + 应用 + 便携 Python 运行时 + 内置 MXFP8 模型）'
-            description = 'Tauri 壳 TTSMultiModel.exe + app/（FastAPI 应用 + runtime/ 侧载 Python + model/ 内置模型），解压即用。增量更新仅替换应用代码。'
+            title = $compTitle
+            description = $compDesc
             required = $true
             archive = "$base.7z"
             format = '7z'
