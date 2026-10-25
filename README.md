@@ -12,7 +12,7 @@ Five open-source TTS engines — voice cloning, voice design, multi-character sc
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![Last commit](https://img.shields.io/github/last-commit/ReSerendipity/TTS-MultiModel)](https://github.com/ReSerendipity/TTS-MultiModel/commits/main)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ReSerendipity/.github/blob/main/CONTRIBUTING.md)
 
 [中文](#中文) · [English](#english)
 
