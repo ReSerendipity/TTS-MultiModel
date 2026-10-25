@@ -32,8 +32,6 @@ Five open-source TTS engines — voice cloning, voice design, multi-character sc
 
 项目**代码以 Apache-2.0 开源，本身不打包任何模型权重**——权重由你从各模型官方仓库自行下载，使用前请核对每个模型的许可（见下方「模型许可」）。
 
-无需 GPU 即可体验界面：<https://reserendipity.github.io/TTS-MultiModel/>（GitHub Pages 纯前端仿真，不执行真实推理）。
-
 ### 核心特性
 
 - **五引擎统一编排**：声明式引擎注册表，VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX 灵活切换；Edge-TTS 在线引擎在无 GPU 时自动兜底。
@@ -43,19 +41,11 @@ Five open-source TTS engines — voice cloning, voice design, multi-character sc
 - **流式与批量**：长文本 SSE 流式输出；批量任务断点续跑，SQLite 记录全部生成历史。
 - **多后端与多语言界面**：NVIDIA CUDA / Apple MPS / CPU 自动适配；界面支持中文（简/繁）、英文、日文、韩文。
 
-### 界面展示
+### 系统架构
 
-| 声音设计（主界面） | 声音克隆 | 剧本配音 |
-|---|---|---|
-| ![声音设计主界面](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-1.png) | ![声音克隆](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-2.png) | ![剧本配音](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-3.png) |
-| 用文本描述音色，调节语速/音调/情感后合成。 | 上传 3–10 秒参考音频即可克隆音色。 | 多角色台词逐行分配说话人，批量配音。 |
+![系统架构](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg)
 
-| 极致克隆 | 系统设置（引擎状态） | 系统架构 |
-|---|---|---|
-| ![极致克隆](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-4.png) | ![系统设置](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-5.png) | ![系统架构](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg) |
-| 参考音频 + 转写文本，相似度可调。 | 查看各引擎加载状态、显存占用与 GPU 后端。 | 客户端 → FastAPI → 引擎注册表 → 存储分层。 |
-
-> 截图为 Web UI 界面（暗色主题）。完整可交互版本见上方在线演示链接。
+客户端（Web UI / CLI / OpenAI 兼容 API）→ FastAPI 引擎注册表 → 五套本地引擎 + Edge-TTS 在线兜底 → SQLite 历史 / outputs / personas。
 
 ### 快速开始
 
@@ -124,7 +114,6 @@ CLI 目前覆盖 VoxCPM2 的 design / clone / batch 三种模式；IndexTTS 合�
 2. **模型权重从哪里来？** 框架本身不含权重。运行 `python scripts/download_models.py --all` 从官方仓库下载到 `model/` 对应子目录；也可手动下载。
 3. **LoRA 微调现在能用吗？** LoRA 训练链路已随仓库提供（`pip install -e .[training]`），但属实验特性、未经真机训练验证，12 GB 显存上训练前需先卸载推理引擎以免 OOM。
 4. **商用需要注意什么？** 项目代码 Apache-2.0 可商用；但各模型权重许可不同——IndexTTS 2.5/2.0 采用 bilibili Model Use License，商用须事先向 bilibili 登记并取得书面授权，详见 `docs/model-cards/`。
-5. **在线演示会真的合成我的声音吗？** 不会。GitHub Pages 演示是纯前端仿真，合成由浏览器 Web Speech API 模拟，不上传任何音频、不执行真实推理。
 
 ### 文档与治理
 
@@ -153,8 +142,6 @@ CLI 目前覆盖 VoxCPM2 的 design / clone / batch 三种模式；IndexTTS 合�
 
 The **code is Apache-2.0 and ships with no model weights**. You download weights from each model's official repository and comply with that model's own license before use (see "Model licenses" below).
 
-No GPU is required to explore the UI: <https://reserendipity.github.io/TTS-MultiModel/> (a GitHub Pages front-end simulation that performs no real inference).
-
 ### Highlights
 
 - **Five engines, one registry**: VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX, switched from a declarative registry; Edge-TTS acts as a CPU-friendly online fallback.
@@ -164,19 +151,11 @@ No GPU is required to explore the UI: <https://reserendipity.github.io/TTS-Multi
 - **Streaming & batching**: SSE streaming for long text; batch jobs resume from checkpoints, with all history kept in SQLite.
 - **Multi-backend, multi-language UI**: NVIDIA CUDA / Apple MPS / CPU auto-detected; UI ships in Simplified/Traditional Chinese, English, Japanese, and Korean.
 
-### Screenshots
+### Architecture
 
-| Voice design (main view) | Voice cloning | Script dubbing |
-|---|---|---|
-| ![Voice design main UI](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-1.png) | ![Voice cloning](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-2.png) | ![Script dubbing](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-3.png) |
-| Describe the timbre, tune speed/pitch/emotion, then synthesize. | Upload a 3–10 s reference clip to clone its voice. | Assign speakers per line and batch-render the script. |
+![Architecture](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg)
 
-| Ultimate clone | Settings (engine status) | Architecture |
-|---|---|---|
-| ![Ultimate clone](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-4.png) | ![Settings](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-5.png) | ![Architecture](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg) |
-| Reference audio + transcript, adjustable similarity. | Per-engine load status, VRAM, and GPU backend. | Clients → FastAPI → engine registry → storage. |
-
-> Screenshots show the dark-themed web UI. For an interactive version, see the live demo link above.
+Clients (web UI / CLI / OpenAI-compatible API) → FastAPI engine registry → five local engines + Edge-TTS online fallback → SQLite history / outputs / personas.
 
 ### Quick start
 
@@ -245,7 +224,6 @@ The CLI currently covers VoxCPM2 `design` / `clone` / `batch`. IndexTTS synthesi
 2. **Where do model weights come from?** The framework bundles none. Run `python scripts/download_models.py --all` to fetch them into the matching `model/` subdirectories, or download manually.
 3. **Is LoRA training ready?** The training path ships in-repo (`pip install -e .[training]`) but is experimental and not yet validated on real hardware; unload inference engines first on a 12 GB card to avoid OOM.
 4. **Can I use this commercially?** The code is Apache-2.0, but weight licenses differ — IndexTTS 2.5/2.0 use the bilibili Model Use License and require prior written registration for commercial use. See `docs/model-cards/`.
-5. **Does the live demo clone my voice?** No. The GitHub Pages demo is a pure front-end simulation using the browser's Web Speech API; no audio leaves your machine and no real inference runs.
 
 ### Docs & governance
 
