@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 660" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif">
+  <rect width="1040" height="660" fill="#0f1115"/>
+  <text x="520" y="38" text-anchor="middle" fill="#e6e8eb" font-size="20" font-weight="700">TTS MultiModel — Architecture</text>
+  <text x="520" y="60" text-anchor="middle" fill="#9aa0aa" font-size="12">Multi-engine orchestration · FastAPI + HTMX · engines plugged by a declarative registry</text>
+
+  <!-- arrows helper: stroke -->
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6270"/>
+    </marker>
+  </defs>
+
+  <!-- Layer 1: clients -->
+  <text x="40" y="100" fill="#8b7cf6" font-size="11" font-weight="600">CLIENTS</text>
+  <g>
+    <rect x="80" y="112" width="260" height="56" rx="10" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="210" y="136" text-anchor="middle" fill="#e6e8eb" font-size="14" font-weight="600">Web UI</text>
+    <text x="210" y="154" text-anchor="middle" fill="#9aa0aa" font-size="11">HTMX + Jinja2 · responsive dark theme</text>
+
+    <rect x="390" y="112" width="260" height="56" rx="10" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="520" y="136" text-anchor="middle" fill="#e6e8eb" font-size="14" font-weight="600">CLI</text>
+    <text x="520" y="154" text-anchor="middle" fill="#9aa0aa" font-size="11">tts-multimodel design / clone / batch</text>
+
+    <rect x="700" y="112" width="260" height="56" rx="10" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="830" y="136" text-anchor="middle" fill="#e6e8eb" font-size="14" font-weight="600">HTTP API</text>
+    <text x="830" y="154" text-anchor="middle" fill="#9aa0aa" font-size="11">OpenAI-compatible /v1/audio/speech</text>
+  </g>
+
+  <line x1="520" y1="168" x2="520" y2="206" stroke="#5b6270" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Layer 2: backend -->
+  <text x="40" y="200" fill="#8b7cf6" font-size="11" font-weight="600">BACKEND</text>
+  <rect x="120" y="212" width="800" height="72" rx="10" fill="#1a1d24" stroke="#8b7cf6" stroke-width="1.4"/>
+  <text x="520" y="240" text-anchor="middle" fill="#e6e8eb" font-size="15" font-weight="700">FastAPI + Uvicorn  ·  http://localhost:7869</text>
+  <text x="520" y="262" text-anchor="middle" fill="#9aa0aa" font-size="11">Declarative engine registry · model manager (load / unload / hot-swap) · GPU backend: CUDA / MPS / CPU · SSE streaming · batch + checkpoint resume</text>
+
+  <line x1="520" y1="284" x2="520" y2="322" stroke="#5b6270" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Layer 3: engines -->
+  <text x="40" y="316" fill="#8b7cf6" font-size="11" font-weight="600">ENGINES</text>
+  <g font-size="12">
+    <rect x="40"  y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="114" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">VoxCPM2</text>
+    <text x="114" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">design · clone · script</text>
+
+    <rect x="208" y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="282" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">IndexTTS 2.5</text>
+    <text x="282" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">zero-shot synthesis</text>
+
+    <rect x="376" y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="450" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">IndexTTS 2.0</text>
+    <text x="450" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">zero-shot synthesis</text>
+
+    <rect x="544" y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="618" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">OpenVoice VC</text>
+    <text x="618" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">audio-to-audio voice convert</text>
+
+    <rect x="712" y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="786" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">Step-Audio-EditX</text>
+    <text x="786" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">emotion / prosody edit</text>
+
+    <rect x="880" y="328" width="148" height="54" rx="9" fill="#16202a" stroke="#2f6f8f"/>
+    <text x="954" y="352" text-anchor="middle" fill="#bfe3f5" font-weight="600">Edge-TTS</text>
+    <text x="954" y="370" text-anchor="middle" fill="#7fb4cc" font-size="10.5">online CPU fallback</text>
+  </g>
+
+  <line x1="520" y1="382" x2="520" y2="420" stroke="#5b6270" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Layer 4: supporting -->
+  <text x="40" y="414" fill="#8b7cf6" font-size="11" font-weight="600">SUPPORT</text>
+  <g font-size="12">
+    <rect x="120" y="426" width="240" height="50" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="240" y="448" text-anchor="middle" fill="#e6e8eb" font-weight="600">SenseVoiceSmall</text>
+    <text x="240" y="465" text-anchor="middle" fill="#9aa0aa" font-size="10.5">ASR / prompt transcription</text>
+
+    <rect x="400" y="426" width="240" height="50" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="520" y="448" text-anchor="middle" fill="#e6e8eb" font-weight="600">speech_zipenhancer</text>
+    <text x="520" y="465" text-anchor="middle" fill="#9aa0aa" font-size="10.5">reference-audio denoise</text>
+
+    <rect x="680" y="426" width="240" height="50" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="800" y="448" text-anchor="middle" fill="#e6e8eb" font-weight="600">FFmpeg · SoX</text>
+    <text x="800" y="465" text-anchor="middle" fill="#9aa0aa" font-size="10.5">audio IO &amp; effects</text>
+  </g>
+
+  <line x1="520" y1="476" x2="520" y2="514" stroke="#5b6270" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Layer 5: storage -->
+  <text x="40" y="508" fill="#8b7cf6" font-size="11" font-weight="600">DATA</text>
+  <g font-size="12">
+    <rect x="120" y="520" width="240" height="50" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="240" y="542" text-anchor="middle" fill="#e6e8eb" font-weight="600">SQLite</text>
+    <text x="240" y="559" text-anchor="middle" fill="#9aa0aa" font-size="10.5">generation history · personas</text>
+
+    <rect x="400" y="520" width="240" height="50" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="520" y="542" text-anchor="middle" fill="#e6e8eb" font-weight="600">model/</text>
+    <text x="520" y="559" text-anchor="middle" fill="#9aa0aa" font-size="10.5">weights downloaded by user (Apache-2.0 code)</text>
+
+    <rect x="680" y="520" width="240" height="50" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="800" y="542" text-anchor="middle" fill="#e6e8eb" font-weight="600">outputs/</text>
+    <text x="800" y="559" text-anchor="middle" fill="#9aa0aa" font-size="10.5">generated WAV/MP3 · batch checkpoints</text>
+  </g>
+
+  <text x="520" y="612" text-anchor="middle" fill="#6b7280" font-size="10.5">Code: Apache-2.0 · Model weights are NOT bundled — each engine ships under its own license (see model-cards).</text>
+</svg>
