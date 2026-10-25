@@ -50,6 +50,16 @@ EXPECTED_FEATURES: dict[str, set[str]] = {
         "tts",
         "streaming",
     },
+    # Breeze TTS 2（2026-10-25 接入）：ultimate 槽位承载 Voice Direction
+    # （克隆 + 指令控制）；vocal_events 为参数级能力（正文内嵌 (laugh)/[笑]
+    # 事件标记随文本透传，无独立方法），与 emotion_control 同口径。
+    "breeze-tts2": {
+        "voice_design",
+        "clone",
+        "ultimate",
+        "streaming",
+        "vocal_events",
+    },
 }
 
 # 能力 → 对应方法名映射（用于验证声明的能力有真实实现）
@@ -68,7 +78,8 @@ FEATURE_METHOD_MAP: dict[str, str] = {
 }
 
 # 已知全部能力集合（用于反向验证：未声明的能力不应被实现）
-ALL_KNOWN_FEATURES = set(FEATURE_METHOD_MAP.keys()) | {"emotion_control", "duration_control"}
+# vocal_events：参数级能力（Breeze 正文事件标记透传），无独立方法
+ALL_KNOWN_FEATURES = set(FEATURE_METHOD_MAP.keys()) | {"emotion_control", "duration_control", "vocal_events"}
 
 
 class TestEngineCapabilityContract:
