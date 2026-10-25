@@ -47,12 +47,12 @@ Five open-source TTS engines — voice cloning, voice design, multi-character sc
 
 | 声音设计（主界面） | 声音克隆 | 剧本配音 |
 |---|---|---|
-| ![声音设计主界面](docs/assets/readme-tts-multimodel-1.png) | ![声音克隆](docs/assets/readme-tts-multimodel-2.png) | ![剧本配音](docs/assets/readme-tts-multimodel-3.png) |
+| ![声音设计主界面](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-1.png) | ![声音克隆](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-2.png) | ![剧本配音](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-3.png) |
 | 用文本描述音色，调节语速/音调/情感后合成。 | 上传 3–10 秒参考音频即可克隆音色。 | 多角色台词逐行分配说话人，批量配音。 |
 
 | 极致克隆 | 系统设置（引擎状态） | 系统架构 |
 |---|---|---|
-| ![极致克隆](docs/assets/readme-tts-multimodel-4.png) | ![系统设置](docs/assets/readme-tts-multimodel-5.png) | ![系统架构](docs/assets/readme-tts-multimodel-6.svg) |
+| ![极致克隆](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-4.png) | ![系统设置](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-5.png) | ![系统架构](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg) |
 | 参考音频 + 转写文本，相似度可调。 | 查看各引擎加载状态、显存占用与 GPU 后端。 | 客户端 → FastAPI → 引擎注册表 → 存储分层。 |
 
 > 截图为 Web UI 界面（暗色主题）。完整可交互版本见上方在线演示链接。
@@ -168,12 +168,12 @@ No GPU is required to explore the UI: <https://reserendipity.github.io/TTS-Multi
 
 | Voice design (main view) | Voice cloning | Script dubbing |
 |---|---|---|
-| ![Voice design main UI](docs/assets/readme-tts-multimodel-1.png) | ![Voice cloning](docs/assets/readme-tts-multimodel-2.png) | ![Script dubbing](docs/assets/readme-tts-multimodel-3.png) |
+| ![Voice design main UI](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-1.png) | ![Voice cloning](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-2.png) | ![Script dubbing](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-3.png) |
 | Describe the timbre, tune speed/pitch/emotion, then synthesize. | Upload a 3–10 s reference clip to clone its voice. | Assign speakers per line and batch-render the script. |
 
 | Ultimate clone | Settings (engine status) | Architecture |
 |---|---|---|
-| ![Ultimate clone](docs/assets/readme-tts-multimodel-4.png) | ![Settings](docs/assets/readme-tts-multimodel-5.png) | ![Architecture](docs/assets/readme-tts-multimodel-6.svg) |
+| ![Ultimate clone](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-4.png) | ![Settings](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-5.png) | ![Architecture](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg) |
 | Reference audio + transcript, adjustable similarity. | Per-engine load status, VRAM, and GPU backend. | Clients → FastAPI → engine registry → storage. |
 
 > Screenshots show the dark-themed web UI. For an interactive version, see the live demo link above.
