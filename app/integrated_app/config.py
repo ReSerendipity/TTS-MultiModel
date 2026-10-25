@@ -119,6 +119,8 @@ LORA_DIR = os.path.join(ROOT_DIR, "lora")
 INDEXTTS2_MODEL_PATH = os.path.join(PRETRAINED_DIR, "IndexTTS-2.5")
 # --- IndexTTS 2.0 Model Paths（独立权重目录，与 2.5 不通用）---
 INDEXTTS20_MODEL_PATH = os.path.join(PRETRAINED_DIR, "IndexTTS-2.0")
+# --- Breeze TTS 2 Model Paths（含 audio_tokenizer/ 子目录，共约 7.7GB）---
+BREEZE_TTS2_MODEL_PATH = os.path.join(PRETRAINED_DIR, "Breeze-TTS-2")
 
 
 # ---------------------------------------------------------------------------
@@ -877,6 +879,9 @@ ENGINE_TEXT_LIMITS: dict[str, int] = {
     "indextts2": 3072,
     "indextts20": 3072,
     "generic": 4096,
+    # Breeze：max_seq_len 2048 token（含模板与参考音频 token），中文约 1.5~2 字/token，
+    # 超长文本应走流式/分段；2000 字为单次调用的稳妥上限。
+    "breeze-tts2": 2000,
 }
 
 

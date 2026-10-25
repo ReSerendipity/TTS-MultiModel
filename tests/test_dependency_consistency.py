@@ -13,9 +13,11 @@ D1 ``test_lock_pins_satisfy_declared_specifiers`` —— `requirements.txt` / `p
    而锁与引擎实际要的是 4.52.1 —— 两个数字互相矛盾，CI 全绿，按声明装环境的人
    IndexTTS 2.0/2.5 直接起不来（实测见 docs/SECURITY_DEPENDABOT_TRIAGE.md §2）。
 
-D2 ``test_engine_pinned_transformers_lineage`` —— 把"引擎钉死 4.52.x"这件事变成断言：
-   锁里必须是 `transformers==4.52.1` + `tokenizers==0.21.0`，且声明必须有 `<4.53` 上界。
-   谁要抬这个上界，必须先让 IndexTTS 侧适配，并让这条守卫带着证据一起改。
+D2 ``test_engine_pinned_transformers_lineage`` —— 把"引擎实测钉版"这件事变成断言：
+   锁里必须是 `transformers==4.57.3` + `tokenizers==0.22.2`，且声明必须是
+   `>=4.57.3,<4.58`（Breeze TTS 2 需 >=4.57；IndexTTS 4.53+ 断裂已由
+   engines/indextts_tf_compat.py shim 修复）。谁要挪动这条血统，必须按
+   _ENGINE_FACT 列的四件事重测后连同证据一起改。
 
 D3 ``test_accepted_risk_registers_stay_in_sync`` —— 两道扫描器的豁免集不许各自漂移：
    `.trivyignore.yaml` 的每条必须有 `expiration`（到期自动重新变红）且 id 出现在
@@ -145,8 +147,9 @@ def test_d1_guard_is_not_vacuous():
     pins = _pins(_LOCK)
     tf = pins.get("transformers")
     assert tf is not None, "锁里没有 transformers，样本失效"
-    assert _violations(pins, {"transformers": [">=4.52.1,<4.53"]}) == []
-    assert _violations(pins, {"transformers": [">=4.57.0"]}), "声明抬到 4.57 时必须报错，否则守卫空转"
+    assert _violations(pins, {"transformers": [">=4.57.3,<4.58"]}) == []
+    assert _violations(pins, {"transformers": [">=4.58"]}), "声明越过实测血统上界时必须报错，否则守卫空转"
+    assert _violations(pins, {"transformers": ["<4.57"]}), "声明低于 Breeze 下界时必须报错，否则守卫空转"
 
     # 第二份钉版集必须真的在检查范围内，而不是挂在循环里凑数：
     # 小清单与锁共享 92 个包，能对上声明的也应 ≥20，且 #88 那个形状要能被抓到。
@@ -161,31 +164,39 @@ def test_d1_guard_is_not_vacuous():
 # D2 引擎钉住的那条血脉
 # ---------------------------------------------------------------------------
 
-_ENGINE_FACT = """IndexTTS 2.0/2.5 的发行元数据要求 transformers==4.52.1 + tokenizers==0.21.0；
-2026-09-21 实测：4.57.6 下 indextts.infer_v2_5 / infer_v2 直接 ImportError（VoxCPM2 不受影响），
-4.52.1 + tokenizers 0.21.0 下三引擎真推理全通（2.5 出 214,040 B/RMS 6176；2.0 出 205,124 B/
-RMS 6926；VoxCPM2 出 230,148 B/RMS 4615）。证据与代价（含已接受风险的公告清单）见
-docs/SECURITY_DEPENDABOT_TRIAGE.md。要改这里，先让 IndexTTS 侧适配，再连同分诊文档一起改。"""
+_ENGINE_FACT = """Breeze TTS 2 的模型代码要求 transformers>=4.57，IndexTTS 2.0/2.5 在 4.53+ 的
+4 处导入断裂由 engines/indextts_tf_compat.py shim 回填（2026-10-25 在 .venv
+transformers 4.57.3 下实测 indextts.infer_v2_5 / infer_v2 导入全通）。当前血统 =
+transformers==4.57.3 + tokenizers==0.22.2：这是「Breeze vendored 链 + indextts shim +
+VoxCPM2」共同实测的钉版。要挪动这里，必须四件事连着改并重测：①indextts_tf_compat
+的符号回填在新版下仍成立；②breeze_tts2/vendor 全链导入冒烟；③IndexTTS/VoxCPM2
+真机推理回归；④docs/SECURITY_DEPENDABOT_TRIAGE.md 公告豁免清单同步复核。"""
 
 
 def test_engine_pinned_transformers_lineage():
-    """锁必须停在 4.52.1 / tokenizers 0.21.0，且声明必须带 <4.53 上界。"""
+    """锁必须停在 4.57.3 / tokenizers 0.22.2，且声明必须带 <4.58 上界。"""
     pins = _pins(_LOCK)
-    assert pins.get("transformers") == "4.52.1", (
+    assert pins.get("transformers") == "4.57.3", (
         f"锁里 transformers 被挪动了：{pins.get('transformers')!r}。{_ENGINE_FACT}"
     )
-    assert pins.get("tokenizers") == "0.21.0", f"锁里 tokenizers 被挪动了：{pins.get('tokenizers')!r}。{_ENGINE_FACT}"
+    assert pins.get("tokenizers") == "0.22.2", f"锁里 tokenizers 被挪动了：{pins.get('tokenizers')!r}。{_ENGINE_FACT}"
     specs = " ".join(_declared_specifiers().get("transformers", []))
-    assert "<4.53" in specs, (
-        f"requirements.txt / pyproject 的 transformers 声明缺 `<4.53` 上界，会解析到让 IndexTTS 起不来的版本。{_ENGINE_FACT}"
+    assert "<4.58" in specs and ">=4.57.3" in specs, (
+        f"requirements.txt / pyproject 的 transformers 声明缺 `>=4.57.3,<4.58` 口径，"
+        f"低于 4.57 会起不来 Breeze TTS 2，越过上界则超出实测血统。{_ENGINE_FACT}"
     )
 
 
 def test_d2_guard_is_not_vacuous():
-    # 声明侧：上界存在是本守卫的判据，去掉后 _violations 应能抓到锁与声明的矛盾
-    assert "<4.53" in " ".join(_declared_specifiers().get("transformers", []))
-    assert _violations({"transformers": "4.57.6"}, {"transformers": [">=4.52.1,<4.53"]}), "锁被抬上 4.57 时必须报错"
-    assert _violations({"tokenizers": "0.23.2"}, {"tokenizers": [">=0.21.0,<0.22"]}), "tokenizers 漂到 0.23 时必须报错"
+    # 声明侧：上下界存在是本守卫的判据，越界后 _violations 应能抓到锁与声明的矛盾
+    assert "<4.58" in " ".join(_declared_specifiers().get("transformers", []))
+    assert _violations({"transformers": "4.52.1"}, {"transformers": [">=4.57.3,<4.58"]}), (
+        "锁被降回 4.52 时必须报错（Breeze 起不来）"
+    )
+    assert _violations({"transformers": "5.0.0"}, {"transformers": [">=4.57.3,<4.58"]}), "锁漂到 5.x 时必须报错"
+    assert _violations({"tokenizers": "0.23.2"}, {"tokenizers": [">=0.21.0,<0.24"]}) == [], (
+        "0.23 在 tokenizers 声明区间内，不该报错"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,172 @@
+{# Breeze TTS 2 · Voice Clone tab（参考音频 + 准确转写 → 克隆）
+   两栏布局：表单（左 65%）+ 结果（右 35%）。 #}
+<div class="pv-theme">
+    <div class="two-col">
+        <!-- ============ Form Column ============ -->
+        <div class="col-form">
+            <form id="brzc-form" hx-post="/api/generate/breeze_clone" hx-target="#brzc-result" hx-swap="innerHTML" hx-indicator="#brzc-spinner" hx-encoding="multipart/form-data">
+                <input type="hidden" name="expected_engine" value="breeze-tts2">
+                <!-- Card: 参考音频与转写 -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+                        {{ "breeze_clone_tab"|t(lang, default="Breeze 声音克隆") }}
+                    </div>
+                    <div class="card-body">
+                        <div class="hint-text" style="margin-bottom:10px">
+                            {{ "breeze_clone_desc"|t(lang, default="Breeze 克隆需要参考音频的**准确转写**（逐字对齐）；正文可内嵌事件标记：英文 (laugh)、中文 [笑]。") }}
+                        </div>
+                        <div class="fg">
+                            <label class="fl">{{ "ref_audio"|t(lang) }}</label>
+                            <div class="upload-zone" onclick="this.querySelector('input').click()">
+                                <input type="file" id="brzc-ref-audio-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateBrzcFileName(this)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                <p><span id="brzc-ref-audio-name">{{ "upload_clone_ref"|t(lang) }}</span></p>
+                                <p style="font-size:10px;margin-top:2px">{{ "supported_formats"|t(lang) }} (5-30s)</p>
+                            </div>
+                        </div>
+                        {# P0-1 声音克隆授权：上传参考音频必须显式声明拥有使用权/已获授权 #}
+                        <div class="fg" style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
+                            <input type="checkbox" name="has_consent" id="brzc-has-consent" value="true" style="margin-top:2px" required>
+                            <label for="brzc-has-consent" class="fl" style="font-size:12px;margin:0;line-height:1.5">{{ "consent_declare"|t(lang) }}</label>
+                        </div>
+                        <div class="fg" id="brzc-audio-preview" style="display:none">
+                            <label class="fl">{{ "audio_preview"|t(lang) }}</label>
+                            <audio id="brzc-preview-audio" controls style="width:100%"></audio>
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="brzc-ref-text">{{ "breeze_ref_text"|t(lang, default="参考音频转写（必填，逐字对齐）") }}</label>
+                            <textarea name="ref_text" dir="auto" id="brzc-ref-text" class="ft tts-textarea tts-auto-resize" rows="2"
+                                      placeholder="{{ 'breeze_ref_text_ph'|t(lang, default='例如：这是参考音频里说的原话，一字不差。') }}"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: 合成文本 -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+                        {{ "synthesis_text"|t(lang) }}
+                    </div>
+                    <div class="card-body">
+                        <div class="fg">
+                            <textarea name="text" dir="auto" id="brzc-text"
+                                      class="ft tts-textarea tts-auto-resize"
+                                      rows="4"
+                                      placeholder="{{ 'enter_text_placeholder'|t(lang) }}"
+                                      data-char-counter="brzc-char-counter"
+                                      data-max-chars="{{ engine_max_total_chars }}"
+                                      data-segment-max-chars="{{ gen_split_max_chars }}"
+                                      data-auto-resize="true"></textarea>
+                            <div class="cc" id="brzc-char-counter">0/{{ engine_max_total_chars }} | {{ "per_segment"|t(lang) }} {{ gen_split_max_chars }}{{ "chars"|t(lang) }}</div>
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="brzc-seed">{{ "seed"|t(lang, default="随机种子") }}</label>
+                            <input type="number" id="brzc-seed" name="seed" value="-1" class="fs" min="-1">
+                            <div class="fh">{{ "seed_hint"|t(lang, default="-1 随机；正整数可复现") }}</div>
+                        </div>
+                        <input type="hidden" name="random_seed" id="brzc-random-seed" value="true">
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button type="submit" class="btn-generate">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                    {{ "generate_btn"|t(lang, default="开始生成") }}
+                </button>
+                <div class="gen-hint">Ctrl+Enter</div>
+            </form>
+        </div>
+
+        <!-- ============ Result Column ============ -->
+        <div class="col-result">
+            <div class="card">
+                <div class="card-hdr">
+                    <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+                    {{ "result_audio"|t(lang) }}
+                </div>
+                <div class="card-body">
+                    <div id="brzc-result" aria-live="polite">
+                        <div id="brzc-spinner" class="htmx-indicator" style="display:none">
+                            <div class="hint-text">{{ "generating"|t(lang) }}</div>
+                            <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+                        </div>
+                        <div class="status-message" id="brzc-status" aria-live="polite"></div>
+                        <div class="empty-state" id="brzc-empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:0.35;margin-bottom:12px"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg>
+                            <p class="empty-state-title">{{ "no_result_yet"|t(lang) }}</p>
+                            <p class="empty-state-desc">{{ "upload_ref_then_generate"|t(lang) }}</p>
+                        </div>
+                    </div>
+                    <audio class="tts-audio-hidden" id="brzc-audio"></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    TTSForm.init({
+        formId: 'brzc-form',
+        resultId: 'brzc-result',
+        statusId: 'brzc-status',
+        textareaId: 'brzc-text',
+        counterId: 'brzc-char-counter',
+        maxChars: {{ engine_max_total_chars }},
+        segmentMaxChars: {{ gen_split_max_chars }},
+        counterClass: 'tts-char-counter'
+    });
+
+    window.updateBrzcFileName = function(input) {
+        var nameEl = document.getElementById('brzc-ref-audio-name');
+        var previewEl = document.getElementById('brzc-audio-preview');
+        var previewAudio = document.getElementById('brzc-preview-audio');
+        if (input.files && input.files.length > 0) {
+            nameEl.textContent = input.files[0].name;
+            var url = URL.createObjectURL(input.files[0]);
+            previewAudio.src = url;
+            previewEl.style.display = '';
+        } else {
+            nameEl.textContent = '{{ "upload_clone_ref"|t(lang) }}';
+            previewEl.style.display = 'none';
+        }
+    };
+
+    // seed 联动 random_seed：填了正整数即关闭随机开关（可复现）
+    var seedInput = document.getElementById('brzc-seed');
+    seedInput.addEventListener('input', function() {
+        document.getElementById('brzc-random-seed').value = (parseInt(seedInput.value, 10) >= 0) ? 'false' : 'true';
+    });
+
+    document.getElementById('brzc-text').addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('brzc-form').requestSubmit();
+        }
+    });
+})();
+</script>
+
+<script>
+// 引擎版本守卫（同 indextts2_clone 口径）
+(function() {
+    window.__CURRENT_ENGINE__ = window.__CURRENT_ENGINE__ || '{{ current_engine }}';
+    var form = document.getElementById('brzc-form');
+    if (!form) return;
+    form.addEventListener('htmx:beforeRequest', function(evt) {
+        var eng = window.__CURRENT_ENGINE__;
+        if (eng && eng !== 'breeze-tts2') {
+            evt.preventDefault();
+            var msg = '当前激活引擎为 ' + eng + '；本页需 Breeze TTS 2 权重，请先到模型页切换引擎后再生成';
+            var st = document.getElementById('brzc-status');
+            if (st) {
+                st.className = 'status-message error';
+                st.textContent = msg;
+            } else if (typeof window.showToast === 'function') {
+                window.showToast(msg, 'error');
+            }
+        }
+    });
+})();
+</script>

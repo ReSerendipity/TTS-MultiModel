@@ -55,21 +55,21 @@ dependencies = [
     "torch>=2.5.1",
     "torchvision>=0.20.1",
     "torchaudio>=2.5.1",
-    # 版本策略：上界是实测钉出来的，不是保守猜测。IndexTTS 2.0/2.5 的发行元数据要求
-    # transformers==4.52.1 + tokenizers==0.21.0；2026-09-21 在 4.57.6 下实测
-    # `indextts.infer_v2_5` / `infer_v2` 导入失败（两个引擎直接起不来，VoxCPM2 正常），
-    # 而 4.52.1 + tokenizers 0.21.0 下三引擎真推理全通（2.5：214,040 B / RMS 6176；
-    # 2.0：205,124 B / RMS 6926；VoxCPM2：230,148 B / RMS 4615）。
-    # 代价（2026-09-21 按 api.osv.dev 实测，不是估算）：4.52.x 带 **16 个** transformers 公告
-    # —— A1–A4 要 4.53（被上面的引擎 pin 挡住）、A5–A8 要 5.x 大版本、A9–A16 这 8 条
-    # **上游根本没有修复版本**。已按"已接受风险"逐条登记理由与可达性判据在
-    # docs/SECURITY_DEPENDABOT_TRIAGE.md §1，并在 pip-audit（security.yml，16 个 PYSEC 号）
-    # 与 Trivy（.trivyignore.yaml，只剩 3 条，因为那两步带 severity:CRITICAL,HIGH +
-    # ignore-unfixed:true 过滤）里绑理由豁免——**新出现的公告仍会让门禁变红**。
-    # 注意 pip-audit 没有到期机制，这 16 条靠文档 §4 的 2026-12-31 复审约定守着。
-    # 抬这个上界之前必须先确认 IndexTTS 侧已适配。
+    # 版本策略：上界是实测钉出来的，不是保守猜测。
+    # - 2026-09-21 曾把上界钉在 <4.53：当时 4.57.6 下 `indextts.infer_v2_5`/`infer_v2`
+    #   顶层 ImportError（QuantizedCacheConfig 等 4 个符号在 4.53+ 被移除）。
+    # - 2026-10-25 为接入 Breeze TTS 2（其模型代码要求 transformers>=4.57）抬到 4.57.3：
+    #   indextts 的 4 处断裂由 `engines/indextts_tf_compat.py` shim 在导入前回填修复
+    #   （幂等、hasattr 守卫，<=4.52 环境 no-op），.venv 实测两模块导入全通；
+    #   Breeze vendored 代码链在 4.57.3 + torch 2.13 下导入全通。
+    # - IndexTTS 真机推理回归与三引擎冒烟验收记录见
+    #   docs/plans/BREEZE_TTS2_INTEGRATION_GUIDE.md。
+    # 安全面：4.52.x 原带 16 个 transformers 公告（A1–A4 需 4.53+），本次抬升直接
+    # 消解其中 4 条；其余（需 5.x 或上游无修复版）维持
+    # docs/SECURITY_DEPENDABOT_TRIAGE.md §1 的登记口径，pip-audit/Trivy 豁免清单
+    # 需随本次抬升按该文档 §4 复审约定同步复核。
     # tests/test_dependency_consistency.py 会核对：本声明与 requirements-lock.txt 的钉版互相满足。
-    "transformers>=4.52.1,<4.53",
+    "transformers>=4.57.3,<4.58",
     "tokenizers>=0.21.0,<0.24",
     # === AI 生态 ===
     "funasr>=1.0.0",

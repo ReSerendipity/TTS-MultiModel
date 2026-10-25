@@ -598,11 +598,79 @@ STEP_AUDIO_EDITX_UI_DATA = EngineUIData(
 # 引擎注册表
 # ---------------------------------------------------------------------------
 
+BREEZE_TTS2_UI_DATA = EngineUIData(
+    engine_id="breeze-tts2",
+    name_i18n="engine.breeze.name",
+    description_i18n="engine.breeze.description",
+    version="2",
+    min_vram_gb=7.5,
+    recommended_vram_gb=12.0,
+    features=[
+        EngineFeature.VOICE_DESIGN,
+        EngineFeature.VOICE_CLONE,
+        EngineFeature.ULTIMATE_CLONE,
+        EngineFeature.STREAMING,
+    ],
+    tab_order=30,
+    icon="wind",
+    color="#0ea5e9",
+    sample_rate=24000,
+    params=[
+        ParamDefinition(
+            key="text",
+            label_i18n="param.text.label",
+            description_i18n="param.breeze.text.description",
+            param_type=ParamType.TEXTAREA,
+            group=ParamGroup.BASIC,
+            placeholder_i18n="param.breeze.text.placeholder",
+            required=True,
+        ),
+        ParamDefinition(
+            key="instruction",
+            label_i18n="param.breeze.instruction.label",
+            description_i18n="param.breeze.instruction.description",
+            param_type=ParamType.TEXTAREA,
+            group=ParamGroup.BASIC,
+            placeholder_i18n="param.breeze.instruction.placeholder",
+        ),
+        ParamDefinition(
+            key="ref_text",
+            label_i18n="param.breeze.ref_text.label",
+            description_i18n="param.breeze.ref_text.description",
+            param_type=ParamType.TEXTAREA,
+            group=ParamGroup.REFERENCE,
+            placeholder_i18n="param.breeze.ref_text.placeholder",
+        ),
+        ParamDefinition(
+            key="cfg_scale",
+            label_i18n="param.breeze.cfg.label",
+            description_i18n="param.breeze.cfg.description",
+            param_type=ParamType.SLIDER,
+            group=ParamGroup.ADVANCED,
+            default=4.0,
+            min=1.0,
+            max=8.0,
+            step=0.5,
+            affects_quality=True,
+        ),
+        ParamDefinition(
+            key="seed",
+            label_i18n="param.seed.label",
+            description_i18n="param.seed.description",
+            param_type=ParamType.SEED,
+            group=ParamGroup.ADVANCED,
+            default=-1,
+        ),
+    ],
+)
+
+
 _ENGINE_UI_REGISTRY: dict[str, EngineUIData] = {
     VOXCPM2_UI_DATA.engine_id: VOXCPM2_UI_DATA,
     INDEXTTTS2_UI_DATA.engine_id: INDEXTTTS2_UI_DATA,
     VOICEBOX_UI_DATA.engine_id: VOICEBOX_UI_DATA,
     STEP_AUDIO_EDITX_UI_DATA.engine_id: STEP_AUDIO_EDITX_UI_DATA,
+    BREEZE_TTS2_UI_DATA.engine_id: BREEZE_TTS2_UI_DATA,
 }
 
 

@@ -25,6 +25,7 @@ OWN_PREFIX = {
     "voxcpm2": ("/api/generate/voxcpm",),
     "indextts2": ("/api/generate/indextts2",),
     "indextts20": ("/api/generate/indextts2",),
+    "breeze-tts2": ("/api/generate/breeze_",),
 }
 
 _STUB = """

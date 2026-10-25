@@ -525,14 +525,21 @@ class IndexTTS2Engine(TTSEngine):
         try:
             import importlib
 
+            # transformers >=4.53 兼容：上游 indextts 顶层导入 4 个已被移除的符号，
+            # 由 shim 在导入前回填（幂等；<=4.52 环境自动 no-op）。详见模块 docstring。
+            from .indextts_tf_compat import apply as _apply_tf_compat
+
+            _apply_tf_compat()
+
             _infer_mod = importlib.import_module(self._infer_module)
             IndexTTS2 = _infer_mod.IndexTTS2
         except ImportError as e:
             raise ImportError(
                 f"indextts 未安装或缺少 {self._infer_module} 推理模块"
                 f"（底层错误：{type(e).__name__}: {e}）。"
-                "若 indextts 已安装，多半是 transformers 版本不匹配——本引擎按 "
-                "transformers 4.52.1 验证通过，4.57.x 下该模块导入会失败。"
+                "若 indextts 已安装，请确认 transformers 版本在声明的支持区间"
+                "（requirements-lock.txt 钉版为权威口径；4.57.3 已由"
+                " indextts_tf_compat shim 实测兼容导入）。"
                 "确未安装时（PyPI 无 'indextts' 包）从官方仓库装：\n"
                 "  git clone https://github.com/index-tts/index-tts.git\n"
                 "  cd index-tts && pip install -e .\n"
