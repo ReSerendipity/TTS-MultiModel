@@ -165,7 +165,7 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
 
         self._validate_model_files()
 
-        from ..gpu_backend import GPUBackend, GPUBackendManager
+        from ...gpu_backend import GPUBackend, GPUBackendManager
 
         backend = GPUBackendManager.detect_backend()
         device: str = self.device or ""

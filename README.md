@@ -4,8 +4,8 @@
 
 **多模型语音合成平台 · Multi-Model Text-to-Speech Platform**
 
-五引擎开源语音合成：声音克隆、声音设计、多角色剧本配音，一个 Web UI 全搞定。
-Five open-source TTS engines — voice cloning, voice design, multi-character script dubbing — behind one web UI.
+六引擎开源语音合成：声音克隆、声音设计、多角色剧本配音，一个 Web UI 全搞定。
+Six open-source TTS engines — voice cloning, voice design, multi-character script dubbing — behind one web UI.
 
 [![CI](https://github.com/ReSerendipity/TTS-MultiModel/actions/workflows/ci.yml/badge.svg)](https://github.com/ReSerendipity/TTS-MultiModel/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/ReSerendipity/TTS-MultiModel?label=release)](https://github.com/ReSerendipity/TTS-MultiModel/releases)
@@ -28,13 +28,13 @@ Five open-source TTS engines — voice cloning, voice design, multi-character sc
 
 ### 项目简介
 
-**TTS MultiModel** 是一个自托管的多引擎语音合成（TTS）平台。它把 VoxCPM2、IndexTTS 2.5、IndexTTS 2.0、OpenVoice、Step-Audio-EditX 五套本地引擎统一到同一个 FastAPI + HTMX Web 界面里，外加一个 Edge-TTS 在线兜底引擎（CPU 可用），让你在一个工作台里完成声音设计、零样本/极致声音克隆、多角色剧本配音、语音转换与音频编辑，而不必在多个工具之间来回切换。
+**TTS MultiModel** 是一个自托管的多引擎语音合成（TTS）平台。它把 VoxCPM2、IndexTTS 2.5、IndexTTS 2.0、OpenVoice、Step-Audio-EditX、Breeze TTS 2 六套本地引擎统一到同一个 FastAPI + HTMX Web 界面里，外加一个 Edge-TTS 在线兜底引擎（CPU 可用），让你在一个工作台里完成声音设计、零样本/极致声音克隆、多角色剧本配音、语音转换与音频编辑，而不必在多个工具之间来回切换。
 
 项目**代码以 Apache-2.0 开源，本身不打包任何模型权重**——权重由你从各模型官方仓库自行下载，使用前请核对每个模型的许可（见下方「模型许可」）。
 
 ### 核心特性
 
-- **五引擎统一编排**：声明式引擎注册表，VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX 灵活切换；Edge-TTS 在线引擎在无 GPU 时自动兜底。
+- **六引擎统一编排**：声明式引擎注册表，VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX / Breeze TTS 2 灵活切换；Edge-TTS 在线引擎在无 GPU 时自动兜底。
 - **声音克隆**：少量参考音频即可零样本克隆；「极致克隆」支持参考音频 + 转写文本做更精细的音色还原。
 - **声音设计**：用自然语言描述目标音色（如「温柔清晰的女声」）直接生成语音，无需参考音频。
 - **剧本配音**：多角色对话剧本自动分配说话人，逐条试听、批量合成。
@@ -45,7 +45,7 @@ Five open-source TTS engines — voice cloning, voice design, multi-character sc
 
 ![系统架构](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg)
 
-客户端（Web UI / CLI / OpenAI 兼容 API）→ FastAPI 引擎注册表 → 五套本地引擎 + Edge-TTS 在线兜底 → SQLite 历史 / outputs / personas。
+客户端（Web UI / CLI / OpenAI 兼容 API）→ FastAPI 引擎注册表 → 六套本地引擎 + Edge-TTS 在线兜底 → SQLite 历史 / outputs / personas。
 
 ### 快速开始
 
@@ -113,7 +113,7 @@ CLI 目前覆盖 VoxCPM2 的 design / clone / batch 三种模式；IndexTTS 合�
 1. **一定要有 GPU 吗？** 本地引擎建议 GPU，但项目注册了 Edge-TTS 在线兜底引擎，无 GPU 也能在 CPU 上体验完整界面与在线合成；要跑 VoxCPM2 / IndexTTS 等本地引擎则建议 6.5 GB+ 显存。
 2. **模型权重从哪里来？** 框架本身不含权重。运行 `python scripts/download_models.py --all` 从官方仓库下载到 `model/` 对应子目录；也可手动下载。
 3. **LoRA 微调现在能用吗？** LoRA 训练链路已随仓库提供（`pip install -e .[training]`），但属实验特性、未经真机训练验证，12 GB 显存上训练前需先卸载推理引擎以免 OOM。
-4. **商用需要注意什么？** 项目代码 Apache-2.0 可商用；但各模型权重许可不同——IndexTTS 2.5/2.0 采用 bilibili Model Use License，商用须事先向 bilibili 登记并取得书面授权，详见 `docs/model-cards/`。
+4. **商用需要注意什么？** 项目代码 Apache-2.0 可商用；但各模型权重许可不同——IndexTTS 2.5/2.0 采用 bilibili Model Use License，商用须事先向 bilibili 登记并取得书面授权；Breeze TTS 2 权重与自托管输出仅限研究/非商用，详见 `docs/model-cards/`。
 
 ### 文档与治理
 
@@ -138,13 +138,13 @@ CLI 目前覆盖 VoxCPM2 的 design / clone / batch 三种模式；IndexTTS 合�
 
 ### Overview
 
-**TTS MultiModel** is a self-hosted, multi-engine Text-to-Speech platform. It unifies five local engines — VoxCPM2, IndexTTS 2.5, IndexTTS 2.0, OpenVoice, and Step-Audio-EditX — behind a single FastAPI + HTMX web UI, with an optional Edge-TTS online fallback engine that runs on CPU. One workbench covers voice design, zero-shot / ultimate voice cloning, multi-character script dubbing, voice conversion, and audio editing.
+**TTS MultiModel** is a self-hosted, multi-engine Text-to-Speech platform. It unifies six local engines — VoxCPM2, IndexTTS 2.5, IndexTTS 2.0, OpenVoice, Step-Audio-EditX, and Breeze TTS 2 — behind a single FastAPI + HTMX web UI, with an optional Edge-TTS online fallback engine that runs on CPU. One workbench covers voice design, zero-shot / ultimate voice cloning, multi-character script dubbing, voice conversion, and audio editing.
 
 The **code is Apache-2.0 and ships with no model weights**. You download weights from each model's official repository and comply with that model's own license before use (see "Model licenses" below).
 
 ### Highlights
 
-- **Five engines, one registry**: VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX, switched from a declarative registry; Edge-TTS acts as a CPU-friendly online fallback.
+- **Six engines, one registry**: VoxCPM2 / IndexTTS 2.5 / IndexTTS 2.0 / OpenVoice / Step-Audio-EditX / Breeze TTS 2, switched from a declarative registry; Edge-TTS acts as a CPU-friendly online fallback.
 - **Voice cloning**: zero-shot cloning from a short reference clip; "ultimate clone" pairs reference audio with its transcript for finer timbre fidelity.
 - **Voice design**: describe the target timbre in plain language (e.g. "warm, clear female voice") and synthesize without any reference audio.
 - **Script dubbing**: assign speakers line by line in a multi-character script and batch-render all lines.
@@ -155,7 +155,7 @@ The **code is Apache-2.0 and ships with no model weights**. You download weights
 
 ![Architecture](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg)
 
-Clients (web UI / CLI / OpenAI-compatible API) → FastAPI engine registry → five local engines + Edge-TTS online fallback → SQLite history / outputs / personas.
+Clients (web UI / CLI / OpenAI-compatible API) → FastAPI engine registry → six local engines + Edge-TTS online fallback → SQLite history / outputs / personas.
 
 ### Quick start
 

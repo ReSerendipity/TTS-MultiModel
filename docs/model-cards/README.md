@@ -32,6 +32,7 @@
 | 卡片 | 对应权重目录 | 复验覆盖 |
 |---|---|---|
 | `VoxCPM2.yaml` / `SenseVoiceSmall.yaml` / `speech_zipenhancer.yaml` / `IndexTTS-2.5.yaml` / `IndexTTS-2.0.yaml` | 同名目录 | ✅ 均在 `configs/model_integrity_manifest.json` 内（合计 30 文件） |
+| `Breeze-TTS-2.yaml` | `Breeze-TTS-2` | 校验走 `docs/SHA256SUMS.models`（三大权重分片哈希与 ModelScope 官方值一致） |
 | （缺卡片） | `model/OpenVoice/`（引擎 `voicebox`）、`model/Step-Audio-EditX/`（引擎 `step-audio-editx`） | ❌ 两目录**未纳入** `model_integrity_manifest.json`，因而也无 SHA 复验 |
 
 > 上述两个缺口是**待补项**（补卡片 + 纳入完整性清单），不是"已核验"；在补齐前，这两个引擎的权重完整性不在此台账可追溯范围内。
