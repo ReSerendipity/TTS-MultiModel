@@ -223,7 +223,7 @@ The CLI currently covers VoxCPM2 `design` / `clone` / `batch`. IndexTTS synthesi
 1. **Do I need a GPU?** Local engines prefer one, but the registered Edge-TTS fallback lets you explore the full UI on CPU; run VoxCPM2 / IndexTTS etc. with 6.5 GB+ VRAM.
 2. **Where do model weights come from?** The framework bundles none. Run `python scripts/download_models.py --all` to fetch them into the matching `model/` subdirectories, or download manually.
 3. **Is LoRA training ready?** The training path ships in-repo (`pip install -e .[training]`) but is experimental and not yet validated on real hardware; unload inference engines first on a 12 GB card to avoid OOM.
-4. **Can I use this commercially?** The code is Apache-2.0, but weight licenses differ — IndexTTS 2.5/2.0 use the bilibili Model Use License and require prior written registration for commercial use. See `docs/model-cards/`.
+4. **Can I use this commercially?** The code is Apache-2.0, but weight licenses differ — IndexTTS 2.5/2.0 use the bilibili Model Use License and require prior written registration for commercial use; Breeze TTS 2 weights and self-hosted outputs are research/non-commercial only. See `docs/model-cards/`.
 
 ### Docs & governance
 
