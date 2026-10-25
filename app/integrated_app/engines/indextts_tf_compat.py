@@ -49,7 +49,7 @@ def apply() -> None:
             def __init__(self, *args, **kwargs) -> None:  # noqa: D401
                 pass
 
-        _cu.QuantizedCacheConfig = QuantizedCacheConfig
+        setattr(_cu, "QuantizedCacheConfig", QuantizedCacheConfig)  # noqa: B010 - 动态符号注入
         logger.debug("[indextts_tf_compat] 已注入 cache_utils.QuantizedCacheConfig stub")
 
     # ---- ② _crop_past_key_values（4.53 从 candidate_generator 移除）----
@@ -69,7 +69,7 @@ def apply() -> None:
                 return tuple((k[..., :new_cache_size, :], v[..., :new_cache_size, :]) for k, v in past_key_values)
             return past_key_values
 
-        _cg._crop_past_key_values = _crop_past_key_values
+        setattr(_cg, "_crop_past_key_values", _crop_past_key_values)  # noqa: B010 - 动态符号注入
         logger.debug("[indextts_tf_compat] 已注入 candidate_generator._crop_past_key_values")
 
     # ---- ③ NEED_SETUP_CACHE_CLASSES_MAPPING / QUANT_BACKEND_CLASSES_MAPPING ----
@@ -77,18 +77,26 @@ def apply() -> None:
     import transformers.generation.configuration_utils as _gu
 
     if not hasattr(_gu, "NEED_SETUP_CACHE_CLASSES_MAPPING"):
-        _gu.NEED_SETUP_CACHE_CLASSES_MAPPING = {
-            "full": _cu.DynamicCache,
-            "offloaded": _cu.OffloadedCache,
-            "sliding_window": _cu.SlidingWindowCache,
-            "static": _cu.StaticCache,
-        }
+        setattr(  # noqa: B010 - 动态符号注入
+            _gu,
+            "NEED_SETUP_CACHE_CLASSES_MAPPING",
+            {
+                "full": _cu.DynamicCache,
+                "offloaded": _cu.OffloadedCache,
+                "sliding_window": _cu.SlidingWindowCache,
+                "static": _cu.StaticCache,
+            },
+        )
         logger.debug("[indextts_tf_compat] 已注入 configuration_utils.NEED_SETUP_CACHE_CLASSES_MAPPING")
     if not hasattr(_gu, "QUANT_BACKEND_CLASSES_MAPPING"):
-        _gu.QUANT_BACKEND_CLASSES_MAPPING = {
-            "quanto": _cu.QuantoQuantizedCache,
-            "hqq": _cu.HQQQuantizedCache,
-        }
+        setattr(  # noqa: B010 - 动态符号注入
+            _gu,
+            "QUANT_BACKEND_CLASSES_MAPPING",
+            {
+                "quanto": _cu.QuantoQuantizedCache,
+                "hqq": _cu.HQQQuantizedCache,
+            },
+        )
         logger.debug("[indextts_tf_compat] 已注入 configuration_utils.QUANT_BACKEND_CLASSES_MAPPING")
 
     # ---- ④ SequenceSummary（4.53 从 modeling_utils 整体删除）----
@@ -107,5 +115,5 @@ def apply() -> None:
             def forward(self, hidden_states, *args, **kwargs):  # noqa: ANN001, ANN003
                 return hidden_states
 
-        _mu.SequenceSummary = SequenceSummary
+        setattr(_mu, "SequenceSummary", SequenceSummary)  # noqa: B010 - 动态符号注入
         logger.debug("[indextts_tf_compat] 已注入 modeling_utils.SequenceSummary stub")

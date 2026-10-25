@@ -288,6 +288,12 @@ exclude = [
 module = ["integrated_app.vendor.*"]
 ignore_errors = true
 
+# Breeze TTS 2 的固化上游代码（engines/breeze_tts2/vendor/，含 qwen_tts_min 裁剪副本）：
+# 与上同口径——上游字节保持一致，不做本仓类型修缮；引擎适配层 engine.py 仍受检。
+[[tool.mypy.overrides]]
+module = ["integrated_app.engines.breeze_tts2.vendor.*"]
+ignore_errors = true
+
 # training/ 模块为「能力声明未验证」实验模块（综合评估主线：lora/ 无产物），
 # 类型标注欠债整体豁免、待训练能力真正跑通后随产物一并补齐（P1-2 追踪项）。
 [[tool.mypy.overrides]]
