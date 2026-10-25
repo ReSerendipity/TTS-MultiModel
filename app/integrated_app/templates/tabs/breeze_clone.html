@@ -30,10 +30,6 @@
                             <input type="checkbox" name="has_consent" id="brzc-has-consent" value="true" style="margin-top:2px" required>
                             <label for="brzc-has-consent" class="fl" style="font-size:12px;margin:0;line-height:1.5">{{ "consent_declare"|t(lang) }}</label>
                         </div>
-                        <div class="fg" id="brzc-audio-preview" style="display:none">
-                            <label class="fl">{{ "audio_preview"|t(lang) }}</label>
-                            <audio id="brzc-preview-audio" controls style="width:100%"></audio>
-                        </div>
                         <div class="fg">
                             <label class="fl" for="brzc-ref-text">{{ "breeze_ref_text"|t(lang, default="参考音频转写（必填，逐字对齐）") }}</label>
                             <textarea name="ref_text" dir="auto" id="brzc-ref-text" class="ft tts-textarea tts-auto-resize" rows="2"
@@ -120,20 +116,17 @@
 
     // 初始占位文案在 HTML 上下文渲染（自动转义），这里捕获后回填，
     // 避免 Jinja 文本进入 JS 字符串再写 DOM（CodeQL DOM-XSS 口径）。
+    // 不做本地 <audio> 预览：blob URL 赋给媒体元素 src 是 CodeQL
+    // js/xss-through-dom 的 sink（模型不区分元素类型）；参考音频会在
+    // 服务端转码校验，合成结果在右侧结果列即可试听。
     var brzcDefaultName = document.getElementById('brzc-ref-audio-name').textContent;
 
     window.updateBrzcFileName = function(input) {
         var nameEl = document.getElementById('brzc-ref-audio-name');
-        var previewEl = document.getElementById('brzc-audio-preview');
-        var previewAudio = document.getElementById('brzc-preview-audio');
         if (input.files && input.files.length > 0) {
             nameEl.textContent = input.files[0].name;
-            var url = URL.createObjectURL(input.files[0]);
-            previewAudio.src = url;
-            previewEl.style.display = '';
         } else {
             nameEl.textContent = brzcDefaultName;
-            previewEl.style.display = 'none';
         }
     };
 
