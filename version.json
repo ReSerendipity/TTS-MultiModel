@@ -1,6 +1,6 @@
 {
   "version": "2.8.0",
-  "release_date": "2026-10-17",
+  "release_date": "2026-10-26",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.7.0：本版主干是桌面分发与工程治理的闭环——dist 便携分卷打包/NSIS 安装器/增量更新装配链与发布门禁五步（真实资产模式）、desktop 移植 Tauri v2 桌面壳并适配 TTS 语义；引擎侧新增 Step-Audio-EditX 音频编辑、IndexTTS 2.0 可对比接入与 Voicebox VC 零样本音色转换（OpenVoice ToneColorConverter），C2 voicebox MCP 桥接+引擎适配器；运维侧 /readyz 升级为模型就绪流量闸门、SRE/可观测性能力应用层集成、备份/回滚/部署清单与 k8s 清单落地；数据侧 generation_history 血缘字段扩展+双轨训练架构、模型卡目录与 LoRA card.yaml schema；streaming 统一 wireGenerationResult 接线并新增 /api/audio 路由、/v1/audio/speech 支持 stream 参数；guardrail 护栏对抗语料与拦截基线；质量侧感知评分口径（UTMOS2 离线 MOS）/流式真分片（TTFB 门禁）/训练台账与 golden 多引擎多音色基线；安全侧 CSRF 强 fail-closed、path-injection 收敛、内联事件 XSS 收口、错误脱敏与 CodeQL 110 条分诊；ci 侧 gpu_golden_baseline 真实合成基线、锁集交叉约束闸、DCO 按作者豁免自动化、release-please 静默失效修复。口径：main 直推（admin 豁免）为既定工作流；GPU 真跑受 runner 约束按台账 skip。"
+  "changelog": "2.8.0：本版主干是新引擎接入与发布分发口径变更——接入 Breeze TTS 2（BreezeBlue 3.48B 中英双语，Voice Design/Clone/Direction 三态 + 正文内嵌 Vocal Events 事件标记 + 流式生成；上游推理源码 Apache-2.0 已 vendor 固化，音频 tokenizer 走 qwen_tts_min 裁剪副本，零新增重依赖），成为第 6 个本地引擎；transformers 抬升并钉住 4.57.3（IndexTTS 4.53+ 的 4 处导入断裂由 indextts_tf_compat shim 回填，双引擎家族共存实测）；桌面发布包确立 framework-only 口径（历史 v2.2.1/v2.4.0 各 ~26GB 模型 Data 分卷成历史，模型统一经 download_models.py 从 HF 镜像/ModelScope 用户自取，manifest 按包内容动态标注；权重不随发布包分发）；发布链路消解 CodeQL 新增告警并修复通用引擎就绪检查（_check_engine_ready 曾把 breeze-tts2 等已加载引擎误报 VoxCPM2 未加载）；真机验收：12GB 笔记本卡 eager 峰值约 8.3GB、稳态 RTF≈2.5×实时，六轮生成全通过；合规侧 Breeze 权重登记为研究/非商用（model-cards/LICENSE_COMPLIANCE/config 三处一致）。"
 }
