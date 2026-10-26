@@ -47,6 +47,20 @@ Six open-source TTS engines — voice cloning, voice design, multi-character scr
 
 客户端（Web UI / CLI / OpenAI 兼容 API）→ FastAPI 引擎注册表 → 六套本地引擎 + Edge-TTS 在线兜底 → SQLite 历史 / outputs / personas。
 
+### 真实界面截图
+
+以下截图均由源码启动 `python app/clean_launch.py`（`http://127.0.0.1:7869`）实拍，未下载模型权重、未触发合成；引擎未加载时空状态如实呈现。
+
+| 声音设计工作台 | 声音克隆 |
+|---|---|
+| ![声音设计工作台](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-1-voice-design.png) | ![声音克隆](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-2-voice-clone.png) |
+| 文本描述音色，调节语速/音调/情感后生成。 | 上传参考音频克隆音色，支持已保存音色库。 |
+
+| 剧本工坊（多人对话） | 历史记录 |
+|---|---|
+| ![剧本工坊](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-3-batch.png) | ![历史记录](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-4-history.png) |
+| 按 `[角色名] 台词` 格式批量配音，可映射角色音色。 | SQLite 记录生成历史，支持搜索、筛选、分页。 |
+
 ### 快速开始
 
 **环境要求**：Windows 10/11 (64-bit) 或 Linux；Python 3.10+（推荐 3.12）；本地引擎建议 NVIDIA GPU（6.5 GB+ 显存），无 GPU 时可用 Edge-TTS 在线引擎体验。
@@ -156,6 +170,20 @@ The **code is Apache-2.0 and ships with no model weights**. You download weights
 ![Architecture](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg)
 
 Clients (web UI / CLI / OpenAI-compatible API) → FastAPI engine registry → six local engines + Edge-TTS online fallback → SQLite history / outputs / personas.
+
+### Real UI screenshots
+
+Captured live from source: `python app/clean_launch.py` on `http://127.0.0.1:7869`. No model weights downloaded, no synthesis triggered; empty states are shown as-is with engines unloaded.
+
+| Voice design workbench | Voice cloning |
+|---|---|
+| ![Voice design workbench](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-1-voice-design.png) | ![Voice cloning](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-2-voice-clone.png) |
+| Describe the timbre, tune speed/pitch/emotion, then generate. | Upload a reference clip to clone a voice; saved personas library included. |
+
+| Script workshop (multi-character) | Generation history |
+|---|---|
+| ![Script workshop](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-3-batch.png) | ![History](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-4-history.png) |
+| Batch dub lines as `[character] dialogue`, map character voices. | SQLite generation history with search, filter, and pagination. |
 
 ### Quick start
 
