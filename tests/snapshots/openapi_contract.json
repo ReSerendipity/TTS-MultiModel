@@ -49,6 +49,33 @@
       ]
     }
   },
+  "/api/generate/breeze_clone": {
+    "POST": {
+      "operationId": "generate_breeze_clone_api_generate_breeze_clone_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/breeze_design": {
+    "POST": {
+      "operationId": "generate_breeze_design_api_generate_breeze_design_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/generate/breeze_direction": {
+    "POST": {
+      "operationId": "generate_breeze_direction_api_generate_breeze_direction_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
   "/api/generate/cancel": {
     "POST": {
       "operationId": "cancel_generation_api_generate_cancel_post",

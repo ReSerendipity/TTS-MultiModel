@@ -1,0 +1,180 @@
+{# Breeze TTS 2 · Voice Direction tab（克隆音色 + 自然语言指令控制语气/情感/语速） #}
+<div class="pv-theme">
+    <div class="two-col">
+        <!-- ============ Form Column ============ -->
+        <div class="col-form">
+            <form id="brzr-form" hx-post="/api/generate/breeze_direction" hx-target="#brzr-result" hx-swap="innerHTML" hx-indicator="#brzr-spinner" hx-encoding="multipart/form-data">
+                <input type="hidden" name="expected_engine" value="breeze-tts2">
+                <!-- Card: 参考音频与转写 -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+                        {{ "breeze_direction_tab"|t(lang, default="Breeze 声音导演") }}
+                    </div>
+                    <div class="card-body">
+                        <div class="hint-text" style="margin-bottom:10px">
+                            {{ "breeze_direction_desc"|t(lang, default="保留参考音色，同时用指令控制语气/情感/语速（如“说得慢一些，语气克制而严肃”）。需参考音频 + 准确转写 + 指令。") }}
+                        </div>
+                        <div class="fg">
+                            <label class="fl">{{ "ref_audio"|t(lang) }}</label>
+                            <div class="upload-zone" onclick="this.querySelector('input').click()">
+                                <input type="file" id="brzr-ref-audio-input" name="ref_audio" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" style="display:none" onchange="updateBrzrFileName(this)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                <p><span id="brzr-ref-audio-name">{{ "upload_clone_ref"|t(lang) }}</span></p>
+                                <p style="font-size:10px;margin-top:2px">{{ "supported_formats"|t(lang) }} (5-30s)</p>
+                            </div>
+                        </div>
+                        {# P0-1 声音克隆授权 #}
+                        <div class="fg" style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
+                            <input type="checkbox" name="has_consent" id="brzr-has-consent" value="true" style="margin-top:2px" required>
+                            <label for="brzr-has-consent" class="fl" style="font-size:12px;margin:0;line-height:1.5">{{ "consent_declare"|t(lang) }}</label>
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="brzr-ref-text">{{ "breeze_ref_text"|t(lang, default="参考音频转写（必填，逐字对齐）") }}</label>
+                            <textarea name="ref_text" dir="auto" id="brzr-ref-text" class="ft tts-textarea tts-auto-resize" rows="2"
+                                      placeholder="{{ 'breeze_ref_text_ph'|t(lang, default='例如：这是参考音频里说的原话，一字不差。') }}"></textarea>
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="brzr-instruction">{{ "direction_instruction"|t(lang, default="导演指令（语气/情感/语速）") }}</label>
+                            <textarea name="instruction" dir="auto" id="brzr-instruction" class="ft tts-textarea tts-auto-resize" rows="2"
+                                      placeholder="{{ 'breeze_direction_ph'|t(lang, default='例如：Speak slowly with a restrained, serious tone. / 说得慢一些，语气克制而严肃。') }}"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: 合成文本 -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+                        {{ "synthesis_text"|t(lang) }}
+                    </div>
+                    <div class="card-body">
+                        <div class="fg">
+                            <textarea name="text" dir="auto" id="brzr-text"
+                                      class="ft tts-textarea tts-auto-resize"
+                                      rows="4"
+                                      placeholder="{{ 'enter_text_placeholder'|t(lang) }}"
+                                      data-char-counter="brzr-char-counter"
+                                      data-max-chars="{{ engine_max_total_chars }}"
+                                      data-segment-max-chars="{{ gen_split_max_chars }}"
+                                      data-auto-resize="true"></textarea>
+                            <div class="cc" id="brzr-char-counter">0/{{ engine_max_total_chars }} | {{ "per_segment"|t(lang) }} {{ gen_split_max_chars }}{{ "chars"|t(lang) }}</div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label class="fl" for="brzr-cfg">{{ "breeze_cfg"|t(lang, default="指令遵循强度 (CFG)") }}</label>
+                                <input type="range" id="brzr-cfg" name="cfg_scale" min="1" max="8" step="0.5" value="4" class="fs" oninput="document.getElementById('brzr-cfg-val').textContent=this.value">
+                                <div class="fh">{{ "breeze_cfg_hint"|t(lang, default="默认 4（官方推荐）；越高越贴合指令") }} — <span id="brzr-cfg-val">4</span></div>
+                            </div>
+                            <div class="form-col">
+                                <label class="fl" for="brzr-seed">{{ "seed"|t(lang, default="随机种子") }}</label>
+                                <input type="number" id="brzr-seed" name="seed" value="-1" class="fs" min="-1">
+                                <div class="fh">{{ "seed_hint"|t(lang, default="-1 随机；正整数可复现") }}</div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="random_seed" id="brzr-random-seed" value="true">
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button type="submit" class="btn-generate">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                    {{ "generate_btn"|t(lang, default="开始生成") }}
+                </button>
+                <div class="gen-hint">Ctrl+Enter</div>
+            </form>
+        </div>
+
+        <!-- ============ Result Column ============ -->
+        <div class="col-result">
+            <div class="card">
+                <div class="card-hdr">
+                    <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+                    {{ "result_audio"|t(lang) }}
+                </div>
+                <div class="card-body">
+                    <div id="brzr-result" aria-live="polite">
+                        <div id="brzr-spinner" class="htmx-indicator" style="display:none">
+                            <div class="hint-text">{{ "generating"|t(lang) }}</div>
+                            <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+                        </div>
+                        <div class="status-message" id="brzr-status" aria-live="polite"></div>
+                        <div class="empty-state" id="brzr-empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:0.35;margin-bottom:12px"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg>
+                            <p class="empty-state-title">{{ "no_result_yet"|t(lang) }}</p>
+                            <p class="empty-state-desc">{{ "upload_ref_then_generate"|t(lang) }}</p>
+                        </div>
+                    </div>
+                    <audio class="tts-audio-hidden" id="brzr-audio"></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    TTSForm.init({
+        formId: 'brzr-form',
+        resultId: 'brzr-result',
+        statusId: 'brzr-status',
+        textareaId: 'brzr-text',
+        counterId: 'brzr-char-counter',
+        maxChars: {{ engine_max_total_chars }},
+        segmentMaxChars: {{ gen_split_max_chars }},
+        counterClass: 'tts-char-counter'
+    });
+
+    // 初始占位文案在 HTML 上下文渲染（自动转义），这里捕获后回填，
+    // 避免 Jinja 文本进入 JS 字符串再写 DOM（CodeQL DOM-XSS 口径）。
+    // 不做本地 <audio> 预览：blob URL 赋给媒体元素 src 是 CodeQL
+    // js/xss-through-dom 的 sink（模型不区分元素类型）；参考音频会在
+    // 服务端转码校验，合成结果在右侧结果列即可试听。
+    var brzrDefaultName = document.getElementById('brzr-ref-audio-name').textContent;
+
+    window.updateBrzrFileName = function(input) {
+        var nameEl = document.getElementById('brzr-ref-audio-name');
+        if (input.files && input.files.length > 0) {
+            nameEl.textContent = input.files[0].name;
+        } else {
+            nameEl.textContent = brzrDefaultName;
+        }
+    };
+
+    // seed 联动 random_seed：填了正整数即关闭随机开关（可复现）
+    var seedInput = document.getElementById('brzr-seed');
+    seedInput.addEventListener('input', function() {
+        document.getElementById('brzr-random-seed').value = (parseInt(seedInput.value, 10) >= 0) ? 'false' : 'true';
+    });
+
+    document.getElementById('brzr-text').addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('brzr-form').requestSubmit();
+        }
+    });
+})();
+</script>
+
+<script>
+// 引擎版本守卫（同 indextts2_clone 口径）
+(function() {
+    window.__CURRENT_ENGINE__ = window.__CURRENT_ENGINE__ || '{{ current_engine }}';
+    var form = document.getElementById('brzr-form');
+    if (!form) return;
+    form.addEventListener('htmx:beforeRequest', function(evt) {
+        var eng = window.__CURRENT_ENGINE__;
+        if (eng && eng !== 'breeze-tts2') {
+            evt.preventDefault();
+            var msg = '当前激活引擎为 ' + eng + '；本页需 Breeze TTS 2 权重，请先到模型页切换引擎后再生成';
+            var st = document.getElementById('brzr-status');
+            if (st) {
+                st.className = 'status-message error';
+                st.textContent = msg;
+            } else if (typeof window.showToast === 'function') {
+                window.showToast(msg, 'error');
+            }
+        }
+    });
+})();
+</script>

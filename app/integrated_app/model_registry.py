@@ -94,6 +94,10 @@ class EngineName(str, Enum):
         EDGE_TTS (str): "edge-tts" —— Edge-TTS CPU 兜底降级引擎（NEXT 评估 P2-2），
             微软在线 TTS 客户端（网络依赖，edge-tts 包不随仓库分发），
             仅声明 tts + streaming 能力，无本地权重，不参与模型加载路由。
+        BREEZE_TTS2 (str): "breeze-tts2" —— Breeze TTS 2 中英双语引擎
+            （BreezeBlue，3.48B，24kHz），支持 Voice Design / Voice Clone /
+            Voice Direction（ultimate 槽位）/ 流式生成 / Vocal Events
+            （正文内嵌事件标记），eager 推理峰值显存约 7.5GB。
 
     使用示例::
 
@@ -108,6 +112,7 @@ class EngineName(str, Enum):
     VOICEBOX = "voicebox"
     STEP_AUDIO_EDITX = "step-audio-editx"
     EDGE_TTS = "edge-tts"
+    BREEZE_TTS2 = "breeze-tts2"
 
 
 #: IndexTTS 家族成员集合。2.5（indextts2）与 2.0（indextts20）是同一推理
@@ -127,6 +132,7 @@ ENGINE_DISPLAY_NAMES: dict[str, str] = {
     EngineName.VOICEBOX.value: "Voicebox VC",
     EngineName.STEP_AUDIO_EDITX.value: "Step-Audio-EditX",
     EngineName.EDGE_TTS.value: "Edge-TTS",
+    EngineName.BREEZE_TTS2.value: "Breeze TTS 2",
 }
 
 #: 各引擎的基线显存需求字典（单位 GB，浮点数）。
@@ -141,6 +147,7 @@ ENGINE_VRAM_REQUIREMENTS: dict[str, float] = {
     EngineName.VOICEBOX.value: 4.0,
     EngineName.STEP_AUDIO_EDITX.value: 8.0,
     EngineName.EDGE_TTS.value: 0.0,
+    EngineName.BREEZE_TTS2.value: 7.5,
 }
 
 #: 配置读取失败时使用的默认显存安全裕度倍数。

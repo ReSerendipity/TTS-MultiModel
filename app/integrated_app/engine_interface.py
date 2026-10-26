@@ -952,6 +952,22 @@ def _register_builtin_engines() -> None:
         quality="high",
     )
 
+    # Breeze TTS 2 - 中英双语高表现力引擎（Voice Design / Direction 双控 + Vocal Events）
+    # 纯懒导入：vendor 代码仅依赖已声明的 transformers/torch 链，但模型加载重
+    # （bf16 约 7GB + audio_tokenizer 682MB），保持启动零成本。
+    # 权重与自托管输出为 BreezeBlue 研究/非商用许可（config.yaml license 字段登记）。
+    engine_registry.register(
+        "breeze-tts2",
+        lazy_module=".engines.breeze_tts2.engine:BreezeTTSEngine",
+        display_name="Breeze TTS 2",
+        vram_requirement=7.5,
+        languages=["zh", "en"],
+        supported_features=["voice_design", "clone", "ultimate", "streaming", "vocal_events"],
+        sample_rate=24000,
+        requires_gpu=True,
+        quality="high",
+    )
+
 
 _register_builtin_engines()
 

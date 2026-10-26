@@ -242,6 +242,31 @@
                         <span class="sidebar-label-text">{{ "tab_indextts20_emotion" | t(lang) }}</span>
                     </button>
                 </div>
+                <div class="sidebar-nav-section" data-section-model="breeze-tts2" data-engine-name="Breeze TTS 2">
+                    <div class="sidebar-nav-label"><span class="sidebar-nav-label-text">{{ "breeze_section"|t(lang, default="Breeze TTS 2") }}</span></div>
+                    <button class="sidebar-item" data-tab="breeze_design" data-model="breeze-tts2"
+                            hx-get="/tab/breeze_design?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            onclick="TTSApp.sidebar.activateTab(this)"
+                            title="{{ 'tab_breeze_design'|t(lang, default='Breeze 声音设计') }}">
+                        <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg>
+                        <span class="sidebar-label-text">{{ "tab_breeze_design"|t(lang, default="Breeze 声音设计") }}</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="breeze_clone" data-model="breeze-tts2"
+                            hx-get="/tab/breeze_clone?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            onclick="TTSApp.sidebar.activateTab(this)"
+                            title="{{ 'tab_breeze_clone'|t(lang, default='Breeze 声音克隆') }}">
+                        <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/><path d="M8 22h8"/></svg>
+                        <span class="sidebar-label-text">{{ "tab_breeze_clone"|t(lang, default="Breeze 声音克隆") }}</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="breeze_direction" data-model="breeze-tts2"
+                            hx-get="/tab/breeze_direction?lang={{ lang }}" hx-target="#tab-content" hx-swap="innerHTML" hx-sync="#tab-content:queue last" hx-trigger="click throttle:300ms" hx-indicator="#tab-loading"
+                            onclick="TTSApp.sidebar.activateTab(this)"
+                            title="{{ 'tab_breeze_direction'|t(lang, default='Breeze 声音导演') }}"
+                            role="tab" aria-selected="false" aria-controls="tab-content">
+                        <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M16 8l-4 4 4 4"/><line x1="8" x2="12" y1="12" y2="12"/></svg>
+                        <span class="sidebar-label-text">{{ "tab_breeze_direction"|t(lang, default="Breeze 声音导演") }}</span>
+                    </button>
+                </div>
                 <div class="sidebar-nav-section sidebar-tools-section">
                     <div class="sidebar-nav-label">{{ "tools_section" | t(lang) }}</div>
                     <!-- 通用菜单 — 全部整合到"工具"区域 -->

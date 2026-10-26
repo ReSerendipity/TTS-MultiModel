@@ -1,0 +1,26 @@
+card_schema_version: "1.0"
+model_dir: Breeze-TTS-2
+display_name: Breeze TTS 2
+engine_adapter: app/integrated_app/engines/breeze_tts2/engine.py
+upstream_source: ModelScope BreezeBlue/Breeze-TTS-2（HF 镜像同名仓库；
+  推理源码 github.com/breezeblue-ai/breeze-tts 已 vendor 至
+  engines/breeze_tts2/vendor/，上游 commit 见 vendor/README.md）
+license_upstream: 推理源码 Apache-2.0；模型权重、衍生模型与自托管输出为
+  BreezeBlue Research and Non-Commercial License（研究/非商用，
+  https://huggingface.co/BreezeBlue/Breeze-TTS-2/blob/main/LICENSE）
+integrity:
+  manifest: docs/SHA256SUMS.models
+  file_count: 3（三大权重分片；哈希与 ModelScope 官方 API 公布值一致）
+owner: ReSerendipity
+status: active
+notes: |
+  中英双语高表现力引擎（Artificial Analysis TTS 榜开源权重第一）。
+  3.48B：T5Gemma2 文本编码器 + Qwen3 backbone + Qwen3-TTS 12Hz codec，24kHz 输出。
+  四大能力：Voice Clone（参考音频+准确转写）、Voice Design（自然语言音色描述，
+  CFG=4）、Voice Direction（克隆+指令控制，走 ultimate 协议槽位）、
+  Vocal Events（正文内嵌 (laugh)/[笑] 等事件标记）。
+  运行约束：eager 注意力 + 全部 fast 阶段关闭（CUDA Graph fast path 仅限
+  Linux + 14.4GiB 显存），bf16 峰值显存约 7.5GiB（社区 RTX 5090 实测），
+  12GB 卡为最低配置；单次文本上限 2000 字符（2048 token 序列约束）。
+  依赖：transformers>=4.57.3（qwen_tts_min 裁剪副本随引擎 vendor，
+  不引入 PyPI qwen-tts 及其 gradio/onnxruntime 重依赖）。

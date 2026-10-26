@@ -617,7 +617,9 @@ def _check_engine_ready(
             # indextts2 与 indextts20 共用同一个引擎对象，用 current_engine 区分 2.5 / 2.0
             loaded = registry.current_engine if registry.current_engine in ("indextts2", "indextts20") else "indextts2"
         else:
-            loaded = None
+            # 通用新式引擎（breeze-tts2 等）：registry 无专属槽位，按当前引擎实例判定
+            _cur = registry.current_engine
+            loaded = _cur if _cur and registry.get_engine_instance(_cur) is not None else None
         need = registry.get_engine_display_name(need_engine)
         if loaded and loaded != need_engine:
             have = registry.get_engine_display_name(loaded)
@@ -633,9 +635,14 @@ def _check_engine_ready(
     if engine_name in ("indextts2", "indextts20"):
         if registry.indextts2_engine is None:
             return _not_ready_html(engine_name)
-    else:
+    elif engine_name == "voxcpm2":
         if registry.voxcpm_model is None:
             return _not_ready_html("voxcpm2")
+    else:
+        # 通用新式引擎（breeze-tts2 等）：registry._engines 无专属槽位，
+        # 按 set_engine_loaded 登记的实例是否存在判就绪（实例化即已加载）。
+        if engine_name is None or registry.get_engine_instance(engine_name) is None:
+            return _not_ready_html(engine_name or "voxcpm2")
     return None
 
 

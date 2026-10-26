@@ -1,0 +1,135 @@
+{# Breeze TTS 2 · Voice Design tab（自然语言描述音色，无参考音频）
+   两栏布局：表单（左 65%）+ 结果（右 35%），与 indextts2_clone 同款视觉。 #}
+<div class="pv-theme">
+    <div class="two-col">
+        <!-- ============ Form Column ============ -->
+        <div class="col-form">
+            <form id="brzd-form" hx-post="/api/generate/breeze_design" hx-target="#brzd-result" hx-swap="innerHTML" hx-indicator="#brzd-spinner" hx-encoding="multipart/form-data">
+                <input type="hidden" name="expected_engine" value="breeze-tts2">
+                <!-- Card: 音色描述 -->
+                <div class="card">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg></span>
+                        {{ "breeze_design_tab"|t(lang, default="Breeze 声音设计") }}
+                    </div>
+                    <div class="card-body">
+                        <div class="hint-text" style="margin-bottom:10px">
+                            {{ "breeze_design_desc"|t(lang, default="用自然语言描述音色（如“一位温柔自信的年轻女性，声音清晰，表达轻快”），无需参考音频。正文可内嵌事件标记：英文 (laugh)、中文 [笑]。") }}
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="brzd-instruction">{{ "voice_description"|t(lang, default="音色描述") }}</label>
+                            <textarea name="instruction" dir="auto" id="brzd-instruction" class="ft tts-textarea tts-auto-resize" rows="2"
+                                      placeholder="{{ 'breeze_instruction_ph'|t(lang, default='例如：A warm, thoughtful young woman with a calm delivery. / 一位温柔沉稳的年轻女性') }}"></textarea>
+                        </div>
+                        <div class="fg">
+                            <label class="fl" for="brzd-text">{{ "synthesis_text"|t(lang) }}</label>
+                            <textarea name="text" dir="auto" id="brzd-text" class="ft tts-textarea tts-auto-resize" rows="4"
+                                      placeholder="{{ 'enter_text_placeholder'|t(lang) }}"
+                                      data-char-counter="brzd-char-counter"
+                                      data-max-chars="{{ engine_max_total_chars }}"
+                                      data-segment-max-chars="{{ gen_split_max_chars }}"
+                                      data-auto-resize="true"></textarea>
+                            <div class="cc" id="brzd-char-counter">0/{{ engine_max_total_chars }} | {{ "per_segment"|t(lang) }} {{ gen_split_max_chars }}{{ "chars"|t(lang) }}</div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label class="fl" for="brzd-cfg">{{ "breeze_cfg"|t(lang, default="指令遵循强度 (CFG)") }}</label>
+                                <input type="range" id="brzd-cfg" name="cfg_scale" min="1" max="8" step="0.5" value="4" class="fs" oninput="document.getElementById('brzd-cfg-val').textContent=this.value">
+                                <div class="fh">{{ "breeze_cfg_hint"|t(lang, default="默认 4（官方推荐）；越高越贴合描述，过低则接近默认音色") }} — <span id="brzd-cfg-val">4</span></div>
+                            </div>
+                            <div class="form-col">
+                                <label class="fl" for="brzd-seed">{{ "seed"|t(lang, default="随机种子") }}</label>
+                                <input type="number" id="brzd-seed" name="seed" value="-1" class="fs" min="-1">
+                                <div class="fh">{{ "seed_hint"|t(lang, default="-1 随机；正整数可复现") }}</div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="random_seed" id="brzd-random-seed" value="true">
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button type="submit" class="btn-generate">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                    {{ "generate_btn"|t(lang, default="开始生成") }}
+                </button>
+                <div class="gen-hint">Ctrl+Enter</div>
+            </form>
+        </div>
+
+        <!-- ============ Result Column ============ -->
+        <div class="col-result">
+            <div class="card">
+                <div class="card-hdr">
+                    <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+                    {{ "result_audio"|t(lang) }}
+                </div>
+                <div class="card-body">
+                    <div id="brzd-result" aria-live="polite">
+                        <div id="brzd-spinner" class="htmx-indicator" style="display:none">
+                            <div class="hint-text">{{ "generating"|t(lang) }}</div>
+                            <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+                        </div>
+                        <div class="status-message" id="brzd-status" aria-live="polite"></div>
+                        <div class="empty-state" id="brzd-empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:0.35;margin-bottom:12px"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg>
+                            <p class="empty-state-title">{{ "no_result_yet"|t(lang) }}</p>
+                            <p class="empty-state-desc">{{ "breeze_design_empty"|t(lang, default="填写音色描述与正文后点击生成") }}</p>
+                        </div>
+                    </div>
+                    <audio class="tts-audio-hidden" id="brzd-audio"></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    TTSForm.init({
+        formId: 'brzd-form',
+        resultId: 'brzd-result',
+        statusId: 'brzd-status',
+        textareaId: 'brzd-text',
+        counterId: 'brzd-char-counter',
+        maxChars: {{ engine_max_total_chars }},
+        segmentMaxChars: {{ gen_split_max_chars }},
+        counterClass: 'tts-char-counter'
+    });
+
+    // seed 联动 random_seed：填了正整数即关闭随机开关（可复现）
+    var seedInput = document.getElementById('brzd-seed');
+    seedInput.addEventListener('input', function() {
+        document.getElementById('brzd-random-seed').value = (parseInt(seedInput.value, 10) >= 0) ? 'false' : 'true';
+    });
+
+    document.getElementById('brzd-text').addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('brzd-form').requestSubmit();
+        }
+    });
+})();
+</script>
+
+<script>
+// 引擎版本守卫（同 indextts2_clone 口径：高亮与内容分家时阻断而非静默错跑）
+(function() {
+    window.__CURRENT_ENGINE__ = window.__CURRENT_ENGINE__ || '{{ current_engine }}';
+    var form = document.getElementById('brzd-form');
+    if (!form) return;
+    form.addEventListener('htmx:beforeRequest', function(evt) {
+        var eng = window.__CURRENT_ENGINE__;
+        if (eng && eng !== 'breeze-tts2') {
+            evt.preventDefault();
+            var msg = '当前激活引擎为 ' + eng + '；本页需 Breeze TTS 2 权重，请先到模型页切换引擎后再生成';
+            var st = document.getElementById('brzd-status');
+            if (st) {
+                st.className = 'status-message error';
+                st.textContent = msg;
+            } else if (typeof window.showToast === 'function') {
+                window.showToast(msg, 'error');
+            }
+        }
+    });
+})();
+</script>

@@ -18,7 +18,7 @@
       本脚本不打包任何权重，符合「发框架、用户自取模型」的分发策略。
 
 用法：
-    python scripts/download_models.py --all            # 拉全部 7 个
+    python scripts/download_models.py --all            # 拉全部 8 个
     python scripts/download_models.py --model voxcpm2  # 只拉某一个
     python scripts/download_models.py --all --source hf         # 强制只用 HF 镜像
     python scripts/download_models.py --all --source modelscope # 强制只用魔搭
@@ -117,6 +117,23 @@ MODEL_REGISTRY: list[dict] = [
         "HF 仓库文件在 checkpoints/converter/ 下，下载后脚本会自动把 converter 目录的"
         "config.json / checkpoint.pth 软链/复制到 model/OpenVoice 根目录。",
         "required": ["config.json", "checkpoint.pth"],
+    },
+    {
+        "key": "breeze-tts2",
+        "title": "Breeze TTS 2（中英双语 · 声音设计/克隆/导演引擎）",
+        "local_dir": "Breeze-TTS-2",
+        "hf_repo": "BreezeBlue/Breeze-TTS-2",
+        "ms_repo": "BreezeBlue/Breeze-TTS-2",
+        "license": "源码 Apache-2.0；权重与自托管输出为 BreezeBlue Research and Non-Commercial License（研究/非商用）",
+        "note": "整仓落盘到 model/Breeze-TTS-2（约 7.7GB，含 audio_tokenizer/ 子目录，缺一不可）。"
+        "eager 推理峰值显存约 7.5GiB，建议 12GB+ 显卡；仅中英双语。",
+        "required": [
+            "config.json",
+            "tokenizer.json",
+            "model-00001-of-00002.safetensors",
+            "model-00002-of-00002.safetensors",
+            "audio_tokenizer/model.safetensors",
+        ],
     },
     {
         "key": "step-audio-editx",
@@ -346,7 +363,7 @@ def main() -> int:
         metavar="KEY",
         help="只下载指定模型（可重复）。KEY 见 MODEL_REGISTRY：" + ", ".join(m["key"] for m in MODEL_REGISTRY),
     )
-    parser.add_argument("--all", action="store_true", help="下载全部 7 个模型集合")
+    parser.add_argument("--all", action="store_true", help="下载全部 8 个模型集合")
     parser.add_argument(
         "--source",
         choices=["auto", "hf", "modelscope"],

@@ -67,6 +67,9 @@ _TAB_TEMPLATES: dict[str, str] = {
     "indextts2_duration": "tabs/indextts2_duration.html",
     "indextts20_clone": "tabs/indextts20_clone.html",
     "indextts20_emotion": "tabs/indextts20_emotion.html",
+    "breeze_design": "tabs/breeze_design.html",
+    "breeze_clone": "tabs/breeze_clone.html",
+    "breeze_direction": "tabs/breeze_direction.html",
     "lora": "tabs/lora_manager.html",
     "lora_training": "tabs/lora_training.html",
     "history": "tabs/history.html",
@@ -94,6 +97,9 @@ _INDEXTTS20_TABS: frozenset[str] = frozenset({"indextts20_clone", "indextts20_em
 
 # 通用新式引擎专属 Tab（字符上限 4096；当前无成员，留空供未来通用引擎 Tab 复用）
 _GENERIC_ENGINE_TABS: frozenset[str] = frozenset()
+
+# Breeze TTS 2 专属 Tab（字符上限 2000，受模型 2048 token 序列约束）
+_BREEZE_TTS2_TABS: frozenset[str] = frozenset({"breeze_design", "breeze_clone", "breeze_direction"})
 
 
 def _common_context(request: Request, tab_name: str = "") -> dict[str, Any]:
@@ -124,6 +130,8 @@ def _common_context(request: Request, tab_name: str = "") -> dict[str, Any]:
         engine_key = "indextts20"
     elif tab_name in _GENERIC_ENGINE_TABS:
         engine_key = "generic"
+    elif tab_name in _BREEZE_TTS2_TABS:
+        engine_key = "breeze-tts2"
     else:
         engine_key = registry.current_engine
     engine_max_chars = get_engine_text_limit(engine_key)

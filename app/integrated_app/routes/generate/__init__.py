@@ -59,6 +59,7 @@
 import logging
 
 from . import (  # noqa: F401 — 导入以触发路由注册
+    breeze_tts2,
     engine_discovery,
     generic,
     indextts2,
@@ -72,6 +73,7 @@ logger = logging.getLogger("tts_multimodel")
 
 __all__ = [
     "router",
+    "breeze_tts2",
     "indextts2",
     "voxcpm2",
     "generic",
