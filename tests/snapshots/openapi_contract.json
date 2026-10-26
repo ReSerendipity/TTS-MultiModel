@@ -387,6 +387,39 @@
       ]
     }
   },
+  "/api/models/download/cancel": {
+    "POST": {
+      "operationId": "download_cancel_api_models_download_cancel_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/models/download/catalog": {
+    "GET": {
+      "operationId": "download_catalog_api_models_download_catalog_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/models/download/start": {
+    "POST": {
+      "operationId": "download_start_api_models_download_start_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/models/download/status": {
+    "GET": {
+      "operationId": "download_status_api_models_download_status_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
   "/api/persona/audio/{name}": {
     "GET": {
       "operationId": "get_persona_audio_api_persona_audio__name__get",

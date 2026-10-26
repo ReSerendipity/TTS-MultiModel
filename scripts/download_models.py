@@ -57,6 +57,8 @@ MODELS_DIR = PROJECT_ROOT / "model"
 MODEL_REGISTRY: list[dict] = [
     {
         "key": "voxcpm2",
+        "tier": "required",
+        "size_hint_gb": 4.7,
         "title": "VoxCPM2（核心多模态 TTS 引擎）",
         "local_dir": "VoxCPM2",
         "hf_repo": "openbmb/VoxCPM2",
@@ -67,6 +69,8 @@ MODEL_REGISTRY: list[dict] = [
     },
     {
         "key": "sensevoice",
+        "tier": "required",
+        "size_hint_gb": 0.9,
         "title": "SenseVoiceSmall（VoxCPM2 的 ASR 辅助）",
         "local_dir": "SenseVoiceSmall",
         "hf_repo": "FunAudioLLM/SenseVoiceSmall",
@@ -77,6 +81,8 @@ MODEL_REGISTRY: list[dict] = [
     },
     {
         "key": "zipenhancer",
+        "tier": "required",
+        "size_hint_gb": 0.02,
         "title": "speech_zipenhancer（VoxCPM2 的降噪辅助）",
         "local_dir": "speech_zipenhancer",
         "hf_repo": None,  # 仅 ModelScope 有
@@ -87,6 +93,8 @@ MODEL_REGISTRY: list[dict] = [
     },
     {
         "key": "indextts2",
+        "tier": "recommended",
+        "size_hint_gb": 11.0,
         "title": "IndexTTS 2.5（情感控制引擎）",
         "local_dir": "IndexTTS-2.5",
         "hf_repo": "IndexTeam/IndexTTS-2.5",
@@ -98,6 +106,8 @@ MODEL_REGISTRY: list[dict] = [
     },
     {
         "key": "indextts20",
+        "tier": "recommended",
+        "size_hint_gb": 11.0,
         "title": "IndexTTS 2.0（2.5 的旧版本变体，权重不通用）",
         "local_dir": "IndexTTS-2.0",
         "hf_repo": "IndexTeam/IndexTTS-2",
@@ -108,6 +118,8 @@ MODEL_REGISTRY: list[dict] = [
     },
     {
         "key": "openvoice",
+        "tier": "optional",
+        "size_hint_gb": 0.2,
         "title": "OpenVoice（Voicebox 语音转换引擎权重）",
         "local_dir": "OpenVoice",
         "hf_repo": "myshell-ai/OpenVoice",
@@ -120,6 +132,8 @@ MODEL_REGISTRY: list[dict] = [
     },
     {
         "key": "breeze-tts2",
+        "tier": "optional",
+        "size_hint_gb": 7.7,
         "title": "Breeze TTS 2（中英双语 · 声音设计/克隆/导演引擎）",
         "local_dir": "Breeze-TTS-2",
         "hf_repo": "BreezeBlue/Breeze-TTS-2",
@@ -136,7 +150,24 @@ MODEL_REGISTRY: list[dict] = [
         ],
     },
     {
+        "key": "index-tts",
+        "kind": "code_repo",
+        "tier": "recommended",
+        "size_hint_gb": 0.03,
+        "title": "index-tts 代码包（IndexTTS 2.5/2.0 引擎的推理代码，PyPI 无包）",
+        "local_dir": "index-tts",
+        "hf_repo": None,
+        "ms_repo": None,
+        "git_url": "https://github.com/index-tts/index-tts.git",
+        "license": "bilibili Model Use License（含代码；克隆自官方源，不随本仓库再分发）",
+        "note": "引擎运行时按 reference_repos/index-tts 引导 sys.path（见 indextts2_engine）；"
+        "无需 pip install -e。与 indextts2/indextts20 权重集合配套使用。",
+        "required": [],
+    },
+    {
         "key": "step-audio-editx",
+        "tier": "optional",
+        "size_hint_gb": 8.0,
         "title": "Step-Audio-EditX（音频编辑引擎权重）",
         "local_dir": "Step-Audio-EditX",
         "hf_repo": "stepfun-ai/Step-Audio-EditX",
@@ -276,13 +307,37 @@ def _verify_model(name: str, entry: dict, local_dir: Path, do_verify: bool) -> b
     if not weights:
         logger.warning("[%s] 未在 %s 找到任何权重文件（可能下载不完整）", name, local_dir)
         return False
-    tiny = [w for w in weights if w.stat().st_size < 1024 * 1024]
+    # 说话人嵌入（*_se.pth，如 OpenVoice base speakers）合法体积即几百 KB，
+    # 不属于"过小=损坏"判定面（2026-10-27 真网实测：openvoice 每次都被误判 fail）。
+    speaker_embed_suffix = "_se.pth"
+    tiny = [w for w in weights if w.stat().st_size < 1024 * 1024 and not w.name.endswith(speaker_embed_suffix)]
     for w in weights:
         logger.info("[%s][OK] %s (%.1f MB)", name, w.name, w.stat().st_size / 1e6)
     if tiny:
         logger.warning("[%s] 存在过小权重文件（<1MB，可能损坏）: %s", name, tiny)
         return False
     return not missing
+
+
+def _clone_code_repo(entry: dict) -> bool:
+    """克隆/更新 code_repo 类目（浅克隆官方源到 reference_repos/<local_dir>）。
+
+    已存在时执行 git pull --ff-only（保持用户本地不动 动半步原则：失败仅告警不回滚）。
+    """
+    import subprocess as _sp
+
+    target = Path("reference_repos") / entry["local_dir"]
+    url = entry["git_url"]
+    if (target / ".git").is_dir():
+        logger.info("[%s] 已存在，执行 git pull --ff-only…", entry["key"])
+        rc = _sp.call(["git", "-C", str(target), "pull", "--ff-only"])
+        return rc == 0
+    target.parent.mkdir(parents=True, exist_ok=True)
+    logger.info("[%s] 浅克隆 %s -> %s", entry["key"], url, target)
+    rc = _sp.call(["git", "clone", "--depth", "1", url, str(target)])
+    if rc != 0:
+        logger.error("[%s] git clone 失败（exit=%s）；请检查网络或手动克隆后重试", entry["key"], rc)
+    return rc == 0
 
 
 def download_one(entry: dict, source: str, do_verify: bool) -> bool:
@@ -297,6 +352,8 @@ def download_one(entry: dict, source: str, do_verify: bool) -> bool:
         True 成功，False 失败。
     """
     name = entry["key"]
+    if entry.get("kind") == "code_repo":
+        return _clone_code_repo(entry)
     local_dir = MODELS_DIR / entry["local_dir"]
     local_dir.mkdir(parents=True, exist_ok=True)
 
