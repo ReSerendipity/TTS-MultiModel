@@ -51,6 +51,14 @@ Six open-source TTS engines — voice cloning, voice design, multi-character scr
 
 以下截图均由源码启动 `python app/clean_launch.py`（`http://127.0.0.1:7869`）实拍，未下载模型权重、未触发合成；引擎未加载时空状态如实呈现。
 
+**首次启动引导（onboarding）**
+
+![首次启动引导](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-0-guide.png)
+
+首次打开会出现 4 步新手引导，spotlight 高亮当前操作的菜单项；完成后不再弹出。
+
+**主界面（引导完成后）**
+
 | 声音设计工作台 | 声音克隆 |
 |---|---|
 | ![声音设计工作台](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-1-voice-design.png) | ![声音克隆](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-2-voice-clone.png) |
@@ -174,6 +182,14 @@ Clients (web UI / CLI / OpenAI-compatible API) → FastAPI engine registry → s
 ### Real UI screenshots
 
 Captured live from source: `python app/clean_launch.py` on `http://127.0.0.1:7869`. No model weights downloaded, no synthesis triggered; empty states are shown as-is with engines unloaded.
+
+**First-run onboarding**
+
+![First-run onboarding](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-shot-0-guide.png)
+
+A 4-step walkthrough appears on first launch, spotlighting the current menu item; it does not reappear after completion.
+
+**Main UI (after onboarding)**
 
 | Voice design workbench | Voice cloning |
 |---|---|
