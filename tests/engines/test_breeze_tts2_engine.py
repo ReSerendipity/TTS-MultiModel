@@ -234,6 +234,10 @@ class TestLifecycleAndValidation:
     def test_vocal_events_markers_pass_through(self, tmp_path, monkeypatch):
         """正文内嵌中英文事件标记不被安全校验拦截（声明 vocal_events 能力的可测面）。"""
         engine = _make_ready_engine(tmp_path, monkeypatch)
+        # 桩运行时产出的占位波形不得写进真实 outputs/（与 contract 用例同口径）
+        import integrated_app.engines.breeze_tts2.engine as eng_mod
+
+        monkeypatch.setattr(eng_mod, "SAVE_DIR", str(tmp_path / "outputs"))
         captured: dict[str, Any] = {}
 
         import integrated_app.engines.breeze_tts2.vendor.breeze_infer.templates as br_templates
