@@ -29,7 +29,7 @@ logger = logging.getLogger("tts_multimodel")
 
 
 def apply() -> None:
-    """回填 indextts 依赖的 4 个 transformers 旧符号（幂等）。
+    """回填 indextts 依赖的 5 个 transformers 旧符号（幂等）。
 
     所有注入都以 ``hasattr`` 守卫——在 transformers <=4.52（符号尚存）或未来
     上游 indextts 自行适配后，本函数自动变为 no-op，无需版本分支。
@@ -116,4 +116,13 @@ def apply() -> None:
                 return hidden_states
 
         setattr(_mu, "SequenceSummary", SequenceSummary)  # noqa: B010 - 动态符号注入
+
+    # ---- ⑤ GenerationConfig.forced_decoder_ids（4.57 属性清理移除）----
+    # indextts 的 vendored 生成代码（transformers_generation_utils.py:1005）读取该
+    # 属性以弹弃用警告；4.57 起 GenerationConfig 不再定义之 → 实例读取 AttributeError。
+    # 类级默认 None 使读取回到"未设置"分支，与 <=4.52 行为完全等价（赋值路径由
+    # 实例 __dict__ 自然遮蔽，不受影响）。
+    if not hasattr(_gu.GenerationConfig, "forced_decoder_ids"):
+        setattr(_gu.GenerationConfig, "forced_decoder_ids", None)  # noqa: B010 - 动态符号注入
+        logger.debug("[indextts_tf_compat] 已注入 GenerationConfig.forced_decoder_ids 类级默认")
         logger.debug("[indextts_tf_compat] 已注入 modeling_utils.SequenceSummary stub")

@@ -53,6 +53,9 @@ models:
       supported_features: ["clone", "emotion_control", "duration_control"]
       sample_rate: 22050
       requires_gpu: true
+      # 推理代码包引导位（PyPI 无 indextts 包；2.9.0 起经 设置页→模型下载管理
+      # 克隆到 reference_repos/index-tts，引擎加载期 sys.path 注入，无需 pip install -e）
+      repo_path: "reference_repos/index-tts"
     indextts20:
       name: "indextts20"
       display_name: "IndexTTS 2.0"
@@ -65,6 +68,7 @@ models:
       supported_features: ["clone", "emotion_control"]
       sample_rate: 22050
       requires_gpu: true
+      repo_path: "reference_repos/index-tts"  # 与 indextts2 共用同一代码包
     voicebox:
       name: "voicebox"
       display_name: "Voicebox VC"

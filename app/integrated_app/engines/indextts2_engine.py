@@ -96,10 +96,10 @@ import functools
 import gc
 import logging
 import os
+import sys
 import tempfile
 import threading
 import time
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -356,12 +356,14 @@ class IndexTTS2Engine(TTSEngine):
         from ..gpu_backend import GPUBackend, GPUBackendManager
 
         # ========== 模型目录路径解析 ==========
-        # 默认模型目录：<项目根目录>/model/IndexTTS-2.5（2.5）或 IndexTTS-2.0（2.0）
-        # Path(__file__).parent.parent.parent 定位到项目根：
-        #   本文件位于 app/integrated_app/engines/，向上3级到达项目根
+        # 默认模型目录：config 权威常量（P1-3 shared/portable 双模式同源；
+        # 历史实现用 Path(__file__) 上溯 3 级，少一级落到 app/model/，
+        # 裸构造（_load_generic_engine / 诊断脚本）时必现"权重缺失"假象——
+        # 生产路径因 loader 显式传参而长期未暴露，2026-10-27 引导改造时抓出）
         if model_dir is None:
-            project_root = Path(__file__).parent.parent.parent
-            model_dir = str(project_root / "model" / self._model_dir_name)
+            from ..config import INDEXTTS2_MODEL_PATH, INDEXTTS20_MODEL_PATH
+
+            model_dir = INDEXTTS20_MODEL_PATH if self.version_str == "2.0" else INDEXTTS2_MODEL_PATH
 
         self.model_dir: str = model_dir
         self.use_deepspeed: bool = use_deepspeed
@@ -507,6 +509,40 @@ class IndexTTS2Engine(TTSEngine):
 
         logger.info(f"[IndexTTS2] 模型文件验证通过: {self.model_dir}")
 
+    # code_repo 引导目录（与 model_download_manager.REFERENCE_REPOS_DIR 同源口径；
+    # 此处不 import 该模块以避免引擎加载期引入管理器依赖，仅以路径约定耦合）
+    REFERENCE_REPO_DIR: str = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "reference_repos",
+        "index-tts",
+    )
+
+    @staticmethod
+    def _ensure_indextts_importable() -> None:
+        """保证 ``indextts`` 包可导入：缺失时把 reference_repos/index-tts 插到 sys.path。
+
+        WHY sys.path 引导而非 vendor 进仓库：index-tts 的代码与权重同属
+        bilibili Model Use License（含 "final code"），vendor 进 Apache-2.0 仓库
+        会造成许可混染；clone 到用户磁盘的 reference_repos/（官方源、保留 LICENSE）
+        与权重"用户自取"同一合规口径。 Why 放在 shim 之后：上游包的顶层导入
+        依赖 indextts_tf_compat 回填的 transformers 符号，顺序不能反。
+
+        幂等：包已可导入（用户 pip install -e / 已引导过）时为 no-op。
+        """
+        import importlib.util
+
+        if importlib.util.find_spec("indextts") is not None:
+            return
+        repo_dir = IndexTTS2Engine.REFERENCE_REPO_DIR
+        if not os.path.isdir(os.path.join(repo_dir, "indextts")):
+            raise ImportError(
+                f"reference_repos/index-tts 不存在（期望 {repo_dir}）。"
+                "请在设置页「模型下载管理」中下载 index-tts，或运行 "
+                "python scripts/download_models.py --model index-tts"
+            )
+        logger.info("[IndexTTS2] 从 reference_repos 引导 indextts 代码包: %s", repo_dir)
+        sys.path.insert(0, repo_dir)
+
     def _load_model(self) -> None:
         """加载 IndexTTS 2.5 模型权重并初始化推理管线。
 
@@ -531,19 +567,25 @@ class IndexTTS2Engine(TTSEngine):
 
             _apply_tf_compat()
 
+            # 代码包引导（2.9.0）：PyPI 无 indextts 包，历史上要求用户
+            # `git clone index-tts && pip install -e .`——现改为从 reference_repos/
+            # 引导（代码仓库经 设置页 → 模型下载管理 → `--model index-tts` 获取，
+            # 与 step-audio-editx 的 repo_path 模式同源）。用户手动 pip install -e
+            # 的环境不受影响（find_spec 命中即跳过引导）。
+            self._ensure_indextts_importable()
+
             _infer_mod = importlib.import_module(self._infer_module)
             IndexTTS2 = _infer_mod.IndexTTS2
         except ImportError as e:
             raise ImportError(
-                f"indextts 未安装或缺少 {self._infer_module} 推理模块"
-                f"（底层错误：{type(e).__name__}: {e}）。"
-                "若 indextts 已安装，请确认 transformers 版本在声明的支持区间"
+                f"indextts 代码包不可用（底层错误：{type(e).__name__}: {e}）。"
+                "获取方式（二选一）：\n"
+                "  ① 推荐设置页 →「模型下载管理」→ index-tts → 下载（自动克隆到"
+                " reference_repos/index-tts，2.0 与 2.5 共用，一次到位）；\n"
+                "  ② 命令行：python scripts/download_models.py --model index-tts\n"
+                "若代码包已在而仍报错，请确认 transformers 版本在声明的支持区间"
                 "（requirements-lock.txt 钉版为权威口径；4.57.3 已由"
                 " indextts_tf_compat shim 实测兼容导入）。"
-                "确未安装时（PyPI 无 'indextts' 包）从官方仓库装：\n"
-                "  git clone https://github.com/index-tts/index-tts.git\n"
-                "  cd index-tts && pip install -e .\n"
-                "（2.0 与 2.5 共用同一仓库，安装一次即同时提供 infer_v2 与 infer_v2_5）"
             ) from e
 
         config_path = os.path.join(self.model_dir, "config.yaml")
