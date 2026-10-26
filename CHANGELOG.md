@@ -2,6 +2,43 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.8.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.7.0...v2.8.0) (2026-10-26)
+
+
+### Features
+
+* **engines:** 接入 Breeze TTS 2 引擎（声音设计/克隆/导演/流式/事件标记） ([bb73862](https://github.com/ReSerendipity/TTS-MultiModel/commit/bb73862665f82669be7f3b83a553b6c46f4cd44c))
+* **engines:** 接入 Breeze TTS 2 引擎（声音设计/克隆/导演/流式/事件标记）+ 桌面发布包剔模（framework-only） ([4e803e3](https://github.com/ReSerendipity/TTS-MultiModel/commit/4e803e3b983f71bfedb25ad8593bf7953536db9c))
+
+
+### Bug Fixes
+
+* **ci:** correct attest subject-name to hyphenated lowercase image ref ([1628cff](https://github.com/ReSerendipity/TTS-MultiModel/commit/1628cffe28ef126c09fb1a289ac69f3d7fd7729c))
+* **ci:** correct attest subject-name to hyphenated lowercase image ref ([d3b6465](https://github.com/ReSerendipity/TTS-MultiModel/commit/d3b6465f4f484928c991f1acce49680345da82fb))
+* **ci:** lowercase GHCR scan ref via bash expansion instead of broken docker tag ([9dcaf8c](https://github.com/ReSerendipity/TTS-MultiModel/commit/9dcaf8cf73e075d49786413d9cf40822945c41ef))
+* **ci:** lowercase GHCR scan ref via bash expansion instead of broken docker tag ([4499680](https://github.com/ReSerendipity/TTS-MultiModel/commit/4499680b9bc2060c2ba3712739054f8b0ec1e05e))
+* **lint:** mypy 棘轮随 vendor 接入归零新增（override 豁免 + shim setattr 注入） ([c82f995](https://github.com/ReSerendipity/TTS-MultiModel/commit/c82f995411b9ed7d121f81381be6c3b8661f0625))
+* **routes:** 通用引擎就绪检查 + 移除上传件本地预览（CodeQL sink 清零） ([995d419](https://github.com/ReSerendipity/TTS-MultiModel/commit/995d419d5985b13c88a2df5e359025d8454d925c))
+* **security:** 消解 CodeQL 三处新增 HIGH 告警（DOM-XSS 模式与路径包含） ([158f228](https://github.com/ReSerendipity/TTS-MultiModel/commit/158f2286f31fbac92f563621fc99d6d0229b4b3d))
+
+
+### Documentation
+
+* **cli:** 补全 CLI 使用文档并统一入口名 + §8 旧位规则清理 ([#193](https://github.com/ReSerendipity/TTS-MultiModel/issues/193)) ([fdb5c11](https://github.com/ReSerendipity/TTS-MultiModel/commit/fdb5c11468ca5d81070b53e7f0b13ea74178e449))
+* **engines:** Breeze TTS 2 文档与 i18n 补全 + 引擎导入深度修复 ([5ee32c4](https://github.com/ReSerendipity/TTS-MultiModel/commit/5ee32c47c29df8271fbfa165bbfd215bbe36f164))
+* **readme:** add real web UI screenshots ([0814a47](https://github.com/ReSerendipity/TTS-MultiModel/commit/0814a47d0ba37c0ff131e5752b5816891ddaa27a))
+* **readme:** add real web UI screenshots ([0c3e66f](https://github.com/ReSerendipity/TTS-MultiModel/commit/0c3e66fad355560dc4f1fd2f7c3e7506dc73f773))
+* **readme:** bilingual showcase with real screenshots ([20d737f](https://github.com/ReSerendipity/TTS-MultiModel/commit/20d737fa7fe9b07a4bbf2b4b7105eaa8aa93359f))
+* **readme:** bilingual showcase with real screenshots ([a299c72](https://github.com/ReSerendipity/TTS-MultiModel/commit/a299c72abb77e9fbe878699c0c9bac5e76c3ddf0))
+* **readme:** fix contributing link ([c017b6c](https://github.com/ReSerendipity/TTS-MultiModel/commit/c017b6c19381ee1284f7f3bdc265d6b82ede5c39))
+* **readme:** README 对外/对内双版本更新（§8） ([a91b1a5](https://github.com/ReSerendipity/TTS-MultiModel/commit/a91b1a5e524f527e50ab675d40c9603b251a17cb))
+* **readme:** remove demo-only screenshots and Pages demo link ([175c9fb](https://github.com/ReSerendipity/TTS-MultiModel/commit/175c9fb2e3e093e863fd7cd5f6b2f3b39374a502))
+* **readme:** remove demo-only screenshots and Pages demo link ([769d2c9](https://github.com/ReSerendipity/TTS-MultiModel/commit/769d2c964ef8c1b59b5b018acaae4ec8b8590384))
+* **readme:** serve images via jsDelivr CDN ([d2a64c6](https://github.com/ReSerendipity/TTS-MultiModel/commit/d2a64c6c338ac2897e7cd3f24b010b419256a66f))
+* **readme:** serve images via jsDelivr CDN ([cef8d85](https://github.com/ReSerendipity/TTS-MultiModel/commit/cef8d85c5e25ddbe9dbfd9d7b64e3c4b2712538a))
+* **readme:** 增加治理规范引用 ([aa94e11](https://github.com/ReSerendipity/TTS-MultiModel/commit/aa94e11513b3f756c40578d276963945e3dd0b60))
+* **readme:** 英文商用 FAQ 补 Breeze TTS 2 非商用许可提示（与中文版对齐） ([404621c](https://github.com/ReSerendipity/TTS-MultiModel/commit/404621c6503568775ea07d419e15385c95ed530a))
+
 ## [2.7.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.6.0...v2.7.0) (2026-10-17)
 
 
