@@ -69,7 +69,7 @@ dependencies = [
     # docs/SECURITY_DEPENDABOT_TRIAGE.md §1 的登记口径，pip-audit/Trivy 豁免清单
     # 需随本次抬升按该文档 §4 复审约定同步复核。
     # tests/test_dependency_consistency.py 会核对：本声明与 requirements-lock.txt 的钉版互相满足。
-    "transformers>=4.57.3,<4.58",
+    "transformers>=4.57.3,<5.21",
     "tokenizers>=0.21.0,<0.24",
     # === AI 生态 ===
     "funasr>=1.0.0",

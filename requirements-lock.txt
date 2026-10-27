@@ -102,7 +102,7 @@ torch-complex==0.4.4
 torchaudio==2.11.0
 torchvision==0.28.0
 tqdm==4.70.1
-transformers==4.57.3
+transformers==5.20.2
 typer==0.27.3
 typing-extensions==4.16.0
 typing-inspection==0.4.4

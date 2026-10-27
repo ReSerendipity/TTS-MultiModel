@@ -104,7 +104,7 @@ tiktoken==0.14.0
 tokenizers==0.22.2
 torch-complex==0.4.4
 tqdm==4.70.1
-transformers==4.57.3
+transformers==5.20.2
 typer==0.27.3
 typing-extensions==4.16.0
 typing-inspection==0.4.4
