@@ -2,6 +2,27 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.9.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.8.0...v2.9.0) (2026-10-27)
+
+
+### Features
+
+* **downloads:** 模型下载管理器——framework-only 分发的用户侧产品化 ([8015a98](https://github.com/ReSerendipity/TTS-MultiModel/commit/8015a983bdd6a65af414bea97d86097fce300d71))
+* **downloads:** 模型下载管理器（framework-only 口径的用户侧产品化） ([73d7024](https://github.com/ReSerendipity/TTS-MultiModel/commit/73d702467b395d18ac007a7656b5853f4334bf87))
+
+
+### Bug Fixes
+
+* **engines:** engines/__init__ 缺参覆盖抹脏生产元数据 + IndexTTS 引导收尾 ([140b396](https://github.com/ReSerendipity/TTS-MultiModel/commit/140b396bc7dd03827d148929b76995e4be433085))
+* **engines:** 移除 engines/__init__ 缺参重复注册（生产元数据污染）+ 守卫与依赖收口 ([a82454e](https://github.com/ReSerendipity/TTS-MultiModel/commit/a82454e3110350ef356c6b52255375cf377cc4a5))
+
+
+### Documentation
+
+* **readme:** retake screenshots after onboarding ([#221](https://github.com/ReSerendipity/TTS-MultiModel/issues/221)) ([b1f1993](https://github.com/ReSerendipity/TTS-MultiModel/commit/b1f1993b18d0b0cdf03cc176d3740ae24b173a99))
+* **readme:** version showcase image filenames to bypass stale CDN cache ([#222](https://github.com/ReSerendipity/TTS-MultiModel/issues/222)) ([0e93045](https://github.com/ReSerendipity/TTS-MultiModel/commit/0e93045b463815547b315f930a31f39f32ac4a95))
+* **readme:** version showcase image filenames to bypass stale CDN cache ([#222](https://github.com/ReSerendipity/TTS-MultiModel/issues/222)) ([1710e14](https://github.com/ReSerendipity/TTS-MultiModel/commit/1710e148cc5c3dc721a85ecfb7ef49bd72d15208))
+
 ## [2.8.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.7.0...v2.8.0) (2026-10-26)
 
 

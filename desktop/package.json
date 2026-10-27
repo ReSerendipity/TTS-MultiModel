@@ -1,6 +1,6 @@
 {
   "name": "tts-multimodel-desktop",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "private": true,
   "description": "TTS MultiModel 桌面应用壳",
   "scripts": {
