@@ -82,6 +82,26 @@ FEATURE_METHOD_MAP: dict[str, str] = {
 ALL_KNOWN_FEATURES = set(FEATURE_METHOD_MAP.keys()) | {"emotion_control", "duration_control", "vocal_events"}
 
 
+def test_engines_package_import_does_not_clobber_registry_metadata():
+    """回归守卫：integrated_app.engines 包导入不得抹掉声明式注册元数据。
+
+    历史 bug（2.9.0 修复）：engines/__init__.py 曾用缺参 register() 重复注册
+    indextts2/20，把 supported_features 抹成 []、sample_rate 顶回默认 24000，
+    生产 `/api/engines/list` 与 tab 能力矩阵读到脏数据；门禁因只 import
+    engine_interface 而从未暴露。本用例把「包导入不破坏元数据」钉死。
+    """
+    import importlib
+
+    import integrated_app.engine_interface as ei
+
+    before = {name: dict(ei.engine_registry.get_metadata(name)) for name in ("indextts2", "indextts20")}
+    importlib.import_module("integrated_app.engines")
+    for name, snapshot in before.items():
+        meta = ei.engine_registry.get_metadata(name)
+        assert meta.get("supported_features") == snapshot["supported_features"], f"{name} features 被包导入抹除"
+        assert meta.get("sample_rate") == snapshot["sample_rate"], f"{name} sample_rate 被包导入篡改"
+
+
 class TestEngineCapabilityContract:
     """引擎能力契约矩阵测试。"""
 
