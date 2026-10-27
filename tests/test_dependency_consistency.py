@@ -313,7 +313,7 @@ def test_pip_audit_ignore_set_equals_the_triage_table():
 def test_d3_d4_guards_are_not_vacuous():
     """变异自证：把三处"写错就静默失效"的地方改坏，本组守卫必须变红。"""
     entries = _trivy_ignore_entries()
-    assert len(entries) == 3, "Trivy 豁免条目数对不上，D3 的解析已失效"
+    assert len(entries) == 5, "Trivy 豁免条目数对不上，D3 的解析已失效（transformers 3 + protobuf 2）"
     assert all("expiration:" in e["body"] for e in entries)
     assert all("version:" in e["body"] and "versions:" not in e["body"] for e in entries)
 

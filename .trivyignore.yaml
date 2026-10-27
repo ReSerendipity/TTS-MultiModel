@@ -4,11 +4,11 @@
 # （IndexTTS 2.0/2.5 的发行元数据要求 transformers==4.52.1；实测 4.57.6 下
 # indextts.infer_v2 / infer_v2_5 直接 ImportError，见 docs/SECURITY_DEPENDABOT_TRIAGE.md §2）。
 #
-# 为什么这里只有 3 条、而 pip-audit 那边有 16 条（不是漏了）：
+# 为什么这里条目少于 pip-audit 全集（不是漏了）：
 # 两个门禁的过滤口径不同。镜像扫描这两步带 `severity: CRITICAL,HIGH` +
 # `ignore-unfixed: true`（docker-build.yml:65 / docker-publish.yml:99），于是 4.52.4 的
-# 16 个公告里只有"HIGH 且有修复版本"的 3 条会进结果 —— 就是下面这 3 条，CI 实测
-# `Total: 6 (HIGH: 6, CRITICAL: 0)`（同一镜像里 root 与 ttsuser 两处 site-packages 各算一次）。
+# 公告里只有"HIGH 且有修复版本"的会进结果 —— transformers 3 条 + protobuf 2 条
+# （2.9.0 起，见下），CI 实测 Total 按 root/ttsuser 两处 site-packages 各算一次。
 # 其余 13 条（8 条无修复版本的本地向量 + 5 条 MODERATE）由 pip-audit 那一步逐条豁免，
 # 因为 pip-audit 没有 severity / unfixed 过滤器。两边的 id 集合都在分诊文档 §1 的同一张表里。
 #
@@ -49,4 +49,23 @@ vulnerabilities:
     package:
       name: transformers
       version: "4.52.4"
+    expiration: "2026-12-31T00:00:00Z"
+
+  # CVE-2025-4565（PYSEC-2026-1806 / GHSA-8qvm-5x2c-j2w7，HIGH，修复于 4.25.8/5.29.5/6.31.1）：
+  # protobuf 纯 Python 后端非可信数据递归 DoS。2.9.0 起 descript-audiotools==0.7.2（indextts
+  # 引擎依赖）强制 protobuf<3.20，镜像解析到 3.19.6。可达性：app/ 对 google.protobuf 零命中，
+  # protobuf 仅被 tensorboardX 生成物消费（训练实验链、本机自产 event 文件），无不可信 wire
+  # 输入面。分诊依据 §1 A19（已接受风险 + 复点）。
+  - id: CVE-2025-4565
+    package:
+      name: protobuf
+      version: "3.19.6"
+    expiration: "2026-12-31T00:00:00Z"
+
+  # CVE-2026-0994（PYSEC-2026-1805 / GHSA-7gcm-g887-7qv7，HIGH，修复于 5.29.6/6.33.5）：
+  # protobuf JSON 递归深度绕过。可达性与分诊依据同 A19/上一条（§1 A20）。
+  - id: CVE-2026-0994
+    package:
+      name: protobuf
+      version: "3.19.6"
     expiration: "2026-12-31T00:00:00Z"
