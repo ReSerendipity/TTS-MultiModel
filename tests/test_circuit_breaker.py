@@ -73,19 +73,61 @@ class TestStateTransitions:
         assert calls == []  # OPEN 态直接拒绝，不再调用目标
 
     def test_open_to_half_open_after_reset_timeout(self, monkeypatch):
-        cb = CircuitBreaker(name="svc", failure_threshold=1, reset_timeout=0.01)
+        """OPEN → HALF_OPEN：用可控时钟，不用 sleep（同 test_half_open_failure_reopens）。
+
+        `reset_timeout=0.01` + `time.sleep(0.02)` 在覆盖率插桩 + 全量并发的负载下，
+        两次读数之间就能耗掉 >10 ms，HALF_OPEN 读取偶发扑空（2026-10-27 夜间
+        precheck -Full 实测失败、单跑 3/3 通过）。真实时钟在这里既非必要也不可靠。
+        """
+        from integrated_app import circuit_breaker as cb_mod
+
+        clock = {"t": 0.0}
+
+        class _Clock:
+            """只代理 monotonic，其余照抄真 time 模块，避免波及无关调用。"""
+
+            def __init__(self, real):
+                self._real = real
+
+            def monotonic(self) -> float:
+                return clock["t"]
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+        monkeypatch.setattr(cb_mod, "time", _Clock(time))
+
+        cb = cb_mod.CircuitBreaker(name="svc", failure_threshold=1, reset_timeout=0.01)
         with pytest.raises(ConnectionError):
             cb.call(_flaky_fn([True]))
         assert cb.state is CircuitState.OPEN
-        time.sleep(0.02)
-        # 读取 state 触发超时检查，应转入 HALF_OPEN
+
+        clock["t"] += 0.02  # 越过冷却窗口：读取 state 触发超时检查，应转入 HALF_OPEN
         assert cb.state is CircuitState.HALF_OPEN
 
     def test_half_open_success_recovers_to_closed(self, monkeypatch):
-        cb = CircuitBreaker(name="svc", failure_threshold=1, reset_timeout=0.01)
+        """HALF_OPEN 探测成功 → CLOSED：可控时钟（同上，消灭 sleep 抖动）。"""
+        from integrated_app import circuit_breaker as cb_mod
+
+        clock = {"t": 0.0}
+
+        class _Clock:
+            def __init__(self, real):
+                self._real = real
+
+            def monotonic(self) -> float:
+                return clock["t"]
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+        monkeypatch.setattr(cb_mod, "time", _Clock(time))
+
+        cb = cb_mod.CircuitBreaker(name="svc", failure_threshold=1, reset_timeout=0.01)
         with pytest.raises(ConnectionError):
             cb.call(_flaky_fn([True]))
-        time.sleep(0.02)
+
+        clock["t"] += 0.02  # 越过冷却：HALF_OPEN 探测成功后回 CLOSED
         result = cb.call(_flaky_fn([False]))
         assert result == 0
         assert cb.state is CircuitState.CLOSED
