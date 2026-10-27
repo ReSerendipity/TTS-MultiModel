@@ -72,19 +72,10 @@ __all__ = [
     "fn_voxcpm_prompt_continue",
 ]
 
-from ..engine_interface import engine_registry
-from .indextts2_engine import IndexTTS2Engine, IndexTTS20Engine
-
-engine_registry.register(
-    "indextts2",
-    IndexTTS2Engine,
-    display_name="IndexTTS 2.5",
-    vram_requirement=6.0,
-)
-
-engine_registry.register(
-    "indextts20",
-    IndexTTS20Engine,
-    display_name="IndexTTS 2.0",
-    vram_requirement=5.5,
-)
+# ⚠️ 2026-10-27 移除本文件的历史重复注册（曾以缺参 register() 覆盖 indextts2/20 的
+# 声明式注册：supported_features 被抹成 []、sample_rate 回退 24000——生产环境
+# `/api/engines/list` 与能力矩阵在 `import integrated_app.engines` 后读到脏元数据；
+# 门禁 check_engine_specs 因只 import engine_interface 而从未暴露）。
+# 引擎注册的唯一权威入口是 engine_interface._register_builtin_engines()
+# （懒导入 + 完整元数据）；`from integrated_app.engines import indextts2_engine`
+# 这类子模块导入由 import 机制自动完成，无需包级 re-register。

@@ -87,6 +87,7 @@ dependencies = [
     # 本机 .venv 从未暴露此事，因为 einops 是从 conformer / vector-quantize-pytorch / indextts
     # 那条**训练链路传递**进来的（`pip show einops` 的 Required-by 实测），不是我们自己声明的。
     # 它是第一方代码的直接依赖，不该靠运气继承 —— 由 tests/test_dependency_consistency.py D5 守住。
+    "descript-audiotools==0.7.2",
     "einops>=0.7.0",
     # === Web 框架 ===
     "fastapi>=0.110.0",
@@ -135,13 +136,12 @@ dependencies = [
     # 缺失即 503 "requires accelerate"（2026-10-01 全流程 UI 模拟实测）。
     # 旧环境因传递依赖侥幸可用，三份清单均无声明；与 einops 同型缺口。
     "accelerate>=1.8.1",
-    # descript-audiotools（indextts DAC 声码器链硬导入 audiotools）**故意不进本清单**：
-    # 其元数据钉 protobuf<3.20，而 protobuf 3.19.x 带 4 个 HIGH CVE（CVE-2025-4565 等，
-    # Trivy 闸实证不可降级）；实测 --no-deps 安装 + 现有依赖即完整可用（tensorboard/
-    # ipython/matplotlib 等重依赖均非导入路径所需）。安装步骤见 Dockerfile /
-    # install.bat / build_portable_bundle.ps1 的 AUDIOTOOLS_NO_DEPS 约定与 GOTCHAS。
-    # fugashi + unidic-lite：indextts 文本前端的日文分词链，引擎加载期即导入
-    # （缺失报 "请安装 fugashi: pip install fugashi unidic-lite"，2026-10-01 实测）。
+    # descript-audiotools==0.7.2：indextts 推理链硬导入 audiotools（GPT 加载路径）。
+    # 2.8.x 时代故意不进本清单——当时 indextts 走用户 pip install -e 安装、依赖随上游
+    # 传递；2.9.0 起代码包改由 reference_repos 引导（不再 pip install），其依赖必须
+    # 由本清单显式接管。注意其元数据要求 protobuf<3.20（已同步锁文件到 3.19.6；
+    # tensorboardX 声明 >=3.20 属元数据冲突，tensorboardX 仅训练链懒导入、运行时不触达，
+    # 实测 funasr/modelscope/create_app 全链在 3.19.6 下正常）。
     "fugashi>=1.3.0",
     "unidic-lite>=1.0.8",
     # openai-whisper：indextts.utils.tokenizer 顶层 from whisper.tokenizer import

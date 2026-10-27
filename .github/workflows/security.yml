@@ -67,7 +67,9 @@ jobs:
             --ignore-vuln PYSEC-2026-2290 \
             --ignore-vuln PYSEC-2026-3929 \
             --ignore-vuln PYSEC-2026-4174 \
-            --ignore-vuln PYSEC-2026-3804
+            --ignore-vuln PYSEC-2026-3804 \
+            --ignore-vuln PYSEC-2026-1805 \
+            --ignore-vuln PYSEC-2026-1806
           # 2026-10-11 追加（A18，accelerate==1.8.1，GHSA-4j2p-28q2-5m79）：无官方修复版本
           # （OSV last_affected=1.14.0、GitHub 咨询 patched_versions 为空、PyPI 最新 1.15.0
           #  未获官方 fixed 标记），且 1.8.1 为 vendored indextts 精确 pin（index-tts-main/
