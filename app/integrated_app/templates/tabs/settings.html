@@ -86,6 +86,43 @@
                     </div>
                 </div>
 
+                <!-- 模型下载管理：framework-only 分发口径的用户侧入口（2.9.0）。
+                     目录/启动/进度/取消全部走 /api/models/download/*，
+                     下载实现在子进程里复用 scripts/download_models.py（单一事实来源）。 -->
+                <div class="card" id="settings-model-downloads">
+                    <div class="card-hdr">
+                        <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+                        {{ "model_dl_title"|t(lang, default="模型下载管理") }}
+                    </div>
+                    <div class="card-body">
+                        <div style="font-size:12px;color:var(--t2);margin-bottom:10px">{{ "model_dl_desc"|t(lang, default="本程序不随包分发模型权重。按档位从官方源下载（国内镜像优先，断点续传，SHA256 校验）。核心档为 VoxCPM2 主链路必需；其余按需。") }}</div>
+                        <div style="overflow-x:auto">
+                            <table style="width:100%;font-size:12px;border-collapse:collapse" id="model-dl-table">
+                                <thead>
+                                    <tr style="text-align:left;color:var(--t2);border-bottom:1px solid var(--border)">
+                                        <th style="padding:6px 8px">{{ "model_dl_col_item"|t(lang, default="条目") }}</th>
+                                        <th style="padding:6px 8px">{{ "model_dl_col_tier"|t(lang, default="档位") }}</th>
+                                        <th style="padding:6px 8px">{{ "model_dl_col_size"|t(lang, default="约体积") }}</th>
+                                        <th style="padding:6px 8px">{{ "model_dl_col_status"|t(lang, default="状态") }}</th>
+                                        <th style="padding:6px 8px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="model-dl-tbody">
+                                    <tr><td colspan="5" style="padding:10px;color:var(--t2)">{{ "loading"|t(lang, default="加载中…") }}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="model-dl-progress" style="display:none;margin-top:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                                <span id="model-dl-progress-key" style="font-size:12px;font-weight:600"></span>
+                                <button class="btn btn-o btn-sm" id="model-dl-cancel-btn" onclick="modelDlCancel()" style="color:var(--red)">{{ "model_dl_cancel_btn"|t(lang, default="取消") }}</button>
+                            </div>
+                            <div class="progress-bar"><div class="progress-fill" id="model-dl-progress-fill" style="width:0%"></div></div>
+                            <div id="model-dl-log" style="margin-top:8px;max-height:160px;overflow:auto;font-family:var(--mono);font-size:11px;color:var(--t2);white-space:pre-wrap;word-break:break-all" aria-live="polite"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 系统维护：stats / queue / GPU / 日志 / 预加载 / 重置 / 关机
                      （后端已有 /api/system/* 与 /api/model/preload*，此前 UI 无入口） -->
                 <div class="card" id="settings-maint">
@@ -953,5 +990,157 @@
             });
         });
     };
+})();
+</script>
+
+<script>
+// 模型下载管理（/api/models/download/*）：目录渲染 + 单任务轮询 + 启停。
+// 下载实现在子进程复用 scripts/download_models.py；此处只做状态表达。
+(function(){
+    var T = function(key, def) {
+        return (window.I18N && window.I18N[key]) || def || key;
+    };
+    var pollTimer = null;
+    var tierBadge = {
+        required:    { cls: 'status-message', style: 'color:var(--red);font-weight:600',    label: 'model_dl_tier_required' },
+        recommended: { cls: 'status-message', style: 'color:var(--orange);font-weight:600', label: 'model_dl_tier_recommended' },
+        optional:    { cls: 'status-message', style: 'color:var(--t2)',                     label: 'model_dl_tier_optional' }
+    };
+
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function csrfHeaders() {
+        var h = {};
+        var token = window.getCsrfToken ? window.getCsrfToken() : '';
+        if (token) h['X-CSRF-Token'] = token;
+        return h;
+    }
+
+    function tierLabel(tier) {
+        var b = tierBadge[tier] || tierBadge.optional;
+        return '<span style="' + b.style + '">' + esc(T(b.label, tier)) + '</span>';
+    }
+
+    function renderCatalog(items) {
+        var tbody = document.getElementById('model-dl-tbody');
+        if (!tbody) return;
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            var size = it.size_hint_gb != null ? (it.size_hint_gb + ' GB') : '—';
+            var kind = it.kind === 'code_repo' ? ' <span style="color:var(--t2);font-size:10px">' + esc(T('model_dl_kind_code', '代码')) + '</span>' : '';
+            html += '<tr style="border-bottom:1px solid var(--border)">'
+                + '<td style="padding:6px 8px">' + esc(it.title) + kind
+                + '<div style="color:var(--t2);font-size:10px;margin-top:2px">' + esc(it.license) + '</div></td>'
+                + '<td style="padding:6px 8px">' + tierLabel(it.tier) + '</td>'
+                + '<td style="padding:6px 8px">' + esc(size) + '</td>'
+                + '<td style="padding:6px 8px"><span id="model-dl-st-' + esc(it.key) + '">'
+                + (it.installed
+                    ? '<span style="color:var(--green,#16a34a);font-weight:600">' + esc(T('model_dl_status_installed', '已安装')) + '</span>'
+                    : '<span style="color:var(--t2)">' + esc(T('model_dl_status_missing', '未下载')) + '</span>')
+                + '</span></td>'
+                + '<td style="padding:6px 8px;text-align:right">'
+                + '<button class="btn ' + (it.installed ? 'btn-o' : 'btn-p') + ' btn-sm" data-dl-key="' + esc(it.key) + '" data-dl-installed="' + (it.installed ? '1' : '0') + '" onclick="modelDlStart(this)">'
+                + esc(it.installed ? T('model_dl_redownload_btn', '重新下载') : T('model_dl_download_btn', '下载'))
+                + '</button></td>'
+                + '</tr>';
+        }
+        tbody.innerHTML = html;
+    }
+
+    function loadCatalog() {
+        fetch('/api/models/download/catalog')
+            .then(function(r) { return r.json(); })
+            .then(function(d) { renderCatalog(d.items || []); refreshStatus(); })
+            .catch(function() { /* tab 生命周期内静默重试由下一次打开触发 */ });
+    }
+
+    function setButtonsDisabled(disabled) {
+        var btns = document.querySelectorAll('#model-dl-tbody button[data-dl-key]');
+        for (var i = 0; i < btns.length; i++) btns[i].disabled = disabled;
+    }
+
+    function refreshStatus() {
+        fetch('/api/models/download/status')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var box = document.getElementById('model-dl-progress');
+                var job = d.job;
+                if (!job || (!d.running && job.phase !== 'running')) {
+                    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                    if (box && box.style.display !== 'none' && job) {
+                        // 收尾帧：展示终态 2.5s 后隐藏并刷新目录
+                        document.getElementById('model-dl-progress-fill').style.width = '100%';
+                        var doneMsg = job.phase === 'done'
+                            ? T('model_dl_done', '下载完成')
+                            : (job.phase === 'cancelled' ? T('model_dl_cancelled', '已取消') : T('model_dl_failed', '下载失败'));
+                        document.getElementById('model-dl-progress-key').textContent =
+                            job.key + ' — ' + doneMsg + ' (' + job.elapsed_s + 's)';
+                        document.getElementById('model-dl-cancel-btn').style.display = 'none';
+                        setTimeout(function() {
+                            box.style.display = 'none';
+                            loadCatalog();
+                        }, 2500);
+                    } else if (box) {
+                        box.style.display = 'none';
+                    }
+                    setButtonsDisabled(false);
+                    return;
+                }
+                // 运行中：展示进度区 + 指数探测进度（日志行数近似）
+                box.style.display = '';
+                document.getElementById('model-dl-cancel-btn').style.display = '';
+                document.getElementById('model-dl-progress-key').textContent = job.key + ' — ' + T('model_dl_running', '下载中') + ' (' + job.elapsed_s + 's)';
+                var lines = job.log_tail || [];
+                var dlLines = 0;
+                for (var i = 0; i < lines.length; i++) if (/%\|/.test(lines[i]) || lines[i].indexOf('Downloading') >= 0) dlLines++;
+                document.getElementById('model-dl-progress-fill').style.width = Math.min(90, 5 + dlLines * 3) + '%';
+                document.getElementById('model-dl-log').textContent = lines.slice(-8).join('\n');
+                setButtonsDisabled(true);
+                if (!pollTimer) pollTimer = setInterval(refreshStatus, 2000);
+            })
+            .catch(function() { /* 网络抖动，下一轮轮询恢复 */ });
+    }
+
+    window.modelDlStart = function(btn) {
+        var key = btn.getAttribute('data-dl-key');
+        var installed = btn.getAttribute('data-dl-installed') === '1';
+        var doStart = function() {
+            var body = new FormData();
+            body.append('key', key);
+            fetch('/api/models/download/start', { method: 'POST', headers: csrfHeaders(), body: body })
+                .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
+                .then(function(res) {
+                    if (!res.ok) {
+                        if (window.showToast) showToast(res.j.message || T('model_dl_start_failed', '启动失败'), 'error');
+                        return;
+                    }
+                    refreshStatus();
+                })
+                .catch(function(e) { if (window.showToast) showToast(String(e), 'error'); });
+        };
+        // 原生 confirm() 全站禁用（test_voice_clone_consent 静态守卫），统一走 ConfirmDialog
+        if (installed && window.ConfirmDialog) {
+            ConfirmDialog.confirm(T('model_dl_confirm_redownload', '该条目已安装，确认重新下载？')).then(function(ok) {
+                if (ok) doStart();
+            });
+            return;
+        }
+        doStart();
+    };
+
+    window.modelDlCancel = function() {
+        fetch('/api/models/download/cancel', { method: 'POST', headers: csrfHeaders() })
+            .then(function(r) { return r.json(); })
+            .then(function() { refreshStatus(); })
+            .catch(function() { /* 下一轮轮询收敛 */ });
+    };
+
+    // 首次进入设置页即拉取（HTMX 片段注入后执行）
+    loadCatalog();
 })();
 </script>
