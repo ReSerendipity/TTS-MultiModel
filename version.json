@@ -1,6 +1,6 @@
 {
   "version": "2.9.0",
-  "release_date": "2026-10-26",
+  "release_date": "2026-10-27",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.8.0：本版主干是新引擎接入与发布分发口径变更——接入 Breeze TTS 2（BreezeBlue 3.48B 中英双语，Voice Design/Clone/Direction 三态 + 正文内嵌 Vocal Events 事件标记 + 流式生成；上游推理源码 Apache-2.0 已 vendor 固化，音频 tokenizer 走 qwen_tts_min 裁剪副本，零新增重依赖），成为第 6 个本地引擎；transformers 抬升并钉住 4.57.3（IndexTTS 4.53+ 的 4 处导入断裂由 indextts_tf_compat shim 回填，双引擎家族共存实测）；桌面发布包确立 framework-only 口径（历史 v2.2.1/v2.4.0 各 ~26GB 模型 Data 分卷成历史，模型统一经 download_models.py 从 HF 镜像/ModelScope 用户自取，manifest 按包内容动态标注；权重不随发布包分发）；发布链路消解 CodeQL 新增告警并修复通用引擎就绪检查（_check_engine_ready 曾把 breeze-tts2 等已加载引擎误报 VoxCPM2 未加载）；真机验收：12GB 笔记本卡 eager 峰值约 8.3GB、稳态 RTF≈2.5×实时，六轮生成全通过；合规侧 Breeze 权重登记为研究/非商用（model-cards/LICENSE_COMPLIANCE/config 三处一致）。"
+  "changelog": "2.9.0：本版主干是 framework-only 分发的用户侧产品化与引擎层治理——新增模型下载管理器（设置页一键按档位下载：核心必需/推荐/可选三级，/api/models/download catalog/start/status/cancel 四端点，子进程隔离可取消、日志尾部轮询进度，复用 download_models.py 单一事实来源；index-tts 代码包纳入管理并经 reference_repos sys.path 引导，彻底移除 pip install -e 前置）；修复 engines/__init__ 缺参覆盖导致的 indextts 引擎元数据污染（features/sample_rate 脏读）；依赖收口 descript-audiotools 入清单、protobuf 3.19.6 + tensorboardX 2.5.1 兼容组合（A19/A20 按已接受风险登记）；openvoice 说话人嵌入误判修复；真机验收：IndexTTS 2.5 与 Breeze TTS 2 双引擎在 12GB 卡 load/infer/unload 全通。口径：main 直推（admin 豁免）为既定工作流；GPU 真跑受 runner 约束按台账 skip。"
 }

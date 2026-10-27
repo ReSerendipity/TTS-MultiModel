@@ -14,8 +14,8 @@
 ## 1. 版本号规范
 
 - 遵循 **SemVer** `MAJOR.MINOR.PATCH`；预发布用 `-alpha.N` / `-beta.N` / `-rc.N`。
-- **已发布最新 = v2.8.0**（2026-10-26）。
-- **唯一权威版本位**：`pyproject.toml` `[project].version`，由 release-please manifest `.release-please-manifest.json` 的 `"."` 驱动（当前 `2.8.0`）。
+- **已发布最新 = v2.9.0**（2026-10-27）。
+- **唯一权威版本位**：`pyproject.toml` `[project].version`，由 release-please manifest `.release-please-manifest.json` 的 `"."` 驱动（当前 `2.9.0`）。
 - 必须同步的其它版本位（仓库内跟踪共 11 处，数目以 `tests/test_version_consistency.py::_site_versions()` 实际返回为准）：
   `version.json` `$.version`、`config.yaml` 顶层 `version`、`desktop/package.json` `$.version`、
   `desktop/src-tauri/tauri.conf.json` `$.version`、`desktop/src-tauri/Cargo.toml` `$.package.version`、
@@ -103,7 +103,7 @@
 
 | 占位符 | 本仓取值 |
 |---|---|
-| 版本位文件与字段 | `pyproject.toml` `[project].version`（当前 `2.8.0`），manifest `.release-please-manifest.json` 的 `"."` 驱动 |
+| 版本位文件与字段 | `pyproject.toml` `[project].version`（当前 `2.9.0`），manifest `.release-please-manifest.json` 的 `"."` 驱动 |
 | 其它需同步版本位 | 见 §1 清单（共 11 处，以测试实际返回为准） |
 | 版本一致性校验入口 | `tests/test_version_consistency.py::test_all_version_sites_agree` |
 | 自动化方式 | release-please（自动位 + 人工补齐），手工 tag 备用路径 |
