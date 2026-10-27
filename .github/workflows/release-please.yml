@@ -157,12 +157,29 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 2026-10-27 事故修复：main 上多个 push 竞争触发本 workflow 时，晚到的
+      # build-release 可能 checkout 到「发布前的旧树」而把错版 wheel 传进最新
+      # release（v2.9.0 发布时实际发生：2.8.0 wheel 挂上 v2.9.0）。强制 checkout
+      # release tag 本身 + 构建后校验制品版本与 tag 一致，让这类错版在 CI 内
+      # 硬失败而不是污染 release。
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Verify checkout matches release tag
+        run: |
+          set -eu
+          tag_version=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          tag_ref="${{ needs.release-please.outputs.tag_name }}"
+          echo "tag=$tag_ref  pyproject.version=$tag_version"
+          test "v$tag_version" = "$tag_ref" || {
+            echo "::error::checkout 出的 pyproject 版本($tag_version)与 release tag($tag_ref)不一致 —— 拒绝构建，避免错版资产"; exit 1;
+          }
 
       - name: Install build tools
         run: pip install build twine
