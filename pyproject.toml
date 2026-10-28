@@ -64,13 +64,16 @@ dependencies = [
     #   Breeze vendored 代码链在 4.57.3 + torch 2.13 下导入全通。
     # - IndexTTS 真机推理回归与三引擎冒烟验收记录见
     #   docs/plans/BREEZE_TTS2_INTEGRATION_GUIDE.md。
-    # 安全面：4.52.x 原带 16 个 transformers 公告（A1–A4 需 4.53+），本次抬升直接
-    # 消解其中 4 条；其余（需 5.x 或上游无修复版）维持
-    # docs/SECURITY_DEPENDABOT_TRIAGE.md §1 的登记口径，pip-audit/Trivy 豁免清单
-    # 需随本次抬升按该文档 §4 复审约定同步复核。
+    # 安全面：4.52.x 原带 16 个 transformers 公告（A1–A4 需 4.53+），4.57.3 抬升已消解
+    # 其中 4 条；其余维持 docs/SECURITY_DEPENDABOT_TRIAGE.md §1 的登记口径。
+    # - 2026-10-27 抬到 5.20.2（owner 裁决的 AI 栈整组迁移：dependabot #201/#203/#232
+    #   因锁集自洽互斥无法独立合并——transformers 4.x 与 hub 1.x 互斥、4.57 硬顶
+    #   tokenizers<=0.23.0，只能整组跳）：同期 hub 0.36.2→1.33.0、tokenizers 0.22.2→0.23.3。
+    #   indextts shim（engines/indextts_tf_compat.py）按 4.53+ 断裂面回填，5.x 新增移除
+    #   符号的兼容性以 CI pytest 导入测试 + 合并后真机推理冒烟为准，发布前必须完成冒烟。
     # tests/test_dependency_consistency.py 会核对：本声明与 requirements-lock.txt 的钉版互相满足。
-    "transformers>=4.57.3,<4.58",
-    "tokenizers>=0.21.0,<0.24",
+    "transformers>=5.20.2,<5.21",
+    "tokenizers>=0.23.3,<0.24",
     # === AI 生态 ===
     "funasr>=1.0.0",
     "modelscope>=1.9.0",
@@ -221,6 +224,10 @@ exclude = [
     # 不由本仓 lint/format 改写，否则未来同步上游会冲突、推理行为可能被静默改变。
     # 与 .pre-commit-config.yaml 的 exclude: ^app/integrated_app/vendor/ 同源。
     "**/vendor",
+    # transformers 4.52.1 符号回填文件（engines/transformers_452_backfill.py）是按上游源码
+    # 逐块切片的字节级副本：风格与 5.x 时代的 SIM/UP/B 规则不兼容，且逐条改写会让
+    # "与上游 diff 可读"这一维护前提消失。语义由 tests + 真机冒烟把关，同 vendor 口径。
+    "**/transformers_452_backfill.py",
     "dist",
     "build",
 ]
@@ -292,6 +299,11 @@ ignore_errors = true
 # 与上同口径——上游字节保持一致，不做本仓类型修缮；引擎适配层 engine.py 仍受检。
 [[tool.mypy.overrides]]
 module = ["integrated_app.engines.breeze_tts2.vendor.*"]
+ignore_errors = true
+
+# transformers 4.52.1 符号回填（逐块字节级上游副本）：不做本仓类型修缮，同 vendor 口径。
+[[tool.mypy.overrides]]
+module = ["integrated_app.engines.transformers_452_backfill"]
 ignore_errors = true
 
 # training/ 模块为「能力声明未验证」实验模块（综合评估主线：lora/ 无产物），

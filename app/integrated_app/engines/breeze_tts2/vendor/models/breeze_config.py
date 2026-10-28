@@ -14,10 +14,12 @@ class T5GemmaEncoderWrapper(T5GemmaEncoder):
 
 
 # register T5GemmaModuleConfig
-AutoConfig.register("t5_gemma_module", T5GemmaModuleConfig)
-AutoModel.register(T5GemmaModuleConfig, T5GemmaEncoderWrapper)
-AutoConfig.register("t5gemma2_text", T5Gemma2TextConfig)
-AutoModel.register(T5Gemma2TextConfig, T5Gemma2TextEncoder)
+# exist_ok=True：transformers 5.20.2 已自带 t5_gemma_module 注册，重复 register 会抛
+# ValueError（"t5_gemma_module" is already used by a Transformers config）。
+AutoConfig.register("t5_gemma_module", T5GemmaModuleConfig, exist_ok=True)
+AutoModel.register(T5GemmaModuleConfig, T5GemmaEncoderWrapper, exist_ok=True)
+AutoConfig.register("t5gemma2_text", T5Gemma2TextConfig, exist_ok=True)
+AutoModel.register(T5Gemma2TextConfig, T5Gemma2TextEncoder, exist_ok=True)
 
 
 # Update BreezeConfig to handle text_encoder_config properly

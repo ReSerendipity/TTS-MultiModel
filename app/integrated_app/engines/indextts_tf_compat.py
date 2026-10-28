@@ -29,17 +29,23 @@ logger = logging.getLogger("tts_multimodel")
 
 
 def apply() -> None:
-    """回填 indextts 依赖的 5 个 transformers 旧符号（幂等）。
+    """回填 indextts / breeze vendored 代码依赖的 transformers 旧符号（幂等）。
 
-    所有注入都以 ``hasattr`` 守卫——在 transformers <=4.52（符号尚存）或未来
-    上游 indextts 自行适配后，本函数自动变为 no-op，无需版本分支。
+    覆盖 4.53+ 的 5 处断裂与 5.x 的 2 处新断裂（cache_utils 具体类收编、
+    no_init_weights 搬家），并挂载 `transformers_452_backfill`——indextts
+    vendored 副本依赖的 18 个 4.52.1 符号（AST 全量扫描实证的完整差集）。
+    所有注入都以 ``hasattr`` 守卫——在符号尚存的旧版本或未来上游自行适配
+    后，本函数自动变为 no-op，无需版本分支。
     """
+    # 4.52 符号库先装（vendored 副本顶层导入依赖它，见 transformers_452_backfill 模块文档）
     import torch.nn as nn
 
     # ---- ① QuantizedCacheConfig（4.53 从 cache_utils 移除）----
     # indextts 仅在 transformers_generation_utils.py:1748 把它当默认值构造，
     # 零参 stub 语义等价（量化缓存路径本项目从不启用）。
     import transformers.cache_utils as _cu
+
+    from integrated_app.engines import transformers_452_backfill  # noqa: F401 - import 即安装
 
     if not hasattr(_cu, "QuantizedCacheConfig"):
 
@@ -51,6 +57,15 @@ def apply() -> None:
 
         setattr(_cu, "QuantizedCacheConfig", QuantizedCacheConfig)  # noqa: B010 - 动态符号注入
         logger.debug("[indextts_tf_compat] 已注入 cache_utils.QuantizedCacheConfig stub")
+
+    # ---- ①b OffloadedCache（5.x 从 cache_utils 收编移除）----
+    # indextts 的 transformers_generation_utils.py:32 顶层导入、:1766 实例化
+    # （cache_implementation="offloaded" 路径）。5.x 移除该类（Layer 体系重组，
+    # offload 由 accelerate 层处理）。别名指 DynamicCache：offloaded 语义退化为
+    # 普通显存缓存（省显存优化失效、功能等价），TTS 短合成不触达该路径。
+    if not hasattr(_cu, "OffloadedCache"):
+        setattr(_cu, "OffloadedCache", _cu.DynamicCache)  # noqa: B010 - 动态符号注入
+        logger.debug("[indextts_tf_compat] 已别名 cache_utils.OffloadedCache -> DynamicCache")
 
     # ---- ② _crop_past_key_values（4.53 从 candidate_generator 移除）----
     # indextts 仅在 speculative decoding 裁剪 KV 缓存处调用（L4312）；
@@ -74,17 +89,30 @@ def apply() -> None:
 
     # ---- ③ NEED_SETUP_CACHE_CLASSES_MAPPING / QUANT_BACKEND_CLASSES_MAPPING ----
     # （4.53 从 generation.configuration_utils 移除，字符串→Cache 类映射）
+    # 5.x 起 cache_utils 进一步收编：OffloadedCache / SlidingWindowCache /
+    # Quanto/HQQ 具体类整体移除（cache 走 Layer 体系重组），只留 DynamicCache /
+    # StaticCache / QuantizedCache。故逐符号 hasattr 解析，缺失时回退
+    # DynamicCache——映射的 key 集合才是 vendored 代码的查询面
+    # （cache_implementation 配置路径），TTS 推理只用 full/dynamic，
+    # 回退值仅保证 dict 构造不炸、对应路径永不触达。
     import transformers.generation.configuration_utils as _gu
+
+    def _cache_cls_or_fallback(name: str):  # noqa: ANN001, ANN202
+        cls = getattr(_cu, name, None)
+        if cls is None:
+            logger.debug("[indextts_tf_compat] cache_utils.%s 在当前版本不存在，回退 DynamicCache", name)
+            cls = _cu.DynamicCache
+        return cls
 
     if not hasattr(_gu, "NEED_SETUP_CACHE_CLASSES_MAPPING"):
         setattr(  # noqa: B010 - 动态符号注入
             _gu,
             "NEED_SETUP_CACHE_CLASSES_MAPPING",
             {
-                "full": _cu.DynamicCache,
-                "offloaded": _cu.OffloadedCache,
-                "sliding_window": _cu.SlidingWindowCache,
-                "static": _cu.StaticCache,
+                "full": _cache_cls_or_fallback("DynamicCache"),
+                "offloaded": _cache_cls_or_fallback("OffloadedCache"),
+                "sliding_window": _cache_cls_or_fallback("SlidingWindowCache"),
+                "static": _cache_cls_or_fallback("StaticCache"),
             },
         )
         logger.debug("[indextts_tf_compat] 已注入 configuration_utils.NEED_SETUP_CACHE_CLASSES_MAPPING")
@@ -93,8 +121,8 @@ def apply() -> None:
             _gu,
             "QUANT_BACKEND_CLASSES_MAPPING",
             {
-                "quanto": _cu.QuantoQuantizedCache,
-                "hqq": _cu.HQQQuantizedCache,
+                "quanto": _cache_cls_or_fallback("QuantoQuantizedCache"),
+                "hqq": _cache_cls_or_fallback("HQQQuantizedCache"),
             },
         )
         logger.debug("[indextts_tf_compat] 已注入 configuration_utils.QUANT_BACKEND_CLASSES_MAPPING")
@@ -116,6 +144,7 @@ def apply() -> None:
                 return hidden_states
 
         setattr(_mu, "SequenceSummary", SequenceSummary)  # noqa: B010 - 动态符号注入
+        logger.debug("[indextts_tf_compat] 已注入 modeling_utils.SequenceSummary stub")
 
     # ---- ⑤ GenerationConfig.forced_decoder_ids（4.57 属性清理移除）----
     # indextts 的 vendored 生成代码（transformers_generation_utils.py:1005）读取该
@@ -125,4 +154,15 @@ def apply() -> None:
     if not hasattr(_gu.GenerationConfig, "forced_decoder_ids"):
         setattr(_gu.GenerationConfig, "forced_decoder_ids", None)  # noqa: B010 - 动态符号注入
         logger.debug("[indextts_tf_compat] 已注入 GenerationConfig.forced_decoder_ids 类级默认")
-        logger.debug("[indextts_tf_compat] 已注入 modeling_utils.SequenceSummary stub")
+
+    # ---- ⑥ no_init_weights（5.x 从 modeling_utils 搬家到 initialization）----
+    # breeze vendored 代码在 from_pretrained 路径里
+    # `from transformers.modeling_utils import no_init_weights`（vendor/models/breeze.py），
+    # 5.20.2 起该 contextmanager 搬家到 transformers.initialization（签名不变）。
+    # 旧位别名指新家，hasattr 守卫幂等；<=4.57 环境自动 no-op。
+    if not hasattr(_mu, "no_init_weights"):
+        import transformers.initialization as _init
+
+        if hasattr(_init, "no_init_weights"):
+            setattr(_mu, "no_init_weights", _init.no_init_weights)  # noqa: B010 - 动态符号注入
+            logger.debug("[indextts_tf_compat] 已别名 modeling_utils.no_init_weights -> initialization.no_init_weights")
