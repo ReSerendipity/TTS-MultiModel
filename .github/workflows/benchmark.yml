@@ -43,7 +43,10 @@ jobs:
           pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-benchmark
+          # pytest 9.2.0 起移除了 Node._nodeid，而 pytest-benchmark 5.3.0 仍读它 →
+          # 全部 benchmark 用例在 setup 阶段 AttributeError。2026-10-28 实测（PR #238）。
+          # pytest-benchmark 修好前钉在 8.x；恢复无上界时需重跑本 workflow 验证。
+          pip install "pytest<9" pytest-asyncio pytest-benchmark
 
       # 2026-08-31 治理修复（P2-1）：跨 run 基线持久化。
       # 此前 `last_run` 的 cp 复制只存在于单次 runner 内、无缓存持久化，
