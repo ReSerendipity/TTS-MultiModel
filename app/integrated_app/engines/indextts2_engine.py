@@ -575,6 +575,15 @@ class IndexTTS2Engine(TTSEngine):
             self._ensure_indextts_importable()
 
             _infer_mod = importlib.import_module(self._infer_module)
+
+            # bigvgan 兼容（须在 infer 模块导入后：bigvgan 由 indextts 注入 sys.path，
+            # 过早 import 会 ModuleNotFoundError 静默跳过）——其 _from_pretrained 是
+            # 4.52 时代 fork（proxies/resume_download 为必填 kw），transformers 5.x 的
+            # 调用链不再传 → TypeError。backfill 包装注入默认值。
+            from .transformers_452_backfill import patch_bigvgan_from_pretrained as _patch_bvg
+
+            _patch_bvg()
+
             IndexTTS2 = _infer_mod.IndexTTS2
         except ImportError as e:
             raise ImportError(

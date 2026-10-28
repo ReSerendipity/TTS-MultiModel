@@ -147,9 +147,9 @@ def test_d1_guard_is_not_vacuous():
     pins = _pins(_LOCK)
     tf = pins.get("transformers")
     assert tf is not None, "锁里没有 transformers，样本失效"
-    assert _violations(pins, {"transformers": [">=4.57.3,<4.58"]}) == []
-    assert _violations(pins, {"transformers": [">=4.58"]}), "声明越过实测血统上界时必须报错，否则守卫空转"
-    assert _violations(pins, {"transformers": ["<4.57"]}), "声明低于 Breeze 下界时必须报错，否则守卫空转"
+    assert _violations(pins, {"transformers": [">=5.20.2,<5.21"]}) == []
+    assert _violations(pins, {"transformers": [">=5.21"]}), "声明越过实测血统上界时必须报错，否则守卫空转"
+    assert _violations(pins, {"transformers": ["<5.20.2"]}), "声明低于实测下界时必须报错，否则守卫空转"
 
     # 第二份钉版集必须真的在检查范围内，而不是挂在循环里凑数：
     # 小清单与锁共享 92 个包，能对上声明的也应 ≥20，且 #88 那个形状要能被抓到。
@@ -164,36 +164,40 @@ def test_d1_guard_is_not_vacuous():
 # D2 引擎钉住的那条血脉
 # ---------------------------------------------------------------------------
 
-_ENGINE_FACT = """Breeze TTS 2 的模型代码要求 transformers>=4.57，IndexTTS 2.0/2.5 在 4.53+ 的
-4 处导入断裂由 engines/indextts_tf_compat.py shim 回填（2026-10-25 在 .venv
-transformers 4.57.3 下实测 indextts.infer_v2_5 / infer_v2 导入全通）。当前血统 =
-transformers==4.57.3 + tokenizers==0.22.2：这是「Breeze vendored 链 + indextts shim +
-VoxCPM2」共同实测的钉版。要挪动这里，必须四件事连着改并重测：①indextts_tf_compat
-的符号回填在新版下仍成立；②breeze_tts2/vendor 全链导入冒烟；③IndexTTS/VoxCPM2
-真机推理回归；④docs/SECURITY_DEPENDABOT_TRIAGE.md 公告豁免清单同步复核。"""
+_ENGINE_FACT = """2026-10-28 起血统 = transformers==5.20.2 + tokenizers==0.23.3 +
+huggingface-hub==1.33.0：Breeze TTS 2、IndexTTS 2.0/2.5、VoxCPM2 在同一 venv 下真机冒烟通过
+（voxcpm2 合成 200 / 切换 indextts2 加载 34.5s / IndexTTS 2.5 真合成 200，440 KB WAV）。
+旧血统 4.57.3 的两处断裂由兼容层回填：engines/indextts_tf_compat.py（4.53+/5.x 的 cache 类与
+生成配置断裂）+ engines/transformers_452_backfill.py（vendored 4.52 副本缺的 18+ 符号、
+BeamHypotheses、PretrainedConfig/GenerationConfig 生成 API）。要挪动这里，必须四件事连着
+改并重测：①两处兼容层回填在新版下仍成立；②breeze_tts2/vendor 全链导入冒烟；
+③IndexTTS/VoxCPM2 真机推理回归；④docs/SECURITY_DEPENDABOT_TRIAGE.md 公告豁免清单同步复核。"""
 
 
 def test_engine_pinned_transformers_lineage():
-    """锁必须停在 4.57.3 / tokenizers 0.22.2，且声明必须带 <4.58 上界。"""
+    """锁必须停在 5.20.2 / tokenizers 0.23.3 / hub 1.33.0，且声明必须带 <5.21 上界。"""
     pins = _pins(_LOCK)
-    assert pins.get("transformers") == "4.57.3", (
+    assert pins.get("transformers") == "5.20.2", (
         f"锁里 transformers 被挪动了：{pins.get('transformers')!r}。{_ENGINE_FACT}"
     )
-    assert pins.get("tokenizers") == "0.22.2", f"锁里 tokenizers 被挪动了：{pins.get('tokenizers')!r}。{_ENGINE_FACT}"
+    assert pins.get("tokenizers") == "0.23.3", f"锁里 tokenizers 被挪动了：{pins.get('tokenizers')!r}。{_ENGINE_FACT}"
+    assert pins.get("huggingface-hub") == "1.33.0", (
+        f"锁里 huggingface-hub 被挪动了：{pins.get('huggingface-hub')!r}。{_ENGINE_FACT}"
+    )
     specs = " ".join(_declared_specifiers().get("transformers", []))
-    assert "<4.58" in specs and ">=4.57.3" in specs, (
-        f"requirements.txt / pyproject 的 transformers 声明缺 `>=4.57.3,<4.58` 口径，"
-        f"低于 4.57 会起不来 Breeze TTS 2，越过上界则超出实测血统。{_ENGINE_FACT}"
+    assert "<5.21" in specs and ">=5.20.2" in specs, (
+        f"requirements.txt / pyproject 的 transformers 声明缺 `>=5.20.2,<5.21` 口径，"
+        f"低于 5.20.2 会退回旧血统，越过上界则超出实测血统。{_ENGINE_FACT}"
     )
 
 
 def test_d2_guard_is_not_vacuous():
     # 声明侧：上下界存在是本守卫的判据，越界后 _violations 应能抓到锁与声明的矛盾
-    assert "<4.58" in " ".join(_declared_specifiers().get("transformers", []))
-    assert _violations({"transformers": "4.52.1"}, {"transformers": [">=4.57.3,<4.58"]}), (
-        "锁被降回 4.52 时必须报错（Breeze 起不来）"
+    assert "<5.21" in " ".join(_declared_specifiers().get("transformers", []))
+    assert _violations({"transformers": "4.57.3"}, {"transformers": [">=5.20.2,<5.21"]}), (
+        "锁被降回 4.57 时必须报错（旧血统，需重跑四件事）"
     )
-    assert _violations({"transformers": "5.0.0"}, {"transformers": [">=4.57.3,<4.58"]}), "锁漂到 5.x 时必须报错"
+    assert _violations({"transformers": "5.22.0"}, {"transformers": [">=5.20.2,<5.21"]}), "锁漂到 5.22 时必须报错"
     assert _violations({"tokenizers": "0.23.2"}, {"tokenizers": [">=0.21.0,<0.24"]}) == [], (
         "0.23 在 tokenizers 声明区间内，不该报错"
     )

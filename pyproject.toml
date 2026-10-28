@@ -224,6 +224,10 @@ exclude = [
     # 不由本仓 lint/format 改写，否则未来同步上游会冲突、推理行为可能被静默改变。
     # 与 .pre-commit-config.yaml 的 exclude: ^app/integrated_app/vendor/ 同源。
     "**/vendor",
+    # transformers 4.52.1 符号回填文件（engines/transformers_452_backfill.py）是按上游源码
+    # 逐块切片的字节级副本：风格与 5.x 时代的 SIM/UP/B 规则不兼容，且逐条改写会让
+    # "与上游 diff 可读"这一维护前提消失。语义由 tests + 真机冒烟把关，同 vendor 口径。
+    "**/transformers_452_backfill.py",
     "dist",
     "build",
 ]
@@ -295,6 +299,11 @@ ignore_errors = true
 # 与上同口径——上游字节保持一致，不做本仓类型修缮；引擎适配层 engine.py 仍受检。
 [[tool.mypy.overrides]]
 module = ["integrated_app.engines.breeze_tts2.vendor.*"]
+ignore_errors = true
+
+# transformers 4.52.1 符号回填（逐块字节级上游副本）：不做本仓类型修缮，同 vendor 口径。
+[[tool.mypy.overrides]]
+module = ["integrated_app.engines.transformers_452_backfill"]
 ignore_errors = true
 
 # training/ 模块为「能力声明未验证」实验模块（综合评估主线：lora/ 无产物），

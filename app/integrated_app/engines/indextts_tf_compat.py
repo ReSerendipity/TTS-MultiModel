@@ -32,15 +32,20 @@ def apply() -> None:
     """回填 indextts / breeze vendored 代码依赖的 transformers 旧符号（幂等）。
 
     覆盖 4.53+ 的 5 处断裂与 5.x 的 2 处新断裂（cache_utils 具体类收编、
-    no_init_weights 搬家）。所有注入都以 ``hasattr`` 守卫——在符号尚存的旧
-    版本或未来上游自行适配后，本函数自动变为 no-op，无需版本分支。
+    no_init_weights 搬家），并挂载 `transformers_452_backfill`——indextts
+    vendored 副本依赖的 18 个 4.52.1 符号（AST 全量扫描实证的完整差集）。
+    所有注入都以 ``hasattr`` 守卫——在符号尚存的旧版本或未来上游自行适配
+    后，本函数自动变为 no-op，无需版本分支。
     """
+    # 4.52 符号库先装（vendored 副本顶层导入依赖它，见 transformers_452_backfill 模块文档）
     import torch.nn as nn
 
     # ---- ① QuantizedCacheConfig（4.53 从 cache_utils 移除）----
     # indextts 仅在 transformers_generation_utils.py:1748 把它当默认值构造，
     # 零参 stub 语义等价（量化缓存路径本项目从不启用）。
     import transformers.cache_utils as _cu
+
+    from integrated_app.engines import transformers_452_backfill  # noqa: F401 - import 即安装
 
     if not hasattr(_cu, "QuantizedCacheConfig"):
 
@@ -52,6 +57,15 @@ def apply() -> None:
 
         setattr(_cu, "QuantizedCacheConfig", QuantizedCacheConfig)  # noqa: B010 - 动态符号注入
         logger.debug("[indextts_tf_compat] 已注入 cache_utils.QuantizedCacheConfig stub")
+
+    # ---- ①b OffloadedCache（5.x 从 cache_utils 收编移除）----
+    # indextts 的 transformers_generation_utils.py:32 顶层导入、:1766 实例化
+    # （cache_implementation="offloaded" 路径）。5.x 移除该类（Layer 体系重组，
+    # offload 由 accelerate 层处理）。别名指 DynamicCache：offloaded 语义退化为
+    # 普通显存缓存（省显存优化失效、功能等价），TTS 短合成不触达该路径。
+    if not hasattr(_cu, "OffloadedCache"):
+        setattr(_cu, "OffloadedCache", _cu.DynamicCache)  # noqa: B010 - 动态符号注入
+        logger.debug("[indextts_tf_compat] 已别名 cache_utils.OffloadedCache -> DynamicCache")
 
     # ---- ② _crop_past_key_values（4.53 从 candidate_generator 移除）----
     # indextts 仅在 speculative decoding 裁剪 KV 缓存处调用（L4312）；
