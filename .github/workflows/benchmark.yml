@@ -15,6 +15,11 @@ on:
       # 门禁脚本自己也算一条：改了判据却不在 PR 上跑一次，就等于把没验证过的逻辑合进 main
       # （push 侧本来有这个 paths，PR 侧漏了 —— 2026-09-22 补）。
       - '.github/workflows/benchmark.yml'
+      # 同一条理由适用于 L3 仓内基线本身（2026-10-29 补）：L1 缓存配额长期满载
+      # （10.23/10 GB，见下方比较步骤注释），PR 侧比较事实上一直落在 benchmarks/baseline.json。
+      # 刷新基线却不在 PR 上跑一次对照，等于把"没验证过的基线"合进 main——
+      # 本次再锚定（616→931µs 等五项）正是靠这条 paths 在 PR 上完成验证的。
+      - 'benchmarks/**'
   schedule:
     # Run weekly on Sunday at 00:07 UTC
     - cron: '7 0 * * 0'
