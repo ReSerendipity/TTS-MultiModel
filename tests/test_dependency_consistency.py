@@ -14,10 +14,10 @@ D1 ``test_lock_pins_satisfy_declared_specifiers`` —— `requirements.txt` / `p
    IndexTTS 2.0/2.5 直接起不来（实测见 docs/SECURITY_DEPENDABOT_TRIAGE.md §2）。
 
 D2 ``test_engine_pinned_transformers_lineage`` —— 把"引擎实测钉版"这件事变成断言：
-   锁里必须是 `transformers==4.57.3` + `tokenizers==0.22.2`，且声明必须是
-   `>=4.57.3,<4.58`（Breeze TTS 2 需 >=4.57；IndexTTS 4.53+ 断裂已由
-   engines/indextts_tf_compat.py shim 修复）。谁要挪动这条血统，必须按
-   _ENGINE_FACT 列的四件事重测后连同证据一起改。
+   锁里必须是 `transformers==5.20.2` + `tokenizers==0.23.3` + `huggingface-hub==1.33.0`，
+   且声明必须是 `>=5.20.2,<5.21`（2026-10-28 PR #238 整组迁移，兼容层见
+   engines/indextts_tf_compat.py + engines/transformers_452_backfill.py）。谁要挪动这条
+   血统，必须按 _ENGINE_FACT 列的四件事重测后连同证据一起改。
 
 D3 ``test_accepted_risk_registers_stay_in_sync`` —— 两道扫描器的豁免集不许各自漂移：
    `.trivyignore.yaml` 的每条必须有 `expiration`（到期自动重新变红）且 id 出现在
@@ -28,7 +28,8 @@ D4 ``test_ignore_files_use_the_keys_the_tools_actually_read`` —— 堵"以为�
    trivy-action v0.36.0 的合法输入叫 `trivyignores`（**没有** `ignorefile`，写错只警告不报错），
    `.trivyignore.yaml` 的 schema 是 `package: {name, version}`（`version` 是单数字符串，
    写成 `versions: [...]` 不生效）。这两个坑本轮都真踩过，各断言一次。
-   同时核对：pip-audit 豁免的 PYSEC 号集合必须与分诊文档 §1 表**完全相等**（双向），
+   同时核对：pip-audit 豁免的 PYSEC 号集合必须与分诊文档 §1 表的**在册行**完全相等（双向，
+   行尾带"已随迁注销"标记的历史行不计入——证据保留、账本反映现状），
    多一个是"未登记降级"，少一个是"登记了却没真豁免"。
 
 维护约定同 test_fe_be_consistency.py：每条守卫配 `*_is_not_vacuous` 变异自证。
@@ -225,12 +226,12 @@ def test_accepted_risk_registers_stay_in_sync():
     """每条豁免都必须有到期时间，且它的 id 必须出现在分诊文档里。"""
     triage = _TRIAGE.read_text(encoding="utf-8")
     entries = _trivy_ignore_entries()
-    assert len(entries) >= 3, f"只解析到 {len(entries)} 条 Trivy 豁免，解析已失效"
+    assert len(entries) >= 2, f"只解析到 {len(entries)} 条 Trivy 豁免，解析已失效"
     missing_expiry = [e["id"] for e in entries if "expiration:" not in e["body"]]
     unlogged = [e["id"] for e in entries if e["id"] not in triage]
 
     ignores = _pip_audit_ignores()
-    assert len(ignores) >= 16, f"只解析到 {len(ignores)} 条 pip-audit 豁免，解析已失效"
+    assert len(ignores) >= 2, f"只解析到 {len(ignores)} 条 pip-audit 豁免，解析已失效"
     # pip-audit 用的是 PYSEC 号，与 Trivy 的 CVE 号不同源；两者都必须在分诊文档里有账
     orphan_pysec = [p for p in ignores if p not in triage]
 
@@ -244,9 +245,13 @@ def test_accepted_risk_registers_stay_in_sync():
     assert not problems, "豁免与分诊记录脱节：\n  " + "\n  ".join(problems)
 
 
-@pytest.mark.parametrize("cve", ["CVE-2026-4372", "CVE-2026-5241", "CVE-2026-9856"])
+@pytest.mark.parametrize("cve", ["CVE-2025-4565", "CVE-2026-0994"])
 def test_accepted_cves_are_actually_pinned_versions(cve: str):
-    """镜像里真出现过的号才允许被豁免：本条防止"顺手多豁免几个"。"""
+    """镜像里真出现过的号才允许被豁免：本条防止"顺手多豁免几个"。
+
+    参数化集合 = protobuf 3.19.6 的现役豁免（§1c 复审结论）。原参数里的
+    CVE-2026-4372/5241/9856 三条 transformers 豁免已随 5.20.2 迁移注销，不再登记。
+    """
     ids = {e["id"] for e in _trivy_ignore_entries()}
     assert cve in ids, f"{cve} 不在 .trivyignore.yaml 里（该文件应只登记 docker-build 实测报出的号）"
     assert cve in _TRIAGE.read_text(encoding="utf-8"), f"{cve} 没在分诊文档里留痕"
@@ -269,8 +274,16 @@ def _trivy_ignore_version_keys() -> tuple[int, int]:
 
 
 def _triage_table_pysecs() -> set[str]:
-    """分诊文档 §1 表 A 组行里登记的 PYSEC 号集合。"""
-    rows = [ln for ln in _TRIAGE.read_text(encoding="utf-8").splitlines() if re.match(r"^\| A\d+ \|", ln)]
+    """分诊文档 §1 表 A 组**在册行**里登记的 PYSEC 号集合。
+
+    行尾带"已随迁注销"标记的是历史证据行（版本迁移已真实消解，§1c），不计入在册账本；
+    证据仍在文档里，但豁免集不跟它们比——D4 的"完全相等"比较的是现状。
+    """
+    rows = [
+        ln
+        for ln in _TRIAGE.read_text(encoding="utf-8").splitlines()
+        if re.match(r"^\| A\d+ \|", ln) and "已随迁注销" not in ln
+    ]
     ids: set[str] = set()
     for ln in rows:
         ids.update(re.findall(r"PYSEC-[0-9]{4}-[0-9]{3,7}", ln))
@@ -294,8 +307,10 @@ def test_trivy_ignore_hooked_up_with_the_keys_the_tools_read():
         problems.append(
             f".trivyignore.yaml 里有 {bad} 处 `versions:` —— schema 只读 `package.version`（单数字符串），复数写法不生效"
         )
-    if good < 3:
-        problems.append(f".trivyignore.yaml 只解析到 {good} 条带 `package.version` 的条目，本文件现有 3 条豁免")
+    if good < 2:
+        problems.append(
+            f".trivyignore.yaml 只解析到 {good} 条带 `package.version` 的条目，本文件现有 2 条豁免（protobuf）"
+        )
     assert not problems, "豁免实际未生效：\n  " + "\n  ".join(problems)
 
 
@@ -307,7 +322,7 @@ def test_pip_audit_ignore_set_equals_the_triage_table():
     """
     registered = _triage_table_pysecs()
     exempted = set(_pip_audit_ignores())
-    assert len(registered) >= 16, f"分诊文档 §1 只解析到 {len(registered)} 个 PYSEC，表或解析已失效"
+    assert len(registered) >= 2, f"分诊文档 §1 只解析到 {len(registered)} 个在册 PYSEC，表或解析已失效"
     assert exempted == registered, (
         f"豁免集与分诊表漂移：只在豁免里（未登记理由）{sorted(exempted - registered)}；"
         f"只在表里（登记了却没豁免）{sorted(registered - exempted)}"
@@ -317,7 +332,7 @@ def test_pip_audit_ignore_set_equals_the_triage_table():
 def test_d3_d4_guards_are_not_vacuous():
     """变异自证：把三处"写错就静默失效"的地方改坏，本组守卫必须变红。"""
     entries = _trivy_ignore_entries()
-    assert len(entries) == 5, "Trivy 豁免条目数对不上，D3 的解析已失效（transformers 3 + protobuf 2）"
+    assert len(entries) == 2, "Trivy 豁免条目数对不上，D3 的解析已失效（2026-10-29 复审后仅剩 protobuf 2）"
     assert all("expiration:" in e["body"] for e in entries)
     assert all("version:" in e["body"] and "versions:" not in e["body"] for e in entries)
 
