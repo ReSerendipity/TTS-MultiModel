@@ -1,6 +1,6 @@
-# Agent 契约（v1）
+# Agent 契约（v2）
 
-<!-- governance:agent-contract v1 -->
+<!-- governance:agent-contract v2 -->
 
 本文件由 `ReSerendipity/.github` 统一维护，仓内副本必须与模板逐字节一致；
 权威治理规范见 [governance](https://github.com/ReSerendipity/.github/tree/main/governance)。
@@ -21,6 +21,9 @@
 - 禁止入库：密钥 / token / 口令 / 连接串；本机绝对路径与用户名；`local/` 内容；
   嵌套或模块级 `AGENTS.md`；`docs/plans`、`docs/project`、`docs/_devarchive`、
   `docs/agents`、`docs/execution`。
+  **例外**：`docs/execution/RELEASE_VERIFICATION.md`（§10.5 发布验证产物）与
+  `GOVERNANCE-EXCLUSIONS.md` §七 已登记的仓/家族白名单路径，按登记口径放行；
+  未登记的同类路径仍按违规处理。
 - 提交必须带 DCO：`git commit -s`，身份用 noreply；不得使用个人邮箱。
 - 不改平台设置（分支保护、ruleset、Secrets、仓库可见性），除非任务明确要求且所有者授权。
 - 不删除、不重置、不 stash 用户未提交的改动；不 `git add -A`。
@@ -36,3 +39,6 @@
 
 本文件由 `.github` 的 `governance/templates/agent-contract.md` 生成；
 仓内副本与模板不一致时，漂移审计会报红。
+
+v2 起本文件只引用例外登记表，不复制具体仓名与清单；例外统一在
+`GOVERNANCE-EXCLUSIONS.md` §七 登记，新增例外先改登记表，再同步模板与副本。
