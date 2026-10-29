@@ -50,6 +50,7 @@ from ...exceptions import (
 )
 from ...gpu_utils import free_gpu_memory, is_oom_error
 from ...history_db import get_history_db
+from ...middleware.request_id import get_request_id, set_request_id
 from ...model_manager import _time_estimator
 from ...monitor import get_health_monitor
 from ...path_guard import ensure_within_dir, is_bare_filename
@@ -89,7 +90,8 @@ _GENERATION_CACHE_LOCK = threading.Lock()
 
 # 幂等键缓存（同报告 §中期根治）：对携带 Idempotency-Key 的请求去重，防止客户端
 # 网络重试导致重复生成。窗口 5 分钟，命中直接复用上次结果文件。
-_IDEMPOTENCY_CACHE: dict[str, tuple[float, str]] = {}
+# 值 = (过期时刻, 文件名, 内容指纹)；指纹缺失（旧条目）时退化为「只认键」。
+_IDEMPOTENCY_CACHE: dict[str, tuple[float, str, str | None]] = {}
 _IDEMPOTENCY_LOCK = threading.Lock()
 _IDEMPOTENCY_TTL_S: float = 300.0
 
@@ -154,15 +156,28 @@ def _build_generation_cache_key(
     )
 
 
-def _idempotency_lookup(key: str) -> str | None:
-    """查询幂等缓存，命中且未过期返回缓存文件名（文件仍需存在）。"""
+def _idempotency_lookup(key: str, fingerprint: str | None = None) -> str | None:
+    """查询幂等缓存，命中且未过期返回缓存文件名（文件仍需存在）。
+
+    Args:
+        key: 客户端携带的 Idempotency-Key。
+        fingerprint: 本次请求的内容指纹。幂等只对「同一份活的网络重试」成立——
+            键相同但内容不同（换文本 / 引擎 / 音色 / 语速）不能把上一次的音频
+            当成本次成功结果返回，此时按新请求处理。旧条目（指纹为 None）保持原行为。
+
+    Returns:
+        命中则可复用的文件名，否则 None。
+    """
     with _IDEMPOTENCY_LOCK:
         entry = _IDEMPOTENCY_CACHE.get(key)
         if not entry:
             return None
-        expire_at, filename = entry
+        expire_at, filename, stored_fp = entry
         if time.monotonic() >= expire_at:
             _IDEMPOTENCY_CACHE.pop(key, None)
+            return None
+        if fingerprint and stored_fp and fingerprint != stored_fp:
+            logger.warning("[idempotency] 同一 Idempotency-Key 携带不同内容，按新请求处理（不复用上次结果）")
             return None
         path = filename if os.path.isabs(filename) else os.path.join(SAVE_DIR, filename)
         if os.path.isfile(path):
@@ -171,14 +186,14 @@ def _idempotency_lookup(key: str) -> str | None:
         return None
 
 
-def _idempotency_store(key: str, filename: str) -> None:
+def _idempotency_store(key: str, filename: str, fingerprint: str | None = None) -> None:
     """写入幂等缓存（带 TTL 与容量裁剪）。"""
     with _IDEMPOTENCY_LOCK:
-        _IDEMPOTENCY_CACHE[key] = (time.monotonic() + _IDEMPOTENCY_TTL_S, filename)
+        _IDEMPOTENCY_CACHE[key] = (time.monotonic() + _IDEMPOTENCY_TTL_S, filename, fingerprint)
         # 简易容量保护：超过 1024 条时清理过期项
         if len(_IDEMPOTENCY_CACHE) > 1024:
             now = time.monotonic()
-            expired = [k for k, (exp, _) in _IDEMPOTENCY_CACHE.items() if now >= exp]
+            expired = [k for k, val in _IDEMPOTENCY_CACHE.items() if now >= val[0]]
             for k in expired[: len(expired) - 512]:
                 _IDEMPOTENCY_CACHE.pop(k, None)
 
@@ -204,7 +219,8 @@ def _gen_semaphore_timeout() -> float:
     try:
         return float(get_config().pydantic_config.generation.semaphore_acquire_timeout_s)
     except Exception:  # noqa: BLE001
-        return _gen_semaphore_timeout()
+        # 回退到本模块常量，不能调用自己（那会把一次配置读取失败放大成递归深度耗尽）
+        return _SEMAPHORE_ACQUIRE_TIMEOUT_S
 
 
 def _gen_hard_timeout() -> float:
@@ -214,7 +230,8 @@ def _gen_hard_timeout() -> float:
     try:
         return float(get_config().pydantic_config.generation.timeout_s)
     except Exception:  # noqa: BLE001
-        return _gen_hard_timeout()
+        # 同上：回退常量，不回退到自身
+        return _GENERATION_HARD_TIMEOUT_S
 
 
 def _ensure_content_safe(request: Any, text: str) -> Any:
@@ -225,7 +242,16 @@ def _ensure_content_safe(request: Any, text: str) -> Any:
     try:
         if not get_config().pydantic_config.security.content_safety_enabled:
             return None
-    except Exception:  # noqa: BLE001
+    except Exception as cfg_err:  # noqa: BLE001
+        # 配置读取失败 = 本轮根本没做检测。静默放行会让审计与指标里「未检测」与
+        # 「检测过且安全」完全同形，故沿用拦截侧同一留痕通道记一条未审计事件。
+        # （是否把放行改成拒绝属取向决策，见 Better Harness finding
+        # content-safety-gate-fails-open-silently。）
+        actor = getattr(request.state, "user", "anonymous") if hasattr(request, "state") else "anonymous"
+        from ...security.audit import log_audit
+
+        logger.warning("[content-safety] 开关配置读取失败，本轮未执行内容检测: %s", cfg_err)
+        log_audit("content_safety_skipped", actor=str(actor), detail=str(cfg_err)[:200], outcome="not-audited")
         return None
     from ...security.content_safety import get_safety_detector
 
@@ -1563,17 +1589,21 @@ def _schedule_oom_auto_recovery(endpoint_name: str) -> None:
         logger.debug("[oom-recovery] 重载任务调度失败（忽略）: %s", ce)
 
 
-def _store_generation_result(filename: str, idem_key: str | None, cache_key: str | None) -> None:
+def _store_generation_result(
+    filename: str, idem_key: str | None, cache_key: str | None, idem_fingerprint: str | None = None
+) -> None:
     """将一次成功生成的结果文件名写入缓存与幂等键（供后续命中短路）。
 
     Args:
         filename: 生成（含后处理）后的音频文件名（相对 SAVE_DIR）。
         idem_key: 请求携带的 Idempotency-Key（无则 None）。
         cache_key: 生成缓存键（缓存未启用则 None）。
+        idem_fingerprint: 该次请求的内容指纹；缺指纹时不登记幂等键——
+            只认字符串的幂等会把「换内容」误判成重试。
     """
     try:
-        if idem_key:
-            _idempotency_store(idem_key, filename)
+        if idem_key and idem_fingerprint:
+            _idempotency_store(idem_key, filename, idem_fingerprint)
     except Exception as ie:  # noqa: BLE001
         logger.debug("[idempotency] 写入异常（忽略）: %s", ie)
     try:
@@ -1723,6 +1753,22 @@ async def _execute_generation(
         semaphore.release()
 
 
+def _bind_request_id(request_id: str, fn: Any) -> Any:
+    """把请求标识带进线程池线程后再执行 fn。
+
+    `run_in_executor` 不会复制 ContextVar，而 RequestIDLogFilter 的回退读的是**发起线程**
+    写过的线程本地镜像——池内线程两者都拿不到，于是 OOM 判定/退避/重试失败这些最需要
+    归因的日志只能落成占位符。app_server 的后台线程与 model_manager_core 的加载线程
+    已经用 set_request_id 显式发布过标识，这里对生成线程池段做同一件事。
+    """
+
+    def inner() -> Any:
+        set_request_id(request_id)
+        return fn()
+
+    return inner
+
+
 async def _execute_generation_impl(
     request: Any,
     text: str,
@@ -1740,7 +1786,8 @@ async def _execute_generation_impl(
     """生成核心实现：线程池执行同步 run_fn → 记录历史 → 后处理 → 返回 HTML。
 
     短路逻辑（在真正进入 GPU 推理前）：
-        1. 幂等键：若请求携带 ``Idempotency-Key`` 且近期命中，直接复用上次结果文件；
+        1. 幂等键：若请求携带 ``Idempotency-Key``、近期命中**且内容指纹一致**，
+           直接复用上次结果文件；
         2. 生成缓存：若 ``generation.cache_enabled`` 且该 (引擎+文本+参数) 已缓存，
            复用既有音频文件，跳过 GPU 推理。
 
@@ -1752,10 +1799,18 @@ async def _execute_generation_impl(
     """
     # --- 短路 1：幂等键去重（防止客户端重试重复生成）---
     idem_key: str | None = None
+    idem_fp: str | None = None
     try:
         idem_key = getattr(request, "headers", {}).get("Idempotency-Key") if hasattr(request, "headers") else None
         if idem_key:
-            hit_file = _idempotency_lookup(idem_key)
+            # 幂等只对「同一份活的重试」成立：除键以外再比内容指纹（覆盖引擎 / 文本 /
+            # 音色 / 语速 / 增强 / 响度这些影响产物的维度），换内容就不算命中。
+            # 指纹算不出时直接不启用幂等，退回真实生成，避免只认字符串的老口子。
+            idem_fp = _build_generation_cache_key(
+                engine, text, voice_or_persona, tempo_factor, voice_enhancement, target_lufs
+            )
+        if idem_key and idem_fp:
+            hit_file = _idempotency_lookup(idem_key, idem_fp)
             if hit_file:
                 logger.info("[idempotency] 命中幂等键，复用结果: %s", hit_file)
                 _log_generation(endpoint_name, text, engine, voice_or_persona, True, 0.0)
@@ -1785,13 +1840,20 @@ async def _execute_generation_impl(
 
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     start_time: float = time.monotonic()
+    # 线程池不继承请求上下文：先把当前请求标识取下来，再随任务一起带进池内线程，
+    # 否则下面 OOM/退避/重试失败的日志全部归不到本次请求。
+    _exec_request_id = get_request_id()
     try:
         if oom_retry:
             result, msg, degraded_note = await loop.run_in_executor(
-                None, lambda: _run_with_oom_retry(run_fn, endpoint_name, degraded_fn=degraded_fn)
+                None,
+                _bind_request_id(
+                    _exec_request_id,
+                    lambda: _run_with_oom_retry(run_fn, endpoint_name, degraded_fn=degraded_fn),
+                ),
             )
         else:
-            result, msg = await loop.run_in_executor(None, run_fn)
+            result, msg = await loop.run_in_executor(None, _bind_request_id(_exec_request_id, run_fn))
             degraded_note = None
         duration: float = time.monotonic() - start_time
         if result is None:
@@ -1842,7 +1904,7 @@ async def _execute_generation_impl(
             _apply_post_processing_to_file, filename, tempo_factor, pp_voice_enhancement, target_lufs
         )
         # 写回生成缓存 / 幂等缓存（命中即可复用本次结果文件，跳过下次 GPU 推理）
-        _store_generation_result(filename, idem_key, cache_key)
+        _store_generation_result(filename, idem_key, cache_key, idem_fp)
         if degraded_note:
             return _partial_success_html(filename, msg, degraded_note)
         if bad_case_note:
