@@ -1146,7 +1146,10 @@ def run_server(ip: str = "127.0.0.1", port: int = 7869) -> None:
 
     # H2 整改：SSL 接线 —— 与 Image_MultiModel 约定对齐：仅当 ssl.enabled=true
     # 且证书文件存在时启用 HTTPS（uvicorn ssl 上下文），否则回退 HTTP
-    ssl_kwargs: dict[str, str | None] = {}
+    # 值为 uvicorn.run() 的具名 kwarg（当前只有 ssl_certfile/ssl_keyfile 两个 str）；
+    # 用 Any 是为了 **解包 时不与 uvicorn 其余参数的精确类型做 dict 值级比对——
+    # 收窄成 str | None 会让 mypy 把该类型套到 run() 的每个参数上（float/bool/回调等）而报假错。
+    ssl_kwargs: dict[str, Any] = {}
     _ssl = get_config().pydantic_config.server.ssl
     if not _ssl.enabled:
         logger.info(
