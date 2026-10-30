@@ -9,14 +9,39 @@ use std::os::windows::process::CommandExt;
 
 use crate::port_manager::find_free_port;
 
+/// 从 HTTP 响应头里取 CSRF token：优先响应头 `X-CSRF-Token`（家族部分仓由中间件直接下发），
+/// 回退解析 `Set-Cookie: csrf_token=...`（部分仓的 CSRF 中间件只种 cookie，不发头）。
+fn extract_csrf_token(headers: &str) -> Option<String> {
+    let mut cookie_token: Option<String> = None;
+    for line in headers.lines() {
+        let lower = line.to_ascii_lowercase();
+        if let Some(rest) = lower.strip_prefix("x-csrf-token:") {
+            let idx = line.len() - rest.len();
+            let value = line[idx..].trim();
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+        if lower.starts_with("set-cookie:") && lower.contains("csrf_token=") {
+            // 形如：Set-Cookie: csrf_token=<value>; Path=/; SameSite=Strict
+            let after = &line[line.find("csrf_token=")? + "csrf_token=".len()..];
+            let value = after.split(';').next().unwrap_or("").trim();
+            if !value.is_empty() {
+                cookie_token = Some(value.to_string());
+            }
+        }
+    }
+    cookie_token
+}
+
 /// 请求 Python 服务本机优雅关闭（桌面端 B-5）。
-/// 用裸 TcpStream 发 HTTP POST，避免为 reqwest 引入 blocking 依赖。
 ///
-/// TTS MultiModel 适配（2026-09-10）：后端 CSRF 中间件对 POST 采用
-/// Double-Submit Cookie 校验（Cookie 与 X-CSRF-Token 必须一致），裸 POST
-/// 会 403 → 优雅关闭失效 → 每次都走 taskkill 强杀并空等 6 秒。
-/// 因此这里先 GET 一次换取 Set-Cookie 的 csrf_token，再带上 Cookie+Header
-/// 发送关闭请求；不削弱后端 CSRF 防护（决策留痕：范围=桌面壳适配）。
+/// 自适应 CSRF：先 GET `/api/system/health` 取 token，再以 double-submit（cookie + 头同值）
+/// POST `/api/system/shutdown`；取不到 token 时按「CSRF 关闭」直接 POST。
+///
+/// 为什么要自适应：家族四仓实现分叉——Image 强制带 token（CSRF 默认开）、SeedVR2/TTS/VOSR2
+/// 直接裸 POST（CSRF 默认关）。任一固定写法在另一种配置下都会静默失效（403 → 退化成
+/// taskkill，优雅关闭形同虚设）。统一为自适应后，四仓同一份实现即可覆盖两种配置。
 fn request_graceful_shutdown(port: u16) -> bool {
     use std::io::{Read, Write};
     use std::net::TcpStream;
@@ -25,56 +50,47 @@ fn request_graceful_shutdown(port: u16) -> bool {
     let Ok(addr) = format!("127.0.0.1:{port}").parse::<std::net::SocketAddr>() else {
         return false;
     };
-    let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(800)) else {
+
+    // 1) GET 健康检查，顺带取 CSRF token（中间件在安全方法响应上补种）
+    let token = {
+        let Ok(mut s) = TcpStream::connect_timeout(&addr, Duration::from_millis(800)) else {
+            return false;
+        };
+        let _ = s.set_read_timeout(Some(Duration::from_millis(1500)));
+        let req = format!(
+            "GET /api/system/health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+        );
+        if s.write_all(req.as_bytes()).is_err() {
+            return false;
+        }
+        let mut buf = Vec::new();
+        if s.read_to_end(&mut buf).is_err() {
+            return false;
+        }
+        let head = String::from_utf8_lossy(&buf);
+        let headers = head.split("\r\n\r\n").next().unwrap_or("");
+        extract_csrf_token(headers)
+    };
+
+    // 2) POST 关闭端点（有 token 走 double-submit，无 token 裸 POST）
+    let Ok(mut s) = TcpStream::connect_timeout(&addr, Duration::from_millis(800)) else {
         return false;
     };
-    // 1) GET 健康检查，换取 CSRF Cookie（Double-Submit Cookie 模式）
-    let cookie = fetch_csrf_token(&mut stream, port);
-    // 2) POST 优雅关闭，带 Cookie + X-CSRF-Token
-    let mut req = format!(
-        "POST /api/system/shutdown HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Length: 0\r\nConnection: close\r\n"
-    );
-    if let Some(token) = cookie {
-        req.push_str(&format!("Cookie: csrf_token={token}\r\nX-CSRF-Token: {token}\r\n"));
-    }
-    req.push_str("\r\n");
-    if stream.write_all(req.as_bytes()).is_err() {
+    let _ = s.set_read_timeout(Some(Duration::from_millis(1500)));
+    let req = match token {
+        Some(tok) => format!(
+            "POST /api/system/shutdown HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nCookie: csrf_token={tok}\r\nX-CSRF-Token: {tok}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        ),
+        None => format!(
+            "POST /api/system/shutdown HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        ),
+    };
+    if s.write_all(req.as_bytes()).is_err() {
         return false;
     }
-    let _ = stream.set_read_timeout(Some(Duration::from_millis(1500)));
     let mut buf = [0u8; 128];
-    let _ = stream.read(&mut buf);
+    let _ = s.read(&mut buf);
     true
-}
-
-/// 从后端换取 CSRF token（GET 响应 Set-Cookie: csrf_token=...）。
-fn fetch_csrf_token(stream: &mut std::net::TcpStream, port: u16) -> Option<String> {
-    use std::io::{Read, Write};
-    use std::time::Duration;
-
-    let req = format!(
-        "GET /api/system/health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
-    );
-    if stream.write_all(req.as_bytes()).is_err() {
-        return None;
-    }
-    let _ = stream.set_read_timeout(Some(Duration::from_millis(1500)));
-    let mut buf = [0u8; 4096];
-    let n = stream.read(&mut buf).unwrap_or(0);
-    let text = String::from_utf8_lossy(&buf[..n]);
-    // 解析 Set-Cookie: csrf_token=<value>
-    for line in text.lines() {
-        let lower = line.to_ascii_lowercase();
-        if lower.starts_with("set-cookie:") {
-            if let Some(rest) = line.split_once(';').map(|(s, _)| s) {
-                let cookie = rest.split_once(':').map(|(_, v)| v.trim()).unwrap_or("");
-                if let Some(value) = cookie.strip_prefix("csrf_token=") {
-                    return Some(value.to_string());
-                }
-            }
-        }
-    }
-    None
 }
 
 /// Python 进程状态
@@ -399,5 +415,34 @@ mod app_dir_tests {
         let d = tmp("tts_appdir_bare");
         assert!(resolve_app_dir_from_exe(&d.join("TTSMultiModel.exe")).is_none());
         let _ = std::fs::remove_dir_all(&d);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_token_prefers_header() {
+        let headers = "HTTP/1.1 200 OK\r\nX-CSRF-Token: abc.def\r\nSet-Cookie: csrf_token=zzz; Path=/";
+        assert_eq!(extract_csrf_token(headers).as_deref(), Some("abc.def"));
+    }
+
+    #[test]
+    fn extract_token_falls_back_to_cookie() {
+        let headers = "HTTP/1.1 200 OK\r\nset-cookie: csrf_token=nonce.sig; Path=/; SameSite=Strict\r\n";
+        assert_eq!(extract_csrf_token(headers).as_deref(), Some("nonce.sig"));
+    }
+
+    #[test]
+    fn extract_token_returns_none_when_absent() {
+        let headers = "HTTP/1.1 200 OK\r\ncontent-type: application/json";
+        assert_eq!(extract_csrf_token(headers), None);
+    }
+
+    #[test]
+    fn extract_token_ignores_other_cookies() {
+        let headers = "HTTP/1.1 200 OK\r\nset-cookie: theme=dark; Path=/\r\n";
+        assert_eq!(extract_csrf_token(headers), None);
     }
 }
