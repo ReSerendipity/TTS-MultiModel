@@ -108,6 +108,18 @@ SHA-256 复验（`scripts/generate_model_checksums.py` 生成，C1 加载链路�
 - 权重：`model/` 离线冷备，恢复后必须 SHA-256 复验（见 `scripts/verify_model_checksums.py`）。
 - 密钥：使用外部 Secret 管理（KMS / CI secrets），禁止明文入库。
 
+### 3.4 演练台账（目标库级，2026-10-31 首录）
+
+> 口径：承接 §3.2 季度演练节奏；每条 = 日期 / 范围 / 命令 / 结果 / 耗时 / 未覆盖项；详细记录与逐条证据见
+> `docs/runbooks/2026-10-31-restore-drill.md`。台账首录即 2026-10-29 评估门禁 D6/O4/R4 的补证动作。
+
+| 日期 | 范围 | 命令（入口） | 结果 | 耗时 | 未覆盖项 |
+|---|---|---|---|---|---|
+| 2026-10-31～11-01（跨午夜窗口） | 目标库级备份恢复实测：生产 `data/history.db` 只读取证 + 实况快照恢复 + 既有 2.1GB 备份物恢复；全程仓库外临时目录，生产库与既有备份物零写入 | `scripts/backup_history_db.py --db-path <生产库> --backup-dir <临时目录> --keep 0`（备份链）；`--restore <快照> --target <临时目录>/restored/history.db`；同法恢复 `data/backups/history_bak_20260905.db`（2,175,934,464 字节） | 生产库 `integrity_check=ok`（9 表 3,635 行）；实况快照恢复 **9/9 表对平**（行数/字段名/按主键 5 行抽样 sha256 全一致，0.645s）；2.1GB 备份物恢复 **8/8 表对平**（10.542s，含恢复后完整性校验，RTO≈10.5s @2.1GB） | 见左 | 线上实例未做任何操作；未触发 purge/checkpoint |
+| 同上 | 发布回滚演练（离线，仓库外临时克隆 + tag 内容还原） | `scripts/rollback_release.py --list` / `--target v2.8.0 --dry-run` / `--target v2.8.0`（克隆内真跑）；`git archive v2.8.0` 内容还原；离线断言 `pytest tests/test_version_consistency.py tests/test_readyz.py` | 演练完成并记录，**结论=发现缺陷**：①脚本反向 revert 在首个 merge 提交（`8a0851da`）退 128（缺 `-m`；`-m 1` 单点验证可行）；②v2.8.0 tag 树版本位自相矛盾（RP 自动位 2.8.0 vs 手工位 2.7.0，OutFile/内嵌 changelog 未跟上），版本位门禁 3 failed/9 passed；③`readyz` 离线健康断言 3/3 通过（**未对线上实例执行**） | 验证套 12.5s | 镜像/k8s 回滚面未演练（无集群，归 O3/阶段 2）；健康探针未打线上实例 |
+
+门禁状态（2026-10-29 评估 → 本轮，判定依据详见演练报告 §6）：**D6 [?]→[x]**（目标库级实测完成且对平通过）；**O4 保持 [?]**（首轮周期点已建，待 2027-01 到期轮次佐证周期性）；**R4 保持 [?]**（演练记录已建，但回滚链存在待修缺陷 F1/F2，修复重跑通过前不升）。
+
 ---
 
 ## 4. 事故复盘（Postmortem）
