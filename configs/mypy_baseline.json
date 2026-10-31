@@ -3,6 +3,6 @@
   "files_with_errors": 27,
   "files_checked": 0,
   "per_file_errors": {},
-  "last_updated": "2026-10-29",
-  "note": "mypy 棘轮基线（本机侧）。口径：本地 scripts/check_mypy_ratchet.py 与本机 precheck.ps1 -Full 比对的是本文件，错误数增加则本地拦、减少则自动收紧本文件。合入门禁侧的必需检查 Typecheck (mypy ratchet) 走组织级复用工作流，比对的是 .ci/mypy_baseline.txt（同一目标 app/integrated_app，但 mypy 版本与调用方式由组织仓固定，两份数值允许不同步）。因此两份账并存是有意的：本机更严、合入更宽，本机红不代表 CI 红；把 CI 也收紧需同步改 .ci/mypy_baseline.txt 并单独授权。"
+  "last_updated": "2026-10-31",
+  "note": "mypy 棘轮基线。错误数增加则 CI 阻断；减少则自动更新本文件（ratchet down）。"
 }

@@ -32,6 +32,57 @@
       ]
     }
   },
+  "/api/downloads/cancel": {
+    "POST": {
+      "operationId": "cancel_api_downloads_cancel_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/downloads/catalog": {
+    "GET": {
+      "operationId": "catalog_api_downloads_catalog_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/downloads/progress": {
+    "GET": {
+      "operationId": "progress_api_downloads_progress_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/downloads/start": {
+    "POST": {
+      "operationId": "start_api_downloads_start_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
+  "/api/downloads/status": {
+    "GET": {
+      "operationId": "status_api_downloads_status_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/downloads/uninstall": {
+    "POST": {
+      "operationId": "uninstall_api_downloads_uninstall_post",
+      "status_codes": [
+        "200",
+        "422"
+      ]
+    }
+  },
   "/api/engines/list": {
     "GET": {
       "operationId": "list_engines_api_engines_list_get",
@@ -699,6 +750,14 @@
       "status_codes": [
         "200",
         "422"
+      ]
+    }
+  },
+  "/downloads": {
+    "GET": {
+      "operationId": "downloads_page_downloads_get",
+      "status_codes": [
+        "200"
       ]
     }
   },
