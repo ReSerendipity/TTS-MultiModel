@@ -2,6 +2,27 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
 
+## [2.9.1](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.9.0...v2.9.1) (2026-10-31)
+
+
+### Bug Fixes
+
+* **ci+tests:** build-release 固定 tag 检出防错版资产 + 两处 flaky 用例根治 ([e31664a](https://github.com/ReSerendipity/TTS-MultiModel/commit/e31664a01dd103a743b6fa9693bf07db70541c18))
+* **ci+tests:** build-release 固定 tag 检出防错版资产 + 两处 flaky 用例根治 ([49332cc](https://github.com/ReSerendipity/TTS-MultiModel/commit/49332ccb23431925c88499728550bd716aada68e))
+* **ci:** training-extra hub 上界随 AI 栈迁移改 &lt;2.0 ([daa60fe](https://github.com/ReSerendipity/TTS-MultiModel/commit/daa60fe7486b0cedf95f5a3edbdfe879330788d8))
+* **engines:** backfill transformers 4.52 symbols so IndexTTS 2.5 runs on 5.20.2 ([ba78502](https://github.com/ReSerendipity/TTS-MultiModel/commit/ba7850212903887e25f4b5c6d0237707fff76e55))
+* **engines:** extend indextts_tf_compat shim for transformers 5.20.2 ([ddee738](https://github.com/ReSerendipity/TTS-MultiModel/commit/ddee738ee83eac713084015d177e4ce6d59d9cc0))
+* **engines:** support 4.x check_model_inputs form for breeze vendor on 5.20.2 ([dd19417](https://github.com/ReSerendipity/TTS-MultiModel/commit/dd19417be928a22041f6afbbd890d61b967aed80))
+* **generate:** 修四处生成路径缺陷并补异常场景用例，纠正 mypy 基线口径 ([fb4f3f7](https://github.com/ReSerendipity/TTS-MultiModel/commit/fb4f3f77354b2acf37f5511b5c985fb8c7f67c31))
+* **server:** type ssl_kwargs as dict[str, Any] for uvicorn kwargs unpack ([9f994dd](https://github.com/ReSerendipity/TTS-MultiModel/commit/9f994dd5ebb7114f9f2b988b355aa94731355a67))
+
+
+### Documentation
+
+* **security:** post-migration exemption review — retire 18 of 20 pip-audit ignores ([8a0851d](https://github.com/ReSerendipity/TTS-MultiModel/commit/8a0851da8efc1abfd36e6303867951635da61ef8))
+* **security:** post-migration exemption review — retire 18 of 20 pip-audit ignores ([c71c6f5](https://github.com/ReSerendipity/TTS-MultiModel/commit/c71c6f5fef20aea1dbba6618ca117852ebf49309))
+* **template:** sync screenshot provenance section from org PR template ([#231](https://github.com/ReSerendipity/TTS-MultiModel/issues/231)) ([285f891](https://github.com/ReSerendipity/TTS-MultiModel/commit/285f89178e93a2bc095f98a1026af75eb77004a8))
+
 ## [2.9.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.8.0...v2.9.0) (2026-10-27)
 
 
