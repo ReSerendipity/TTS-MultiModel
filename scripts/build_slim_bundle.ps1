@@ -245,6 +245,18 @@ if (Test-Path -LiteralPath $catalogSrc) {
     Write-Host '  [warn] 未找到 downloads_catalog.json：安装环境包将在运行期报 NO_CATALOG' -ForegroundColor Yellow
 }
 
+# 3b) 完整性公钥必须进卷：ExcludeFiles/robocopy /XF 的 *.pem 会把
+#     manifest_signing_public_key.pem 一并剔掉 → 启动自检无法验签（Image 仓
+#     enforce 模式下直接拒绝启动，真机踩过）。私钥是 dotfile，仍被排除。
+$pubKey = Join-Path $Root 'app\integrated_app\security\manifest_signing_public_key.pem'
+if (Test-Path -LiteralPath $pubKey) {
+    Copy-Item -LiteralPath $pubKey -Destination (Join-Path $appDir 'app\integrated_app\security\manifest_signing_public_key.pem') -Force
+    $totals.Files++
+    $totals.Bytes += (Get-Item -LiteralPath $pubKey).Length
+} else {
+    Write-Host '  [warn] 未找到完整性公钥（manifest_signing_public_key.pem）' -ForegroundColor Yellow
+}
+
 # 4) 随包脚本（模型下载与校验，程序内「下载模型」直接调它）
 $scriptsDest = Join-Path $appDir 'scripts'
 New-Item -ItemType Directory -Path $scriptsDest -Force | Out-Null
