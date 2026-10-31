@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block tab_content %}
+<div class="dl-page" id="dlPage">
+    <div class="dl-page-head">
+        <h2 class="dl-page-title">{{ "downloads.title"|t(lang, default="下载管理") }}</h2>
+        <p class="dl-page-desc">{{ "downloads.subtitle"|t(lang, default="安装运行环境（torch）与模型权重后才能开始推理。安装包只含引导解释器，环境与权重均在本页安装。") }}</p>
+    </div>
+
+    <!-- 状态条：当前跑在引导解释器还是完整运行时 -->
+    <div class="dl-card dl-summary">
+        <div class="dl-summary-main">
+            <span class="dl-badge" id="dlMode">—</span>
+            <span class="dl-summary-text" id="dlReadyText">{{ "downloads.loading"|t(lang, default="正在读取状态…") }}</span>
+        </div>
+        <button class="dl-btn dl-btn-ghost" id="dlRefresh" type="button">
+            {{ "downloads.refresh"|t(lang, default="刷新") }}
+        </button>
+    </div>
+
+    <!-- 运行环境 -->
+    <div class="dl-card">
+        <div class="dl-section-head">
+            <div>
+                <h3 class="dl-section-title">{{ "downloads.runtime"|t(lang, default="运行环境") }}</h3>
+                <p class="dl-section-desc">{{ "downloads.runtime_desc"|t(lang, default="torch 运行时离线包，安装到程序内置解释器，无需另装 Python。") }}</p>
+            </div>
+            <div class="dl-actions">
+                <button class="dl-btn dl-btn-primary" id="dlInstallRuntime" type="button">
+                    {{ "downloads.install"|t(lang, default="安装") }}
+                </button>
+                <button class="dl-btn dl-btn-ghost dl-hidden" id="dlCancelRuntime" type="button">
+                    {{ "downloads.cancel"|t(lang, default="取消") }}
+                </button>
+                <button class="dl-btn dl-btn-danger dl-hidden" id="dlUninstallRuntime" type="button">
+                    {{ "downloads.uninstall"|t(lang, default="卸载") }}
+                </button>
+            </div>
+        </div>
+        <dl class="dl-kv">
+            <dt>{{ "downloads.status"|t(lang, default="状态") }}</dt><dd id="dlRuntimeStatus">—</dd>
+            <dt>{{ "downloads.size"|t(lang, default="占用") }}</dt><dd id="dlRuntimeSize">—</dd>
+            <dt>Python</dt><dd id="dlRuntimePython">—</dd>
+            <dt>torch</dt><dd id="dlRuntimeTorch">—</dd>
+            <dt>CUDA</dt><dd id="dlRuntimeCuda">—</dd>
+            <dt>{{ "downloads.path"|t(lang, default="路径") }}</dt><dd class="dl-mono" id="dlRuntimePath">—</dd>
+        </dl>
+        <div class="dl-progress dl-hidden" id="dlRuntimeProgress">
+            <div class="dl-progress-bar" id="dlRuntimeBar" style="width:0%"></div>
+        </div>
+        <p class="dl-progress-text dl-hidden" id="dlRuntimeProgressText"></p>
+    </div>
+
+    <!-- 模型权重 -->
+    <div class="dl-card">
+        <div class="dl-section-head">
+            <div>
+                <h3 class="dl-section-title">{{ "downloads.models"|t(lang, default="模型权重") }}</h3>
+                <p class="dl-section-desc">{{ "downloads.models_desc"|t(lang, default="权重从 HuggingFace / ModelScope 下载，支持断点续传；同一时刻只跑一个下载任务。") }}</p>
+            </div>
+        </div>
+        <ul class="dl-model-list" id="dlModelList">
+            <li class="dl-model-item dl-muted">{{ "downloads.loading"|t(lang, default="正在读取状态…") }}</li>
+        </ul>
+        <p class="dl-hint" id="dlModelRoot"></p>
+        <div class="dl-progress dl-hidden" id="dlModelProgress">
+            <div class="dl-progress-bar" id="dlModelBar" style="width:0%"></div>
+        </div>
+        <p class="dl-progress-text dl-hidden" id="dlModelProgressText"></p>
+    </div>
+</div>
+
+<style>
+.dl-page { display: flex; flex-direction: column; gap: 16px; padding: 4px 2px 32px; max-width: 980px; }
+.dl-page-head { margin-bottom: 4px; }
+.dl-page-title { font-size: 20px; margin: 0 0 6px; }
+.dl-page-desc { margin: 0; font-size: 13px; color: var(--text-secondary, #94a3b8); line-height: 1.65; }
+.dl-card { background: var(--bg-secondary, #fff); border: 1px solid var(--border-subtle, #e5e7eb); border-radius: 12px; padding: 16px 18px; }
+.dl-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dl-summary-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dl-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; background: var(--bg-tertiary, #f3f4f6); color: var(--text-primary, #111827); border: 1px solid var(--border-subtle, #e5e7eb); }
+.dl-badge.is-ready { background: #22c55e; color: #fff; border-color: transparent; }
+.dl-summary-text { font-size: 13px; color: var(--text-secondary, #6b7280); }
+.dl-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.dl-section-title { font-size: 15px; margin: 0 0 4px; }
+.dl-section-desc { margin: 0; font-size: 12px; color: var(--text-secondary, #6b7280); line-height: 1.6; }
+.dl-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.dl-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid transparent; font-size: 13px; cursor: pointer; }
+.dl-btn-primary { background: #6B5CE7; color: #fff; }
+.dl-btn-ghost { background: transparent; border-color: var(--border-subtle, #d1d5db); color: inherit; }
+.dl-btn-danger { background: transparent; border-color: #ef4444; color: #ef4444; }
+.dl-btn:disabled { opacity: .5; cursor: not-allowed; }
+.dl-kv { display: grid; grid-template-columns: 88px 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+.dl-kv dt { color: var(--text-secondary, #6b7280); }
+.dl-kv dd { margin: 0; }
+.dl-mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; word-break: break-all; }
+.dl-model-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.dl-model-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border-subtle, #e5e7eb); border-radius: 10px; }
+.dl-model-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dl-model-name { font-size: 13px; }
+.dl-model-sub { font-size: 12px; color: var(--text-secondary, #6b7280); }
+.dl-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.dl-dot.on { background: #22c55e; }
+.dl-dot.off { background: #9ca3af; opacity: .45; }
+.dl-muted { color: var(--text-secondary, #6b7280); font-size: 13px; }
+.dl-hint { margin: 12px 0 0; font-size: 12px; color: var(--text-secondary, #6b7280); font-family: ui-monospace, monospace; word-break: break-all; }
+.dl-hidden { display: none !important; }
+.dl-progress { height: 6px; background: var(--bg-tertiary, #f3f4f6); border-radius: 999px; overflow: hidden; margin-top: 12px; }
+.dl-progress-bar { height: 100%; background: #6B5CE7; transition: width .3s ease; }
+.dl-progress-text { margin: 8px 0 0; font-size: 12px; color: var(--text-secondary, #6b7280); word-break: break-all; }
+.dl-log { margin: 6px 0 0; font-family: ui-monospace, monospace; font-size: 11px; color: var(--text-secondary, #6b7280); max-height: 76px; overflow: auto; white-space: pre-wrap; }
+</style>
+{% endblock %}
+
+{% block page_scripts %}
+{# CSP nonce：本仓当前 CSP 响应头仍含 'unsafe-inline'，但一旦收紧成「nonce 存在即
+   不含 unsafe-inline」，缺 nonce 的内联脚本会被**静默**拦下（页面 200、JS 不执行、
+   后端日志看不到任何 /api/downloads/* 请求）。带上 nonce 后两种策略下都能跑。 #}
+<script nonce="{{ csp_nonce | default('') }}">
+(function () {
+    'use strict';
+    // 文案一律取 window.I18N（base.html 注入的整份语言 JSON），
+    // 缺键时用调用方给的兜底，绝不把裸 key 显示给用户。
+    var I18N = window.I18N || {};
+    function t(key, fallback) { return I18N[key] || fallback || key; }
+
+    var POLL_MS = 1000;
+    var pollTimer = null;
+    var state = { status: null, tasks: [] };
+
+    function csrf() { return typeof window.getCsrfToken === 'function' ? window.getCsrfToken() : ''; }
+
+    function api(path, options) {
+        var opts = Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {});
+        if (options && options.method && options.method !== 'GET') {
+            opts.headers['X-CSRF-Token'] = csrf();
+        }
+        return fetch(path, opts).then(function (resp) {
+            return resp.json().catch(function () { return {}; });
+        });
+    }
+
+    function humanSize(bytes) {
+        if (!bytes) return '—';
+        var units = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0, value = bytes;
+        while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+        return value.toFixed(value >= 10 || i === 0 ? 0 : 1) + ' ' + units[i];
+    }
+
+    function setText(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+
+    function show(id, visible) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        if (visible) el.classList.remove('dl-hidden');
+        else el.classList.add('dl-hidden');
+    }
+
+    function modeLabel(mode) {
+        if (mode === 'bootstrap') return t('downloads.mode_bootstrap', 'Bootstrap');
+        if (mode === 'full') return t('downloads.mode_full', 'Full runtime');
+        return t('downloads.mode_system', 'System Python');
+    }
+
+    function runtimeTask() {
+        return (state.tasks || []).filter(function (task) { return task.kind === 'runtime'; })[0] || null;
+    }
+
+    function modelTask() {
+        return (state.tasks || []).filter(function (task) { return task.kind === 'model'; })[0] || null;
+    }
+
+    function renderStatus() {
+        var data = state.status;
+        if (!data) return;
+        var running = runtimeTask();
+        setText('dlMode', modeLabel(data.mode));
+        var badge = document.getElementById('dlMode');
+        if (badge) badge.classList.toggle('is-ready', !!data.ready);
+        setText('dlReadyText', data.ready
+            ? t('downloads.ready', 'Ready')
+            : t('downloads.not_ready', 'Runtime or weights not installed yet'));
+
+        var rt = data.runtime || {};
+        var installed = !!rt.installed;
+        setText('dlRuntimeStatus', installed
+            ? t('downloads.installed', 'Installed')
+            : (running ? t('downloads.installing', 'Installing…') : t('downloads.not_installed', 'Not installed')));
+        setText('dlRuntimeSize', humanSize(rt.size_bytes));
+        setText('dlRuntimePython', rt.python_version || '—');
+        setText('dlRuntimeTorch', rt.torch_version || '—');
+        setText('dlRuntimeCuda', rt.cuda || '—');
+        setText('dlRuntimePath', rt.path || '—');
+        show('dlUninstallRuntime', installed);
+        show('dlInstallRuntime', !installed && !running);
+
+        var list = document.getElementById('dlModelList');
+        if (!list) return;
+        list.innerHTML = '';
+        var models = data.models || [];
+        models.forEach(function (model) {
+            var li = document.createElement('li');
+            li.className = 'dl-model-item';
+
+            var meta = document.createElement('div');
+            meta.className = 'dl-model-meta';
+            var name = document.createElement('span');
+            name.className = 'dl-model-name';
+            var dot = document.createElement('span');
+            dot.className = 'dl-dot ' + (model.present ? 'on' : 'off');
+            name.appendChild(dot);
+            name.appendChild(document.createTextNode(model.display_name || model.name));
+            var sub = document.createElement('span');
+            sub.className = 'dl-model-sub';
+            sub.textContent = model.name + (model.size_hint_gb ? ' · ~' + model.size_hint_gb + ' GB' : '')
+                + ' · ' + (model.present ? t('downloads.installed', 'Installed') : t('downloads.not_installed', 'Not installed'));
+            meta.appendChild(name);
+            meta.appendChild(sub);
+            li.appendChild(meta);
+
+            var actions = document.createElement('div');
+            actions.className = 'dl-actions';
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'dl-btn ' + (model.present ? 'dl-btn-danger' : 'dl-btn-primary');
+            btn.textContent = model.present
+                ? t('downloads.uninstall', 'Uninstall')
+                : t('downloads.install', 'Install');
+            btn.addEventListener('click', function () {
+                if (model.present) uninstallModel(model.name, model.display_name);
+                else startTask('model', model.name);
+            });
+            actions.appendChild(btn);
+            li.appendChild(actions);
+            list.appendChild(li);
+        });
+        if (!models.length) {
+            var empty = document.createElement('li');
+            empty.className = 'dl-model-item dl-muted';
+            empty.textContent = t('downloads.no_models', 'No weights configured');
+            list.appendChild(empty);
+        }
+        setText('dlModelRoot', (t('downloads.path', 'Path') + ': ') + (data.model_root || ''));
+    }
+
+    function renderRuntimeProgress() {
+        var task = runtimeTask();
+        var box = document.getElementById('dlRuntimeBar');
+        if (task && !task.finished) {
+            show('dlRuntimeProgress', true);
+            show('dlRuntimeProgressText', true);
+            show('dlCancelRuntime', true);
+            show('dlInstallRuntime', false);
+            var pct = Math.max(0, Math.min(100, (task.ratio || 0) * 100));
+            if (box) box.style.width = pct.toFixed(1) + '%';
+            setText('dlRuntimeProgressText',
+                (task.message || task.stage || '') + ' · ' + pct.toFixed(0) + '%');
+            return;
+        }
+        show('dlCancelRuntime', false);
+        if (task && task.finished) {
+            show('dlRuntimeProgress', true);
+            show('dlRuntimeProgressText', true);
+            if (task.stage === 'error') {
+                if (box) box.style.width = '100%';
+                setText('dlRuntimeProgressText', t('downloads.error', 'Error') + ': ' + (task.error || ''));
+            } else if (task.stage === 'cancelled') {
+                if (box) box.style.width = '0%';
+                setText('dlRuntimeProgressText', t('downloads.cancelled', 'Cancelled'));
+            } else {
+                // 装完必须重启：torch 已进解释器，但当前进程没加载它
+                if (box) box.style.width = '100%';
+                setText('dlRuntimeProgressText', t('downloads.restart_hint', 'Installed. Please restart the app.'));
+            }
+            return;
+        }
+        show('dlRuntimeProgress', false);
+        show('dlRuntimeProgressText', false);
+    }
+
+    function renderModelProgress() {
+        var task = modelTask();
+        var box = document.getElementById('dlModelBar');
+        if (!task) {
+            show('dlModelProgress', false);
+            show('dlModelProgressText', false);
+            return;
+        }
+        show('dlModelProgress', true);
+        show('dlModelProgressText', true);
+        if (task.finished) {
+            if (box) box.style.width = '100%';
+            if (task.stage === 'error') setText('dlModelProgressText', t('downloads.error', 'Error') + ': ' + (task.error || ''));
+            else if (task.stage === 'cancelled') setText('dlModelProgressText', t('downloads.cancelled', 'Cancelled'));
+            else setText('dlModelProgressText', task.target + ' · ' + t('downloads.done', 'Done'));
+            return;
+        }
+        if (box) box.style.width = '60%';
+        setText('dlModelProgressText', (task.target || '') + ' · ' + (task.message || task.stage || ''));
+    }
+
+    function renderProgress() {
+        renderRuntimeProgress();
+        renderModelProgress();
+        var anyRunning = (state.tasks || []).some(function (task) { return !task.finished; });
+        if (anyRunning) startPolling();
+        else if (pollTimer) { stopPolling(); refresh(); }
+    }
+
+    function refresh() {
+        return Promise.all([api('/api/downloads/status'), api('/api/downloads/progress')])
+            .then(function (results) {
+                var statusResp = results[0] || {};
+                var progressResp = results[1] || {};
+                if (statusResp.success) state.status = statusResp.data;
+                if (progressResp.success) state.tasks = (progressResp.data || {}).tasks || [];
+                renderStatus();
+                renderProgress();
+            })
+            .catch(function (err) {
+                setText('dlReadyText', t('downloads.error', 'Error') + ': ' + err);
+            });
+    }
+
+    function startPolling() {
+        if (pollTimer) return;
+        pollTimer = setInterval(function () {
+            api('/api/downloads/progress').then(function (resp) {
+                if (resp && resp.success) {
+                    state.tasks = (resp.data || {}).tasks || [];
+                    renderProgress();
+                }
+            });
+        }, POLL_MS);
+    }
+
+    function stopPolling() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    }
+
+    function startTask(kind, target) {
+        api('/api/downloads/start', { method: 'POST', body: JSON.stringify({ kind: kind, target: target || '' }) })
+            .then(function (resp) {
+                if (!resp.success) {
+                    alert((resp.error && resp.error.message) || t('downloads.error', 'Error'));
+                    return;
+                }
+                startPolling();
+                refresh();
+            })
+            .catch(function (err) { alert(String(err)); });
+    }
+
+    function uninstallRuntime() {
+        if (!confirm(t('downloads.confirm_uninstall', 'Uninstall the runtime?'))) return;
+        api('/api/downloads/uninstall', { method: 'POST', body: JSON.stringify({ kind: 'runtime', target: '' }) })
+            .then(refresh);
+    }
+
+    function uninstallModel(key, label) {
+        if (!confirm(t('downloads.confirm_uninstall_model', 'Delete these weight files?') + '\n' + (label || key))) return;
+        api('/api/downloads/uninstall', { method: 'POST', body: JSON.stringify({ kind: 'model', target: key }) })
+            .then(refresh);
+    }
+
+    document.getElementById('dlInstallRuntime').addEventListener('click', function () { startTask('runtime', ''); });
+    document.getElementById('dlCancelRuntime').addEventListener('click', function () {
+        api('/api/downloads/cancel', { method: 'POST', body: JSON.stringify({ kind: 'runtime', target: '' }) }).then(refresh);
+    });
+    document.getElementById('dlUninstallRuntime').addEventListener('click', uninstallRuntime);
+    document.getElementById('dlRefresh').addEventListener('click', refresh);
+
+    refresh();
+})();
+</script>
+{% endblock %}

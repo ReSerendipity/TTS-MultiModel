@@ -13,7 +13,11 @@ SetCompressor /SOLID lzma
 CRCCheck on
 BrandingText "TTSMultiModel"
 
-!define APP_VERSION "2.9.0"
+; 版本号：发布时用 -DAPP_VERSION=<pyproject.toml 的 version> 显式传入；下面的默认值只在
+; 脱离参数编译时兜底，务必与 pyproject.toml 保持一致。
+!ifndef APP_VERSION
+  !define APP_VERSION "2.9.0"
+!endif
 !define DATA_PREFIX "TTSMultiModel-Data.7z"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\TTSMultiModel"
 !define APP_ICON "${__FILEDIR__}\..\..\desktop\src-tauri\icons\icon.ico"
@@ -53,7 +57,7 @@ Var TOOLSDIR
 ; ---------- 安装 ----------
 Section "TTSMultiModel 桌面版" SEC_APP
   ; ---------- 安装前告知（静默模式自动确认） ----------
-  MessageBox MB_OKCANCEL|MB_ICONINFORMATION "安装前请知悉：`n`n  - 完全安装需约 31GB 磁盘（应用 + 便携 Python 运行时 + PyTorch + 语音模型），约需 5~15 分钟`n  - 本软件本机离线运行，不上传任何用户数据`n  - 语音克隆仅限您拥有权利的音频，严禁冒充他人；AI 生成音频请依法标识`n  - IndexTTS 模型商用需 bilibili 书面授权`n`n完整条款见上一页「许可协议」。确定继续安装？" /SD IDOK
+  MessageBox MB_OKCANCEL|MB_ICONINFORMATION "安装前请知悉：`n`n  - 本次安装约 1.5GB（应用 + 引导解释器），PyTorch 运行环境与语音模型不在安装包内，安装后请到程序内「下载管理」页安装（合计约 30GB）`n  - 本软件本机离线运行，不上传任何用户数据`n  - 语音克隆仅限您拥有权利的音频，严禁冒充他人；AI 生成音频请依法标识`n  - IndexTTS 模型商用需 bilibili 书面授权`n`n完整条款见上一页「许可协议」。确定继续安装？" /SD IDOK
   Pop $0
   ${If} $0 == "IDCANCEL"
     Abort
@@ -64,7 +68,10 @@ Section "TTSMultiModel 桌面版" SEC_APP
   RMDir /r "$TOOLSDIR"
   CreateDirectory "$TOOLSDIR"
   SetOutPath "$TOOLSDIR"
-  File "${SRC_7ZA}"
+  ; 必须 /oname=7za.exe：构建机给的可能是 7z.exe（或任意文件名），而下面 ExecWait
+  ; 固定调 "$TOOLSDIR\7za.exe"。缺 /oname 时解出来的名字对不上 → 进程起不来 →
+  ; 错误码为空串 → 弹「数据解压失败（错误码 ）」且安装目录空着。
+  File /oname=7za.exe "${SRC_7ZA}"
   File "killttsmultimodel.ps1"
 
   !insertmacro KillRunning
@@ -108,6 +115,17 @@ Section "TTSMultiModel 桌面版" SEC_APP
     Abort
   ${EndIf}
 
+  ; 校验瘦包布局：归档根必须解开成 $INSTDIR\app\，且引导解释器就位
+  ; （壳靠 app\bootstrap\python.exe 起后端并把用户带到「下载管理」页）
+  ${IfNot} ${FileExists} "$INSTDIR\app\start_portable.py"
+    MessageBox MB_ICONSTOP "安装异常：未找到 app\start_portable.py。$\n数据卷布局错误（归档根应为 app\），请重新生成数据卷。"
+    Abort
+  ${EndIf}
+  ${IfNot} ${FileExists} "$INSTDIR\app\bootstrap\python.exe"
+    MessageBox MB_ICONSTOP "安装异常：未找到 app\bootstrap\python.exe。$\n引导解释器缺失，应用无法启动。"
+    Abort
+  ${EndIf}
+
   ; 快捷方式（开始菜单 + 桌面）
   !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
     CreateDirectory "$SMPROGRAMS\$StartMenuFolder"
@@ -125,7 +143,7 @@ Section "TTSMultiModel 桌面版" SEC_APP
   WriteRegStr HKCU "${UNINST_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoRepair" 1
-  WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" 31000000
+  WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" 1600000
 
   ; 卸载器
   WriteUninstaller "$INSTDIR\uninstall.exe"

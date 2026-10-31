@@ -419,8 +419,8 @@ logs/
 _archive/
 
 # Tauri desktop shell (P1-2) - 更新签名密钥严禁入库（私钥）
+# 更新签名私钥绝不入库；公钥必须入库（conf.pubkey 的校验基准，家族仓一致口径）
 desktop/tauri.key
-desktop/tauri.key.pub
 desktop/node_modules/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/

@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "note": "下载管理页的环境包清单基线。发版时由 scripts/build_slim_bundle.ps1 -Mode runtime 覆盖为含真实分卷名与 SHA256 的版本；volumes 为空表示尚未发布环境包，页面会提示清单缺失。",
+  "runtime": {
+    "version": "1",
+    "tag": "runtime-v1",
+    "base_url": "https://github.com/ReSerendipity/TTS-MultiModel/releases/download/runtime-v1",
+    "python": "3.12.10",
+    "torch": "2.5.1+cu124",
+    "cuda": "cu124",
+    "packages": [
+      "torch==2.5.1",
+      "torchvision==0.20.1",
+      "torchaudio==2.5.1"
+    ],
+    "size_bytes": 0,
+    "built_at": null,
+    "min_app_version": "2.9.0",
+    "volumes": []
+  },
+  "models": []
+}
