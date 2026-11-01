@@ -317,7 +317,15 @@ def _verify_model(name: str, entry: dict, local_dir: Path, do_verify: bool) -> b
     # 说话人嵌入（*_se.pth，如 OpenVoice base speakers）合法体积即几百 KB，
     # 不属于"过小=损坏"判定面（2026-10-27 真网实测：openvoice 每次都被误判 fail）。
     speaker_embed_suffix = "_se.pth"
+<<<<<<< Updated upstream
     tiny = [w for w in weights if w.stat().st_size < 1024 * 1024 and not w.name.endswith(speaker_embed_suffix)]
+=======
+    tiny = [
+        w
+        for w in weights
+        if w.stat().st_size < 1024 * 1024 and not w.name.endswith(speaker_embed_suffix)
+    ]
+>>>>>>> Stashed changes
     for w in weights:
         logger.info("[%s][OK] %s (%.1f MB)", name, w.name, w.stat().st_size / 1e6)
     if tiny:
