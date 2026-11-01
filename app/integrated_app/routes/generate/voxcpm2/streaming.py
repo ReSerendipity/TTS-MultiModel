@@ -766,7 +766,60 @@ async def streaming_generation(
 @router.post(
     "/streaming_audio",
     summary="流式音频",
-    description="流式音频生成与播放",
+    description=(
+        "流式音频生成与播放。主引擎不可用时自动降级到 edge-tts（阶段 4 D-2）："
+        "200 返回 JSON（status/filename/size_bytes/engine/degraded），"
+        "降级也失败时 503 返回 error_type=fallback_failed（与主引擎故障 engine_not_ready 可区分）。"
+    ),
+    responses={
+        200: {
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string", "enum": ["ok"]},
+                            "filename": {"type": "string"},
+                            "size_bytes": {"type": "integer"},
+                            "engine": {"type": "string", "enum": ["edge-tts"]},
+                            "degraded": {
+                                "type": "object",
+                                "properties": {
+                                    "from": {"type": "string"},
+                                    "to": {"type": "string", "enum": ["edge-tts"]},
+                                    "reason": {"type": "string"},
+                                },
+                            },
+                        },
+                    }
+                }
+            },
+            "description": "主引擎不可用时的 edge-tts 自动降级结果（HTML 正常路径不变）",
+        },
+        503: {
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string", "enum": ["error"]},
+                            "error_type": {"type": "string", "enum": ["fallback_failed"]},
+                            "detail": {"type": "string"},
+                            "degraded": {
+                                "type": "object",
+                                "properties": {
+                                    "from": {"type": "string"},
+                                    "to": {"type": "string", "enum": ["edge-tts"]},
+                                    "attempted": {"type": "boolean"},
+                                },
+                            },
+                        },
+                    }
+                }
+            },
+            "description": "主引擎不可用且降级目标 edge-tts 也失败（可区分错误，不假成功）",
+        },
+    },
 )
 async def streaming_audio_generation(
     request: Request,
@@ -796,6 +849,16 @@ async def streaming_audio_generation(
     # S-R1: 复用 pre_validate
     error: HTMLResponse | None = pre_validate(request, "voxcpm2", text, MAX_TEXT_LENGTH)
     if error is not None:
+        # D-2 自动降级（阶段 4）：仅当主引擎（带权重）确实不可用且文本非空时，
+        # 先尝试 edge-tts 兜底——成功返回带 degraded 标记的 JSON（openapi 已登记），
+        # 失败返回可区分的 fallback_failed（不假成功）；其余校验错误走原路径。
+        if text.strip():
+            from .. import utils as _gen_utils
+
+            if _gen_utils._main_engine_unavailable("voxcpm2"):
+                fallback = await _gen_utils._maybe_edge_tts_fallback("voxcpm2", text)
+                if fallback is not None:
+                    return fallback
         return error
 
     stream_denoise: bool = _parse_bool_form(denoise)

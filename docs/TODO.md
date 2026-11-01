@@ -2,15 +2,16 @@
 
 > 建档说明（2026-11-01，阶段 3）：本仓此前无 tracked 缺陷登记文档（`FIX_LOG.md` 为本机独有不入库、`docs/reports/PENDING_ISSUES.md` 在 gitignore 面、CHANGELOG 由 release-please 生成不手写），按整改派单要求新建本文件作为缺陷/待办的 tracked 登记处。以下各项均已**实测复现**，登记待所有者决策，**不在登记轮修复**。
 
-## D-1 进程级无守护（裸跑形态服务被杀后不自愈）
+## D-1 进程级无守护（裸跑形态服务被杀后不自愈）——已按所有者决策接受（2026-11-01，阶段 4）
 
 - 实测：2026-11-01 阶段 2b，kill 服务子进程后 T+60s 无任何拉回，launcher 同死；人工恢复 T_manual=9s(liveness)/3m12s(含模型重载)。详见 `docs/runbooks/2026-11-01-o3-failover-drill.md` §2b.3。
-- 待决策：引入守护（NSSM/任务计划/clean_launch respawn）或接受「无自愈+人工 RTO≈3m12s」为既定形态。
+- **处置**：所有者拍板**接受无自愈、不引入守护**；口径已写入 `docs/SRE_RUNBOOK.md` §2.5（含「什么形态才承诺自愈」的容器/k8s 边界）。状态：**闭环（口径成文）**。
 
-## D-2 降级链最后一公里断裂（主引擎不可用 → Edge-TTS 无法实际接管）
+## D-2 降级链最后一公里断裂——已修复并实测闭环（2026-11-01，阶段 4）
 
-- 实测：2026-11-01 阶段 2b——主引擎不可用时生成硬失败（engine_not_ready），**无自动降级**；`/api/model/switch` 半自动切换 edge-tts 2.1s 成功，但 `streaming_audio` ×2 均 400（无权重引擎 `loaded` 恒 false 被生成守卫拦截），且 openapi 无 edge-tts 生成路由。详见同文档 §2b.4。
-- 待决策：为 edge-tts 补生成路由 / 放宽无权重引擎守卫 / 将降级明确定义为「人工切引擎 + UI 提示」并写入 SOP。
+- 阶段 2b 实测的三断点：①edge-tts 无 REST 生成路由；②无权重引擎被生成守卫恒拦；③主引擎不可用无自动降级。
+- **处置**（commit 本轮）：①新增 `POST /api/generate/edge-tts/tts` 直连路由（`routes/generate/edge_tts.py`）；②守卫放宽至无权重引擎（requires_gpu=False 且 vram_gb=0，raw YAML 兜底判定），主引擎口径不变；③`streaming_audio` 主引擎「未加载且权重目录缺失」时自动降级，200 JSON 带 `degraded` 字段（openapi 快照已登记），降级也失败返回可区分的 `error_type=fallback_failed`（不假成功）。
+- 实测（真机、坏 model_dir 仓外副本注入）：T0=13:48:40 → **3.07s** 返回 200，产物 `edge_tts_fallback_1793512123451.mp3` **21,888 B**（edge-tts 7.3.1 恒出 MP3，RIFF/WAV 不可用），degraded 实际取值 `{from: voxcpm2, to: edge-tts, reason: main_engine_unavailable}`；撤除后主路径回归 `engine_not_ready` 原样（未加载流不再被降级劫持——首版语义缺陷已修）。测试 `tests/test_edge_tts_fallback.py` 5/5 绿。状态：**闭环**。
 
 ## G1 生产启动链在本机以 CPU torch 运行（GPU 推理不可达）
 

@@ -39,7 +39,7 @@ from fastapi import APIRouter, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...audio_processing import enhance_audio
-from ...config import MAX_UPLOAD_SIZE_BYTES, SAVE_DIR, get_config
+from ...config import MAX_UPLOAD_SIZE_BYTES, SAVE_DIR, _load_yaml_config, get_config
 from ...error_surface import redact_paths
 from ...exceptions import (
     EngineSwitchError,
@@ -667,9 +667,157 @@ def _check_engine_ready(
     else:
         # 通用新式引擎（breeze-tts2 等）：registry._engines 无专属槽位，
         # 按 set_engine_loaded 登记的实例是否存在判就绪（实例化即已加载）。
-        if engine_name is None or registry.get_engine_instance(engine_name) is None:
-            return _not_ready_html(engine_name or "voxcpm2")
+        if engine_name is None:
+            return _not_ready_html("voxcpm2")
+        if registry.get_engine_instance(engine_name) is None:
+            if _is_weightless_engine(engine_name):
+                # 无权重引擎（requires_gpu=False 且 vram_gb=0，如 edge-tts）：
+                # 没有「加载」概念，守卫放行；真实可用性（依赖在场/网络可达）
+                # 由生成路径验证并给出可区分错误（阶段 4 D-2 收口）。
+                return None
+            return _not_ready_html(engine_name)
     return None
+
+
+class EdgeTTSFallbackUnavailableError(RuntimeError):
+    """降级目标 Edge-TTS 不可用（依赖缺失 / 网络失败 / 无音频块）。"""
+
+
+def _is_weightless_engine(engine_name: str) -> bool:
+    """判定引擎是否为「无权重引擎」（requires_gpu=False 且 vram_gb=0）。
+
+    只有这类引擎（当前即 edge-tts）才允许在未加载实例时通过生成守卫；
+    带权重引擎（含 requires_gpu=False 但有本地权重的 voicebox）不受此放宽影响。
+    配置查询失败时保守返回 False（主引擎路径守卫行为不变）。
+    """
+    try:
+        eng = get_config().pydantic_config.models.engines.get(engine_name)
+        if eng is not None:
+            return bool(not eng.requires_gpu and float(eng.vram_gb) == 0.0)
+    except Exception:  # noqa: BLE001 - 走 raw YAML 兜底
+        pass
+    try:
+        # pydantic 校验失败时回退默认配置、engines 表可能缺失（阶段 4 实测）：
+        # 直接读 raw YAML，保证守卫放宽口径不随配置加载形态漂移。
+        raw = (_load_yaml_config() or {}).get("models", {}).get("engines", {}).get(engine_name) or {}
+        return bool(not raw.get("requires_gpu", True) and float(raw.get("vram_gb", -1)) == 0.0)
+    except Exception:  # noqa: BLE001 - 配置异常时不得放宽守卫
+        return False
+
+
+def _engine_model_files_present(engine_name: str) -> bool:
+    """判定引擎权重目录（config model_dir + pretrained 根）在磁盘上是否存在。
+
+    无法判定（配置缺失/引擎未知）时保守返回 True（不触发降级）。
+    """
+    try:
+        raw_cfg = _load_yaml_config() or {}
+        eng = (raw_cfg.get("models") or {}).get("engines") or {}
+        model_dir = str((eng.get(engine_name) or {}).get("model_dir") or "")
+        if not model_dir:
+            return True
+        from ...config import get_pretrained_dir
+
+        return os.path.isdir(os.path.join(get_pretrained_dir(), model_dir))
+    except Exception:  # noqa: BLE001 - 判定失败时不触发降级
+        return True
+
+
+def _main_engine_unavailable(engine_name: str) -> bool:
+    """判定主引擎（带权重引擎）当前是否「想加载也加载不了」（自动降级触发判据）。
+
+    语义边界（阶段 4 实测修正）：**未加载 ≠ 不可用**。用户尚未加载模型是常态，
+    此时必须维持原 engine_not_ready 提示；只有「未加载 且 权重目录在磁盘缺失」
+    （注入坏 model_dir / 权重被移除）才视为不可用并触发降级。
+    无权重引擎恒返回 False（它们不是降级的触发方）。
+    """
+    if _is_weightless_engine(engine_name):
+        return False
+    try:
+        from ...model_registry import registry
+
+        if engine_name in ("indextts2", "indextts20"):
+            if registry.indextts2_engine is not None:
+                return False
+        elif engine_name == "voxcpm2":
+            if registry.voxcpm_model is not None:
+                return False
+        elif registry.get_engine_instance(engine_name) is not None:
+            return False
+    except Exception:  # noqa: BLE001 - registry 异常时保守按不可用处理
+        return True
+    return not _engine_model_files_present(engine_name)
+
+
+async def _synthesize_edge_tts_wav(text: str, lang: str = "zh") -> tuple[str, int]:
+    """降级 seam：用 Edge-TTS 合成并落盘，返回 (文件名, 字节数)。
+
+    格式事实（2026-11-01 实测）：edge-tts 7.3.1 的 ``Communicate`` 已移除
+    ``output_format`` 参数（传入即 TypeError，引擎层回退默认），**恒产出 MP3**，
+    故产物扩展名为 ``.mp3``、判据=字节数>0 + MP3 帧头（RIFF/WAV 不可用）。
+    依赖缺失 / 网络失败 / 零音频块 → 抛 ``EdgeTTSFallbackUnavailableError``
+    （调用方转成可区分的 ``fallback_failed`` 错误，不得假成功）。
+
+    测试通过 monkeypatch 本函数模拟成功与失败（离线、无网络依赖）。
+    """
+    try:
+        from ...engines.edge_tts_engine import EdgeTTSEngine
+    except Exception as exc:  # noqa: BLE001 - 引擎模块导入失败
+        raise EdgeTTSFallbackUnavailableError(f"edge-tts 引擎模块不可用: {exc}") from exc
+    engine = EdgeTTSEngine()
+    chunks: list[bytes] = []
+    try:
+        async for data, _msg in engine.generate_streaming(text, lang=lang):
+            if data:
+                chunks.append(bytes(data))
+    except EdgeTTSFallbackUnavailableError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - 网络/服务侧失败统一归为降级不可用
+        raise EdgeTTSFallbackUnavailableError(f"edge-tts 合成失败: {exc}") from exc
+    if not chunks:
+        raise EdgeTTSFallbackUnavailableError("edge-tts 未返回任何音频块")
+    payload = b"".join(chunks)
+    filename = f"edge_tts_fallback_{int(time.time() * 1000)}.mp3"
+    out_path = os.path.join(SAVE_DIR, filename)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "wb") as fh:
+        fh.write(payload)
+    return filename, len(payload)
+
+
+async def _maybe_edge_tts_fallback(need_engine: str, text: str) -> JSONResponse | None:
+    """主引擎不可用时的自动降级入口（阶段 4 D-2）。
+
+    返回值语义：
+        - ``JSONResponse(200)``：降级成功，body 含 ``degraded`` 字段（可区分标记）；
+        - ``JSONResponse(503)``：降级尝试失败，``error_type=fallback_failed``
+          （与主引擎故障 ``engine_not_ready`` 可区分，不假成功）；
+        - ``None``：主引擎并非不可用（调用方沿用原错误路径，守卫行为不变）。
+    """
+    if not _main_engine_unavailable(need_engine):
+        return None
+    try:
+        _filename, size_bytes = await _synthesize_edge_tts_wav(text)
+    except EdgeTTSFallbackUnavailableError as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "error_type": "fallback_failed",
+                "detail": f"主引擎 {need_engine} 不可用，且降级目标 edge-tts 也失败: {exc}",
+                "degraded": {"from": need_engine, "to": "edge-tts", "attempted": True},
+            },
+        )
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "ok",
+            "filename": _filename,
+            "size_bytes": size_bytes,
+            "engine": "edge-tts",
+            "degraded": {"from": need_engine, "to": "edge-tts", "reason": "main_engine_unavailable"},
+        },
+    )
 
 
 def _record_to_history_db(
