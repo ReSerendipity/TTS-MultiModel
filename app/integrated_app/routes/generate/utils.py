@@ -692,17 +692,11 @@ def _is_weightless_engine(engine_name: str) -> bool:
     """
     try:
         eng = get_config().pydantic_config.models.engines.get(engine_name)
-        if eng is not None:
-            return bool(not eng.requires_gpu and float(eng.vram_gb) == 0.0)
-    except Exception:  # noqa: BLE001 - 走 raw YAML 兜底
-        pass
-    try:
-        # pydantic 校验失败时回退默认配置、engines 表可能缺失（阶段 4 实测）：
-        # 直接读 raw YAML，保证守卫放宽口径不随配置加载形态漂移。
-        raw = (_load_yaml_config() or {}).get("models", {}).get("engines", {}).get(engine_name) or {}
-        return bool(not raw.get("requires_gpu", True) and float(raw.get("vram_gb", -1)) == 0.0)
+        return bool(eng is not None and not eng.requires_gpu and float(eng.vram_gb) == 0.0)
     except Exception:  # noqa: BLE001 - 配置异常时不得放宽守卫
         return False
+    # 阶段 6 F4 修复后（vram_gb/ram_gb 放宽为 ge=0），pydantic 能完整解析 config.yaml，
+    # 阶段 4 的 raw-YAML 兜底已成死码，按 A3 收益判定删除。
 
 
 def _engine_model_files_present(engine_name: str) -> bool:
