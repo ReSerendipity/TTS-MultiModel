@@ -347,11 +347,98 @@ def _download_file(
 
 
 # ------------------------------------------------------------ 环境包安装 ----
+
+
+def _install_runtime_online(
+    catalog: dict,
+    on_progress=None,
+    should_cancel=None,
+) -> dict:
+    """在线安装运行环境：pip 直连官方索引装 torch 家族（不依赖预置分卷）。
+
+    发布形态说明：GB 级环境包托管成本高、上行带宽也限制发布速度，因此默认改为
+    「安装时现拉」——用户在下载管理页点安装，后端跑 pip（官方 cuXXX 索引 + PyPI
+    补生态包），装完写 RUNTIME.json，壳重启即切 Full。
+
+    Args:
+        catalog: downloads_catalog.json 的 runtime 段（含 packages / index_url 等）。
+        on_progress: (stage, ratio, message) 进度回调。
+        should_cancel: 返回 True 时终止安装。
+
+    Returns:
+        写入的元信息 dict（与离线安装路径同结构）。
+    """
+    import subprocess
+
+    packages = [str(p) for p in (catalog.get("packages") or []) if p] or ["torch", "torchvision"]
+    index_url = str(catalog.get("index_url") or "")
+    extra_index = str(catalog.get("pip_extra_index") or "")
+
+    def report(stage: str, ratio: float, message: str) -> None:
+        if on_progress:
+            on_progress(stage, ratio, message)
+
+    report("download", 0.01, "连接官方索引…")
+    command = [sys.executable, "-m", "pip", "install", *packages, "--no-warn-script-location", "--progress-bar", "off"]
+    if index_url:
+        command += ["--index-url", index_url]
+    if extra_index:
+        command += ["--extra-index-url", extra_index]
+    env = dict(os.environ, PIP_CONFIG_FILE="NUL")  # 屏蔽用户镜像，防止被顶成 +cpu
+    proc = subprocess.Popen(
+        command,
+        cwd=PROJECT_ROOT,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    tail: list[str] = []
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        if should_cancel and should_cancel():
+            proc.terminate()
+            raise InterruptedError("已取消")
+        line = raw.rstrip()
+        if not line:
+            continue
+        tail.append(line)
+        tail = tail[-3:]
+        report("download", 0.5, line[:160])
+    code = proc.wait()
+    if code != 0:
+        raise RuntimeError(f"在线安装失败（退出码 {code}）：{' | '.join(tail)[-300:]}")
+
+    report("swap", 0.9, "写入运行环境标记")
+    meta = {
+        "runtime_version": str(catalog.get("version", "1")),
+        "python": catalog.get("python"),
+        "torch": catalog.get("torch"),
+        "cuda": catalog.get("cuda"),
+        "built_at": catalog.get("built_at"),
+        "min_app_version": catalog.get("min_app_version"),
+        "install_mode": "online",
+        "packages": packages,
+        "installed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    target = _python_dir()
+    name = globals().get("RUNTIME_META_NAME", "RUNTIME.json")
+    with open(os.path.join(target, name), "w", encoding="utf-8") as handle:
+        json.dump(meta, handle, ensure_ascii=False, indent=2)
+    report("done", 1.0, "环境安装完成，请重启应用")
+    return meta
+
+
 def install_runtime(on_progress: ProgressCb | None = None, should_cancel: Callable[[], bool] | None = None) -> dict:
     """下载环境包并把 torch 离线装进当前解释器（bootstrap/ 自身），写 RUNTIME.json。"""
     catalog = runtime_catalog()
     if not catalog:
         raise RuntimeError("未找到环境包清单 downloads_catalog.json，无法确定下载地址（请更新到含清单的版本）")
+    if str(catalog.get("install_mode") or "").lower() == "online":
+        # 2026-11-01：在线安装（官方索引现拉），不依赖预置分卷
+        return _install_runtime_online(catalog, on_progress=on_progress, should_cancel=should_cancel)
     volumes = [v for v in catalog.get("volumes", []) if isinstance(v, dict)]
     if not volumes:
         raise RuntimeError("环境包清单缺少 volumes")

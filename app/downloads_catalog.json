@@ -16,18 +16,11 @@
     "size_bytes": 2551514962,
     "built_at": "2026-11-01T01:56:38Z",
     "min_app_version": "2.9.0",
-    "volumes": [
-      {
-        "name": "TTS-MultiModel-Runtime-cu124.zip.001",
-        "size": 1992294400,
-        "sha256": "d060f60054e4007ab7eac96fa5f495df434ba1e6da46556d442353e65b64dd5f"
-      },
-      {
-        "name": "TTS-MultiModel-Runtime-cu124.zip.002",
-        "size": 559220562,
-        "sha256": "8c39b9db635c165512e9b24535c628fd142252e5b5891a90241dbf43526e9819"
-      }
-    ]
+    "volumes": [],
+    "install_mode": "online",
+    "index_url": "https://download.pytorch.org/whl/cu124",
+    "pip_extra_index": "https://pypi.tuna.tsinghua.edu.cn/simple",
+    "note": "install_mode=online：页内点安装时后端直接 pip 官方索引安装 （torch 家族 + 生态包），无需下载预置分卷。"
   },
   "models": [
     {
