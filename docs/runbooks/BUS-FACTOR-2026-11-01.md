@@ -3,14 +3,42 @@
 > 对应评估门禁：**E7**（关键知识无单点 Bus Factor>1）、**P25**（核心系统知识单点有登记与备份），均为 ⛔P0（条件），评估口径「触发场景未发生，按基线 P1 带项上线并登记观察」。
 > 本文即该「登记」本体：现状量化 + 知识单点载体点名 + 补偿措施 + **可判定**的升级/解除判据。落点说明：`docs/execution/` 在本仓属禁止入库面（AGENTS.md 硬约束，例外仅 RELEASE_VERIFICATION.md 且当前并未跟踪），故按仓规落 `docs/runbooks/`（tracked 运维记录位）。
 
-## 1. 现状量化（实测数字，非估算）
+## 1. 现状量化（实测数字，非估算；2026-11-01 11:10:37 +0800 实测）
 
-- 全仓 742 commits（`git rev-list --count HEAD`，2026-11-01）
-- 近 12 个月（2025-11-01 起）共 724 commits，按作者聚合：
-  - **同一邮箱** `259081123+ReSerendipity@users.noreply.github.com`（GitHub noreply 公开标识，随公开提交历史可见）：**692 commits（95.6%）**，署名分散为 4 种（署名A 283 / 署名B 160 / 署名C 135 / 署名D 114——本机用户名按仓规脱敏，原始映射见 git log）
-  - dependabot[bot]：32（4.4%，自动化）
-  - **其他人类贡献者：0**
-- 结论：**Bus Factor = 1**（单一维护者；署名多样性是同一邮箱的别名，不构成冗余）。与评估报告 E7 原话一致（736 commits 同一邮箱三种署名；现 +6 至 742，口径不变）。
+- 全仓 **744** commits（`git rev-list --count HEAD`，2026-11-01 11:10:37）
+- **全仓历史始于 2026-07-19**（`git log --reverse --format='%ad' --date=short | head -1`）——距今约 3 个半月，**「近 12 个月」窗口等于全量、该框架无意义**，本节全部比例以全量 744 为分母
+- 全仓 **7 个不同邮箱**（`git log --format='%ae' | sort -u | wc -l` = 7）
+
+**表 1 · 按邮箱聚合**（`git log --format='%ae' | sort | uniq -c | sort -rn`）：
+
+| 邮箱 | commits | 占比（分母=744） | 归类 |
+|---|---|---|---|
+| `259081123+ReSerendipity@users.noreply.github.com`（GitHub noreply 公开标识） | 558 | 75.0% | 人类（所有者） |
+| `dev@tts-multimodel.local` | 135 | 18.1% | 人类（所有者） |
+| `…49699333+dependabot[bot]@users.noreply.github.com` | 32 | 4.3% | bot |
+| `…41898282+github-actions[bot]@users.noreply.github.com` | 10 | 1.3% | bot |
+| `doro@rewq.cn` | 4 | 0.5% | 人类（所有者） |
+| `zengyangc@outlook.com` | 4 | 0.5% | 人类（所有者） |
+| `zwork@local` | 1 | 0.1% | 人类（所有者） |
+
+**表 2 · 署名 × 邮箱交叉**（`git log --format='%an%x1f%ae' | sort | uniq -c | sort -rn`；署名含本机用户名者按仓规脱敏为署名A/B，原始映射见 git log）：
+
+| 署名 | 邮箱 | commits |
+|---|---|---|
+| ReSerendipity | noreply（同上） | 284 |
+| 署名A | noreply（同上） | 160 |
+| TTS MultiModel Dev | `dev@tts-multimodel.local` | 135 |
+| TTS MultiModel Dev | noreply（同上） | 114 |
+| dependabot[bot] | dependabot 邮箱 | 32 |
+| github-actions[bot] | github-actions 邮箱 | 10 |
+| 署名A | `doro@rewq.cn` | 4 |
+| ReSerendipity | `zengyangc@outlook.com` | 3 |
+| zwork | `zwork@local` | 1 |
+| 署名A | `zengyangc@outlook.com` | 1 |
+
+**三种多样性的区分与判定**：署名多样性（10 种署名）≠ 邮箱多样性（7 个邮箱）≠ 贡献者多样性——**7 个邮箱中 5 个人类邮箱均指向同一所有者**（noreply + `dev@…local` 为其惯用别名，其余 3 个为个人邮箱别名），bot 邮箱 2 个为自动化。三者各自都不构成 Bus Factor 冗余：署名可随意填写、别名邮箱同属一人、bot 提交无维护判断。**人类贡献者数 = 1，Bus Factor = 1**（与评估报告 E7「736 commits 同一邮箱三种署名」的结论方向一致，但其「同一邮箱」表述同样应读作「同一人的多个署名/邮箱」）。
+
+> **更正记录（2026-11-01）**：本文首版 §1 把「4 种署名变体之和 692」误标为「同一邮箱 692（95.6%）」——该和实际跨两个邮箱（noreply 558 + `dev@tts-multimodel.local` 135）；并误用「近 12 个月 724」分母（全仓历史仅始于 2026-07-19，12 个月窗口不成立）。派单方独立复算指出后，以本节两表重做证据；**结论不变（Bus Factor=1）**，修正经新提交落库（不 amend）。
 
 ## 2. 核心模块与「除所有者外无人能改」判定
 
