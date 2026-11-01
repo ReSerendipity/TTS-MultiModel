@@ -135,6 +135,16 @@
       ]
     }
   },
+  "/api/generate/edge-tts/tts": {
+    "POST": {
+      "operationId": "edge_tts_tts_api_generate_edge_tts_tts_post",
+      "status_codes": [
+        "200",
+        "422",
+        "503"
+      ]
+    }
+  },
   "/api/generate/generic/clone": {
     "POST": {
       "operationId": "generic_clone_endpoint_api_generate_generic_clone_post",
@@ -185,7 +195,8 @@
       "operationId": "streaming_audio_generation_api_generate_streaming_audio_post",
       "status_codes": [
         "200",
-        "422"
+        "422",
+        "503"
       ]
     }
   },

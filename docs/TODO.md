@@ -24,6 +24,8 @@
 
 - lock 记 `torch==2.13.0` / `torchaudio==2.11.0` / `torchvision==0.28.0`；venv 实为 `2.15.0+cu134`（本轮换构前为 2.15.0+cpu）/ `2.11.1` / **torchvision 未安装**。三处不一致；禁止本轮改 lock。
 
-## G5（新登记）tests openapi 快照与实现漂移（独立 chore，本轮不修）
+## G5（更正定性，2026-11-01 阶段 5b 闭环）tests openapi 快照与实现不一致——阶段 4 的回归，已重基线闭环
 
-- 阶段 4 新增 edge-tts 路由与 streaming_audio 降级 responses 后，`tests/test_openapi_snapshot.py::test_contract_matches_snapshot` 持续失败（快照 fixture 未再生）。属仓库文件改动（快照再生），按阶段 4/5 的改动面限制未处理；G1 轮测试基线前后均为该同一失败，非本轮引入。
+- 性质更正：阶段 5 曾误记为「待排期漂移」；实际是**阶段 4（`036e78b`）新增 edge-tts 路由与 streaming_audio 503 后未同步基线**造成的门禁红灯（快照上次入库为第三方提交 `a24c44d`）——根因归属 `036e78b`，非独立漂移。
+- 处置：`UPDATE_OPENAPI_SNAPSHOT=1` 重基线（仓内既有机制，`tests/test_openapi_snapshot.py:20-21,83-85`）；diff 逐行核对恰两条（`[ADDED] /api/generate/edge-tts/tts`、`[CHANGED] streaming_audio 422→422,503`），零夹带。复验：快照测试 3 passed；全量套 **0 failed / 2601 passed / 41 skipped**（红灯清零，passed +1）。
+- 状态：**闭环**。
