@@ -1,0 +1,53 @@
+# Bus Factor 登记与观察判据（2026-11-01 · E7/P25 带项上线）
+
+> 对应评估门禁：**E7**（关键知识无单点 Bus Factor>1）、**P25**（核心系统知识单点有登记与备份），均为 ⛔P0（条件），评估口径「触发场景未发生，按基线 P1 带项上线并登记观察」。
+> 本文即该「登记」本体：现状量化 + 知识单点载体点名 + 补偿措施 + **可判定**的升级/解除判据。落点说明：`docs/execution/` 在本仓属禁止入库面（AGENTS.md 硬约束，例外仅 RELEASE_VERIFICATION.md 且当前并未跟踪），故按仓规落 `docs/runbooks/`（tracked 运维记录位）。
+
+## 1. 现状量化（实测数字，非估算）
+
+- 全仓 742 commits（`git rev-list --count HEAD`，2026-11-01）
+- 近 12 个月（2025-11-01 起）共 724 commits，按作者聚合：
+  - **同一邮箱** `259081123+ReSerendipity@users.noreply.github.com`（GitHub noreply 公开标识，随公开提交历史可见）：**692 commits（95.6%）**，署名分散为 4 种（署名A 283 / 署名B 160 / 署名C 135 / 署名D 114——本机用户名按仓规脱敏，原始映射见 git log）
+  - dependabot[bot]：32（4.4%，自动化）
+  - **其他人类贡献者：0**
+- 结论：**Bus Factor = 1**（单一维护者；署名多样性是同一邮箱的别名，不构成冗余）。与评估报告 E7 原话一致（736 commits 同一邮箱三种署名；现 +6 至 742，口径不变）。
+
+## 2. 核心模块与「除所有者外无人能改」判定
+
+| 模块/资产 | 单点判定依据 |
+|---|---|
+| `app/integrated_app/app_server.py` + `routes/**`（路由/中间件组装） | 全部历史提交均为单维护者；无第二人 review 记录 |
+| `app/integrated_app/engines/**`（7 引擎接入） | 引擎注册显式实参、采样率单一事实源等约定**只记载于 AGENTS.md**（不随仓分发） |
+| `app/integrated_app/security/**`（完整性自检/清单签名） | 清单再生成+重签流程只存在于 AGENTS.md/本地 SOP |
+| `scripts/backup_history_db.py`、`scripts/rollback_release.py` 等 DR/发布链 | 修复与演练记录 2026-10-31 起由本会话建立，仍单维护者 |
+| `config.yaml` 人工版本位 / release 手工补齐位 | release-governance §1 记载 RP 不碰的手工位清单——其操作知识依赖维护者记忆+本地文档 |
+| `.github/workflows/**`（21 workflows） | 门禁层位口径（提交钩子/推送钩子/CI job 之辨）只记载于 AGENTS.md |
+
+## 3. 知识单点载体点名：AGENTS.md（本地维护、不随仓库分发）
+
+- 事实：`AGENTS.md` **33,767 B，untracked**，被 `.gitignore:383` 忽略（`git ls-files --error-unmatch` 报 not known；`git check-ignore -v` 命中 `.gitignore:383`）——实测 2026-11-01。
+- 承载的知识类型：①Agent 行为契约（6 条铁律、自检清单、命令执行形态）；②代码事实源与红线（引擎注册、采样率、i18n、版本位）；③门禁层位口径（哪道闸在提交钩子/推送钩子/CI job）；④本机独有资产地图（`local/`、`docs/agents/`、`.qoder/` 及「探测不到≠缺失」判定）。
+- clone 者拿不到的具体后果：本地三层硬门禁（ruff/mypy 棘轮/pytest+覆盖率）在干净克隆必缺，**不得读作预检全绿**；被跟踪文档引用 `docs/agents/**` 链接全部 404 属预期，但新协作者无从知晓这是设计意图；完整性清单再生成/重签、版本位手工补齐等流程无 clone 内替代文档。
+
+## 4. 补偿措施（已在位 + 本轮新增）
+
+- 已在位：`CHANGELOG.md` 头注原文——「> 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。」（`DOD.md`、`deploy/kubernetes/README.md` 同款标注）
+- 本轮新增：①本文（登记本体+可判定判据）；②`docs/SRE_RUNBOOK.md` §3.4 门禁段将 E7/P25 记为 **[?]**（带项上线，非通过）；③阶段 1–2b 建立的演练/缺口台账（restore-drill、o3-failover-drill、TODO 登记）使关键流程至少在 tracked 面有替代记载。
+
+## 5. 升级/解除判据（可判定条件，不写「视情况」）
+
+**从「带项上线」升级为「阻断」**——满足任一条即触发：
+1. 所有者连续 **14 个自然日**不可达（无 commit/issue/review 活动可查）且窗口内出现需要所有者独有知识的操作（tag/手工版本位/完整性清单重签）无法执行；
+2. 出现**第二个人类贡献者**的提交触及 §2 清单中任一核心模块，且无所有者成对 review（`git log --format='%an <%ae>'` 中出现新邮箱 + 触及清单路径即判定）;
+3. AGENTS.md 引用的任一流程被写入 CI/branch-protection，但 clone 中 `git ls-files` 查不到其引用的非豁免路径（探测不到写成存在的口径违规，机械可查）;
+4. release 手工版本位补齐因知识缺失连续 **2 次**失败（版本位一致性测试红）。
+
+**解除/降级条件**：可分发副本（如 `AGENTS.public.md`）入库且 CI 复现本地三层门禁的主要检查，则 E7/P25 的观察理由消失，可重评。
+
+## 6. 待所有者决策（只列利弊与建议，不自行改 .gitignore / 不提交 AGENTS.md）
+
+| 方案 | 利 | 弊 | 建议 |
+|---|---|---|---|
+| a. AGENTS.md 直接随仓分发 | 单一来源，零漂移 | 文件含本机路径/本地资产约定，直接分发违反仓规（禁止入库本机绝对路径与用户名）并泄露本机布局 | 不建议 |
+| b. 拆出 `AGENTS.public.md`（策划版：契约+红线+门禁层位，剥离本机路径） | clone 者拿到可执行约定；本机版保留全量 | 双文件漂移风险——需同步闸（如 spec_refs 类校验） | **建议**，配同步检查 |
+| c. 维持本地独占 + 接受 Bus Factor=1 | 零成本 | E7/P25 永久带项；协作者/CI 拿不到约定 | 仅在明确单人项目定位时接受 |

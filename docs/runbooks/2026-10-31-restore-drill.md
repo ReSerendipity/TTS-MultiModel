@@ -77,6 +77,15 @@ sha256（全量口径）：
 | F3 | `docs/SRE_RUNBOOK.md` §3.3 推荐的每日备份入口 `scripts/backup_db.py` 指向遗留路径 `data/tts_history.db`（不存在，运行即 `[skip]`），真实备份链是 `scripts/backup_history_db.py`（`config.yaml → history.db_path` 单一事实源） | `data/` 目录实测无 `tts_history.db`；两脚本源码比对 | §3.3 修订指向真实链路，避免「每日备份」静默空转 | 阶段 2 |
 | F4 | `config.yaml` 既有校验告警（`models.engines.edge-tts.vram_gb=0.0` 触发 pydantic 宽松回退） | 恢复入口运行时 stderr（与本演练无因果关系，顺带登记） | 按 P0-2 宽松回退设计属预期行为；建议修配置值并重存 | 常规维护 |
 
+### 5.1 阶段 3 处置对账（2026-11-01，逐行对账不删行）
+
+| # | 阶段 1 登记内容 | 阶段 3 处置 | 状态 |
+|---|---|---|---|
+| F1 | `rollback_release.py` 遇 merge 提交反向 revert 失败 | **已修**：脚本加 merge→`revert -m 1` 分支 + range 改 `--first-parent`（线性仓行为不变）；仓外最小仓先复现（脚本退 1，内层 git revert 报 "is a merge but no -m option was given"）→修复→重跑 **exit 0**、树状态判据全过（文件还原、merge 引入文件消失、工作树干净）；`py_compile` 过；仓内无既有覆盖测试（如实登记，以最小仓演练为验证） | 已闭环 |
+| F2 | v2.8.0 tag 版本位自相矛盾（内嵌 changelog 自述 2.7.0 + 手工位 2.7.0） | **已补断言**：SRE_RUNBOOK §2.4 新增回滚前硬停断言（tag ↔ version.json ↔ CHANGELOG 顶部 + 内嵌 changelog 自述一致）；按新断言只读判定：v2.8.0=**FAIL**、HEAD v2.9.0=PASS；tag 与历史未动；`tests/test_version_consistency.py` 已在（本轮只许改 rollback_release.py，未改它；「补内嵌说明断言进测试」登记为后续独立 chore） | 断言已入 SOP；测试补强待后续 |
+| F3 | SRE_RUNBOOK §3.3 推荐入口 `backup_db.py` 指向不存在的 `data/tts_history.db` | **未处理（待决策）**：§3.3 修订未列入本轮范围；真实链为 `scripts/backup_history_db.py`（本文件 §3 已实测） | 仍待所有者授权修订 |
+| F4 | config.yaml edge-tts vram_gb=0.0 pydantic 告警 | **未处理（待决策）**：属配置值修正，本轮禁改 config.yaml | 仍待所有者授权修正 |
+
 ## 6. 门禁状态对照（2026-10-29 评估 → 本轮）
 
 | 门禁 | 前 | 后 | 依据 |
