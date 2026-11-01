@@ -13,16 +13,20 @@
 - **处置**（commit 本轮）：①新增 `POST /api/generate/edge-tts/tts` 直连路由（`routes/generate/edge_tts.py`）；②守卫放宽至无权重引擎（requires_gpu=False 且 vram_gb=0，raw YAML 兜底判定），主引擎口径不变；③`streaming_audio` 主引擎「未加载且权重目录缺失」时自动降级，200 JSON 带 `degraded` 字段（openapi 快照已登记），降级也失败返回可区分的 `error_type=fallback_failed`（不假成功）。
 - 实测（真机、坏 model_dir 仓外副本注入）：T0=13:48:40 → **3.07s** 返回 200，产物 `edge_tts_fallback_1793512123451.mp3` **21,888 B**（edge-tts 7.3.1 恒出 MP3，RIFF/WAV 不可用），degraded 实际取值 `{from: voxcpm2, to: edge-tts, reason: main_engine_unavailable}`；撤除后主路径回归 `engine_not_ready` 原样（未加载流不再被降级劫持——首版语义缺陷已修）。测试 `tests/test_edge_tts_fallback.py` 5/5 绿。状态：**闭环**。
 
-## G1 生产启动链在本机以 CPU torch 运行——环境已修复（阶段一，2026-11-01），GPU 推理实测待窗口
+## G1 生产启动链在本机以 CPU torch 运行——**已闭环（2026-11-01 阶段 6）：环境修复 + GPU 真机实测均完成**
 
 - 阶段 2b 实测：服务按授权入口启动后显存零增长、GPU util 0%，venv torch=2.15.0+cpu，VoxCPM2 CPU 推理 RTF≈28（5 字 41s，15 字 ≈23 分钟）。
-- **阶段 5 处置**（同版本换 CUDA 构建，不降级）：venv torch **2.15.0+cpu → 2.15.0+cu134**（wheel 2162.1 MB，dry-run 闸门确认仅替换 torch 本体）。装后实测：`cuda.is_available()=True`、`torch.version.cuda=13.4`（驱动 UMD 13.4 同代）、capability=(12,0)、真 GPU matmul 1024² 0.271s/8MB、torchaudio 2.11.1+cpu 完好、七引擎 import 冒烟全过、测试套 2598→2600 passed 且新增失败=0（同一既有失败为 openapi 快照漂移，见下）。
-- **诚实边界**：v2.9.0 changelog「12GB 卡 load/infer/unload 全通」所用环境仍**不是**本 venv，本轮修好环境**不等于**证实该历史主张——维持「待所有者指认」，未改 changelog、未追认。
-- **剩余**：voxcpm2 加载→最小真实合成→卸载→显存回落（需 7.8 GiB 预检额度），待派单方窗口（阶段二）。
+- 阶段 5 处置：venv torch **2.15.0+cpu → 2.15.0+cu134**（同版本换构建，dry-run 闸门仅 torch 本体；`cuda.is_available()` 实测 True、13.4、capability (12,0)、七引擎冒烟、测试套零新增失败）。
+- **阶段 6 GPU 真机实测**（8906 MiB free 预检过，真实 config.yaml）：加载 **43.2s**、显存 **+6609 MiB（≈6.45 GiB，与声明 6.5 同量级）**；合成（5 字，与 2b 同口径）**8.39s** / 130,278 B / 1.36s 音频 @48kHz（CPU 基线 41.0s / 84,304 B / 0.88s → **4.9× 提速**）；卸载→显存回落（9648→3280 used）；重载 **30.3s**→再合成 **4.18s**。**load/infer/unload 循环真机成立**。
+- **诚实边界（保留）**：v2.9.0 changelog「12GB 卡 load/infer/unload 全通」所用环境仍非本 venv，本轮是修复后环境上的自证，**不等于**证实当年验收环境——维持「待所有者指认」，未改 changelog。
 
 ## G4（新登记）requirements-lock.txt 与 venv 漂移（独立 chore，本轮不修）
 
 - lock 记 `torch==2.13.0` / `torchaudio==2.11.0` / `torchvision==0.28.0`；venv 实为 `2.15.0+cu134`（本轮换构前为 2.15.0+cpu）/ `2.11.1` / **torchvision 未安装**。三处不一致；禁止本轮改 lock。
+
+## F4（对账自 restore-drill §5.1）edge-tts vram_gb=0.0 被 pydantic 判非法——已闭环（2026-11-01 阶段 6）
+
+- 处置：schema 放宽 `vram_gb`/`ram_gb` 为 `ge=0`（0=无本地权重的真实语义），config.yaml 完整过 pydantic（voxcpm2 vram=6.5 文件值落位），raw-YAML 兜底死码删除；判据 `requires_gpu=False 且 vram_gb==0.0` 不变（voicebox vram 4.0 不受影响，测试钉住）。详见 commit `cabed0f` 与 `tests/test_config_zero_vram.py`。
 
 ## G5（更正定性，2026-11-01 阶段 5b 闭环）tests openapi 快照与实现不一致——阶段 4 的回归，已重基线闭环
 
