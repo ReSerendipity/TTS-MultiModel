@@ -13,10 +13,21 @@
       "torchvision==0.20.1",
       "torchaudio==2.5.1"
     ],
-    "size_bytes": 0,
-    "built_at": null,
+    "size_bytes": 2551514962,
+    "built_at": "2026-11-01T01:56:38Z",
     "min_app_version": "2.9.0",
-    "volumes": []
+    "volumes": [
+      {
+        "name": "TTS-MultiModel-Runtime-cu124.zip.001",
+        "size": 1992294400,
+        "sha256": "d060f60054e4007ab7eac96fa5f495df434ba1e6da46556d442353e65b64dd5f"
+      },
+      {
+        "name": "TTS-MultiModel-Runtime-cu124.zip.002",
+        "size": 559220562,
+        "sha256": "8c39b9db635c165512e9b24535c628fd142252e5b5891a90241dbf43526e9819"
+      }
+    ]
   },
   "models": []
 }
