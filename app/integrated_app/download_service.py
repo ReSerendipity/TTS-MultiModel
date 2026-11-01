@@ -498,7 +498,9 @@ def install_model(
         time.sleep(0.5)
 
     if job.phase == "failed":
-        raise RuntimeError(f"模型下载失败（退出码 {job.returncode}），详见日志 {job.log_file}")
+        # DownloadJob 的属性是 _log_path；对外暴露的字段在 status()["log_file"]。
+        log_path = (job.status() or {}).get("log_file") or getattr(job, "_log_path", "")
+        raise RuntimeError(f"模型下载失败（退出码 {job.returncode}），详见日志 {log_path}")
     if job.phase == "cancelled":
         raise InterruptedError("已取消")
     if on_progress:

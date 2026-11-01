@@ -29,5 +29,110 @@
       }
     ]
   },
-  "models": []
+  "models": [
+    {
+      "name": "voxcpm2",
+      "display_name": "VoxCPM2（默认引擎）",
+      "source": "modelscope:OpenBMB/VoxCPM2",
+      "size_bytes": 4960722408,
+      "files": [
+        {
+          "path": "model/VoxCPM2/model.safetensors",
+          "url": "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/model.safetensors",
+          "size": 4580080592
+        },
+        {
+          "path": "model/VoxCPM2/audiovae.pth",
+          "url": "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/audiovae.pth",
+          "size": 376951122
+        },
+        {
+          "path": "model/VoxCPM2/config.json",
+          "url": "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/config.json",
+          "size": 4336
+        },
+        {
+          "path": "model/VoxCPM2/tokenizer.json",
+          "url": "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/tokenizer.json",
+          "size": 3676772
+        },
+        {
+          "path": "model/VoxCPM2/tokenizer_config.json",
+          "url": "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/tokenizer_config.json",
+          "size": 5059
+        },
+        {
+          "path": "model/VoxCPM2/special_tokens_map.json",
+          "url": "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/special_tokens_map.json",
+          "size": 1632
+        },
+        {
+          "path": "model/VoxCPM2/tokenization_voxcpm2.py",
+          "url": "https://modelscope.cn/models/OpenBMB/VoxCPM2/resolve/master/tokenization_voxcpm2.py",
+          "size": 2895
+        }
+      ]
+    },
+    {
+      "name": "sensevoice",
+      "display_name": "SenseVoiceSmall（ASR，VoxCPM2 依赖）",
+      "source": "modelscope:iic/SenseVoiceSmall",
+      "size_bytes": 937034228,
+      "files": [
+        {
+          "path": "model/SenseVoiceSmall/model.pt",
+          "url": "https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/model.pt",
+          "size": 936291369
+        },
+        {
+          "path": "model/SenseVoiceSmall/am.mvn",
+          "url": "https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/am.mvn",
+          "size": 11203
+        },
+        {
+          "path": "model/SenseVoiceSmall/chn_jpn_yue_eng_ko_spectok.bpe.model",
+          "url": "https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/chn_jpn_yue_eng_ko_spectok.bpe.model",
+          "size": 377341
+        },
+        {
+          "path": "model/SenseVoiceSmall/config.yaml",
+          "url": "https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/config.yaml",
+          "size": 1855
+        },
+        {
+          "path": "model/SenseVoiceSmall/configuration.json",
+          "url": "https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/configuration.json",
+          "size": 396
+        },
+        {
+          "path": "model/SenseVoiceSmall/tokens.json",
+          "url": "https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/tokens.json",
+          "size": 352064
+        }
+      ]
+    },
+    {
+      "name": "zipenhancer",
+      "display_name": "ZipEnhancer（降噪，VoxCPM2 依赖）",
+      "source": "modelscope:iic/speech_zipenhancer_ans_multiloss_16k_base",
+      "size_bytes": 18231248,
+      "files": [
+        {
+          "path": "model/speech_zipenhancer/onnx_model.onnx",
+          "url": "https://modelscope.cn/models/iic/speech_zipenhancer_ans_multiloss_16k_base/resolve/master/onnx_model.onnx",
+          "size": 9805700
+        },
+        {
+          "path": "model/speech_zipenhancer/pytorch_model.bin",
+          "url": "https://modelscope.cn/models/iic/speech_zipenhancer_ans_multiloss_16k_base/resolve/master/pytorch_model.bin",
+          "size": 8424575
+        },
+        {
+          "path": "model/speech_zipenhancer/configuration.json",
+          "url": "https://modelscope.cn/models/iic/speech_zipenhancer_ans_multiloss_16k_base/resolve/master/configuration.json",
+          "size": 973
+        }
+      ]
+    }
+  ]
 }
