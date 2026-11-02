@@ -36,3 +36,11 @@
 - 性质更正：阶段 5 曾误记为「待排期漂移」；实际是**阶段 4（`036e78b`）新增 edge-tts 路由与 streaming_audio 503 后未同步基线**造成的门禁红灯（快照上次入库为第三方提交 `a24c44d`）——根因归属 `036e78b`，非独立漂移。
 - 处置：`UPDATE_OPENAPI_SNAPSHOT=1` 重基线（仓内既有机制，`tests/test_openapi_snapshot.py:20-21,83-85`）；diff 逐行核对恰两条（`[ADDED] /api/generate/edge-tts/tts`、`[CHANGED] streaming_audio 422→422,503`），零夹带。复验：快照测试 3 passed；全量套 **0 failed / 2601 passed / 41 skipped**（红灯清零，passed +1）。
 - 状态：**闭环**。
+
+## R4 发布回滚演练（门禁补证动作）——已闭环（2026-11-02 阶段 8）：真仓完整历史重跑 exit 0，四态 `[?]→[x]`
+
+- 动作：在真仓 **756 条完整历史的 file 协议全量克隆**（非浅、非合成最小仓，保真度自检 8 项全过）内，用生产 venv 解释器真跑 `scripts/rollback_release.py --target v2.8.0`——与 2026-10-31 退 128 那次完全同形的调用。
+- 实测：11:11:25→11:11:30（5s）**退出码 0**；43/43 个 revert 全部成功（主线 10 个 merge 全走 `-m 1`，含当初元凶 `8a0851da`，第 24/43 个目标）；回滚后树与 `v2.8.0` 树逐字节一致（tree hash `db91f16d`，diff 0 文件 0 增删）；脚本活体 sha256 三方对平（`6dbc567e…`/5050 B）。生产 checkout 全程零改动（起测/收测 `git status --porcelain` 均 0）。
+- 判据：R4 两判据 **①记录可复核 ②对象是活体** 逐项通过 → `[x]`（③周期性不适用，归 D6/O4）。
+- 留痕：`docs/runbooks/2026-11-02-r4-real-history-rollback-drill.md`（含未覆盖清单与台账行）；演练目录 `C:/Users/Doro/Desktop/评估报告_2026-10-29/_演练/R4-real-history/` 保留作证据。
+- 未随本轮收口的挂账项：F2（`v2.8.0` tag 内嵌版本位漂移，SRE_RUNBOOK §2.4 硬停断言对其判 FAIL）仍属所有者决策项，不在阶段 8 范围；脚本未实现 §2.4 断言（人工 SOP）亦登记为未覆盖。
