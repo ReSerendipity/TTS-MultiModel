@@ -100,17 +100,33 @@ SHA-256 复验（`scripts/generate_model_checksums.py` 生成，C1 加载链路�
 
 - `history_db`（SQLite）：每日全量备份 + 一致性快照；PII 字段按 `security.pii_retention_days`
   留存，到期由启动期清理任务删除（`history_db.purge_expired`）。
-- **落地脚本**：`scripts/backup_db.py` 已提供（对应评估 P3-1「无 DB/历史数据备份」）。
-  它使用 SQLite 在线备份 API 做一致性快照（不阻塞在线写入），并一并备份审计日志与
-  `config.yaml`，本地按时间命名轮转（默认保留 14 份），支持 `--restore` 一键恢复
-  （恢复前自动备份当前版本防误操作）。
+- **落地脚本（唯一推荐入口，阶段 9 修订）**：`scripts/backup_history_db.py`
+  （对应评估 P3-1「无 DB/历史数据备份」）。它使用 SQLite backup API 做一致性快照
+  （运行期亦可安全备份，含未 checkpoint 的 WAL 内容），时间命名去重、`--keep` 轮转，
+  恢复后自动 `PRAGMA integrity_check`，并支持 `--drill` 临时目录恢复演练；产物落
+  `data/backups/`。配套测试 `tests/test_backup_history_db.py`。历史库路径按成文优先级
+  解析（环境变量 `TTS_HISTORY_DB_PATH` > `config.yaml → history.db_path` > 默认
+  `data/history.db`），不依赖 CWD。原推荐入口 `scripts/backup_db.py` 自述对象
+  `data/tts_history.db`（系 2026-08-16 `64a753f` 配置清理后遗留的死命名）与
+  `data/audit.log`（实测未落盘）**已于阶段 9 退役删除**，决策依据与取证见
+  `docs/runbooks/2026-11-02-o4-backup-wiring.md` §3。
 
   ```bash
-  # 每日全量备份（建议由 cron / k8s CronJob 调用）
-  python scripts/backup_db.py --retain 14
-  # 从指定备份恢复历史库
-  python scripts/backup_db.py --restore backups/history-20260831-030000.db
+  # 每日全量备份（与本机调度登记产物 scripts/install_backup_schedule.py 的注册命令行
+  # 一致；该产物默认 --dry-run，真实注册待所有者授权后进行）
+  .venv/Scripts/python.exe scripts/backup_history_db.py --keep 14
+  # 从指定备份恢复历史库（--target 会覆盖目标路径，执行前确认）
+  .venv/Scripts/python.exe scripts/backup_history_db.py --restore data/backups/history_backup_<时间戳>.db --target data/history.db
   ```
+
+- **备份集覆盖（可判定；逐资产实测表见 `docs/runbooks/2026-11-02-o4-backup-wiring.md` §2）**：
+  默认备份集仅覆盖主业务库 `data/history.db`。`config.yaml` 由 git 跟踪（内容版本可
+  还原，不依赖备份集）；`data/` 下 5 个运行密钥（`.pii_key`/`.history_hmac_key`/
+  `.watermark_key`/`.csrf_secret`/`.manifest_signing_key`）**无任何备份覆盖**，丢失即
+  链路断裂，密钥侧管理属所有者决策项；`generation_versioning` 库 `enabled=false`
+  （治理决策：保留模块、停用功能），不在默认备份集，如启用可经 `--db-path` 显式覆盖；
+  审计日志 `data/audit.log` 有代码实体（`audit.py`）且配置开启，但截至 2026-11-02
+  实测未落盘，当前无此对象可备。
 
 - 权重：`model/` 离线冷备，恢复后必须 SHA-256 复验（见 `scripts/verify_model_checksums.py`）。
 - 密钥：使用外部 Secret 管理（KMS / CI secrets），禁止明文入库。
@@ -127,8 +143,9 @@ SHA-256 复验（`scripts/generate_model_checksums.py` 生成，C1 加载链路�
 | 2026-11-01 00:5x–01:2x | O3 单点与切换演练（**降格执行**：派单方补充围栏覆盖工单前提——TTS 服务未运行、空闲显存仅 1721 MiB（ComfyUI 占 10224 MiB，无关负载未触碰），注入 A/B 按围栏禁止执行） | 只读取证：`netstat`（7869 无监听 / 8188=ComfyUI PID 28656）、`tasklist`、`nvidia-smi`（total/used/free/util）；纸面算账：`config.yaml models.engines` 各引擎 vram 声明 vs 卡容量 11.94 GiB | **注入 A/B 未执行（前置条件不满足，如实登记未覆盖，无伪造数字）**；单卡多副本冗余算账判定**不成立**（2×voxcpm2=13.0 GiB 超卡、indextts20 之外全超；`deployment.yaml` 每副本请求 `nvidia.com/gpu: 1` 单卡不可调度两副本；同卡复制仍是同一点）；本机裸跑无进程级守护（k8s liveness 属编排层）；RTO：进程级/降级切换未实测，DB 沿用 ≈10.5s | —（无注入即无计时） | 进程级自愈与降级切换实测、硬件级冗余——需所有者指定停 ComfyUI 的窗口或换有空卡的机器（详见 `docs/runbooks/2026-11-01-o3-failover-drill.md` §7 决策三问） |
 | 2026-11-01 09:50–10:24 | **O3 真机实测（阶段 2b）**：显存已腾空（ComfyUI 由所有者指令结束，零触碰）；注入 A/B 真做 | 启动：`clean_launch.py` 脱壳启动（`BROWSER` 环境变量抑制弹窗）；A：`taskkill` 服务子进程 + 60s 观察窗；B：`TTS_CONFIG_PATH` 仓外副本（voxcpm2 model_dir 置缺）+ `/api/model/switch`；真实合成 ×3（voxcpm_design，5 字短文本） | **进程级自愈：不存在（实测 T+60s 无恢复，launcher 同死）**；人工恢复 **9s(liveness)/3m12s(含重载 61s)**；**自动降级：无**（生成硬失败 engine_not_ready）；半自动切换 edge-tts **2.1s 成功**但降级输出被生成守卫拦死（×2 止损，**输出不可用**）；撤除后回主引擎合成成功、终态零残留 | 合成 41.0s/69.1s/98.4s；加载 68.3/61.0/64.6s（**CPU 口径**。**GPU 口径已实测（阶段 6，2026-11-01）**：加载 43.2s / 显存 +6609 MiB≈6.45 GiB；合成 8.39s（130,278 B / 1.36s @48kHz）；卸载回落 9648→3280 used；重载 30.3s→再合成 4.18s。环境 torch 2.15.0+cu134） | GPU 推理不可达（**G1**：venv torch=2.15.0+cpu，系统 python 缺 funasr——两环境各缺一半）；OOM 自愈未覆盖；需所有者决策 GPU 环境/守护/降级路由（演练文档 §2b.7） |
 | 2026-11-02 11:10–11:18 | **R4 真仓完整历史重跑（阶段 8）**：file 协议全量克隆真仓（756 提交/22 tag/85 merge，非浅克隆）于仓库外演练目录，生产 venv 解释器只读调用，生产 checkout 全程零改动（起测复核 porcelain=0） | `scripts/rollback_release.py --target v2.8.0`（克隆内真跑，与 2026-10-31 退 128 那次完全同形） | **退出码 0**（11:11:25→11:11:30，主执行体 5s）：43/43 revert 全部成功（主线 10 个 merge 全走 `-m 1`）；回滚后树与 `v2.8.0` 树逐字节一致（tree hash `db91f16d`，`diff --stat` 0 文件 0 增删）；`8a0851da` 为第 24/43 个目标、`-m 1` revert 成功（`ff86f67`，diffstat 互逆 +199/−634↔+634/−199）；脚本活体 sha256 三方对平（`6dbc567e…`/5050 B）；**R4 自判 `[?]→[x]`** | 5s（主执行体；含克隆与对平全程 11:10:25–11:18:16） | 生产真实回滚、镜像/kubectl 回滚面、回滚后服务层验证、§2.4 硬停断言脚本化、`pytest-timeout`（venv 缺插件且禁装）——详见 `docs/runbooks/2026-11-02-r4-real-history-rollback-drill.md` §7/§10 |
+| 2026-11-02 12:17–12:26 | **O4 备份链路可修半边（阶段 9）**：F3 退役 `backup_db.py` + 文档推荐入口改指活链 + 调度登记产物（仅 dry-run，未注册）+ 活体 `data/history.db` 真跑备份与恢复对平；恢复目标仅仓外临时目录，既有备份物零改动、仅新增 | `.venv/Scripts/python.exe scripts/backup_history_db.py --keep 14`（冷 shell 12:18:44 原样复跑同 exit 0）；`--restore <新备份> --target <仓外临时>/restored_history.db`；`scripts/install_backup_schedule.py --dry-run` | 备份 exit 0（12:17:03→12:17:04），产物 `history_backup_20261102_121704.db` **2,408,448 B** sha256 `874d8447…164f41`（与冷 shell 第二份逐字节同哈希）；恢复 exit 0 含 `integrity_check=ok`；**9/9 表对平 PASS**（12:18:32 报告：字段名/行数/主键前 5 行抽样 sha256 全一致，比对期间活体 mtime 11:29:43 未变）；config.yaml git 覆盖实证（blob `d45ed956…`==HEAD）；dry-run 输出七要素契约、重复运行逐字节一致、`--apply` 未调用 | 备份 1s（12:17:03→12:17:04）；恢复 1s（12:17:50→12:17:51）；对平重放同秒 0s（12:25:43→12:25:43，首跑报告落盘 12:18:32） | 真实调度注册未做（待所有者授权）；异地副本未做（需属主给第二存储位置）；5 个运行密钥与 `generation_versioning` 库不在备份集；**新发现 F6：测试套件将 `test_operation` 等噪声行写入生产 `data/history.db.action_logs`（终跑两阶段各 +20 行，共 2,666→2,706，行时间戳 12:20:38.983–12:36:44.837）**——详见 `docs/runbooks/2026-11-02-o4-backup-wiring.md` |
 
-门禁状态（2026-10-29 评估 → 三轮整改，判定依据详见各演练报告）：**D6 [?]→[x]**（目标库级实测完成且对平通过）；**O4 保持 [?]**（首轮周期点已建，待 2027-01 到期轮次佐证周期性）；**R4 [?]→[x]**（2026-11-02 阶段 8：真仓 756 条完整历史克隆上 `--target v2.8.0` 真跑 **exit 0**、43/43 revert、回滚后树与 v2.8.0 树逐字节一致；两判据①可复核②活体全过，F1 修复就此真仓闭环——见 `docs/runbooks/2026-11-02-r4-real-history-rollback-drill.md`；F2 目标 tag 版本位漂移为独立挂账项（属主决策），不影响 R4 判据）；**O3 保持 [?]**（「降级切换」子项经阶段 4 修复+真机实测**升 [x]**——自动降级 3.07s、产物 21,888 B MP3、degraded 字段齐备、fallback_failed 可区分；但「无核心单点」仍受单卡算账约束，**整体不升 [x]**）；D-2 已闭环（见 `docs/TODO.md`）、D-1 已按所有者决策接受成文（§2.5）；**E7 [ ]→[?]、P25 [ ]→[?]**（Bus Factor=1 登记成文：`docs/runbooks/BUS-FACTOR-2026-11-01.md`——现状量化/知识单点载体/补偿措施/可判定升级判据齐备，按「登记成文+补偿在位+判据可判定→[?] 带项上线」口径记账；Bus Factor>1 的事实未变，**不升 [x]**，升级为阻断的条件见该文 §5）。
+门禁状态（2026-10-29 评估 → 三轮整改，判定依据详见各演练报告）：**D6 [?]→[x]**（目标库级实测完成且对平通过）；**O4 保持 [?]**（⛔P0；四阻塞中阶段 9 已拔掉两个：②F3 死路径退役、§3.3 推荐入口改指 `backup_history_db.py` 并经冷 shell 原样验证，①调度接线交付 `install_backup_schedule.py` 可验证产物（默认 dry-run、幂等、11 测试），但**真实注册待所有者授权、未注册**；仍阻断的另两个是硬前提：③同机无异地——需属主给第二存储位置，非本轮可伪装关闭；④周期性——待 2027-01 到期轮次佐证；另 F6 新登记：测试噪声直写生产库。见 `docs/runbooks/2026-11-02-o4-backup-wiring.md`）；**R4 [?]→[x]**（2026-11-02 阶段 8：真仓 756 条完整历史克隆上 `--target v2.8.0` 真跑 **exit 0**、43/43 revert、回滚后树与 v2.8.0 树逐字节一致；两判据①可复核②活体全过，F1 修复就此真仓闭环——见 `docs/runbooks/2026-11-02-r4-real-history-rollback-drill.md`；F2 目标 tag 版本位漂移为独立挂账项（属主决策），不影响 R4 判据）；**O3 保持 [?]**（「降级切换」子项经阶段 4 修复+真机实测**升 [x]**——自动降级 3.07s、产物 21,888 B MP3、degraded 字段齐备、fallback_failed 可区分；但「无核心单点」仍受单卡算账约束，**整体不升 [x]**）；D-2 已闭环（见 `docs/TODO.md`）、D-1 已按所有者决策接受成文（§2.5）；**E7 [ ]→[?]、P25 [ ]→[?]**（Bus Factor=1 登记成文：`docs/runbooks/BUS-FACTOR-2026-11-01.md`——现状量化/知识单点载体/补偿措施/可判定升级判据齐备，按「登记成文+补偿在位+判据可判定→[?] 带项上线」口径记账；Bus Factor>1 的事实未变，**不升 [x]**，升级为阻断的条件见该文 §5）。
 
 ---
 

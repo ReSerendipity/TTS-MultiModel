@@ -83,7 +83,7 @@ sha256（全量口径）：
 |---|---|---|---|
 | F1 | `rollback_release.py` 遇 merge 提交反向 revert 失败 | **已修**：脚本加 merge→`revert -m 1` 分支 + range 改 `--first-parent`（线性仓行为不变）；仓外最小仓先复现（脚本退 1，内层 git revert 报 "is a merge but no -m option was given"）→修复→重跑 **exit 0**、树状态判据全过（文件还原、merge 引入文件消失、工作树干净）；`py_compile` 过；仓内无既有覆盖测试（如实登记，以最小仓演练为验证） | 已闭环 |
 | F2 | v2.8.0 tag 版本位自相矛盾（内嵌 changelog 自述 2.7.0 + 手工位 2.7.0） | **已补断言**：SRE_RUNBOOK §2.4 新增回滚前硬停断言（tag ↔ version.json ↔ CHANGELOG 顶部 + 内嵌 changelog 自述一致）；按新断言只读判定：v2.8.0=**FAIL**、HEAD v2.9.0=PASS；tag 与历史未动；`tests/test_version_consistency.py` 已在（本轮只许改 rollback_release.py，未改它；「补内嵌说明断言进测试」登记为后续独立 chore） | 断言已入 SOP；测试补强待后续 |
-| F3 | SRE_RUNBOOK §3.3 推荐入口 `backup_db.py` 指向不存在的 `data/tts_history.db` | **未处理（待决策）**：§3.3 修订未列入本轮范围；真实链为 `scripts/backup_history_db.py`（本文件 §3 已实测） | 仍待所有者授权修订 |
+| F3 | SRE_RUNBOOK §3.3 推荐入口 `backup_db.py` 指向不存在的 `data/tts_history.db` | **未处理（待决策）**：§3.3 修订未列入本轮范围；真实链为 `scripts/backup_history_db.py`（本文件 §3 已实测）。**阶段 9 闭环（2026-11-02）**：§3.3 推荐入口改指 `scripts/backup_history_db.py` 并成文覆盖口径；`backup_db.py` 退役删除（判据：全仓 grep 零代码/测试引用、`data/tts_history.db` 系 `64a753f`（2026-08-16）配置清理后遗留死命名、宣称的 `audit.log` 实测未落盘）；文档命令冷 shell 原样跑 exit 0；真跑备份与恢复对平见 `docs/runbooks/2026-11-02-o4-backup-wiring.md` | 已闭环（阶段 9） |
 | F4 | config.yaml edge-tts vram_gb=0.0 pydantic 告警 | **未处理（待决策）**：属配置值修正，本轮禁改 config.yaml。**阶段 5b 补注新后果**：阶段 4 的「无权重引擎」降级判据依赖 `vram_gb == 0.0`，而该值被 pydantic 判为非法（`Input should be greater than 0`，测试日志实测出现两次并触发回退原始 YAML）——即**降级判据建立在一个 schema 认为无效的配置值上**，为此判据实现不得不内置 raw YAML 兜底路径 | 仍待所有者授权修正（与 F4 同源，一并拍板） |
 
 ## 6. 门禁状态对照（2026-10-29 评估 → 本轮）

@@ -44,3 +44,20 @@
 - 判据：R4 两判据 **①记录可复核 ②对象是活体** 逐项通过 → `[x]`（③周期性不适用，归 D6/O4）。
 - 留痕：`docs/runbooks/2026-11-02-r4-real-history-rollback-drill.md`（含未覆盖清单与台账行）；演练目录 `C:/Users/Doro/Desktop/评估报告_2026-10-29/_演练/R4-real-history/` 保留作证据。
 - 未随本轮收口的挂账项：F2（`v2.8.0` tag 内嵌版本位漂移，SRE_RUNBOOK §2.4 硬停断言对其判 FAIL）仍属所有者决策项，不在阶段 8 范围；脚本未实现 §2.4 断言（人工 SOP）亦登记为未覆盖。
+
+## F3 文档推荐入口死路径（`backup_db.py`）——已闭环（2026-11-02 阶段 9）：退役删除，推荐入口改指活链，四态 `[?]（待决策）→[x]`
+
+- 实测判据：`git grep -l backup_db` 仅命中 `docs/SRE_RUNBOOK.md`、`docs/runbooks/2026-10-31-restore-drill.md`，`app/`、`tests/`、`.github/` 零引用；`data/tts_history.db` 不存在（`ls` 实测）。
+- 根因（**推翻工单派单锚的「S-R4 合并所致」推测**）：`git show` 取证——`90e8512` 时 `config.yaml:58` 曾有 `db_path: data/tts_history.db`，`64a753f`（2026-08-16「prune legacy sections」）清理该段，`80c13b5`（2026-08-31）新增 `backup_db.py` 时照抄了这个**已死 15 天**的命名；S-R4 合并的是 `outputs/history.db`→`data/history.db`，与 `tts_history.db` 无涉。
+- 处置：`git rm scripts/backup_db.py`；SRE_RUNBOOK §3.3 推荐入口改指 `scripts/backup_history_db.py`（有测试 `tests/test_backup_history_db.py`、2026-10-31 演练实测活链），并成文备份集覆盖口径；冷 shell 新进程原样跑文档命令 `.venv/Scripts/python.exe scripts/backup_history_db.py --keep 14` **exit 0**（12:18:44）。详见 `docs/runbooks/2026-11-02-o4-backup-wiring.md` §3/§4。
+
+## O4 备份链路（门禁项，⛔P0）——阶段 9 关掉四阻塞中的两个，**保持 `[?]`**
+
+- 本轮关掉：②F3 死路径（上条，`[x]`）；①无调度接线——交付 `scripts/install_backup_schedule.py`（默认 `--dry-run` 打印任务名/频率/触发时刻/完整命令行/运行身份/下一次应执行时刻，`--apply` 才注册且**本轮未调用、真实注册待所有者授权**；幂等：固定 `/tn` + `/f`，重复 dry-run 逐字节一致），配套 11 项测试全绿且不触碰系统。
+- 剩下什么（不可伪装关闭）：③同机无异地——需属主给第二个存储位置，属资源决策；④周期性——待 2027-01 到期轮次佐证（调度未注册前无周期证据）。另备份集覆盖边界新成文：`data/` 下 5 个运行密钥（`.pii_key`/`.history_hmac_key`/`.watermark_key`/`.csrf_secret`/`.manifest_signing_key`，实测 44/64/119/64/32 B）无任何备份覆盖、`generation_versioning` 库（`enabled=false`）不在默认备份集、`data/audit.log` 实测未落盘（无此对象）。留痕：`docs/runbooks/2026-11-02-o4-backup-wiring.md`。
+
+## F6（阶段 9 新登记，未修）测试套件直写生产 `data/history.db.action_logs`——隔离缺陷，属主决策
+
+- 实测：本轮真跑备份↔活体对平 PASS 于 12:18:32（`action_logs=2,666` 行，活体主库 mtime 11:29:43 自备份起未变）；随后口径 A/B 首轮窗生产库被写入 20 行测试噪声（id 2,675–2,686，`action='test_operation'`/`message='测试操作'`/`engine='test_hard_timeout_engine'` 等，行时间戳 12:20:38.983–12:23:01.831，mtime 推前至 12:19:57/12:23:08）；lint 整改后两口径终跑（12:33:17–12:37:53）又写入 20 行（id 2,687–2,706，行时间戳 12:33:53.650–12:36:44.837），本轮累计 2,666→2,706。同型噪声在阶段 8 窗口亦有留存（id 2,647–2,666，11:26:37–11:29:35）——工单锚的「11:29 活跃在写」实为测试写，非服务使用。
+- 影响：备份物忠实反映当前态但含测试噪声（本轮备份物干净，因取于写入窗之前）；恢复对平必须限定静态窗口做，否则被漂移误判（12:25:43 重放即因漂移 FAIL）。
+- 处置边界：修隔离（fixture 指向临时库）超出阶段 9 范围（本轮只做 O4 可修半边），按「发现按证据登记」处理；本轮累计写入的 40 行未回删（禁改活体数据硬约束）。
