@@ -77,6 +77,12 @@ TODO.md 新增 F3 条目。文档不留任何指向死路径的推荐入口（�
 
 ## 4. 真跑备份与恢复对平（数字全部实测）
 
+> **入口失效提示（2026-11-03，F7 补注）**：本节两条命令里的 `.venv/Scripts/python.exe` 在**当时环境有效**
+> （2026-11-02 真跑 exit 0，数字见下、未改）；该入口已于 **2026-11-03 失效**（`.venv` 联接目标
+> `D:\_venvs\tts` 不存在）。现行可执行写法见 `docs/SRE_RUNBOOK.md` §3.3：
+> `python scripts/run_python.py scripts/backup_history_db.py …`（留痕
+> `docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md`）。
+
 **备份**（最终留存入口，即文档推荐命令原文）：
 
 ```

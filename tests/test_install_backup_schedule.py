@@ -60,13 +60,20 @@ def test_next_run_exactly_at_slot_rolls_to_tomorrow():
 # ---------------------------------------------------------------- 注册计划契约
 def test_build_plan_contains_required_contract_fields():
     plan = ibs.build_plan(now=_fixed_now())
-    for key in ("task_name", "frequency", "trigger", "command", "working_dir",
-                "identity", "next_run", "query_argv", "create_argv"):
+    for key in (
+        "task_name",
+        "frequency",
+        "trigger",
+        "command",
+        "working_dir",
+        "identity",
+        "next_run",
+        "query_argv",
+        "create_argv",
+    ):
         assert key in plan and plan[key], key
-    # 命令行 = §3.3 文档推荐入口 + venv 解释器绝对路径 + keep 透传
-    assert plan["command"] == (
-        f'"{ibs.VENV_PY}" "{ibs.BACKUP_SCRIPT}" --keep {ibs.DEFAULT_KEEP}'
-    )
+    # 命令行 = §3.3 文档推荐入口（解释器由 scripts/run_python.py 解析）+ keep 透传
+    assert plan["command"] == (f'"{ibs.PYTHON_EXE}" "{ibs.BACKUP_SCRIPT}" --keep {ibs.DEFAULT_KEEP}')
     # 频率与 §3.3「每日全量备份」节奏句自洽
     assert "每日" in plan["frequency"] and "§3.3" in plan["frequency"]
     assert plan["next_run"] == "2026-11-03 03:00:00"
@@ -86,13 +93,20 @@ def test_dry_run_prints_full_contract_and_does_not_write(capsys):
     rc = ibs.main(["--dry-run"], runner=fake)
     out = capsys.readouterr().out
     assert rc == 0
-    for token in ("任务名", "频率", "触发时刻", "完整命令行", "工作目录",
-                  "运行身份", "下一次应执行", "TTS-MultiModel-Backup-Daily"):
+    for token in (
+        "任务名",
+        "频率",
+        "触发时刻",
+        "完整命令行",
+        "工作目录",
+        "运行身份",
+        "下一次应执行",
+        "TTS-MultiModel-Backup-Daily",
+    ):
         assert token in out, token
     assert "未做任何系统写入" in out and "未调用 schtasks /create" in out
     # 探测只允许只读 /query；任何 /create /change /delete 都不许出现在 dry-run
-    assert all("/create" not in c and "/change" not in c and "/delete" not in c
-               for c in fake.calls), fake.calls
+    assert all("/create" not in c and "/change" not in c and "/delete" not in c for c in fake.calls), fake.calls
 
 
 def test_dry_run_output_is_deterministic_for_same_inputs(capsys):

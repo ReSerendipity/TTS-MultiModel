@@ -49,7 +49,7 @@
 
 - 实测判据：`git grep -l backup_db` 仅命中 `docs/SRE_RUNBOOK.md`、`docs/runbooks/2026-10-31-restore-drill.md`，`app/`、`tests/`、`.github/` 零引用；`data/tts_history.db` 不存在（`ls` 实测）。
 - 根因（**推翻工单派单锚的「S-R4 合并所致」推测**）：`git show` 取证——`90e8512` 时 `config.yaml:58` 曾有 `db_path: data/tts_history.db`，`64a753f`（2026-08-16「prune legacy sections」）清理该段，`80c13b5`（2026-08-31）新增 `backup_db.py` 时照抄了这个**已死 15 天**的命名；S-R4 合并的是 `outputs/history.db`→`data/history.db`，与 `tts_history.db` 无涉。
-- 处置：`git rm scripts/backup_db.py`；SRE_RUNBOOK §3.3 推荐入口改指 `scripts/backup_history_db.py`（有测试 `tests/test_backup_history_db.py`、2026-10-31 演练实测活链），并成文备份集覆盖口径；冷 shell 新进程原样跑文档命令 `.venv/Scripts/python.exe scripts/backup_history_db.py --keep 14` **exit 0**（12:18:44）。详见 `docs/runbooks/2026-11-02-o4-backup-wiring.md` §3/§4。
+- 处置：`git rm scripts/backup_db.py`；SRE_RUNBOOK §3.3 推荐入口改指 `scripts/backup_history_db.py`（有测试 `tests/test_backup_history_db.py`、2026-10-31 演练实测活链），并成文备份集覆盖口径；冷 shell 新进程原样跑文档命令 `.venv/Scripts/python.exe scripts/backup_history_db.py --keep 14` **exit 0**（12:18:44；**当时环境有效；该入口已于 2026-11-03 失效，见 F7**）。详见 `docs/runbooks/2026-11-02-o4-backup-wiring.md` §3/§4。
 
 ## O4 备份链路（门禁项，⛔P0）——阶段 9 关掉四阻塞中的两个，**保持 `[?]`**
 
@@ -64,3 +64,52 @@
 - **剩余属主决策（不在本轮范围）**：①451+88 行「疑似/无法判定」原地保留待判定；②既有备份物（12:17/12:18/14:29 三份均取于隔离前）仍含噪声，是否重取干净备份待定；③调度注册与异地副本沿阶段 9 不变。
 - **阶段 11（2026-11-02/03，B 批闸门 fastfail→零隔离）**：对残留 539 行的第二批判据做代码取证——`8192` **钉上**（`tests/test_generation_error_friendliness.py:160` `"啊"*8192`+`instruction="温柔"` → 写链 `design.py:257`→`utils.py:1017`→`logs.py:273`；隔离库复现行与生产 **206/206** 五元组签名闭合，错误串为 ：142 `object()` 桩指纹）；`streaming` **钉不上**（路由写死 `streaming.py:704/718/736-740/754/909/940`，复现证明测试不传该值也落库；44 行中 **3 行真实合成**（338=27.2s、629/630=3.6/3.3s）会被判据误删）→ 按工单闸门「立即停手」：**B 批 `F6-20261102-B` 零行隔离**，备份/隔离/回滚/复隔离取消。**(B) 22 行 0.0s 失败证伪为真实使用**（错误串 tests/ 零出现、id 987=CUDA assert、守卫 `7326b94` 09-14/`4a45e6f` 09-19 晚于行时间），成因 7 类，判定点与修正（IndexTTS2 路由 `voice_or_persona` 写死为空 `synthesize.py:529`，空 persona≠未选）见诊断；**clone.py:260 空引擎缺口现状仍敞开（唯一），是否补属产品决策**。两口径 A 2545/0/117×2、B 2448/0/91（cov 51.63%）全 exit 0，五快照 `history.db` 2,469,888 B/sha `9652e5e7…` 逐字节不变（哨兵无漏，conftest 未动）。注意：`.venv` 符号链接目标 `D:\_venvs\tts` 已失效，本轮以系统 Python 3.12.10 代跑（未装依赖）。残留精算：206 可证+41 streaming（39 可证+2 钉不到）+3 真实+22 真实+**179 generation 与 88 model 未检**。留痕：`docs/runbooks/2026-11-02-f6-batch-b-and-fastfail.md`。
 - **阶段 12（2026-11-03，C 批隔离——可证部分收口）**：阶段 11 钉上的唯一判据 `text_length==8192` 经派单方拆闸放行，**206 行**（处置前 206/206 全 `failed`、0 success、桩错误指纹，与 streaming/model/0.0s 禁触集合零交集实测）移入 `action_logs_quarantine_20261102` 批次 **`F6-20261103-C`**：等式① `206==206`、② `333+2,167+206==2,706` PASS；备份 `history_backup_20261103_075607.db`（2,469,888 B，sha `e4394184…`，系统 Python 3.12.10 代跑，`.venv` 沿阶段 11 失效未修）仓外恢复回读对平 539/2,167/2,706 exit 0 后方动手；回滚实测（主表回处置前 539、`MAX(ts_ms)` 回 1793594184555、C 批清零、A 批 2,167）；六列有序指纹 C 批四态同值 `22fbff87…`、A 批处置前（备份件）=回滚态=终态 `b955196a…` 零触碰；re-isolate 终态 333/2,167/206 verify PASS。两口径 A **2545/0/117** ×2、B **2448/0/91**（cov 51.58%≥45%）全 exit 0，测后 `history.db`/-wal/-shm 与 `generation_versions.db` 与隔离终态**逐字节一致**（零增长在 C 批终态成立）。8193 实测 **0 行**无待决。执行器为阶段 10 原件派生（仓外 `_演练/F6-batch-C/scripts/`，机制同源，仅批次/判据/verify 三处不同）。**至此可证测试噪声 2,167+206=2,373 行全部隔离在案可回滚；残留主表 333 行（41 streaming+3 真实 streaming+22 真实+179 generation 未检+88 model 未检）全部为待决项。** 留痕：`docs/runbooks/2026-11-02-f6-batch-b-and-fastfail.md` §9。
+
+## F7 文档写死 `.venv` 解释器路径已成死路径——**已修复（2026-11-03 阶段 13）**：仓库唯一解析入口 + 冷 shell 实测 exit 0
+
+- **事实（实测）**：项目 `.venv` 是指向 `D:\_venvs\tts` 的目录联接（junction），该目标目录**不存在**
+  （`Test-Path D:\` True / `D:\_venvs` False）；`Test-Path .venv\Scripts\python.exe` = **False**（等价
+  `test -x` = NO）。同机系统 `C:\Python312\python.exe`（3.12.10）可正常跑脚本——**坏的是「文档指定的入口」，
+  不是能力**。
+- **盘点**：tracked 文件内 `.venv` 出现 **105 处 / 86 行 / 38 文件**，其中**可执行入口 23 站点**（12 文档命令
+  + 11 代码站点）。逐个站点的分类处置（改指 / 改解析 / 保留+加注 / 不动及理由）见留痕 §3。
+- **处置**：新增 `scripts/run_python.py` 作为**仓库唯一解释器解析入口**（顺序：`TTS_PYTHON` 覆盖 → 项目 venv
+  Windows/POSIX → PATH `python`/`python3` → `py -3` → 当前进程；候选**逐个实际执行探测**，退出码原样透传，
+  解析不到 exit 127 并给修复指引）。`docs/SRE_RUNBOOK.md` §3.3 备份/恢复两条命令改指该入口；
+  `scripts/install_backup_schedule.py` 的调度命令行改为解析结果（旧值会把死路径注册成每日任务，dry-run 曾
+  打印 `[warn] 未找到 venv 解释器`）；`check_engine_compat/specs/declared_capabilities/training_isolation`
+  四处重复的写死路径收敛到同一入口。
+- **验收（唯一算数判据）**：冷 shell（新 `cmd.exe`，`VIRTUAL_ENV`/`CONDA_PREFIX`/`PYTHONPATH`/`TTS_PYTHON`
+  全空）原样执行 `python scripts/run_python.py scripts/backup_history_db.py --keep 14` → **exit 0**
+  （10:35:25，444 ms），产物 `data/backups/history_backup_20261103_103525.db` **2,469,888 B**、sha256
+  `02c9d487…`；首跑 10:33:29 产物**同哈希**（逐字节一致），既有备份删除 **0** 份。`check_engine_compat.py`
+  经入口与直跑系统 Python **输出逐字节一致**（sha256 同值 `49bd9fce…`，均 exit 1 = funasr 缺失 8/9）。
+- **未覆盖（诚实边界）**：venv 未重建（硬约束）、符号链接未修；GPU 口径（阶段 5/6 的 `2.15.0+cu134`）无法复验；
+  发版链脚本（`build_portable_bundle.ps1` / `release_gate.ps1`）与 `.githooks` 内部两级回退按「已有兜底」保留
+  未收敛。
+- 留痕：`docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md`（含入口清单、冷 shell 日志、对照、
+  两口径与零写入证据索引）。
+
+## F8 本地 git 钩子未接线（`core.hooksPath=local/hooks`）——**已登记，未修（2026-11-03 阶段 13）**
+
+- **漂移事实（实测）**：`git config core.hooksPath` = **`local/hooks`**（来源 `file:.git/config`，本地改动、不入库）；
+  该目录被 `.gitignore:385` 的 `/local/` 忽略，内只有 `pre-push` 与 `.origin`（内容 `.githooks`）。
+  → `pre-push` 经 `local/hooks/pre-push` 转发到 `.githooks/pre-push` **仍生效**；`.githooks/` 下的
+  `pre-commit`、`commit-msg`（DCO）、`post-merge`、`post-checkout`、`prepare-commit-msg` **全部休眠**。
+  与 `scripts/install-hooks.ps1:5-6` 的成文口径（2026-09-16 起统一 `core.hooksPath .githooks`）冲突。
+- **影响（量化）**：`local/hooks/pre-push` mtime = 2026-10-31 00:00:19，此后 **25 个提交**在本地 pre-commit 与
+  DCO 校验缺席下产生；**25/25 仍带 `Signed-off-by`**（作者手工 `-s`）——事实未违反，**校验缺席**（本地 ruff /
+  大文件 / 私钥 / 引擎一致性 / 上游同步等门禁在这 25 个提交上只有 CI 兜底）。
+- **接线前置条件（先解决再接线）**：手跑 `sh .githooks/pre-commit` 当前 **exit 1**（2026-11-03 10:29:13→10:29:31），
+  红在 `Engine Compatibility Check`（`funasr` 缺失，8/9 通过；其余 6 个门禁 Passed）→ **接线后会立刻开始拦提交**。
+- **`funasr` 依赖面（只读取证，未安装）**：`pyproject.toml:78` / `requirements.txt:7` / 锁 `==1.4.16` 属**必装依赖**；
+  **VoxCPM2 加载期硬依赖**（`model_manager_core/load.py:350` 无条件 `from funasr import AutoModel`，`:420` 加载
+  ASR 子模型；缺则 `load()` `ModuleNotFoundError`）；`step-audio-editx` 依赖它做音频 tokenizer；辅助模型
+  `SenseVoiceSmall`（ASR）/ `speech_zipenhancer`（降噪）经 funasr 通道。**不受影响**：`indextts2`、`indextts20`、
+  `edge-tts`、`voicebox`、`breeze-tts2`（`engines/` 与 `vendor/` 内 funasr 零命中；缺 funasr 时三者 import 均 OK）。
+  注意粒度：`funasr` 不是它们的 import 期依赖，而是 VoxCPM2 的**加载期**依赖——`check_engine_compat` 只测 import，
+  会给 VoxCPM2 绿灯，真加载才失败。
+- **属主修复命令（本轮未执行，硬约束禁改 `core.hooksPath`）**：`./.githooks/install.sh` **或**
+  `git config core.hooksPath .githooks`；⛔ **勿用** `scripts/install-hooks.ps1`（已退役墓碑，指向不存在的
+  `scripts/git-hooks`，会让钩子静默失效）。
+- 留痕：`docs/SRE_RUNBOOK.md`「治理与勘误速查」F8 条 + `docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md` §6。

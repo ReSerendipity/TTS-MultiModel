@@ -35,9 +35,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from run_python import first_existing
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BACKUP_SCRIPT = PROJECT_ROOT / "scripts" / "backup_history_db.py"
-VENV_PY = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+#: 引导解释器：由仓库唯一解析入口（scripts/run_python.py，F7）解析——优先项目 venv，
+#: 不可用时退回 PATH 上的 python。旧写法把 .venv/Scripts/python.exe 写死为唯一解释器，
+#: 2026-11-03 该路径失效（符号链接目标 D:\_venvs\tts 不存在）后注册出来的命令不可执行。
+_BOOTSTRAP = first_existing(PROJECT_ROOT)
+PYTHON_EXE = Path(_BOOTSTRAP.executable) if _BOOTSTRAP else PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+PYTHON_PREFIX_ARGS: tuple[str, ...] = _BOOTSTRAP.prefix_args if _BOOTSTRAP else ()
 
 DEFAULT_TASK_NAME = "TTS-MultiModel-Backup-Daily"
 DEFAULT_TRIGGER = "03:00"
@@ -61,7 +68,10 @@ def build_plan(
 ) -> dict[str, Any]:
     """构造注册计划（纯函数，不触碰系统）。"""
     now = now or _dt.datetime.now()
-    command = f'"{VENV_PY}" "{BACKUP_SCRIPT}" --keep {keep}'
+    bootstrap = f'"{PYTHON_EXE}"'
+    if PYTHON_PREFIX_ARGS:
+        bootstrap = " ".join([bootstrap, *PYTHON_PREFIX_ARGS])
+    command = f'{bootstrap} "{BACKUP_SCRIPT}" --keep {keep}'
     return {
         "task_name": task_name,
         "frequency": "每日（对齐 docs/SRE_RUNBOOK.md §3.3「每日全量备份」节奏句）",
@@ -75,13 +85,19 @@ def build_plan(
         "next_run": compute_next_run(trigger_hhmm, now).strftime("%Y-%m-%d %H:%M:%S"),
         "query_argv": ["schtasks", "/query", "/tn", task_name],
         "create_argv": [
-            "schtasks", "/create", "/f",
-            "/tn", task_name,
-            "/tr", command,
-            "/sc", "daily",
-            "/st", trigger_hhmm,
+            "schtasks",
+            "/create",
+            "/f",
+            "/tn",
+            task_name,
+            "/tr",
+            command,
+            "/sc",
+            "daily",
+            "/st",
+            trigger_hhmm,
         ],
-        "python_exists": VENV_PY.exists(),
+        "interpreter_exists": PYTHON_EXE.exists(),
         "script_exists": BACKUP_SCRIPT.exists(),
     }
 
@@ -111,15 +127,14 @@ def render_dry_run(plan: dict[str, Any], existing: bool | None) -> str:
     ]
     if existing is True:
         lines.append(
-            f"  同名任务探测  : 已存在 → --apply 时将用 /f 就地更新该任务，"
-            f"不会产生第二个「{plan['task_name']}」"
+            f"  同名任务探测  : 已存在 → --apply 时将用 /f 就地更新该任务，不会产生第二个「{plan['task_name']}」"
         )
     elif existing is False:
         lines.append("  同名任务探测  : 不存在 → --apply 时将新建唯一任务")
     else:
         lines.append("  同名任务探测  : 未探测（schtasks 不可用）")
-    if not plan["python_exists"]:
-        lines.append("  [warn] 未找到 venv 解释器，命令行将不可执行: " + str(VENV_PY))
+    if not plan["interpreter_exists"]:
+        lines.append("  [warn] 未找到可用解释器，命令行将不可执行: " + str(PYTHON_EXE))
     if not plan["script_exists"]:
         lines.append("  [warn] 未找到备份入口脚本: " + str(BACKUP_SCRIPT))
     lines += [
@@ -139,14 +154,18 @@ def _quote(arg: str) -> str:
 
 def main(argv: list[str] | None = None, runner: Callable[..., Any] = subprocess.run) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--dry-run", action="store_true",
-                        help="显式声明只打印计划（缺省行为即是，无任何系统写入）")
-    parser.add_argument("--apply", action="store_true",
-                        help="真实注册（危险：写系统任务计划）。缺省仅 --dry-run 打印计划。")
+    parser.add_argument("--dry-run", action="store_true", help="显式声明只打印计划（缺省行为即是，无任何系统写入）")
+    parser.add_argument(
+        "--apply", action="store_true", help="真实注册（危险：写系统任务计划）。缺省仅 --dry-run 打印计划。"
+    )
     parser.add_argument("--task-name", default=DEFAULT_TASK_NAME, help="任务名（幂等键）")
     parser.add_argument("--trigger", default=DEFAULT_TRIGGER, help="每日触发时刻 HH:MM（本机时区）")
-    parser.add_argument("--keep", type=int, default=DEFAULT_KEEP,
-                        help="透传给 backup_history_db.py 的保留份数（默认 14，对齐 §3.3 旧文档 retain 14 口径）")
+    parser.add_argument(
+        "--keep",
+        type=int,
+        default=DEFAULT_KEEP,
+        help="透传给 backup_history_db.py 的保留份数（默认 14，对齐 §3.3 旧文档 retain 14 口径）",
+    )
     args = parser.parse_args(argv)
 
     if args.dry_run and args.apply:
