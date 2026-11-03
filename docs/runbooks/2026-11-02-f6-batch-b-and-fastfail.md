@@ -127,3 +127,77 @@ skip 41→117、10→91 源于环境插件差异；两轮相同点：**0 failed�
 `forensics/A_gate_verdict.md`（闸门裁定）、`forensics/B_codepath_diagnosis.md`（B 诊断全链）、
 `forensics/grep_8192_writepath.txt`、`grep_streaming_writepath.txt`、`grep_z22_falsify.txt`；
 `coverage.xml`、`htmlcov/`（口径 B 覆盖率产物）。
+
+## 9. C 批执行记录（阶段 12，2026-11-03 07:52 – 08:06）
+
+> 工单：桌面 `wo_stage12.txt`。把阶段 11 已钉上的唯一判据（`text_length == 8192`）从残留 539 行中隔离，
+> 批次标记 **`F6-20261103-C`**；`voice_persona='streaming'` 44 行、22 行真实秒失败、88 行 `model` 等其余项按工单明令禁触。
+> 执行器为阶段 10 原执行器（§8 所引 `_演练/F6-isolation/scripts/quarantine_f6_action_logs.py`）的 **C 批派生**
+> `_演练/F6-batch-C/scripts/quarantine_f6_action_logs_c.py`：机制逐字同源（单事务 `BEGIN IMMEDIATE`、
+> 先全列 `INSERT…SELECT` 入隔离表、同事务内才按隔离表 id 删主表、无 DROP TABLE、无 VACUUM、除该步外无 DELETE），
+> 仅三处不同——批次标记、判据桶（单个：`json_extract(extra_json,'$.text_length') = 8192`）、verify 等式（工单口径①②）。
+> 解释器：系统 `C:\Python312\python.exe`（3.12.10，pytest 9.1.1）；`.venv` 符号链接目标 `D:\_venvs\tts` 失效未修（硬约束 6），沿阶段 11 口径。
+
+### 9.1 处置前复核（只读，07:52:44，`logs/census_pre_isolation.log` + `logs/preflight.log`）
+
+- 对平：主表 **539**、A 批隔离表 **2,167**（`F6-20261102-A`），合计 **2,706** ✓；`history.db` 2,469,888 B（mtime 2026-11-02 14:46:35、sha `9652e5e78a679981…` == 阶段 11 收口值）、`-wal` 0 B、`-shm` 32,768 B、`integrity_check=ok`；HEAD `48ae20b`、porcelain=0、ahead 4 ✓。
+- **谓词命中 206 行，全部 `failed`、0 条 `success`**：206/206 `message LIKE '%failed%'`（`"VoxCPM design failed (0.3s)"`×173、`(0.4s)`×32、`(1.0s)`×1），全部 `action='generation'`、level=INFO，extra_json 一律含测试桩指纹错误串 `VoxCPM声音设计生成失败: 'object' object has no attribute 'generate'`——判据纯净 ✓。
+- **禁触集合零交集实测**：与 `voice_persona='streaming'`（44 行原地）交集 **0**、与 `action='model'` 交集 **0**、与 `'%(0.0s)%'` 交集 **0**；与 A 批隔离表 id 交集 **0**（主表 id 上限 2,698 < A 批隔离 id 上限 2,706；`action_logs` 主键为 `INTEGER PRIMARY KEY AUTOINCREMENT`，无 id 复用风险）。
+- **8193 检查：0 行**（`tests/test_generation_error_friendliness.py:151` 负例 8193→400 不落库，与阶段 11 §2.1 一致）→ **无 8193 待决项**；全表 `text_length` 分布中 8192 之外均为 ≤31 自然小值，无邻近可疑值。
+
+### 9.2 备份与恢复验证（工单硬约束 2 闸门，通过后方进入隔离）
+
+- 备份 07:56:07：`scripts/backup_history_db.py --db-path data/history.db --backup-dir <仓外 F6-batch-C>/backups --keep 0`，产物 `backups/history_backup_20261103_075607.db` **2,469,888 B**、sha256 `e43941847713eb67c593b720c93f46d77a0979a892324cad081085372792a136`、**exit 0**（`logs/02_backup.log`、`03_backup_sha.log`）。
+- 仓外恢复回读（`_演练/F6-batch-C/restore_drill/`）：`--restore` **exit 0**（脚本内置 integrity_check 通过）；回读 `action_logs` **539** 行（=处置前主表）、`MAX(ts_ms)` **1793594184555**、A 批 **2,167**、合计 **2,706**、谓词命中 206、`integrity ok`（`logs/04_restore.log`、`05_restore_readback.log`）。
+
+### 9.3 隔离与两等式对账（首跑 07:57:26 `logs/07_isolate.log`；断言修正后干净复跑 08:00:21 `logs/15_isolate_clean.log`）
+
+- `isolate`（批次 `F6-20261103-C`）：事务内断言谓词命中 `206 == 处置前实测 206`，全列 `INSERT…SELECT` 入隔离表 **206** 行、同事务删主表对应 id；`integrity_check=ok`，**exit 0**。
+- **等式①：C 批隔离数 206 == 谓词命中数 206 ✓**；**等式②：主表剩余 333 + A 批 2,167 + C 批 206 == 2,706 ✓**。A 批不变量 2,167 ✓、主表谓词残留 0 ✓、隔离态 verify **VERIFY PASS exit 0**（`logs/08,16,22`）。
+- 隔离态 `MAX(ts_ms)=1793594173715`：处置前最大行 id 2698 属 C 桶，隔离后最大值自然回落至 2697（`Streaming success (0.0s)`）——回滚态须回到 1793594184555（见 §9.4，已验）。
+
+### 9.4 回滚实测与指纹比对（工单硬约束 5）
+
+- **首跑如实登记**：07:57:44 回滚（`logs/11_rollback.log`）操作数字全对（`restored=206`、主表 539、`MAX(ts_ms)=1793594184555`、C 批 0、A 批 2,167、integrity ok），但执行器初版把回滚态主表期望误写为阶段 10 口径的 2,706（打印 ROLLBACK/VERIFY FAIL）——**校准缺陷、非操作缺陷**，主表状态从未出错。当场修正断言（08:00:12 回滚态 verify 复核 **VERIFY PASS exit 0**，`logs/12b`），并于 08:00:21 起完整干净复跑（`logs/15–20`）：isolate→verify→**rollback（ROLLBACK PASS exit 0）**→回滚态 verify（**VERIFY PASS exit 0**）。
+- **回滚态不变量口径钉死（登记备查）**：工单硬约束 5 原文「主表须回到 2,706」与同句「隔离表 C 批清零而 A 批仍为 2,167」在单表无重复行约束下不能同时成立（按工单等式②，回滚态即 539 + 2,167 + 0 == 2,706）。本轮按等式②执行：**C 批回滚使主表回到处置前值 539**、总账回 2,706、`MAX(ts_ms)` 回 1793594184555、C 批清零、A 批原样。
+- **逐行内容指纹（六列 `id,ts_ms,level,action,message,extra_json` 按 id 升序规范化 sha256）**：C 批 206 行（id 714→2698）指纹在**处置前主表态 = 隔离态 = 回滚态 = 终态隔离态**四态全部 `22fbff87d04758d2f886c554723ff2f4334ea91081aee3c514a839ec2e9222db`（`logs/06,09,13,17,20,23_fp*.json`）——`INSERT…SELECT` 逐列保真、DELETE/回插零损伤。A 批 2,167 行（含隔离原因/批次标记八列）指纹在**处置前（备份恢复件）= 回滚态 = 终态隔离态**全部 `b955196a280bc3b91ac51dfbea5bf070c041362406ed1c84c380de2ae39a7403`（`logs/10b,14,24`）——**A 批全程零触碰**。
+
+### 9.5 re-isolate 终态（08:00:31，`logs/21_reisolate_final.log`、`22_verify_final.log`）
+
+- 终态：主表 **333**、A 批 **2,167**、C 批 **206**、`MAX(ts_ms)=1793594173715`、`integrity_check=ok`、隔离态 verify **VERIFY PASS exit 0**。
+
+### 9.6 两口径全量与三文件零增长（工单硬约束 6）
+
+- 隔离终态基线快照（08:00:51，`logs/25_metrics_pre_tests.json`）：`history.db` 2,469,888 B sha `051d16889e0e90de…`、`-wal` 0 B sha `e3b0c442…`、`-shm` 32,768 B sha `fd4c9fda9cd3f9ae…`、`generation_versions.db` 65,536 B sha `41ab2af72b3af97c…`。
+- 两口径（系统 Python 代跑；skip 数沿阶段 11 口径不可与阶段 10 横比，**不变量为 0 failed / exit 0**）：
+
+| 口径 | 命令（同阶段 11） | 窗口 | 结果 | exit |
+|---|---|---|---|---|
+| A ×1 | `pytest tests/ -v --tb=short --ignore=tests/e2e` | 08:01:06→08:02:32 | **2545 passed / 0 failed / 117 skipped**（82.67s） | 0 |
+| A ×2 | 同上 | 08:02:38→08:03:55 | **2545 passed / 0 failed / 117 skipped**（74.43s） | 0 |
+| B ×1 | A 集 + `-m "not integration and not gpu and not cuda and not vram and not benchmark and not stress" --cov=app/integrated_app --cov-branch --cov-report=xml/html→仓外 --cov-fail-under=45` | 08:04:02→08:05:52 | **2448 passed / 0 failed / 91 skipped / 123 deselected**；覆盖率 **51.58% ≥ 45%**（106.24s） | 0 |
+
+- 测后快照（08:06:19，`logs/29_metrics_post_tests.json`）：**`history.db` / `-wal` / `-shm` 三文件字节数+sha256 与隔离终态逐字节一致**（`-shm` 内容 sha 亦同，仅 mtime 因只读连接开合刷新），附加 `generation_versions.db` 亦逐字节一致；账目 333/2,167/206、合计 2,706、`MAX(ts_ms)`、integrity ok 全部不变——**哨兵无漏，测试套对生产库零增长在 C 批终态下成立**。覆盖率 51.58% 与阶段 11 的 51.63% 差 0.05pp（同命令同环境的分支覆盖计数运行间波动，远在 45% 门槛内），如实登记。
+- 全部产物/日志在仓外 `_演练/F6-batch-C/`；生产工作树 porcelain 全程 0（`.coverage` 为 gitignore 内测试产物，未入库）。
+
+### 9.7 未覆盖清单（本轮没做什么、为什么）
+
+1. **44 行 streaming、22 行真实秒失败、88 行 `model`、179 行未检 `generation`**：全部原地未动（工单明令禁触），归属待决沿阶段 11 §7。
+2. **8193：0 行**，无待决项（阶段 11 §2.1 结论本轮复验成立）。
+3. **备份链既有挂账不变**：调度注册、异地副本、旧备份物（12:17/12:18/14:29 三份含噪声）重取与否沿阶段 9/10；本轮新增仓外备份 `history_backup_20261103_075607.db` 为 C 批处置前干净快照（含 A 批隔离表）。
+4. **`.venv` 失效未修**（硬约束 6），本轮与阶段 11 同用系统 Python 3.12.10。
+5. 未触碰：`scripts/rollback_release.py`、`requirements-lock.txt`、`tests/conftest.py` 与哨兵测试、远端（无 push/无 tag/无分支切换/无 worktree）、`core.hooksPath`、服务启停、系统计划任务、其他仓库。
+
+### 9.8 留痕索引（仓外 `_演练/F6-batch-C/`）
+
+`scripts/{census_c, quarantine_f6_action_logs_c, fingerprint_c, db_metrics_c}.py` + `preflight` 只读内联查询
+（全部只读，除隔离/回滚事务内部删除外无任何写操作；隔离执行器为阶段 10 原件派生，差异仅批次/判据/verify）；
+`logs/census_pre_isolation.log`（07:52:44）、`preflight.log`（07:55:52）、`02_backup.log`、`03_backup_sha.log`、
+`04_restore.log`、`05_restore_readback.log`、`06_fp_pre_isolation.json`、`07_isolate.log`（首跑）、
+`08_verify_isolated.log`、`09_fp_isolated.json`、`10_fp_A_isolated.json`（缺考——内联脚本 import 缺陷，
+A 批处置前指纹以备份件锚定见 `10b`）、`10b_fp_A_backup_vs_rollback.log`、`11_rollback.log`（首跑，含校准缺陷 FAIL 原样留痕）、
+`12_verify_rollback.log`（同上）、`12b_verify_rollback_fixed.log`、`13_fp_rollback.json`、`14_fp_A_rollback.json`、
+`15–20`（干净复跑：isolate/verify/指纹/rollback/verify/指纹）、`21_reisolate_final.log`、`22_verify_final.log`、
+`23_fp_final_C.json`、`24_fp_final_A.json`、`25_metrics_pre_tests.json`、`26_runA1.log`、`27_runA2.log`、`28_runB.log`、
+`29_metrics_post_tests.json`；`backups/history_backup_20261103_075607.db`（处置前快照）、
+`restore_drill/history.db`（恢复验证件）、`coverage.xml`、`htmlcov/`（口径 B 覆盖率产物）。
