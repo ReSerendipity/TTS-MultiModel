@@ -90,7 +90,7 @@
 - 留痕：`docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md`（含入口清单、冷 shell 日志、对照、
   两口径与零写入证据索引）。
 
-## F8 本地 git 钩子未接线（`core.hooksPath=local/hooks`）——**已登记，未修（2026-11-03 阶段 13）**
+## F8 本地 git 钩子未接线（`core.hooksPath=local/hooks`）——**前置条件已解除（阶段 14），钩子仍未接线**
 
 - **漂移事实（实测）**：`git config core.hooksPath` = **`local/hooks`**（来源 `file:.git/config`，本地改动、不入库）；
   该目录被 `.gitignore:385` 的 `/local/` 忽略，内只有 `pre-push` 与 `.origin`（内容 `.githooks`）。
@@ -100,16 +100,36 @@
 - **影响（量化）**：`local/hooks/pre-push` mtime = 2026-10-31 00:00:19，此后 **25 个提交**在本地 pre-commit 与
   DCO 校验缺席下产生；**25/25 仍带 `Signed-off-by`**（作者手工 `-s`）——事实未违反，**校验缺席**（本地 ruff /
   大文件 / 私钥 / 引擎一致性 / 上游同步等门禁在这 25 个提交上只有 CI 兜底）。
-- **接线前置条件（先解决再接线）**：手跑 `sh .githooks/pre-commit` 当前 **exit 1**（2026-11-03 10:29:13→10:29:31），
-  红在 `Engine Compatibility Check`（`funasr` 缺失，8/9 通过；其余 6 个门禁 Passed）→ **接线后会立刻开始拦提交**。
-- **`funasr` 依赖面（只读取证，未安装）**：`pyproject.toml:78` / `requirements.txt:7` / 锁 `==1.4.16` 属**必装依赖**；
+- **接线前置条件——已解除（2026-11-03 阶段 14 实测）**：手跑 `sh .githooks/pre-commit` 现为 **exit 0**
+  （11:30:48→11:31:08，20s），`Engine Compatibility Check ... Passed`（**9/9**），其余实跑门禁 6/6 Passed；
+  装前同命令 **exit 1**（8/9，红在 funasr）。**钩子仍未接线**：`git config core.hooksPath` 仍为 **`local/hooks`**
+  （本轮未动，硬约束 4）。→ 剩余前置只有**属主授权动作**：`./.githooks/install.sh` 或
+  `git config core.hooksPath .githooks`（接线会立刻开始拦提交，需属主知情）。
+- **`funasr` 依赖面（阶段 14 已补装到系统 Python）**：`pyproject.toml:78` / `requirements.txt:7` / 锁 `==1.4.16`
+  属**必装依赖**，三处同钉契约本轮**未改动**；
   **VoxCPM2 加载期硬依赖**（`model_manager_core/load.py:350` 无条件 `from funasr import AutoModel`，`:420` 加载
   ASR 子模型；缺则 `load()` `ModuleNotFoundError`）；`step-audio-editx` 依赖它做音频 tokenizer；辅助模型
   `SenseVoiceSmall`（ASR）/ `speech_zipenhancer`（降噪）经 funasr 通道。**不受影响**：`indextts2`、`indextts20`、
   `edge-tts`、`voicebox`、`breeze-tts2`（`engines/` 与 `vendor/` 内 funasr 零命中；缺 funasr 时三者 import 均 OK）。
-  注意粒度：`funasr` 不是它们的 import 期依赖，而是 VoxCPM2 的**加载期**依赖——`check_engine_compat` 只测 import，
-  会给 VoxCPM2 绿灯，真加载才失败。
+  注意粒度：`funasr` 不是它们的 import 期依赖，而是 VoxCPM2 的**加载期**依赖——`check_engine_compat` 只测 import；
+  阶段 14 补装后该项已 9/9（该门禁**不**证明权重能加载，只证明依赖可导入）。
+- **阶段 14 实做（2026-11-03，`funasr` 已到位 / 钩子仍未接线）**：给系统 Python `C:\Python312\python.exe`
+  （3.12.10）补装 `funasr==1.4.16`——先 `pip install --dry-run` 落盘，`Would install` **16 个包**且
+  torch / torchaudio / torchvision / numpy / transformers **一个都不在改动列表**（numpy 2.4.6、transformers 5.16.1
+  均为 `Requirement already satisfied`），闸门通过后才真装（**exit 0**，实装 16 个、`pip list` 304→320 行闭合）。
+  **torch 未被改动的证据（四重）**：①`torch.__version__` = `2.11.0+cu128`、`torch.version.cuda` = `12.8` 逐字不变；
+  ②`torch/` 目录 **4,415,065,323 B / 13,795 文件**装前装后同值；③6 个关键文件 sha256 全同（含 `torch_cuda.dll`
+  811,555,840 B、`cublas64_12.dll` 113,716,224 B）；④`torch-2.11.0+cu128.dist-info/RECORD` sha256
+  `69c1d26cfc4e5a1556004838ac1fb19c7806412c4c8db9193302335a60afc345` 同值。GPU 探测（fp32 2048² matmul
+  0.209s + fp16 conv2d 0.109s）通过、`cuda.is_available()` 仍 True。**未做真加载**：`nvidia-smi` free
+  **1,719 MiB** < 需 **6,609 MiB**（ComfyUI PID 31,096 占 10,226 MiB，零触碰）→ 按硬停口径止于 import 层，
+  并用 `MetaPathFinder` 屏蔽 `funasr` 的反向对照证明探针有分辨力。两口径 A **2566/0/116** ×3、B **2469/0/90**
+  （123 deselected，cov **51.59%**）全 exit 0——相对阶段 13 **+2 passed / −2 skipped**，归因实测为 funasr 依赖树
+  带入 `jieba==0.42.1`（`tests/test_fts_tokenizer.py` 恰有 2 个 `_check_jieba()` 门控用例，现 7 passed/0 skipped）。
+  活体库零增长：`history.db` 2,469,888 B / sha `051d1688…`、333 行、`MAX(ts_ms)` 1793594173715 测前测后逐字节一致。
+  留痕：`docs/runbooks/2026-11-03-f8-funasr-install.md`。
 - **属主修复命令（本轮未执行，硬约束禁改 `core.hooksPath`）**：`./.githooks/install.sh` **或**
   `git config core.hooksPath .githooks`；⛔ **勿用** `scripts/install-hooks.ps1`（已退役墓碑，指向不存在的
   `scripts/git-hooks`，会让钩子静默失效）。
-- 留痕：`docs/SRE_RUNBOOK.md`「治理与勘误速查」F8 条 + `docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md` §6。
+- 留痕：`docs/SRE_RUNBOOK.md`「治理与勘误速查」F8 条 + `docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md` §6
+  \+ `docs/runbooks/2026-11-03-f8-funasr-install.md`（阶段 14：装前/装后对照、dry-run、torch 指纹、未覆盖清单）。
