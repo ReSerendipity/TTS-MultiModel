@@ -1,6 +1,6 @@
 # TTS-MultiModel — docs 索引
 
-TTS_MultiModel（多引擎语音合成）的开发 / 安全 / 运维 / 治理文档入口；面向最终用户的使用说明见根 `README.md`。下表覆盖 `docs/` 下 31 篇 tracked Markdown 索引（`docs/adr/` 5 篇 ADR 另计，共 36 篇 tracked），链接均为相对路径；「状态/截至」摘自各文自述定位（2026-11-04 复核）。
+TTS_MultiModel（多引擎语音合成）的开发 / 安全 / 运维 / 治理文档入口；面向最终用户的使用说明见根 `README.md`。下表覆盖 `docs/` 下 32 篇 tracked Markdown 索引（`docs/adr/` 5 篇 ADR 另计，共 37 篇 tracked），链接均为相对路径；「状态/截至」摘自各文自述定位（2026-11-04 复核）。
 
 ## 安全与合规
 | 文件 | 管什么 | 状态/截至 |
@@ -33,6 +33,7 @@ TTS_MultiModel（多引擎语音合成）的开发 / 安全 / 运维 / 治理文
 | [TODO.md](TODO.md) | TODO / 缺陷登记（owner 决策项） | 现行（持续追加） |
 | [SRE_RUNBOOK.md](SRE_RUNBOOK.md) | SRE 运行手册（SLA / SLO / 回滚 / 灾难恢复演练） | 现行（演练表带 2026-10-29→11-03 时间戳） |
 | [rollback_sop.md](rollback_sop.md) | 回滚 SOP（自动化回滚 / 版本化回滚） | 现行 |
+| [runbooks/2026-09-agent-memory-archive.md](runbooks/2026-09-agent-memory-archive.md) | 2026-09 Agent 工作记忆归档（环境/打包/发版/Git 坑点，去重后入库） | 留痕 2026-09-14→09-19 + 09-30 计划 |
 | [runbooks/2026-10-31-restore-drill.md](runbooks/2026-10-31-restore-drill.md) | 目标库级备份恢复与发布回滚演练（阶段 1） | 留痕 2026-10-31 |
 | [runbooks/2026-11-01-o3-failover-drill.md](runbooks/2026-11-01-o3-failover-drill.md) | O3 单点与切换演练（阶段 2 · 降格执行） | 留痕 2026-11-01 |
 | [runbooks/2026-11-02-f6-test-db-isolation.md](runbooks/2026-11-02-f6-test-db-isolation.md) | F6 测试套写污染生产库——止血与可逆隔离（整改阶段 10） | 留痕 2026-11-02 |
