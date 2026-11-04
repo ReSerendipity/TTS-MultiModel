@@ -53,9 +53,9 @@
 
 ## 3. 知识单点载体点名：AGENTS.md（本地维护、不随仓库分发）
 
-- 事实：`AGENTS.md` **33,767 B，untracked**，被 `.gitignore:383` 忽略（`git ls-files --error-unmatch` 报 not known；`git check-ignore -v` 命中 `.gitignore:383`）——实测 2026-11-01。
-- 承载的知识类型：①Agent 行为契约（6 条铁律、自检清单、命令执行形态）；②代码事实源与红线（引擎注册、采样率、i18n、版本位）；③门禁层位口径（哪道闸在提交钩子/推送钩子/CI job）；④本机独有资产地图（`local/`、`docs/agents/`、`.qoder/` 及「探测不到≠缺失」判定）。
-- clone 者拿不到的具体后果：本地三层硬门禁（ruff/mypy 棘轮/pytest+覆盖率）在干净克隆必缺，**不得读作预检全绿**；被跟踪文档引用 `docs/agents/**` 链接全部 404 属预期，但新协作者无从知晓这是设计意图；完整性清单再生成/重签、版本位手工补齐等流程无 clone 内替代文档。
+- 事实：`AGENTS.md` **33,767 B，untracked**，被 `.gitignore:386` 忽略（`git ls-files --error-unmatch` 报 not known；`git check-ignore -v` 命中 `.gitignore:386`）——实测 2026-11-01。
+- 承载的知识类型：①Agent 行为契约（6 条铁律、自检清单、命令执行形态）；②代码事实源与红线（引擎注册、采样率、i18n、版本位）；③门禁层位口径（哪道闸在提交钩子/推送钩子/CI job）；④本机独有资产地图（`local/`（含 `local/docs-archive/` 归档）、`.qoder/` 及「探测不到≠缺失」判定）。
+- clone 者拿不到的具体后果：本地三层硬门禁（ruff/mypy 棘轮/pytest+覆盖率）在干净克隆必缺，**不得读作预检全绿**；被跟踪文档引用 `local/docs-archive/agents/**` 链接全部 404 属预期（本地归档，未随仓库发布），但新协作者无从知晓这是设计意图；完整性清单再生成/重签、版本位手工补齐等流程无 clone 内替代文档。
 
 ## 4. 补偿措施（已在位 + 本轮新增）
 

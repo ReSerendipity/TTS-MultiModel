@@ -255,6 +255,9 @@ GITIGNORE_UPDATE.md
 history_scan.sh
 remove_tracked_sample_ttsmultimodel.sh
 docs/ADR/
+# ADR 自 2026-11-04 起入库（下两行按大小写两种写法解除忽略）
+!docs/adr/
+!docs/adr/**
 docs/archived-prototypes/
 docs/DEPENDENCIES_DECISIONS.md
 docs/DIALECT_SUPPORT_PLAN.md
@@ -386,6 +389,7 @@ AGENTS.md
 FIX_LOG.md
 docs/FILEMAP.md
 docs/README.md
+!docs/README.md
 docs/_devarchive/
 docs/plans/
 docs/project/

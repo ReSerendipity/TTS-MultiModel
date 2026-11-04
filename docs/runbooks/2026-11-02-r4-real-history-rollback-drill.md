@@ -162,7 +162,7 @@ EXIT  0
 `prod-precheck.log`、`enumeration-43.txt`（注意：该文件为**回滚后**采集，86 行=43 revert+43 原主线；起测 43 条口径见 `preflight.log`）、
 `testrun-A.log`/`testrun-A-exit.txt`/`testrun-B.log`/`testrun-B-exit.txt`（§9 两口径全量测试套）、`htmlcov/`（口径 B 的 HTML 覆盖率报告，重定向至此避免污染生产树）。
 
-**台账落点备注（GOTCHAS #191）**：#191 行的「动作未执行→已执行」更新写入的是 `docs/agents/GOTCHAS.md`（实测
-`git check-ignore -v` 命中 `.gitignore:405 docs/agents/`，该目录属本机独有层、不可入库——正是 #191 ④ 记过的坑）。
+**台账落点备注（GOTCHAS #191）**：#191 行的「动作未执行→已执行」更新写入的是 `local/docs-archive/agents/GOTCHAS.md`（本地归档，未随仓库发布；实测
+`git check-ignore -v` 命中 `.gitignore` 的 `docs/agents/`，该目录属本机独有层、不可入库——正是 #191 ④ 记过的坑）。
 入库侧的 R4 闭环记账由本 runbook、`docs/SRE_RUNBOOK.md` §3.4（台账行 + 门禁状态句 `R4 [?]→[x]`）与
 `docs/TODO.md`（R4 条目）三处承载；`git add -f` 强推 ignored 目录不在本轮授权范围，如实登记不粉饰。

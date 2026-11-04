@@ -5,7 +5,7 @@
 > 隔离侧表逐行保留原值、回滚路径**实测**过（§5）。
 > 全仓唯一改动面：`tests/conftest.py`（全局隔离+哨兵）、`tests/test_f6_db_isolation_sentinel.py`
 > （自证 8 项）、本 runbook、台账两处（`docs/TODO.md` F6、`docs/SRE_RUNBOOK.md` §3.3/§3.4）。
-> `docs/agents/GOTCHAS.md` #196 为本地层（`.gitignore:405` 的 `docs/agents/`），不入提交。
+> `local/docs-archive/agents/GOTCHAS.md` #196 为本地层（`.gitignore` 中 `docs/agents/` 与 `/local/` 均已忽略，本地归档、未随仓库发布），不入提交。
 > 证据目录（仓外）：`C:/Users/Doro/Desktop/评估报告_2026-10-29/_演练/F6-isolation/`。
 
 ## 1. 处置前基线备份与验证（硬约束 2，未通过不得动手）

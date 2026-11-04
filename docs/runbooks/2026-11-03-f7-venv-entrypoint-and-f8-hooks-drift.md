@@ -69,7 +69,7 @@
 
 ### 3.3 非可执行引用（63 行，保留）
 
-忽略规则（`.gitignore:353`、`.dockerignore:2`、`.github/layout-rules.yaml:37-38`）、散文/注释（`pyproject.toml`
+忽略规则（`.gitignore:356`、`.dockerignore:2`、`.github/layout-rules.yaml:37-38`）、散文/注释（`pyproject.toml`
 的版本决策注释、`CHANGELOG.md` 历史条目、`desktop/README.md`、`tests/` 说明串等）**全部保留**：
 它们描述的是「这台机器曾经/应该有什么」，不是「照着敲这条命令」。删掉它们等于抹掉环境证据。
 
@@ -182,7 +182,7 @@ $ python scripts/run_python.py --list
 |---|---|
 | `git config core.hooksPath` | **`local/hooks`**（来源 `file:.git/config`） |
 | `local/hooks/` 内容 | `.origin`（内容 **`.githooks`**）、`pre-push`（338 B，转发到 `.githooks/pre-push` 后再跑家族台账脚本） |
-| `local/hooks` 是否入库 | 否——`.gitignore:385` 规则 `/local/` |
+| `local/hooks` 是否入库 | 否——`.gitignore:388` 规则 `/local/` |
 | `.githooks/` tracked 文件 | `README.md, commit-msg, install.sh, lib-depwatch.sh, post-checkout, post-merge, pre-commit, pre-commit-lite, pre-push, prepare-commit-msg`（10 个） |
 | **休眠的钩子** | `pre-commit`、`commit-msg`（DCO）、`post-merge`、`post-checkout`、`prepare-commit-msg` |
 | **仍生效的钩子** | `pre-push`（经 `local/hooks/pre-push` 委托） |

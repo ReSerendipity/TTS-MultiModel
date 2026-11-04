@@ -6,10 +6,10 @@
 ## 1. 口径与依据（为什么是快照，不是入库）
 
 `.qoder/`（Qoder 钩子注册 `settings.json`、编辑后验证钩子 `hooks/edit_verify_loop.py`、
-`rules/`、`skills/`、`commands/`、`tools/` 等）按 **AGENTS.md §00 定案**整层
+`rules/`、`skills/`、`commands/`、`tools/` 等）按 **AGENTS.md §00 定案**（AGENTS.md 为本地文档，未随仓库发布）整层
 **不入库**：`.gitignore` L209 忽略整目录，`git ls-files .qoder/` 跟踪数为 0。
 该定案的理由仍然成立——这一层是本机 IDE 生命周期资产，新克隆 / CI / 干净检出里
-本来就必然不存在（见 AGENTS.md 干净检出检查项里的同款警告）。
+本来就必然不存在（见 AGENTS.md 干净检出检查项里的同款警告；该文件为本地文档，未随仓库发布）。
 
 但"不入库"带来一个被 P5 暴露的问题：**没有回退点**。P5（把 event 贯穿 4 个调用点）
 因此"既不能撤销也不能证明"——`edit_verify_loop.py` 不在版本控制内，12 项 selftest
@@ -49,7 +49,7 @@ python scripts/qoder_snapshot.py prune --keep 5
   （退出码 2），绝不写半个坏树。半拷贝 / 磁盘损坏因此不会借还原之手扩散。
 - **清单即证据**：每份快照带 `manifest.json`（逐文件 sha256 + 大小 + 当时的
   `git rev-parse HEAD` 锚点），`list` 会复验；锚点让人能把本地资产态与提交态对上。
-- **离线优先**（AGENTS.md 硬约束 #5）：只读写本地文件；唯一外部调用是取 git HEAD
+- **离线优先**（AGENTS.md 硬约束 #5；该文件为本地文档，未随仓库发布）：只读写本地文件；唯一外部调用是取 git HEAD
   做锚点，取不到记 `null`，不影响任何子命令成败。
 
 ## 4. 已知边界（如实说明，别当成承诺）

@@ -1,6 +1,6 @@
 # TODO / 缺陷登记（owner 决策项）
 
-> 建档说明（2026-11-01，阶段 3）：本仓此前无 tracked 缺陷登记文档（`FIX_LOG.md` 为本机独有不入库、`docs/reports/PENDING_ISSUES.md` 在 gitignore 面、CHANGELOG 由 release-please 生成不手写），按整改派单要求新建本文件作为缺陷/待办的 tracked 登记处。以下各项均已**实测复现**，登记待所有者决策，**不在登记轮修复**。
+> 建档说明（2026-11-01，阶段 3）：本仓此前无 tracked 缺陷登记文档（`FIX_LOG.md` 为本机独有不入库、`local/docs-archive/reports/PENDING_ISSUES.md` 属本地归档面（`local/` 已忽略，未随仓库发布）、CHANGELOG 由 release-please 生成不手写），按整改派单要求新建本文件作为缺陷/待办的 tracked 登记处。以下各项均已**实测复现**，登记待所有者决策，**不在登记轮修复**。
 
 ## D-1 进程级无守护（裸跑形态服务被杀后不自愈）——已按所有者决策接受（2026-11-01，阶段 4）
 
@@ -93,7 +93,7 @@
 ## F8 本地 git 钩子未接线（`core.hooksPath=local/hooks`）——**前置条件已解除（阶段 14），钩子仍未接线**
 
 - **漂移事实（实测）**：`git config core.hooksPath` = **`local/hooks`**（来源 `file:.git/config`，本地改动、不入库）；
-  该目录被 `.gitignore:385` 的 `/local/` 忽略，内只有 `pre-push` 与 `.origin`（内容 `.githooks`）。
+  该目录被 `.gitignore:388` 的 `/local/` 忽略，内只有 `pre-push` 与 `.origin`（内容 `.githooks`）。
   → `pre-push` 经 `local/hooks/pre-push` 转发到 `.githooks/pre-push` **仍生效**；`.githooks/` 下的
   `pre-commit`、`commit-msg`（DCO）、`post-merge`、`post-checkout`、`prepare-commit-msg` **全部休眠**。
   与 `scripts/install-hooks.ps1:5-6` 的成文口径（2026-09-16 起统一 `core.hooksPath .githooks`）冲突。

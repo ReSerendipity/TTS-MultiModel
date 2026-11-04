@@ -97,8 +97,8 @@ chmod +x scripts/install.sh && ./scripts/install.sh
 
 ```bash
 docker compose up -d
-# 或拉取随版本发布的 GHCR 镜像（版本号以 config.yaml 为准，当前 v2.7.0）
-docker pull ghcr.io/reserendipity/tts-multimodel:2.7.0
+# 或拉取随版本发布的 GHCR 镜像；版本以 config.yaml 为准（当前 2.9.0，截至 2026-11-04）
+docker pull ghcr.io/reserendipity/tts-multimodel:2.9.0
 ```
 
 启动后访问 <http://localhost:7869>。最小验证：浏览器打开该地址能看到左侧导航与「声音设计」工作台；或命令行运行 `tts-multimodel --help`（源码直跑为 `python app/integrated_app/cli.py --help`）。
@@ -229,8 +229,8 @@ chmod +x scripts/install.sh && ./scripts/install.sh
 
 ```bash
 docker compose up -d
-# or pull the versioned GHCR image (tag follows config.yaml, currently v2.7.0)
-docker pull ghcr.io/reserendipity/tts-multimodel:2.7.0
+# or pull the versioned GHCR image; tag follows config.yaml (currently 2.9.0, as of 2026-11-04)
+docker pull ghcr.io/reserendipity/tts-multimodel:2.9.0
 ```
 
 Then open <http://localhost:7869>. Sanity check: the left sidebar and the "Voice design" workbench render in the browser, or run `tts-multimodel --help` (from source: `python app/integrated_app/cli.py --help`).
