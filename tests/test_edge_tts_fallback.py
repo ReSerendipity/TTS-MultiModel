@@ -109,16 +109,16 @@ def test_weightless_engine_guard_passes_without_instance(monkeypatch: Any) -> No
     blocked = gen_utils._check_engine_ready(None, "voxcpm2")
     assert blocked is not None and blocked.status_code == 400
     # 降级触发判据：voxcpm2 不可用=True，edge-tts 恒 False
-    # 触发判据（未加载 + 权重缺失才 True）：本机 VoxCPM2 权重在盘，需显式模拟缺失
-    monkey_files = {"missing": True}
-    real_present = gen_utils._engine_model_files_present
+    # 权重是否在盘必须显式桩定：CI 干净检出没有权重，依赖真实磁盘会让
+    # 「权重在盘 → 不可降级」这一分支在 CI 上假红（本机有权重才偶然绿）。
+    present = {"value": False}
     monkeypatch.setattr(
         gen_utils,
         "_engine_model_files_present",
-        lambda name: False if monkey_files["missing"] else real_present(name),
+        lambda name: present["value"],
     )
     assert gen_utils._main_engine_unavailable("voxcpm2") is True
-    monkey_files["missing"] = False  # 权重在盘 + 未加载 → 不可降级（未加载≠不可用）
+    present["value"] = True  # 权重在盘 + 未加载 → 不可降级（未加载≠不可用）
     assert gen_utils._main_engine_unavailable("voxcpm2") is False
     assert gen_utils._main_engine_unavailable("edge-tts") is False
 

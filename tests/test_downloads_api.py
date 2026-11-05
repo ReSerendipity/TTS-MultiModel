@@ -35,18 +35,25 @@ from integrated_app.routes import downloads as downloads_route  # noqa: E402
 
 
 def _make_app_dir(tmp_path, runtime_name: str = "bootstrap") -> os.PathLike[str]:
-    """造一个打包态目录：<root>/<runtime_name>/python.exe。"""
+    """造一个打包态目录：<root>/<runtime_name>/python[.exe]。
+
+    两个文件名都建：``_exe_name()`` 在 Windows 返回 ``python.exe``、在 POSIX
+    返回 ``python``，只建其一会让另一平台判成 ``present=False``（CI 三平台矩阵
+    实测红）。
+    """
     runtime = tmp_path / runtime_name
     runtime.mkdir(parents=True, exist_ok=True)
-    (runtime / "python.exe").write_bytes(b"")
+    for exe in ("python", "python.exe"):
+        (runtime / exe).write_bytes(b"")
     return tmp_path
 
 
 @pytest.fixture()
 def boot_root(tmp_path, monkeypatch):
-    """把 download_service 的 PROJECT_ROOT 指到临时打包态目录。"""
+    """把 download_service 的根目录与运行时目录都指到临时打包态目录。"""
     root = _make_app_dir(tmp_path)
     monkeypatch.setattr(ds, "PROJECT_ROOT", str(root))
+    monkeypatch.setattr(ds, "_runtime_dir", lambda: str(root / "bootstrap"))
     return root
 
 
