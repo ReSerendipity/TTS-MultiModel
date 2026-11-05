@@ -51,10 +51,11 @@
 - 根因（**推翻工单派单锚的「S-R4 合并所致」推测**）：`git show` 取证——`90e8512` 时 `config.yaml:58` 曾有 `db_path: data/tts_history.db`，`64a753f`（2026-08-16「prune legacy sections」）清理该段，`80c13b5`（2026-08-31）新增 `backup_db.py` 时照抄了这个**已死 15 天**的命名；S-R4 合并的是 `outputs/history.db`→`data/history.db`，与 `tts_history.db` 无涉。
 - 处置：`git rm scripts/backup_db.py`；SRE_RUNBOOK §3.3 推荐入口改指 `scripts/backup_history_db.py`（有测试 `tests/test_backup_history_db.py`、2026-10-31 演练实测活链），并成文备份集覆盖口径；冷 shell 新进程原样跑文档命令 `.venv/Scripts/python.exe scripts/backup_history_db.py --keep 14` **exit 0**（12:18:44；**当时环境有效；该入口已于 2026-11-03 失效，见 F7**）。详见 `docs/runbooks/2026-11-02-o4-backup-wiring.md` §3/§4。
 
-## O4 备份链路（门禁项，⛔P0）——阶段 9 关掉四阻塞中的两个，**保持 `[?]`**
+## O4 备份链路（门禁项，⛔P0）——阶段 9 关掉四阻塞中的两个，**调度已注册（2026-11-06）；保持 `[?]`（异地未决 + 首燃未回读）**
 
 - 本轮关掉：②F3 死路径（上条，`[x]`）；①无调度接线——交付 `scripts/install_backup_schedule.py`（默认 `--dry-run` 打印任务名/频率/触发时刻/完整命令行/运行身份/下一次应执行时刻，`--apply` 才注册且**本轮未调用、真实注册待所有者授权**；幂等：固定 `/tn` + `/f`，重复 dry-run 逐字节一致），配套 11 项测试全绿且不触碰系统。
 - 剩下什么（不可伪装关闭）：③同机无异地——需属主给第二个存储位置，属资源决策；④周期性——待 2027-01 到期轮次佐证（调度未注册前无周期证据）。另备份集覆盖边界新成文：`data/` 下 5 个运行密钥（`.pii_key`/`.history_hmac_key`/`.watermark_key`/`.csrf_secret`/`.manifest_signing_key`，实测 44/64/119/64/32 B）无任何备份覆盖、`generation_versioning` 库（`enabled=false`）不在默认备份集、`data/audit.log` 实测未落盘（无此对象）。留痕：`docs/runbooks/2026-11-02-o4-backup-wiring.md`。
+- **调度注册完成（2026-11-06，属主工单授权 `--apply` 首次真实调用）**：任务 **TTS-MultiModel-Backup-Daily** 注册成功（schtasks exit 0，无需提权——当前用户身份注册）；回读 verbose 实测「下次运行时间 2026/11/6 3:00:00、模式就绪、已启用、登录状态只使用交互方式、作为用户运行 Doro」；注册命令行（run_python 解析 → 活体 `.venv` 解释器 + `backup_history_db.py --keep 14`）注册前实跑一次 exit 0（产物 `history_backup_20261106_003611.db` 2,469,888 B，系列 6→7 份零删除）。**下次时间与触发人成文**：每日 03:00；触发人=当前登录用户 Doro（交互式 token，用户未登录不执行——无人值守需属主决策）。**不预支结论**：机器周期证据待 2026-11-06 03:00 首燃后回读；「同机无异地」半边未动。留痕：`docs/runbooks/2026-11-06-o4-schedule-registration.md`。
 
 ## F6（阶段 9 登记；2026-11-02 阶段 10 止血+可逆隔离、2026-11-03 阶段 12 C 批隔离——**可证部分已隔离，剩余为待决项**）测试套件写污染生产 `data/history.db.action_logs`
 
@@ -90,7 +91,7 @@
 - 留痕：`docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md`（含入口清单、冷 shell 日志、对照、
   两口径与零写入证据索引）。
 
-## F8 本地 git 钩子未接线（`core.hooksPath=local/hooks`）——**前置条件已解除（阶段 14），钩子仍未接线**
+## F8 本地 git 钩子未接线（`core.hooksPath=local/hooks`）——**已接线（2026-11-06，`core.hooksPath=.githooks`），断链闭合**
 
 - **漂移事实（实测）**：`git config core.hooksPath` = **`local/hooks`**（来源 `file:.git/config`，本地改动、不入库）；
   该目录被 `.gitignore:388` 的 `/local/` 忽略，内只有 `pre-push` 与 `.origin`（内容 `.githooks`）。
@@ -131,5 +132,16 @@
 - **属主修复命令（本轮未执行，硬约束禁改 `core.hooksPath`）**：`./.githooks/install.sh` **或**
   `git config core.hooksPath .githooks`；⛔ **勿用** `scripts/install-hooks.ps1`（已退役墓碑，指向不存在的
   `scripts/git-hooks`，会让钩子静默失效）。
+- **接线完成（2026-11-06，属主工单授权）**：`sh .githooks/install.sh` → `git config core.hooksPath` 回读 **`.githooks`**；
+  主仓 `sh .githooks/pre-commit`（pre-commit 框架全链）exit 0；fresh clone（本机临时克隆）out-of-box 钩子
+  不生效（`core.hooksPath` 本地配置不入库，属 git 机制）→ 同一 install.sh 一步引导即生效，commit-msg DCO
+  门禁无签 **exit 1** / 带签 **exit 0** 双向实测；全链真实提交首轮被 `Engine Compatibility Check` 8/9 **正确拦截**
+  （funasr 现仅存于主仓 2026-11-05 重建的 `.venv`——系统 `C:\Python312` 实测 `ModuleNotFoundError`，阶段 14
+  「装进系统 Python」口径已被 venv 重建动作超越），克隆具备项目 venv（文档化 onboarding 终态，实测以 junction
+  指向主仓 venv 代演，零安装零联网）后 12 项钩子全 Passed、提交 `96215e5` 带 SOB（作者=签署者）。
+  断链窗口 **31 笔**提交（报告口径 29 + 后续 2 笔）**不重写不补钩**（rebase 禁改；逐笔 trailers 实测 31/31 全带
+  `Signed-off-by`——报告点名的 ea27533/b49297e 缺签两笔已以同主题重建为 34ef17f/043f200 且带签，内容逐字节一致）；
+  `local/hooks/` 原样保留未删（inert，回滚 = `git config core.hooksPath local/hooks`）。
 - 留痕：`docs/SRE_RUNBOOK.md`「治理与勘误速查」F8 条 + `docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md` §6
-  \+ `docs/runbooks/2026-11-03-f8-funasr-install.md`（阶段 14：装前/装后对照、dry-run、torch 指纹、未覆盖清单）。
+  \+ `docs/runbooks/2026-11-03-f8-funasr-install.md`（阶段 14：装前/装后对照、dry-run、torch 指纹、未覆盖清单）
+  \+ `docs/runbooks/2026-11-06-f8-hooks-wiring.md`（接线动作、主仓/fresh clone 双向验证、环境演进登记）。
