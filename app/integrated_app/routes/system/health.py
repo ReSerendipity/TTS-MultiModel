@@ -219,6 +219,63 @@ async def ready() -> dict[str, Any]:
     return result
 
 
+@router.get(
+    "/health",
+    summary="综合健康状态（桌面壳探活）",
+    description="桌面壳 wait_for_ready 与前端 health_monitor 的聚合入口；引导态（无 torch）也必须 200",
+)
+async def health() -> dict[str, Any]:
+    """精确路径 ``GET /api/system/health`` 的唯一实现。
+
+    Why 必须存在：家族桌面壳 ``health_check.rs`` 的探活与优雅关闭都打这个精确路径，
+    FastAPI 精确匹配下 ``/health/ping`` 与 ``/health/ready`` 都替代不了——缺了它壳
+    永远拿到 404，桌面端表现是「启动超时」，全装态也一样。前端 health_monitor.js
+    早在消费同一路径（曾长期 404，属既有缺陷，此处一并补上）。
+
+    响应形状：
+        - 顶层 ``status``（ready/degraded）与 ``mode``（full/bootstrap）；
+        - ``security.integrity`` 为壳端 B-2 篡改告警的契约字段，取**启动自检缓存**
+          （``get_last_selfcheck``），绝不在此处现算哈希——探针 500ms 一次，现算会打爆 IO；
+        - 全装态合并 ready() 的深度字段（模型/DB/GPU）；引导态只回浅层——此时
+          相关模块缺失是常态而非故障，探针永不 500。
+    """
+    from importlib.util import find_spec
+
+    from ...security.integrity_selfcheck import get_last_selfcheck
+
+    has_torch = find_spec("torch") is not None
+    integrity = get_last_selfcheck()
+    security_block: dict[str, Any] = {
+        "security": {
+            "integrity": {
+                "checked": bool(integrity),
+                "failed": int(integrity.get("failed", 0)) if integrity else 0,
+                "failed_files": list(integrity.get("failed_files", [])) if integrity else [],
+                "manifest_signed": bool(integrity.get("manifest_signed", False)) if integrity else False,
+            }
+        }
+    }
+
+    if not has_torch:
+        return {
+            "status": "ok",
+            "mode": "bootstrap",
+            "degraded": True,
+            "uptime_seconds": _uptime_seconds(),
+            **security_block,
+        }
+
+    try:
+        payload = await ready()
+    except Exception as exc:  # noqa: BLE001 — 探针永不 500
+        logger.warning(f"[health] ready 聚合失败，回退浅层响应: {exc}")
+        payload = {"status": "degraded", "uptime_seconds": _uptime_seconds()}
+    payload["mode"] = "full"
+    payload["degraded"] = payload.get("status") != "ready"
+    payload.update(security_block)
+    return payload
+
+
 # ---------------------------------------------------------------------------
 # 3. 生成统计: /stats
 # ---------------------------------------------------------------------------

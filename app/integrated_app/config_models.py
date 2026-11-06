@@ -260,8 +260,8 @@ class EngineSpecConfig(BaseModel):
         display_name: UI 显示的人类可读名称（如 "VoxCPM 2.0 旗舰引擎"）。
         hf_repo: HuggingFace/ModelScope 仓库地址，用于下载引导脚本。
         model_dir: 本地模型目录名（相对于 model/ 根目录）。
-        vram_gb: 最低显存需求 (GB)，用于加载前的显存预检，必须 > 0。
-        ram_gb: 最低内存需求 (GB)，用于低配机器的友好提示，必须 > 0。
+        vram_gb: 最低显存需求 (GB)，用于加载前的显存预检；无本地权重的 CPU 引擎（如 edge-tts）取 0.0（真实语义，非占位；阶段 6 F4 修复：gt=0 → ge=0）。
+        ram_gb: 最低内存需求 (GB)，用于低配机器的友好提示；无权重引擎可取 0.0（同上）。
         languages: 该引擎支持的语言代码列表（如 ["zh", "en", "ja"]）。
         quality: 质量等级标签，可选值：x-low / low / medium / high。
         license: 引擎许可证类型（如 "MIT"、"Apache-2.0"、"CC BY-NC-SA 4.0"）。
@@ -278,8 +278,8 @@ class EngineSpecConfig(BaseModel):
     display_name: str = Field(default="", description="UI 显示名称")
     hf_repo: str = Field(default="", description="HuggingFace/ModelScope 仓库地址")
     model_dir: str = Field(default="", description="本地模型目录名（相对于 model/）")
-    vram_gb: float = Field(default=6.0, gt=0, description="最低显存需求 (GB)")
-    ram_gb: float = Field(default=16.0, gt=0, description="最低内存需求 (GB)")
+    vram_gb: float = Field(default=6.0, ge=0, description="最低显存需求 (GB)；0 表示无本地权重（CPU 引擎）")
+    ram_gb: float = Field(default=16.0, ge=0, description="最低内存需求 (GB)；0 表示无本地权重（CPU 引擎）")
     languages: list[str] = Field(default_factory=lambda: ["zh", "en"], description="支持语言列表")
     quality: str = Field(default="high", description="质量等级: x-low/low/medium/high")
     license: str = Field(default="", description="引擎许可证类型")

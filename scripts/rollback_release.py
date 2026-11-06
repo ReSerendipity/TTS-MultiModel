@@ -76,8 +76,11 @@ def rollback(target: str, dry_run: bool) -> None:
     target_commit = _run(["rev-list", "-n1", target])
     print(f"[info] 目标 tag {target} -> commit {target_commit[:8]}")
 
-    # 其后所有提交（不含该提交），由新到旧
-    commits_out = _run(["rev-list", f"{target_commit}..HEAD"])
+    # 其后所有提交（不含该提交），由新到旧。
+    # --first-parent：只沿主线走。merge 提交已用 -m 1 整体撤销其分支线变更，
+    # 若仍枚举分支线提交会对同一变更做二次 revert 而失败（2026-11-01 实测）；
+    # 线性历史下与原 target..HEAD 完全等价，普通提交行为不变。
+    commits_out = _run(["rev-list", "--first-parent", f"{target_commit}..HEAD"])
     commits = commits_out.splitlines() if commits_out else []
     if not commits:
         print("[info] 当前 HEAD 已在目标 tag 之上无新增提交，无需回滚。")
@@ -89,7 +92,13 @@ def rollback(target: str, dry_run: bool) -> None:
 
     for c in commits:
         print(f"[revert] {c[:8]}")
-        _run(["revert", "--no-edit", c], dry_run=dry_run)
+        # merge 提交必须 -m 1（2026-11-01 实测：无 -m 时 git revert 报
+        # "is a merge but no -m option was given" 退 128，整条回滚链中断）
+        parents_out = _run(["rev-list", "--parents", "-n1", c])
+        if len(parents_out.split()) > 2:
+            _run(["revert", "--no-edit", "-m", "1", c], dry_run=dry_run)
+        else:
+            _run(["revert", "--no-edit", c], dry_run=dry_run)
 
     if dry_run:
         print("[dry-run] 以上为预览，未实际改动。去掉 --dry-run 以执行。")

@@ -1,6 +1,6 @@
 # Changelog
 
-> 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。
+> 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。同理，条目中提及的 `docs/project/`、`docs/_devarchive/`、`docs/reports/`、`docs/agents/` 等本地文档路径已于 2026-11-04 迁至 `local/docs-archive/`（本地归档，未随仓库发布），条目内路径按迁移前写法原样保留。
 
 ## [2.9.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.8.0...v2.9.0) (2026-10-27)
 

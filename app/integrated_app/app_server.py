@@ -519,6 +519,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.debug(f"[lifespan] Checkpoint 扫描跳过: {e}")
 
     auto_load = os.environ.get("TTS_AUTO_LOAD_MODEL", "0") == "1"
+    if auto_load and not getattr(app.state, "runtime_has_torch", True):
+        # 引导态（瘦包无 torch）下强制自动加载只会刷一屏 ImportError，用户还得手动去
+        # 下载页装环境——这里直接跳过，把「为什么没加载」说清楚。
+        logger.warning("[lifespan] 引导态（无 torch）跳过自动加载模型，请先在下载管理页安装运行环境")
+        auto_load = False
     if auto_load:
         auto_engine = os.environ.get("TTS_AUTO_LOAD_ENGINE", "voxcpm2")
         app.state.model_loading = True
@@ -831,6 +836,24 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
+
+    # --- 运行形态探测（瘦包引导态降级）---
+    # 瘦包内置的引导解释器（app/bootstrap/）没有 torch，模型管理器/引擎路由全部不可用，
+    # 但「下载管理」页必须活着——它是用户装环境的唯一通道。这里**不 import torch**
+    # （import 一次要数秒，且会污染状态端点），只用 find_spec 判断是否已装环境。
+    # 判据说明：RUNTIME.json 才是「环境装好」的权威标志，find_spec 只用于日志与降级决策。
+    from importlib.util import find_spec
+
+    has_torch = find_spec("torch") is not None
+    app.state.config = get_config()
+    app.state.runtime_has_torch = has_torch
+    # 契约：无 torch 时显式置 None，调用方据此跳过模型相关逻辑（不靠捕获 ImportError）
+    app.state.model_manager = None
+    if not has_torch:
+        logger.warning(
+            "[create_app] 未检测到 torch：以引导态启动，模型管理与推理引擎路由将被跳过，"
+            "用户需在「下载管理」页安装运行环境"
+        )
 
     # --- 异常处理器：注册顺序不敏感，按 Exception 子类匹配 ---
     app.add_exception_handler(TTSError, tts_error_handler)

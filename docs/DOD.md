@@ -2,7 +2,7 @@
 
 > **来源**：家族通用 DOD 模板 `.spec_audit/family_DOD.md`（源自 SpiritPal definition-of-done.md 泛化；该家族模板已归档，2026-09-17 起按本仓本地化内容维护），本仓本地化。
 > **适用范围**：TTS_MultiModel 全项目所有功能开发任务。
-> **关于 `AGENTS.md` 与代理指引资产层**：下文多处引用的 `AGENTS.md`、`docs/agents/**`（含 `GOTCHAS.md` / `SOPS.md` / `CODE_STYLE.md` / `REVISION_LOG.md`）、`.qoder/{rules,skills,commands}`、`LOCAL_RULES.md`、`FIX_LOG.md`、`precheck.ps1` 均为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略，`git ls-files` 查不到），clone 本仓的读者无需查找这些文件，相关约束以本文条目正文为准；它们缺失属预期，不是文档链失效。
+> **关于 `AGENTS.md` 与代理指引资产层**：下文多处引用的 `AGENTS.md`、`local/docs-archive/agents/**`（含 `GOTCHAS.md` / `SOPS.md` / `CODE_STYLE.md` / `REVISION_LOG.md`）、`.qoder/{rules,skills,commands}`、`LOCAL_RULES.md`、`FIX_LOG.md`、`precheck.ps1` 均为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略，`git ls-files` 查不到），clone 本仓的读者无需查找这些文件，相关约束以本文条目正文为准；它们缺失属预期，不是文档链失效。
 
 ---
 
@@ -37,7 +37,7 @@
 - [ ] `ruff` / `ruff-format` 通过（0 error）；mypy 命中 `.ci/mypy_baseline` 无新增
 - [ ] 无调试残留（`print()` / `breakpoint()` / `pdb`，诊断日志除外需标记 `[diag]`）
 - [ ] 未引入跨层违规引用（服务路径不得 import `training` 模块；机械执行体 `scripts/check_training_isolation.py`，已挂 CI）
-- [ ] 涉及引擎改动遵守 `docs/project/MULTI_ENGINE_DESIGN.md` + `DI_SINGLETONS.md`（均本地维护、不随仓库分发；一致性由 `scripts/check_engine_specs.py`、`scripts/check_engine_compat.py` 校验，已挂 CI）
+- [ ] 涉及引擎改动遵守 `local/docs-archive/project/MULTI_ENGINE_DESIGN.md` + `local/docs-archive/project/DI_SINGLETONS.md`（均本地维护、不随仓库分发；一致性由 `scripts/check_engine_specs.py`、`scripts/check_engine_compat.py` 校验，已挂 CI）
 - [ ] 新增路由遵守 routes 分层约定（generate / system）
 
 ## 2. 测试覆盖
@@ -51,8 +51,8 @@
 ## 3. 文档同步
 
 - [ ] `AGENTS.md` 已同步（本地维护、不随仓库分发；目录结构 / 模块边界 / 配置 / 环境变量）
-- [ ] 新增模块在 `docs/project/ARCHITECTURE.md` 有对应条目（该文件本地维护、不随仓库分发；本地 AGENTS.md §3 是其同源副本，同样不随仓库分发）
-- [ ] 踩坑已追加到 `docs/agents/GOTCHAS.md`（触发/现象/做法/日期；本地维护、不随仓库分发，台账落点见 AGENTS.md 铁律 #2）
+- [ ] 新增模块在 `local/docs-archive/project/ARCHITECTURE.md` 有对应条目（该文件本地维护、不随仓库分发；本地 AGENTS.md §3 是其同源副本，同样不随仓库分发）
+- [ ] 踩坑已追加到 `local/docs-archive/agents/GOTCHAS.md`（触发/现象/做法/日期；本地维护、不随仓库分发，台账落点见 AGENTS.md 铁律 #2）
 - [ ] `CHANGELOG.md` 已记录变更（type 对应 Added/Fixed/…）
 - [ ] `python scripts/check_spec_refs.py` 输出 `SPEC_REFS STATE=CHECKED` 且无新增 HARD 项（判定口径见 `.github/scripts/spec_refs_gate.sh`；`STATE=SKIPPED` 表示本轮一条都没查，退出码同样是 0，不得勾这一项）
 
@@ -85,7 +85,7 @@
 |---|---|---|
 | 1 | 三个引擎各点一次切换（voxcpm2 → indextts2 → indextts20 → voxcpm2） | 每次都出现遮罩且**阶段文本会推进**（卸载→清理→加载→就绪），不是停在同一句 30 秒；切完顶部引擎徽标随之变化 |
 | 2 | 切换期间观察控制台与 `logs/app.log` | 无 `疑似仍有强引用未释放` / 无 `可用 -0.xxGB` / 出现 `本次回收 X.XXGB`（这是显存泄漏回归的哨兵） |
-| 3 | 每个引擎各生成一次，**戴耳机听完整个片段** | 无爆音、无断续、无明显电子嘶声（尤其 IndexTTS 上采样到 48k 后的高频水印）；播放器时长与实际听感一致。水印可懂度另用同源对照判读：`python scripts/make_watermark_ab.py` → 按 `docs/reports/watermark_ab/README.md` 的 A/B 来回切，**听不出哪段是 B 为通过** |
+| 3 | 每个引擎各生成一次，**戴耳机听完整个片段** | 无爆音、无断续、无明显电子嘶声（尤其 IndexTTS 上采样到 48k 后的高频水印）；播放器时长与实际听感一致。水印可懂度另用同源对照判读：`python scripts/make_watermark_ab.py` → 按 `local/docs-archive/reports/watermark_ab/README.md`（本地归档，未随仓库发布）的 A/B 来回切，**听不出哪段是 B 为通过** |
 | 4 | 中文文本 + 一段英文 + 数字/日期各一次 | 数字按语言正确读法展开；「切换标题字体」菜单里**未安装的家族要显示「未安装」且点了不写 `localStorage`**，Console 不出现 CSP violation（`python scripts/check_font_menu_availability.py` 可机器化核对数量，见 §5.2） |
 | 5 | 故意制造 6 类误操作：空文本 / 超上限文本 / 未勾授权 / 传 `.txt` / 传内容是文本但命名 `.wav` / 音色未加载就点生成 | 每类都是**红色错误块 + 可读中文 + 有「立即加载」或「重试」按钮**，结果区绝不出现 `{"detail":[{...` 这类原始 JSON 或 `Traceback`/绝对路径。**并且要验按钮做事**：点「重试」必须看到一次新的提交（Network 里有新请求或表单被重新提交），点「立即加载」必须看到加载遮罩 —— 只确认"按钮存在"不算通过（GOTCHAS #133） |
 | 6 | 长文本生成到一半点「取消」 | 立即停下并给出取消态提示；**取消后再生成一次能正常排队**（不是卡住/需刷新）；`logs/app.log` 里取消**不应**出现 ERROR 级记录 |
@@ -94,7 +94,7 @@
 | 9 | 连续切换 6 次后查 `/api/system/health` 与 `nvidia-smi` | 空闲显存回到切换前水平（±0.5GB），无单调递增趋势（长时泄漏哨兵） |
 | 10 | `curl` 直连 `/v1/audio/speech`（不带 Cookie/授权声明） | 返回机器可读 JSON 错误（**不是** HTML 片段）—— 验证错误渲染分流没把 API 客户端带进 HTML 分支 |
 
-**收尾**：把发现的任何"只在真机上暴露"的问题按铁律 #2 记进 `docs/agents/GOTCHAS.md`，
+**收尾**：把发现的任何"只在真机上暴露"的问题按铁律 #2 记进 `local/docs-archive/agents/GOTCHAS.md`（本地归档，未随仓库发布），
 并在本表下方补一行该次验证的版本号与结论。
 
 ### 5.2 能自动化掉的"看得见/听得着"（先跑这三条，再决定哪些还要人做）
@@ -105,7 +105,7 @@
 | `python scripts/check_font_menu_availability.py`（需服务在跑） | 4 的字体面 | 菜单每条的"可用/未安装"结论与同浏览器实测一致，且加载期 0 条 CSP 报错。2026-09-19 起字体已自托管（776 文件 / 25.5 MB + 14 份 OFL 全文），实测 **14/14 可用** |
 | `python scripts/check_offline_first_paint.py`（需服务在跑） | 8 的断网面 | 浏览器里掐掉**所有非本机请求**（localhost 放行）后：出网尝试 0 次、可见标签 >0、内容区有正文、无未渲染 Jinja/未翻译键、Console 零 error。2026-09-20 实测：放行 95 次本机请求、**0 次出网尝试**、12 个可见标签、`vd-form` 在位 → 通过。口径注意：它证明"根本不尝试出网"，不覆盖 DNS/代理层失败 |
 | `python scripts/check_tab_switch_race.py`（需服务在跑） | 侧栏换页竞态 | 给第一个 `/tab/` 请求注入 1.5s 延迟、350 ms 后点第二个，要求**末态落在最后点的那一页**（结构签名比对，不看像素）。修前 **6/6 组被旧响应盖回先点那页**，带 `hx-sync="#tab-content:queue last"` 后 **0/6** → 通过（#136）。必须用 async Playwright：sync 的 route handler 会把请求串行化，测出来是假阴性 |
-| `python scripts/make_watermark_ab.py` + 人耳 | 3 的水印面 | 生成同源 A/B 与量化表（落在 `docs/reports/watermark_ab/`，**该目录被 `.gitignore` 忽略**，属可重生成的本地产物）；**能否听出 B 仍需人耳**，脚本只保证差异唯一 |
+| `python scripts/make_watermark_ab.py` + 人耳 | 3 的水印面 | 生成同源 A/B 与量化表（落在 `local/docs-archive/reports/watermark_ab/`；**该目录属 `/local/` 忽略面**，本地归档、未随仓库发布，属可重生成的本地产物）；**能否听出 B 仍需人耳**，脚本只保证差异唯一 |
 
 - 最近一次执行：**2026-09-23，v2.2.6 + #144（issue #130 那 16 处）**。工作树 = **独立 `git worktree`
   检出的 `origin/main`**（主工作树当时挂着另一个写者的未提交改动，"跑测试期间冻结工作树"的前提在

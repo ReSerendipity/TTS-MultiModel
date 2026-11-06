@@ -300,6 +300,14 @@
                         <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                         <span class="sidebar-label-text">{{ "tab_help" | t(lang) }}</span>
                     </button>
+                    {# 下载管理：整页跳转而非 htmx 换 tab —— 瘦包首启的落地点，
+                       页面自己轮询 /api/downloads/progress，与 tab 懒加载生命周期无关。 #}
+                    <a class="sidebar-item" href="/downloads" data-tab="downloads" data-model="all"
+                       title="{{ 'nav.downloads'|t(lang, default='下载管理') }}"
+                       {% if active_page == 'downloads' %}aria-current="page"{% endif %}>
+                        <svg class="sidebar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                        <span class="sidebar-label-text">{{ "nav.downloads"|t(lang, default='下载管理') }}</span>
+                    </a>
                 </div>
             </nav>
 
@@ -427,18 +435,19 @@
                      role="tabpanel" aria-label="内容区域" aria-live="polite"
                      hx-swap="innerHTML"
                      data-loading-text="{{ "loading_tab"|t(lang) }}">
-
-                <!-- ARIA Live Region for dynamic status updates -->
-                <div id="aria-live-status" class="aria-live-region" aria-live="polite" aria-atomic="true"></div>
-                    <!-- Initial Page Load Skeleton -->
-                    <div class="skeleton-screen active" id="page-initial-skeleton">
-                        <div class="skeleton-initial">
-                            <div class="skeleton-line h-36 w-80 skeleton-block"></div>
-                            <div class="skeleton-line h-24 w-60 skeleton-block"></div>
-                            <div class="skeleton-line h-48 w-full skeleton-block"></div>
-                            <div class="skeleton-line h-24 w-40 skeleton-block"></div>
+                    {% block tab_content %}
+                    <!-- ARIA Live Region for dynamic status updates -->
+                    <div id="aria-live-status" class="aria-live-region" aria-live="polite" aria-atomic="true"></div>
+                        <!-- Initial Page Load Skeleton -->
+                        <div class="skeleton-screen active" id="page-initial-skeleton">
+                            <div class="skeleton-initial">
+                                <div class="skeleton-line h-36 w-80 skeleton-block"></div>
+                                <div class="skeleton-line h-24 w-60 skeleton-block"></div>
+                                <div class="skeleton-line h-48 w-full skeleton-block"></div>
+                                <div class="skeleton-line h-24 w-40 skeleton-block"></div>
+                            </div>
                         </div>
-                    </div>
+                    {% endblock %}
                 </div>
             </div>
         </main>
@@ -996,5 +1005,6 @@
         _remeasureWhenFontsReady();
     })();
     </script>
+    {% block page_scripts %}{% endblock %}
 </body>
 </html>

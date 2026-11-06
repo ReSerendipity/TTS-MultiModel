@@ -5,7 +5,7 @@
 
 ## 项目主许可
 
-TTS_MultiModel 项目代码采用 [Apache License 2.0](LICENSE)。
+TTS_MultiModel 项目代码采用 [Apache License 2.0](../LICENSE)。
 
 ## 模型权重许可（独立于代码，见 USER_AGREEMENT / NOTICE）
 

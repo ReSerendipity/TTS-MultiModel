@@ -99,6 +99,61 @@ async def index(request: Request) -> Response:
         return HTMLResponse(content=_FALLBACK_HTML, status_code=200, headers=headers)
 
 
+@router.get("/downloads", summary="下载管理", description="渲染下载管理页（环境包 + 模型权重安装）")
+async def downloads_page(request: Request) -> Response:
+    """渲染「下载管理」页。
+
+    瘦包首次启动时壳直接把窗口导航到这里（见 desktop/src-tauri 的
+    ``startup_entry``）：引导解释器没有 torch，首页的推理功能不可用，把用户丢在
+    首页等于给了个打不开的空壳。本页是用户装环境与权重的唯一自救通道，因此
+    渲染失败时必须给出可读的降级 HTML，而不是 500 白屏。
+
+    Args:
+        request: FastAPI ``Request`` 对象（取 ``app.state.templates`` 与语言 Cookie）。
+
+    Returns:
+        ``TemplateResponse`` — ``downloads.html``（extends ``base.html``）；
+        模板缺失时返回纯静态说明页（状态码 200）。
+    """
+    templates: Jinja2Templates | None = getattr(request.app.state, "templates", None)
+    lang = get_lang(request)
+    config = get_config()
+    ctx: dict[str, Any] = {
+        "version": getattr(request.app.state, "version", "0.0.0"),
+        "lang": lang,
+        "i18n_json": get_i18n_json(lang),
+        "audio_player_config": config.pydantic_config.audio_player.model_dump(),
+        "ui_config": config.pydantic_config.ui.model_dump(),
+        "active_page": "downloads",
+    }
+    headers = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+
+    if templates is not None:
+        try:
+            return templates.TemplateResponse(
+                request=request,
+                name="downloads.html",
+                context=ctx,
+                headers=headers,
+            )
+        except Exception as exc:  # noqa: BLE001 - 模板缺失/语法错误统一兜底
+            logger.exception("渲染 downloads.html 失败: %s", exc)
+
+    fallback = (
+        "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='UTF-8'>"
+        "<title>下载管理 - TTS MultiModel</title></head>"
+        "<body style='font-family:system-ui,sans-serif;padding:48px;max-width:720px;margin:0 auto;'>"
+        "<h2 style='color:#6B5CE7;'>下载管理页面不可用</h2>"
+        "<p>模板文件缺失或损坏。你仍可直接调用本机接口安装环境包：</p>"
+        "<pre style='background:#f0edff;padding:12px;border-radius:8px;'>"
+        "curl -X POST http://127.0.0.1:7869/api/downloads/start "
+        "-H 'Content-Type: application/json' -d '{\"kind\":\"runtime\"}'</pre>"
+        "<p>安装进度：<code>GET /api/downloads/progress</code></p>"
+        "</body></html>"
+    )
+    return HTMLResponse(content=fallback, status_code=200, headers=headers)
+
+
 @router.get("/favicon.ico", summary="网站图标", include_in_schema=False)
 async def favicon() -> Response:
     """网站图标：301 永久重定向到静态资源。
