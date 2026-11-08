@@ -420,7 +420,13 @@ pytest_tmp/
 logs/
 
 # --- 本地归档（草稿/抓取资源/临时工具，仅本地保留）---
-_archive/
+# 例外：仓根 _archive/ 同时承担治理 §12.1 的文档归档区——_archive/INDEX.md 与
+# _archive/执行记录/ 必须入库（2026-11-08 文档归档落地）；其余（草稿/抓取资源/
+# 临时工具）仍仅本地保留。用 _archive/* 而非 _archive/，否则父目录被排除后无法再包含子项。
+_archive/*
+!_archive/INDEX.md
+!_archive/执行记录/
+!_archive/执行记录/**
 
 # Tauri desktop shell (P1-2) - 更新签名密钥严禁入库（私钥）
 # 更新签名私钥绝不入库；公钥必须入库（conf.pubkey 的校验基准，家族仓一致口径）
