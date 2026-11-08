@@ -1,6 +1,6 @@
 """``scripts/run_python.py``（仓库唯一解释器解析入口，F7）的判定测试。
 
-判据（与 docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md 对齐）：
+判据（与 _archive/执行记录/2026-11/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md 对齐）：
 
 - 解析顺序 = 显式覆盖 → 项目 venv → PATH python → PATH python3 → py -3 → 当前进程；
 - 候选必须**实际可执行**才算通过（探测失败即跳过，不把「文件存在」当「能用」）；

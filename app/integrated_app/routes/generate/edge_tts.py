@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Edge-TTS 生成薄路由（阶段 4 D-2：降级链落点）。
 
-背景（`docs/runbooks/2026-11-01-o3-failover-drill.md` §2b.4 断点①）：
+背景（`_archive/执行记录/2026-11/2026-11-01-o3-failover-drill.md` §2b.4 断点①）：
     edge-tts 注册于引擎表但无任何 REST 生成路由——降级切换成功后合成请求
     仍无落点。本模块补上直连生成端点；模块级 ``router`` 由
     ``app_server._discover_routes`` 自动发现，无需中心路由表登记。

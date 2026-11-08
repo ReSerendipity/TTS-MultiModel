@@ -4,7 +4,7 @@
 
 ## D-1 进程级无守护（裸跑形态服务被杀后不自愈）——已按所有者决策接受（2026-11-01，阶段 4）
 
-- 实测：2026-11-01 阶段 2b，kill 服务子进程后 T+60s 无任何拉回，launcher 同死；人工恢复 T_manual=9s(liveness)/3m12s(含模型重载)。详见 `docs/runbooks/2026-11-01-o3-failover-drill.md` §2b.3。
+- 实测：2026-11-01 阶段 2b，kill 服务子进程后 T+60s 无任何拉回，launcher 同死；人工恢复 T_manual=9s(liveness)/3m12s(含模型重载)。详见 `_archive/执行记录/2026-11/2026-11-01-o3-failover-drill.md` §2b.3。
 - **处置**：所有者拍板**接受无自愈、不引入守护**；口径已写入 `docs/SRE_RUNBOOK.md` §2.5（含「什么形态才承诺自愈」的容器/k8s 边界）。状态：**闭环（口径成文）**。
 
 ## D-2 降级链最后一公里断裂——已修复并实测闭环（2026-11-01，阶段 4）
@@ -43,31 +43,31 @@
 - 动作：在真仓 **756 条完整历史的 file 协议全量克隆**（非浅、非合成最小仓，保真度自检 8 项全过）内，用生产 venv 解释器真跑 `scripts/rollback_release.py --target v2.8.0`——与 2026-10-31 退 128 那次完全同形的调用。
 - 实测：11:11:25→11:11:30（5s）**退出码 0**；43/43 个 revert 全部成功（主线 10 个 merge 全走 `-m 1`，含当初元凶 `8a0851da`，第 24/43 个目标）；回滚后树与 `v2.8.0` 树逐字节一致（tree hash `db91f16d`，diff 0 文件 0 增删）；脚本活体 sha256 三方对平（`6dbc567e…`/5050 B）。生产 checkout 全程零改动（起测/收测 `git status --porcelain` 均 0）。
 - 判据：R4 两判据 **①记录可复核 ②对象是活体** 逐项通过 → `[x]`（③周期性不适用，归 D6/O4）。
-- 留痕：`docs/runbooks/2026-11-02-r4-real-history-rollback-drill.md`（含未覆盖清单与台账行）；演练目录 `C:/Users/Doro/Desktop/评估报告_2026-10-29/_演练/R4-real-history/` 保留作证据。
+- 留痕：`_archive/执行记录/2026-11/2026-11-02-r4-real-history-rollback-drill.md`（含未覆盖清单与台账行）；演练目录 `C:/Users/Doro/Desktop/评估报告_2026-10-29/_演练/R4-real-history/` 保留作证据。
 - 未随本轮收口的挂账项：F2（`v2.8.0` tag 内嵌版本位漂移，SRE_RUNBOOK §2.4 硬停断言对其判 FAIL）仍属所有者决策项，不在阶段 8 范围；脚本未实现 §2.4 断言（人工 SOP）亦登记为未覆盖。
 
 ## F3 文档推荐入口死路径（`backup_db.py`）——已闭环（2026-11-02 阶段 9）：退役删除，推荐入口改指活链，四态 `[?]（待决策）→[x]`
 
-- 实测判据：`git grep -l backup_db` 仅命中 `docs/SRE_RUNBOOK.md`、`docs/runbooks/2026-10-31-restore-drill.md`，`app/`、`tests/`、`.github/` 零引用；`data/tts_history.db` 不存在（`ls` 实测）。
+- 实测判据：`git grep -l backup_db` 仅命中 `docs/SRE_RUNBOOK.md`、`_archive/执行记录/2026-11/2026-10-31-restore-drill.md`，`app/`、`tests/`、`.github/` 零引用；`data/tts_history.db` 不存在（`ls` 实测）。
 - 根因（**推翻工单派单锚的「S-R4 合并所致」推测**）：`git show` 取证——`90e8512` 时 `config.yaml:58` 曾有 `db_path: data/tts_history.db`，`64a753f`（2026-08-16「prune legacy sections」）清理该段，`80c13b5`（2026-08-31）新增 `backup_db.py` 时照抄了这个**已死 15 天**的命名；S-R4 合并的是 `outputs/history.db`→`data/history.db`，与 `tts_history.db` 无涉。
-- 处置：`git rm scripts/backup_db.py`；SRE_RUNBOOK §3.3 推荐入口改指 `scripts/backup_history_db.py`（有测试 `tests/test_backup_history_db.py`、2026-10-31 演练实测活链），并成文备份集覆盖口径；冷 shell 新进程原样跑文档命令 `.venv/Scripts/python.exe scripts/backup_history_db.py --keep 14` **exit 0**（12:18:44；**当时环境有效；该入口已于 2026-11-03 失效，见 F7**）。详见 `docs/runbooks/2026-11-02-o4-backup-wiring.md` §3/§4。
+- 处置：`git rm scripts/backup_db.py`；SRE_RUNBOOK §3.3 推荐入口改指 `scripts/backup_history_db.py`（有测试 `tests/test_backup_history_db.py`、2026-10-31 演练实测活链），并成文备份集覆盖口径；冷 shell 新进程原样跑文档命令 `.venv/Scripts/python.exe scripts/backup_history_db.py --keep 14` **exit 0**（12:18:44；**当时环境有效；该入口已于 2026-11-03 失效，见 F7**）。详见 `_archive/执行记录/2026-11/2026-11-02-o4-backup-wiring.md` §3/§4。
 
 ## O4 备份链路（门禁项，⛔P0）——阶段 9 关掉四阻塞中的两个，**调度已注册（2026-11-06）；保持 `[?]`（异地未决 + 首燃未回读）**
 
 - 本轮关掉：②F3 死路径（上条，`[x]`）；①无调度接线——交付 `scripts/install_backup_schedule.py`（默认 `--dry-run` 打印任务名/频率/触发时刻/完整命令行/运行身份/下一次应执行时刻，`--apply` 才注册且**本轮未调用、真实注册待所有者授权**；幂等：固定 `/tn` + `/f`，重复 dry-run 逐字节一致），配套 11 项测试全绿且不触碰系统。
-- 剩下什么（不可伪装关闭）：③同机无异地——需属主给第二个存储位置，属资源决策；④周期性——待 2027-01 到期轮次佐证（调度未注册前无周期证据）。~~另备份集覆盖边界新成文：`data/` 下 5 个运行密钥无任何备份覆盖、`generation_versioning` 库不在默认备份集、`data/audit.log` 实测未落盘~~ → **覆盖边界已于 2026-11-08 在代码侧闭环（见下条）**。留痕：`docs/runbooks/2026-11-02-o4-backup-wiring.md`。
+- 剩下什么（不可伪装关闭）：③同机无异地——需属主给第二个存储位置，属资源决策；④周期性——待 2027-01 到期轮次佐证（调度未注册前无周期证据）。~~另备份集覆盖边界新成文：`data/` 下 5 个运行密钥无任何备份覆盖、`generation_versioning` 库不在默认备份集、`data/audit.log` 实测未落盘~~ → **覆盖边界已于 2026-11-08 在代码侧闭环（见下条）**。留痕：`_archive/执行记录/2026-11/2026-11-02-o4-backup-wiring.md`。
 - **覆盖边界闭环（2026-11-08，代码侧）**：`scripts/backup_history_db.py` 原来只备 `history.db`——灾难恢复时等于丢三样东西：密钥丢了库里的 PII/HMAC 全部解不开也验不了、版本链丢了回滚找不到原始产物、审计日志丢了追责没证据。新增 `build_coverage_plan()`（口径=1 个历史库 + `generation_versions.db` + 5 个运行密钥 + `audit.log` 及 3 份轮转）、`create_full_backup()`（整集备份目录 + `manifest.json`，逐项记 `source`/`size`/`sha256`/`present`/`reason`，库走 SQLite backup API、密钥/日志字节复制）、`verify_full_backup()`（按 manifest 复算 sha256，篡改与丢文件都报红，空 manifest 不算通过）、CLI `--coverage` / `--full` / `--verify`。**缺失不静默**：文件不存在时 manifest 记 `present:false` + `reason:'file_not_found'` 并在 stdout 点名，不允许"因为不存在就跳过"（那和没做备份长得一模一样）。`.history_hmac_key` 按现状优先取用户配置目录（`%APPDATA%/tts-multimodel`），旧 `data/` 路径仍作候选。实证（活体现场跑，产物落 `%TEMP%` 后即删）：`--coverage` 11 项里 7 项在场、必需项 0 缺失、`audit.log` 系列确实不存在（与债项"实测未落盘"一致）、`--full` 生成 `full_20261108_153643`（7/11 项在场，缺项已记账）、`--verify` 通过。测试 `tests/test_backup_coverage.py` 7 例（口径齐全 / 缺失如实记账 / 密钥取新路径 / sha256 与内容一致 / 缺项记账不跳过 / 篡改与删文件都报红 / 空 manifest 不算通过）。负控三形态各红（`KEY_FILES` 只留 1 个 → 3 红、`verify` 直接 `return []` → 2 红、缺项不拷贝 → 2 红），复原后 SHA256 一致、7/7 复绿。**仍未做**：③异地（资源决策）、④周期性（待首燃回读），故 O4 整体仍 `[?]`；调度任务命令行仍是 `backup_history_db.py --keep 14`（只备历史库），要不要改成 `--full` 属调度口径变更，需主确认（改 `--full` 会把密钥明文带进备份目录，得同时定备份目录的访问控制）。
 
-- **调度注册完成（2026-11-06，属主工单授权 `--apply` 首次真实调用）**：任务 **TTS-MultiModel-Backup-Daily** 注册成功（schtasks exit 0，无需提权——当前用户身份注册）；回读 verbose 实测「下次运行时间 2026/11/6 3:00:00、模式就绪、已启用、登录状态只使用交互方式、作为用户运行 Doro」；注册命令行（run_python 解析 → 活体 `.venv` 解释器 + `backup_history_db.py --keep 14`）注册前实跑一次 exit 0（产物 `history_backup_20261106_003611.db` 2,469,888 B，系列 6→7 份零删除）。**下次时间与触发人成文**：每日 03:00；触发人=当前登录用户 Doro（交互式 token，用户未登录不执行——无人值守需属主决策）。**不预支结论**：机器周期证据待 2026-11-06 03:00 首燃后回读；「同机无异地」半边未动。留痕：`docs/runbooks/2026-11-06-o4-schedule-registration.md`。
+- **调度注册完成（2026-11-06，属主工单授权 `--apply` 首次真实调用）**：任务 **TTS-MultiModel-Backup-Daily** 注册成功（schtasks exit 0，无需提权——当前用户身份注册）；回读 verbose 实测「下次运行时间 2026/11/6 3:00:00、模式就绪、已启用、登录状态只使用交互方式、作为用户运行 Doro」；注册命令行（run_python 解析 → 活体 `.venv` 解释器 + `backup_history_db.py --keep 14`）注册前实跑一次 exit 0（产物 `history_backup_20261106_003611.db` 2,469,888 B，系列 6→7 份零删除）。**下次时间与触发人成文**：每日 03:00；触发人=当前登录用户 Doro（交互式 token，用户未登录不执行——无人值守需属主决策）。**不预支结论**：机器周期证据待 2026-11-06 03:00 首燃后回读；「同机无异地」半边未动。留痕：`_archive/执行记录/2026-11/2026-11-06-o4-schedule-registration.md`。
 
 ## F6（阶段 9 登记；2026-11-02 阶段 10 止血+可逆隔离、2026-11-03 阶段 12 C 批隔离——**可证部分已隔离，剩余为待决项**）测试套件写污染生产 `data/history.db.action_logs`
 
 - **修正后的量级（阶段 10 实测 14:26:19，处置前活体）**：`action_logs` 全量 **2,706 行**。**阶段 9 登记的「+40 行」为局部观测**（仅本轮两次运行窗口 12:20:38–12:36:44），全量为：可证测试签名 **2,167 行** = `test_operation`（`message='测试操作'`/`extra_json={"key": "value"}`，签名 347/347 统一）**347** + `unknown` 空签名双写 **344**（±2s 配对 344/347；时间戳为逐对相差 ~5ms 的双写，非严格同值）+ `generation` 含 `"engine": "test_` 桩引擎签名 **1,476**（其中含 `"endpoint": "ep"` 1,230）；噪声跨度 2026-08-08 00:31:20 → 2026-11-02 12:36:44。不可证部分：`generation` 无上述签名 **451 行**（时间相关性实测：仅 **12 行（2.66%）** 落在可考证的阶段 8/9 测试窗口内，270 行耗时 ≤0.4s，其余 439 行散布于 2026-07-31→11-01 无窗口记录期）+ `model` 动作 **88 行**（全部在窗口外）——工单原文「剩下 449 行也不可采信」经实测为**夸大**，如实分档：可证 2,167 / 高度疑似 12 / 无法判定 439+88。
 - **机制（实测）**：`tests/conftest.py` 原 103 行内 `TTS_HISTORY_DB_PATH` 出现 0 次，全测试套仅 `tests/test_history_pruning.py` 自行隔离——默认所有测试经 `get_history_db()` 单例 / `log_operation()` 双写生产库；连带 `outputs/generation_versions.db`（`VersionManager(db_path=None)` 默认路径）同型被写（实测 mtime 12:36:31 落在阶段 9 窗口）。`push_subscriptions.db` 实测无任何代码引用（孤儿 -wal/-shm，不处置）。
-- **处置（阶段 10）**：①止血——conftest 全局隔离（强制 `TTS_HISTORY_DB_PATH` 走应用承认的优先级入口）+ `sqlite3.connect` 哨兵（打开生产 `data/history.db` 即抛错并点名测试 nodeid）+ `generation_versions.db` 默认路径透明重定向；配套 `tests/test_f6_db_isolation_sentinel.py` 8 项自证。②有效性证明：口径 A 全量两跑 **2622 passed / 0 failed / 41 skipped**（=基线 2614+新增 8），处置前后 `action_logs` 行数 2706→2706、`MAX(ts_ms)`、`history.db`/`-wal`/`-shm` 与 `generation_versions.db` 字节数+sha256 **逐字节不变**；口径 B **2530 / 0 / 10（123 deselected）** 覆盖率 52.33%≥45%。③可逆隔离：仅三个可证桶移入 `action_logs_quarantine_20261102`（batch `F6-20261102-A`），单事务，对账 `2,167 == 347+344+1,476`、`2,167 + 539 == 2,706` 两等式 PASS；回滚路径**实测执行**（回滚→主表 2,706、行内容指纹 FP1==FP2→再隔离）；读路径（`/api/system/logs` 分页/COUNT、`logs-compat` 走内存、`/logs/clean` 计数形态）隔离态全验通过。留痕：`docs/runbooks/2026-11-02-f6-test-db-isolation.md`。
+- **处置（阶段 10）**：①止血——conftest 全局隔离（强制 `TTS_HISTORY_DB_PATH` 走应用承认的优先级入口）+ `sqlite3.connect` 哨兵（打开生产 `data/history.db` 即抛错并点名测试 nodeid）+ `generation_versions.db` 默认路径透明重定向；配套 `tests/test_f6_db_isolation_sentinel.py` 8 项自证。②有效性证明：口径 A 全量两跑 **2622 passed / 0 failed / 41 skipped**（=基线 2614+新增 8），处置前后 `action_logs` 行数 2706→2706、`MAX(ts_ms)`、`history.db`/`-wal`/`-shm` 与 `generation_versions.db` 字节数+sha256 **逐字节不变**；口径 B **2530 / 0 / 10（123 deselected）** 覆盖率 52.33%≥45%。③可逆隔离：仅三个可证桶移入 `action_logs_quarantine_20261102`（batch `F6-20261102-A`），单事务，对账 `2,167 == 347+344+1,476`、`2,167 + 539 == 2,706` 两等式 PASS；回滚路径**实测执行**（回滚→主表 2,706、行内容指纹 FP1==FP2→再隔离）；读路径（`/api/system/logs` 分页/COUNT、`logs-compat` 走内存、`/logs/clean` 计数形态）隔离态全验通过。留痕：`_archive/执行记录/2026-11/2026-11-02-f6-test-db-isolation.md`。
 - **剩余属主决策（不在本轮范围）**：①451+88 行「疑似/无法判定」原地保留待判定；②既有备份物（12:17/12:18/14:29 三份均取于隔离前）仍含噪声，是否重取干净备份待定；③调度注册与异地副本沿阶段 9 不变。
-- **阶段 11（2026-11-02/03，B 批闸门 fastfail→零隔离）**：对残留 539 行的第二批判据做代码取证——`8192` **钉上**（`tests/test_generation_error_friendliness.py:160` `"啊"*8192`+`instruction="温柔"` → 写链 `design.py:257`→`utils.py:1017`→`logs.py:273`；隔离库复现行与生产 **206/206** 五元组签名闭合，错误串为 ：142 `object()` 桩指纹）；`streaming` **钉不上**（路由写死 `streaming.py:704/718/736-740/754/909/940`，复现证明测试不传该值也落库；44 行中 **3 行真实合成**（338=27.2s、629/630=3.6/3.3s）会被判据误删）→ 按工单闸门「立即停手」：**B 批 `F6-20261102-B` 零行隔离**，备份/隔离/回滚/复隔离取消。**(B) 22 行 0.0s 失败证伪为真实使用**（错误串 tests/ 零出现、id 987=CUDA assert、守卫 `7326b94` 09-14/`4a45e6f` 09-19 晚于行时间），成因 7 类，判定点与修正（IndexTTS2 路由 `voice_or_persona` 写死为空 `synthesize.py:529`，空 persona≠未选）见诊断；**clone.py:260 空引擎缺口现状仍敞开（唯一），是否补属产品决策**。两口径 A 2545/0/117×2、B 2448/0/91（cov 51.63%）全 exit 0，五快照 `history.db` 2,469,888 B/sha `9652e5e7…` 逐字节不变（哨兵无漏，conftest 未动）。注意：`.venv` 符号链接目标 `D:\_venvs\tts` 已失效，本轮以系统 Python 3.12.10 代跑（未装依赖）。残留精算：206 可证+41 streaming（39 可证+2 钉不到）+3 真实+22 真实+**179 generation 与 88 model 未检**。留痕：`docs/runbooks/2026-11-02-f6-batch-b-and-fastfail.md`。
-- **阶段 12（2026-11-03，C 批隔离——可证部分收口）**：阶段 11 钉上的唯一判据 `text_length==8192` 经派单方拆闸放行，**206 行**（处置前 206/206 全 `failed`、0 success、桩错误指纹，与 streaming/model/0.0s 禁触集合零交集实测）移入 `action_logs_quarantine_20261102` 批次 **`F6-20261103-C`**：等式① `206==206`、② `333+2,167+206==2,706` PASS；备份 `history_backup_20261103_075607.db`（2,469,888 B，sha `e4394184…`，系统 Python 3.12.10 代跑，`.venv` 沿阶段 11 失效未修）仓外恢复回读对平 539/2,167/2,706 exit 0 后方动手；回滚实测（主表回处置前 539、`MAX(ts_ms)` 回 1793594184555、C 批清零、A 批 2,167）；六列有序指纹 C 批四态同值 `22fbff87…`、A 批处置前（备份件）=回滚态=终态 `b955196a…` 零触碰；re-isolate 终态 333/2,167/206 verify PASS。两口径 A **2545/0/117** ×2、B **2448/0/91**（cov 51.58%≥45%）全 exit 0，测后 `history.db`/-wal/-shm 与 `generation_versions.db` 与隔离终态**逐字节一致**（零增长在 C 批终态成立）。8193 实测 **0 行**无待决。执行器为阶段 10 原件派生（仓外 `_演练/F6-batch-C/scripts/`，机制同源，仅批次/判据/verify 三处不同）。**至此可证测试噪声 2,167+206=2,373 行全部隔离在案可回滚；残留主表 333 行（41 streaming+3 真实 streaming+22 真实+179 generation 未检+88 model 未检）全部为待决项。** 留痕：`docs/runbooks/2026-11-02-f6-batch-b-and-fastfail.md` §9。
+- **阶段 11（2026-11-02/03，B 批闸门 fastfail→零隔离）**：对残留 539 行的第二批判据做代码取证——`8192` **钉上**（`tests/test_generation_error_friendliness.py:160` `"啊"*8192`+`instruction="温柔"` → 写链 `design.py:257`→`utils.py:1017`→`logs.py:273`；隔离库复现行与生产 **206/206** 五元组签名闭合，错误串为 ：142 `object()` 桩指纹）；`streaming` **钉不上**（路由写死 `streaming.py:704/718/736-740/754/909/940`，复现证明测试不传该值也落库；44 行中 **3 行真实合成**（338=27.2s、629/630=3.6/3.3s）会被判据误删）→ 按工单闸门「立即停手」：**B 批 `F6-20261102-B` 零行隔离**，备份/隔离/回滚/复隔离取消。**(B) 22 行 0.0s 失败证伪为真实使用**（错误串 tests/ 零出现、id 987=CUDA assert、守卫 `7326b94` 09-14/`4a45e6f` 09-19 晚于行时间），成因 7 类，判定点与修正（IndexTTS2 路由 `voice_or_persona` 写死为空 `synthesize.py:529`，空 persona≠未选）见诊断；**clone.py:260 空引擎缺口现状仍敞开（唯一），是否补属产品决策**。两口径 A 2545/0/117×2、B 2448/0/91（cov 51.63%）全 exit 0，五快照 `history.db` 2,469,888 B/sha `9652e5e7…` 逐字节不变（哨兵无漏，conftest 未动）。注意：`.venv` 符号链接目标 `D:\_venvs\tts` 已失效，本轮以系统 Python 3.12.10 代跑（未装依赖）。残留精算：206 可证+41 streaming（39 可证+2 钉不到）+3 真实+22 真实+**179 generation 与 88 model 未检**。留痕：`_archive/执行记录/2026-11/2026-11-02-f6-batch-b-and-fastfail.md`。
+- **阶段 12（2026-11-03，C 批隔离——可证部分收口）**：阶段 11 钉上的唯一判据 `text_length==8192` 经派单方拆闸放行，**206 行**（处置前 206/206 全 `failed`、0 success、桩错误指纹，与 streaming/model/0.0s 禁触集合零交集实测）移入 `action_logs_quarantine_20261102` 批次 **`F6-20261103-C`**：等式① `206==206`、② `333+2,167+206==2,706` PASS；备份 `history_backup_20261103_075607.db`（2,469,888 B，sha `e4394184…`，系统 Python 3.12.10 代跑，`.venv` 沿阶段 11 失效未修）仓外恢复回读对平 539/2,167/2,706 exit 0 后方动手；回滚实测（主表回处置前 539、`MAX(ts_ms)` 回 1793594184555、C 批清零、A 批 2,167）；六列有序指纹 C 批四态同值 `22fbff87…`、A 批处置前（备份件）=回滚态=终态 `b955196a…` 零触碰；re-isolate 终态 333/2,167/206 verify PASS。两口径 A **2545/0/117** ×2、B **2448/0/91**（cov 51.58%≥45%）全 exit 0，测后 `history.db`/-wal/-shm 与 `generation_versions.db` 与隔离终态**逐字节一致**（零增长在 C 批终态成立）。8193 实测 **0 行**无待决。执行器为阶段 10 原件派生（仓外 `_演练/F6-batch-C/scripts/`，机制同源，仅批次/判据/verify 三处不同）。**至此可证测试噪声 2,167+206=2,373 行全部隔离在案可回滚；残留主表 333 行（41 streaming+3 真实 streaming+22 真实+179 generation 未检+88 model 未检）全部为待决项。** 留痕：`_archive/执行记录/2026-11/2026-11-02-f6-batch-b-and-fastfail.md` §9。
 
 ## F7 文档写死 `.venv` 解释器路径已成死路径——**已修复（2026-11-03 阶段 13）**：仓库唯一解析入口 + 冷 shell 实测 exit 0
 
@@ -91,7 +91,7 @@
 - **未覆盖（诚实边界）**：venv 未重建（硬约束）、符号链接未修；GPU 口径（阶段 5/6 的 `2.15.0+cu134`）无法复验；
   发版链脚本（`build_portable_bundle.ps1` / `release_gate.ps1`）与 `.githooks` 内部两级回退按「已有兜底」保留
   未收敛。
-- 留痕：`docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md`（含入口清单、冷 shell 日志、对照、
+- 留痕：`_archive/执行记录/2026-11/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md`（含入口清单、冷 shell 日志、对照、
   两口径与零写入证据索引）。
 
 ## F8 本地 git 钩子未接线（`core.hooksPath=local/hooks`）——**已接线（2026-11-06，`core.hooksPath=.githooks`），断链闭合**
@@ -131,7 +131,7 @@
   （123 deselected，cov **51.59%**）全 exit 0——相对阶段 13 **+2 passed / −2 skipped**，归因实测为 funasr 依赖树
   带入 `jieba==0.42.1`（`tests/test_fts_tokenizer.py` 恰有 2 个 `_check_jieba()` 门控用例，现 7 passed/0 skipped）。
   活体库零增长：`history.db` 2,469,888 B / sha `051d1688…`、333 行、`MAX(ts_ms)` 1793594173715 测前测后逐字节一致。
-  留痕：`docs/runbooks/2026-11-03-f8-funasr-install.md`。
+  留痕：`_archive/执行记录/2026-11/2026-11-03-f8-funasr-install.md`。
 - **属主修复命令（本轮未执行，硬约束禁改 `core.hooksPath`）**：`./.githooks/install.sh` **或**
   `git config core.hooksPath .githooks`；⛔ **勿用** `scripts/install-hooks.ps1`（已退役墓碑，指向不存在的
   `scripts/git-hooks`，会让钩子静默失效）。
@@ -145,6 +145,6 @@
   断链窗口 **31 笔**提交（报告口径 29 + 后续 2 笔）**不重写不补钩**（rebase 禁改；逐笔 trailers 实测 31/31 全带
   `Signed-off-by`——报告点名的 ea27533/b49297e 缺签两笔已以同主题重建为 34ef17f/043f200 且带签，内容逐字节一致）；
   `local/hooks/` 原样保留未删（inert，回滚 = `git config core.hooksPath local/hooks`）。
-- 留痕：`docs/SRE_RUNBOOK.md`「治理与勘误速查」F8 条 + `docs/runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md` §6
-  \+ `docs/runbooks/2026-11-03-f8-funasr-install.md`（阶段 14：装前/装后对照、dry-run、torch 指纹、未覆盖清单）
-  \+ `docs/runbooks/2026-11-06-f8-hooks-wiring.md`（接线动作、主仓/fresh clone 双向验证、环境演进登记）。
+- 留痕：`docs/SRE_RUNBOOK.md`「治理与勘误速查」F8 条 + `_archive/执行记录/2026-11/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md` §6
+  \+ `_archive/执行记录/2026-11/2026-11-03-f8-funasr-install.md`（阶段 14：装前/装后对照、dry-run、torch 指纹、未覆盖清单）
+  \+ `_archive/执行记录/2026-11/2026-11-06-f8-hooks-wiring.md`（接线动作、主仓/fresh clone 双向验证、环境演进登记）。

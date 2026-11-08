@@ -1,6 +1,6 @@
 """阶段 4 D-2 自动降级链测试（离线，monkeypatch seam，不触 GPU / 不联网）。
 
-覆盖（`docs/runbooks/2026-11-01-o3-failover-drill.md` §2b.4 三断点）：
+覆盖（`_archive/执行记录/2026-11/2026-11-01-o3-failover-drill.md` §2b.4 三断点）：
 ① 主引擎可用 → 不走降级（回归保护：响应仍是 HTML，degraded 链路零触发）；
 ② 主引擎不可用 → 自动降级 edge-tts，返回 200 JSON 带 degraded 标记 + 产物判据；
 ③ 降级目标也失败 → 503 error_type=fallback_failed（与 engine_not_ready 可区分，不假成功）；
