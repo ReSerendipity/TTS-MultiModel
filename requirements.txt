@@ -5,10 +5,10 @@ torchaudio>=2.5.1
 transformers>=5.20.2,<5.21
 tokenizers>=0.23.3,<0.24
 funasr>=1.0.0
-descript-audiotools==0.7.2
 modelscope>=1.9.0
 munch>=4.0.0
 addict>=2.4.0
+descript-audiotools==0.7.2
 einops>=0.7.0
 fastapi>=0.110.0
 uvicorn>=0.29.0

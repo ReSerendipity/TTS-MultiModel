@@ -29,7 +29,7 @@ cryptography==50.0.2  # GOTCHAS #98：WinPython 7z 解 NSIS 后预装 cryptograp
 decorator==5.3.1
 einops==0.8.2
 fastapi==0.143.0
-filelock==4.2.1
+filelock==4.1.0
 fugashi==1.5.2
 fsspec==2026.9.0
 funasr==1.4.16
@@ -69,7 +69,7 @@ openai-whisper==20250625
 opencc-python-reimplemented==0.1.7
 oss2==2.19.1
 packaging==26.3
-pillow==13.0.0
+pillow==12.3.0
 platformdirs==4.12.4
 pooch==1.9.0
 protobuf==3.19.6
