@@ -12,8 +12,6 @@ import re
 import subprocess
 from pathlib import Path
 
-import pytest
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 #: 仓库里**非自身源码**的目录名（按路径分段比对，不做子串匹配）。
@@ -452,10 +450,17 @@ def _git(*args: str) -> tuple[int, str]:
         return 127, ""
 
 
-def _release_tags() -> list[str]:
+def _release_tags() -> list[str] | None:
+    """取仓库里的 `vX.Y.Z` tag；**无法核对**（没 git / 不是 git 仓库）时返回 None。
+
+    刻意不用 `pytest.skip`：`scripts/check_release_readiness.py` 是**直接 import 并调用**
+    这些测试函数的（它把本文件复制进临时目录跑，那里没有 `.git`），`pytest.skip` 抛的是
+    `Skipped` 异常，会把那个脚本整条打断成 traceback + 非零退出（2026-11-08 实测 2 例红）。
+    用返回值把"环境不支持核对"和"核对失败"分开：前者 return，后者 assert。
+    """
     rc, out = _git("tag", "--list", "v*")
     if rc != 0:
-        pytest.skip("本环境没有可用的 git（或不是仓库），tag 版本位无法核对")
+        return None
     return [t for t in out.splitlines() if _RELEASE_TAG.fullmatch(t.strip())]
 
 
@@ -480,12 +485,14 @@ def test_release_tags_match_the_version_they_point_at() -> None:
     却指向 2.8.0 的提交）。三者在发版当天都只表现为"用户装出来自称旧版本"。
     """
     tags = _release_tags()
+    if tags is None:
+        return  # 没 git / 不是仓库：本环境无从核对（readiness 脚本的临时副本就走这条路）
     if not tags:
         # 干净的普通克隆一定有 tag（tag 是仓库级的）；空列表只可能是浅克隆没拉 tag。
-        # 这里不 skip 成绿：宁可红，也不要"没对象"被当成"通过"。
+        # 这里不 return 成绿：宁可红，也不要"没对象"被当成"通过"；只有浅克隆是已知的不可核对面。
         shallow = _git("rev-parse", "--is-shallow-repository")[1]
         if shallow == "true":
-            pytest.skip("浅克隆未包含 tag，无法核对（CI 需 fetch --tags 或 depth=0）")
+            return
         raise AssertionError(
             "仓库里一个 vX.Y.Z release tag 都没有 —— 要么真的从未发版（那 §1 的版本位清单要改口径），"
             "要么 tag 没跟着仓库走。两种都不该静默通过。"
@@ -522,10 +529,13 @@ def test_known_tag_drift_entries_are_still_accurate() -> None:
     """豁免必须过期即红：tag 被重打/删除、或那份提交后来被修正，条目就成了永久后门。"""
     if not _KNOWN_TAG_DRIFT:
         return
-    tags = set(_release_tags())
+    tags = _release_tags()
+    if tags is None:
+        return  # 没 git / 不是仓库：无从核对（readiness 脚本的临时副本）
+    tagset = set(tags)
     stale: list[str] = []
     for tag, (recorded, reason) in _KNOWN_TAG_DRIFT.items():
-        if tag not in tags:
+        if tag not in tagset:
             stale.append(f"{tag}：tag 已不存在 —— 删掉这条豁免（{reason}）")
             continue
         rc, out = _git("show", f"{tag}:pyproject.toml")
@@ -550,7 +560,7 @@ def test_release_tag_names_do_not_collide() -> None:
     """
     rc, out = _git("tag", "--list")
     if rc != 0:
-        pytest.skip("本环境没有可用的 git（或不是仓库），tag 名字无法核对")
+        return  # 没 git / 不是仓库：无从核对（readiness 脚本的临时副本，见 `_release_tags` 的说明）
     lowered: dict[str, list[str]] = {}
     for tag in [t.strip() for t in out.splitlines() if t.strip()]:
         m = re.search(r"(?i)^v?(\d+\.\d+\.\d+)$", tag)
