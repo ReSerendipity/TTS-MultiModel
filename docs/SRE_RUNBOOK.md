@@ -111,6 +111,15 @@ SHA-256 复验（`scripts/generate_model_checksums.py` 生成，C1 加载链路�
   `data/audit.log`（实测未落盘）**已于阶段 9 退役删除**，决策依据与取证见
   `docs/runbooks/2026-11-02-o4-backup-wiring.md` §3。
 
+  **覆盖口径（2026-11-08 起，O4 覆盖边界闭环）**：默认备份仍只备历史库；整集备份用
+  `--full`，产物是 `data/backups/full_<时间戳>/`（历史库 + `generation_versions.db` +
+  5 个运行密钥 + `audit.log` 及轮转）并带 `manifest.json`（逐项 `sha256`/`size`/`present`/`reason`）。
+  `--coverage` 只打印覆盖计划、必需项缺失时非零退出；`--verify <目录>` 按 manifest 复算
+  sha256（篡改、丢文件、空 manifest 都报红）。**注意**：`--full` 会把 5 个密钥的明文复制进
+  备份目录（manifest 里 `contains_secrets: true` 自证），该目录的访问控制必须与 `data/` 同级看待；
+  缺项不会被静默跳过，会以 `present:false` + `reason` 记进 manifest 并在日志点名。
+  配套测试 `tests/test_backup_coverage.py`。
+
   ```bash
   # 解释器入口统一走 scripts/run_python.py（仓库唯一解析入口，2026-11-03 F7）：
   #   实际执行探测顺序 = venv（.venv/Scripts | .venv/bin）→ PATH python → python3 → py -3 → 当前进程；
