@@ -7,7 +7,7 @@
 gitignore）无法由 GitHub hosted runner 的 cron 触达，调度必须落在 Windows 任务计划程序
 （schtasks）。按硬约束，**真实注册需所有者单独授权**——本脚本默认 ``--dry-run``，只打印
 将要注册的任务契约（任务名/频率/触发时刻/完整命令行/运行身份/下一次应执行时刻），
-不做任何系统写入；``--apply`` 才真正调用 ``schtasks /create``（本轮从未调用）。
+不做任何系统写入；``--apply`` 才真正调用 ``schtasks /create``。历史：2026-11-06 属主工单授权曾 ``--apply`` 真实注册任务 ``TTS-MultiModel-Backup-Daily``；2026-11-09 23:18 属主决策取消注册，当前本机无该任务——本脚本即重注册入口（``--apply`` 对同名任务就地覆盖，幂等）。
 
 频率口径自洽性（与成文节奏句对齐，见 ``docs/SRE_RUNBOOK.md``）：
 

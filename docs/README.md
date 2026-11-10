@@ -1,6 +1,6 @@
 # TTS-MultiModel — docs 索引
 
-TTS_MultiModel（多引擎语音合成）的开发 / 安全 / 运维 / 治理文档入口；面向最终用户的使用说明见根 `README.md`。下表覆盖 `docs/` 下 32 篇 tracked Markdown 索引（`docs/adr/` 5 篇 ADR 另计，共 37 篇 tracked），链接均为相对路径；「状态/截至」摘自各文自述定位（2026-11-04 复核）。
+TTS_MultiModel（多引擎语音合成）的开发 / 安全 / 运维 / 治理文档入口；面向最终用户的使用说明见根 `README.md`。下表覆盖 `docs/` 根与子目录共 24 篇 tracked Markdown（`docs/adr/` 5 篇 ADR 另计，合计 29 篇 tracked，`git ls-files 'docs/*.md'` 实测 2026-11-10）；全量逐文件清单与状态见 [`INDEX.md`](INDEX.md)。链接均为相对路径；「状态/截至」摘自各文自述定位（2026-11-04 复核）。
 
 ## 安全与合规
 | 文件 | 管什么 | 状态/截至 |
