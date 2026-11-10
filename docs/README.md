@@ -33,15 +33,15 @@ TTS_MultiModel（多引擎语音合成）的开发 / 安全 / 运维 / 治理文
 | [TODO.md](TODO.md) | TODO / 缺陷登记（owner 决策项） | 现行（持续追加） |
 | [SRE_RUNBOOK.md](SRE_RUNBOOK.md) | SRE 运行手册（SLA / SLO / 回滚 / 灾难恢复演练） | 现行（演练表带 2026-10-29→11-03 时间戳） |
 | [rollback_sop.md](rollback_sop.md) | 回滚 SOP（自动化回滚 / 版本化回滚） | 现行 |
-| [runbooks/2026-09-agent-memory-archive.md](../_archive/执行记录/2026-11/2026-09-agent-memory-archive.md) | 2026-09 Agent 工作记忆归档（环境/打包/发版/Git 坑点，去重后入库） | 留痕 2026-09-14→09-19 + 09-30 计划 |
-| [runbooks/2026-10-31-restore-drill.md](../_archive/执行记录/2026-11/2026-10-31-restore-drill.md) | 目标库级备份恢复与发布回滚演练（阶段 1） | 留痕 2026-10-31 |
-| [runbooks/2026-11-01-o3-failover-drill.md](../_archive/执行记录/2026-11/2026-11-01-o3-failover-drill.md) | O3 单点与切换演练（阶段 2 · 降格执行） | 留痕 2026-11-01 |
-| [runbooks/2026-11-02-f6-test-db-isolation.md](../_archive/执行记录/2026-11/2026-11-02-f6-test-db-isolation.md) | F6 测试套写污染生产库——止血与可逆隔离（整改阶段 10） | 留痕 2026-11-02 |
-| [runbooks/2026-11-02-o4-backup-wiring.md](../_archive/执行记录/2026-11/2026-11-02-o4-backup-wiring.md) | O4 备份链路可修半边（阶段 9 留痕） | 留痕 2026-11-02 |
-| [runbooks/2026-11-02-r4-real-history-rollback-drill.md](../_archive/执行记录/2026-11/2026-11-02-r4-real-history-rollback-drill.md) | R4 发布回滚演练——真仓 756 条历史重跑（整改阶段 8） | 留痕 2026-11-02 |
-| [runbooks/2026-11-02-f6-batch-b-and-fastfail.md](../_archive/执行记录/2026-11/2026-11-02-f6-batch-b-and-fastfail.md) | F6 B 批闸门取证与 fastfail（阶段 11） | 留痕 2026-11-02→11-03 |
-| [runbooks/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md](../_archive/执行记录/2026-11/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md) | F7 文档解释器入口失效 · F8 本地钩子接线漂移（阶段 13 留痕） | 留痕 2026-11-03 |
-| [runbooks/2026-11-03-f8-funasr-install.md](../_archive/执行记录/2026-11/2026-11-03-f8-funasr-install.md) | F8 前置条件——系统 Python 补装 funasr 1.4.16（阶段 14 留痕） | 留痕 2026-11-03 |
+| [_archive/执行记录/2026-11/2026-09-agent-memory-archive.md](../_archive/执行记录/2026-11/2026-09-agent-memory-archive.md) | 2026-09 Agent 工作记忆归档（环境/打包/发版/Git 坑点，去重后入库） | 留痕 2026-09-14→09-19 + 09-30 计划 |
+| [_archive/执行记录/2026-11/2026-10-31-restore-drill.md](../_archive/执行记录/2026-11/2026-10-31-restore-drill.md) | 目标库级备份恢复与发布回滚演练（阶段 1） | 留痕 2026-10-31 |
+| [_archive/执行记录/2026-11/2026-11-01-o3-failover-drill.md](../_archive/执行记录/2026-11/2026-11-01-o3-failover-drill.md) | O3 单点与切换演练（阶段 2 · 降格执行） | 留痕 2026-11-01 |
+| [_archive/执行记录/2026-11/2026-11-02-f6-test-db-isolation.md](../_archive/执行记录/2026-11/2026-11-02-f6-test-db-isolation.md) | F6 测试套写污染生产库——止血与可逆隔离（整改阶段 10） | 留痕 2026-11-02 |
+| [_archive/执行记录/2026-11/2026-11-02-o4-backup-wiring.md](../_archive/执行记录/2026-11/2026-11-02-o4-backup-wiring.md) | O4 备份链路可修半边（阶段 9 留痕） | 留痕 2026-11-02 |
+| [_archive/执行记录/2026-11/2026-11-02-r4-real-history-rollback-drill.md](../_archive/执行记录/2026-11/2026-11-02-r4-real-history-rollback-drill.md) | R4 发布回滚演练——真仓 756 条历史重跑（整改阶段 8） | 留痕 2026-11-02 |
+| [_archive/执行记录/2026-11/2026-11-02-f6-batch-b-and-fastfail.md](../_archive/执行记录/2026-11/2026-11-02-f6-batch-b-and-fastfail.md) | F6 B 批闸门取证与 fastfail（阶段 11） | 留痕 2026-11-02→11-03 |
+| [_archive/执行记录/2026-11/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md](../_archive/执行记录/2026-11/2026-11-03-f7-venv-entrypoint-and-f8-hooks-drift.md) | F7 文档解释器入口失效 · F8 本地钩子接线漂移（阶段 13 留痕） | 留痕 2026-11-03 |
+| [_archive/执行记录/2026-11/2026-11-03-f8-funasr-install.md](../_archive/执行记录/2026-11/2026-11-03-f8-funasr-install.md) | F8 前置条件——系统 Python 补装 funasr 1.4.16（阶段 14 留痕） | 留痕 2026-11-03 |
 | [runbooks/BUS-FACTOR-2026-11-01.md](runbooks/BUS-FACTOR-2026-11-01.md) | Bus Factor 登记与观察判据（E7/P25 带项上线） | 留痕 2026-11-01 |
 | [runbooks/key-rotation-SOP-19.md](runbooks/key-rotation-SOP-19.md) | 完整性签名密钥轮换 Runbook | 现行 SOP（SOP-19） |
 
