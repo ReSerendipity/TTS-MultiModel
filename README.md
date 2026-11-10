@@ -97,8 +97,8 @@ chmod +x scripts/install.sh && ./scripts/install.sh
 
 ```bash
 docker compose up -d
-# 或拉取随版本发布的 GHCR 镜像（版本号以 config.yaml 为准，当前 v2.7.0）
-docker pull ghcr.io/reserendipity/tts-multimodel:2.7.0
+# 或拉取随版本发布的 GHCR 镜像；版本以 config.yaml 为准（当前 2.9.0，截至 2026-11-04）
+docker pull ghcr.io/reserendipity/tts-multimodel:2.9.0
 ```
 
 启动后访问 <http://localhost:7869>。最小验证：浏览器打开该地址能看到左侧导航与「声音设计」工作台；或命令行运行 `tts-multimodel --help`（源码直跑为 `python app/integrated_app/cli.py --help`）。
@@ -151,6 +151,14 @@ CLI 目前覆盖 VoxCPM2 的 design / clone / batch 三种模式；IndexTTS 合�
 ### 许可证
 
 项目代码基于 [Apache License 2.0](LICENSE)，Copyright (c) 2026 ReSerendipity。模型权重不随代码分发，各自遵循其官方许可；请勿将本项目用于侵权、伪造或诈骗等违法用途。
+
+### 使用边界与合成内容标识
+
+本项目是**本地自托管工具**，不对外提供语音合成服务；生成音频的使用责任由使用者承担。
+
+- **禁止冒充他人**：不得用克隆音色冒充真实人物、伪造其言论，或用于诈骗、骚扰、虚假信息传播。
+- **输出宜标注为 AI 合成**：对外发布合成语音时，请在音频或说明中明示「AI 合成」。《互联网信息服务深度合成管理规定》第十七条要求提供合成人声服务的组织和个人对生成内容作出标识；本工具默认**不**在输出音频中嵌入水印或来源元数据，标识需由使用者自行添加。
+- **克隆前取得授权**：克隆他人音色应取得本人同意，不要上传无权使用的参考音频。
 
 ---
 
@@ -229,8 +237,8 @@ chmod +x scripts/install.sh && ./scripts/install.sh
 
 ```bash
 docker compose up -d
-# or pull the versioned GHCR image (tag follows config.yaml, currently v2.7.0)
-docker pull ghcr.io/reserendipity/tts-multimodel:2.7.0
+# or pull the versioned GHCR image; tag follows config.yaml (currently 2.9.0, as of 2026-11-04)
+docker pull ghcr.io/reserendipity/tts-multimodel:2.9.0
 ```
 
 Then open <http://localhost:7869>. Sanity check: the left sidebar and the "Voice design" workbench render in the browser, or run `tts-multimodel --help` (from source: `python app/integrated_app/cli.py --help`).
@@ -283,6 +291,14 @@ Bug reports (with repro steps), feature requests, and PRs are welcome (Fork → 
 ### License
 
 Project code is licensed under [Apache License 2.0](LICENSE), Copyright (c) 2026 ReSerendipity. Model weights are not bundled and follow their own licenses; please do not use this project for infringement, forgery, fraud, or any unlawful purpose.
+
+### Acceptable use & synthetic-content disclosure
+
+This project is a **self-hosted local tool**, not a hosted synthesis service; responsibility for generated audio lies with the operator.
+
+- **No impersonation**: do not clone a voice to impersonate a real person, fabricate their statements, or use it for fraud, harassment, or disinformation.
+- **Label outputs as AI-generated**: when publishing synthesized speech, state that it is AI-generated. Article 17 of China's Deep Synthesis Regulation requires providers of synthetic-voice services to label generated content; this tool does **not** embed watermarks or provenance metadata in the audio by default, so the label must be added by the operator.
+- **Get consent before cloning**: obtain the speaker's permission and do not upload reference audio you have no right to use.
 
 ---
 

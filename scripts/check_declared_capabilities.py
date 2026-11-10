@@ -29,11 +29,18 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from run_python import venv_python
+
 
 def _reexec_with_venv_python() -> None:
-    venv_python = Path(__file__).resolve().parents[1] / ".venv" / "Scripts" / "python.exe"
-    if venv_python.exists() and Path(sys.executable).resolve() != venv_python.resolve():
-        os.execv(str(venv_python), [str(venv_python), __file__, *sys.argv[1:]])
+    """存在可用项目 .venv 且当前解释器非 .venv 时，用 .venv 解释器重跑自身。
+
+    解释器解析统一走 ``scripts/run_python.py``（F7：本仓唯一解析入口，Windows/POSIX
+    双路径）；venv 不可用（含符号链接目标失效）时保持当前解释器。
+    """
+    venv = venv_python()
+    if venv is not None and Path(sys.executable).resolve() != venv.resolve():
+        os.execv(str(venv), [str(venv), __file__, *sys.argv[1:]])
 
 
 _reexec_with_venv_python()

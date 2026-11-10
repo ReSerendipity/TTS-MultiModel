@@ -1,22 +1,62 @@
-# 依赖漏洞告警分诊（Dependabot alerts triage）日期：2026-09-21（同日按 CI 真实输出 + api.osv.dev 复核修订过一次）适用：`main` @ PR #100 之后　责任人：仓库所有者状态：**GitHub 上那 20 条 open 告警（10 个公告 × 2 份清单）已于 2026-09-21 全部按 §5 的映射逐条dismiss 完毕**（`requirements-lock.txt`、`launcher/requirements-small.txt` 各计一次）。但**扫描器视角的下界代价比这个大**：transformers 4.52.x 实际带 **16 个公告**，其中 8 个只有 PYSEC 号、没有 GHSA 记录 ——Dependabot 只跟 GHSA，所以那 8 条**根本不开单**，只有 pip-audit（OSV 全源）看得见。也就是说："把 20 条 dismiss 完" ≠ "4.52.x 的风险登记完"。本文 §1 是完整的 16+2 行。号与来源全部绑定证据（§1a），不凭记忆。## 1. 结论速览A1–A8 有 GHSA 记录（= Dependabot 那 16 条告警的来源）；A9–A16 是 PYSEC-only 的 ZDI 系列（Dependabot 不开单，pip-audit 会红）。P1/P2 与 transformers 无关。| # | CVE | PYSEC / GHSA | 严重度 | 修复版本 | 具体代码路径 | 本仓可达性判据 | 处置 ||---|---|---|---|---|---|---|---|| A1 | CVE-2025-5197 | PYSEC-2026-1983 / GHSA-9356-575x-2w9m | MODERATE | 4.53.0 | `convert_tf_weight_name_to_pt_weight_name()` 正则灾难性回溯 | `grep -rl convert_tf_weight_name_to_pt_weight_name app/ scripts/` → **0 命中**；本仓不做 TF→PT 权重名转换 | 已接受风险（pip-audit 豁免） **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A2 | CVE-2025-6051 | PYSEC-2026-1988 / GHSA-rcv9-qm8p-9p6j | MODERATE | 4.53.0 | `EnglishNormalizer.normalize_numbers()` 正则 | 同法 **0 命中**（`normalize_numbers` / `EnglishNormalizer` 各 0）；文本前处理走 voxcpm / indextts 自带前端，不用 transformers normalizer | 已接受风险 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A3 | CVE-2025-6638 | PYSEC-2026-1981 / GHSA-59p9-h35m-wg4g | MODERATE | 4.53.0 | `MarianTokenizer.remove_language_code()` 正则 | `grep Marian app/ scripts/` → **0 命中**，本仓不加载 Marian 模型 | 已接受风险 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A4 | CVE-2025-6921 | PYSEC-2026-1980 / GHSA-4w7r-h757-3r74 | MODERATE | 4.53.0 | `AdamWeightDecay._do_use_weight_decay()` 处理用户可控正则 | **0 命中**；且是**训练期**优化器，本仓不发训练（`training/` 由 AST 门禁隔离） | 已接受风险 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A5 | CVE-2026-1839 | PYSEC-2026-2288 / GHSA-69w3-r845-3855 | MODERATE（AV:L/UI:R） | 5.0.0rc3 | `Trainer._load_rng_state()` 调 `torch.load()` 未带 `weights_only=True` | `grep "from transformers import Trainer"` → **0 命中**；`training/trainer.py` 的 `LoRATrainer` 是我们自己的类，不继承 HF `Trainer` | 已接受风险 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A6 | CVE-2026-4372 | PYSEC-2026-2289 / GHSA-29pf-2h5f-8g72 | **HIGH** | 5.3.0 | 恶意 `config.json` 里 `_attn_implementation_internal` 指向攻击者仓库，`AutoModelForCausalLM.from_pretrained()` 加载时 RCE | 前提是**加载别人给的模型目录**。本仓权重全部来自 `model/` 本地目录，入库前人工确认 + SHA-256 复验（`LOCAL_RULES.md` 禁区流程）；唯一从 Hub 取物的是 `security/content_safety.py` 里固定 revision 的 CLIP tokenizer，模型名不接受用户输入 | 已接受风险；Trivy 侧另需 `.trivyignore.yaml` **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A7 | CVE-2026-5241 | PYSEC-2026-2290 / GHSA-fgcw-684q-jj6r | **HIGH**（AV:N） | 5.5.0 | LightGlue 模型加载路径 `trust_remote_code` 失效 → 初始化期任意代码执行 | 本仓只加载 TTS 语音模型（voxcpm / indextts / funasr / zipenhancer），无视觉匹配模型；`grep LightGlue` → 0 | 已接受风险；Trivy 侧同上 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A8 | CVE-2026-9856 | PYSEC-2026-3929 / GHSA-xrqw-3rrv-vx5w | **HIGH**（AV:N） | 5.10.0 | `save_pretrained()` 经 chat template 造成路径穿越任意文件写 | `grep -rn save_pretrained app/ scripts/` → **0 命中**；音色保存写的是我们自己的目录 | 已接受风险；Trivy 侧同上 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A9 | CVE-2025-14920 | PYSEC-2025-211 / 无 GHSA | 未评（CVSS3.0 `AV:L/…/UI:R/C:H/I:H/A:H`） | **无** | Perceiver 原始 checkpoint 反序列化 | ZDI 系列，入口都是**人工执行权重转换器**：`grep -riE "convert_[a-z_]*original_checkpoint|PerceiverModel" app/ scripts/` → **0 命中** | 已接受风险（Dependabot 不开单） **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A10 | CVE-2025-14921 | PYSEC-2025-212 / 无 GHSA | 同上 | **无** | Transformer-XL 原始 checkpoint 反序列化 | 同 A9（`TransformerXL` 0 命中） | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A11 | CVE-2025-14924 | PYSEC-2025-213 / 无 GHSA | 同上 | **无** | megatron_gpt2 反序列化 | 同 A9（`megatron` 0 命中） | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A12 | CVE-2025-14926 | PYSEC-2025-214 / 无 GHSA | 同上 | **无** | SEW `convert_config` 代码注入 | 同 A9（`SEWModel` 0 命中） | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A13 | CVE-2025-14927 | PYSEC-2025-215 / 无 GHSA | 同上 | **无** | SEW-D `convert_config` 代码注入 | 同 A9（`SEWD` 0 命中） | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A14 | CVE-2025-14928 | PYSEC-2025-216 / 无 GHSA | 同上 | **无** | HuBERT `convert_config` 代码注入 | 同 A9（`HuBERT` 0 命中）；ASR 侧走 funasr 自有权重格式 | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A15 | CVE-2025-14929 | PYSEC-2025-217 / 无 GHSA | 同上 | **无** | X-CLIP checkpoint 转换反序列化 | 同 A9（`XCLIP` 0 命中）；CLIP 在本仓只做安全判定、且用 `AutoTokenizer` 不换 checkpoint | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A16 | CVE-2025-14930 | PYSEC-2025-218 / 无 GHSA | 同上 | **无** | GLM4 反序列化 | 同 A9；本仓无 LLM 对话模型 | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A17 | 无 CVE（PYSEC-only） | PYSEC-2026-4174 / GHSA-x9r9-c232-4q39（2026-10-11 dependabot 告警 #23/#24 已 dismiss） | HIGH（影响 4.49.0–5.8.1） | 5.8.2（被引擎 pin `<4.53` 挡住，同 §2 A5–A8 口径） | `GenerativePreTrainedModel.load_custom_generate()` 在 trust 校验前把远端 `custom_generate/generate.py` 写入 `~/.cache/huggingface/modules`（文件写不可逆；执行仍受 trust 门控） | `grep -rn "load_custom_generate\|custom_generate\|GenerativePreTrainedModel" app/ scripts/` → **0 命中**；本仓只加载 TTS/ASR 权重与 tokenizer，从不走 generative 自定义加载路径；且 `clean_launch.py` 设 `TRANSFORMERS_OFFLINE=1`/`HF_HUB_OFFLINE=1`，离线模式下远端模块拉取本身被禁 | 已接受风险（pip-audit 豁免，2026-10-02 登记）；2026-10-11 owner 授权 dismiss #23/#24（tolerable_risk，判据入 comment）；**复点维持**：indextts 放开 pin 后升 5.8.2 消解（§4-6）。**2026-10-12 上游复核（本轮实测）**：index-tts/index-tts main @ `d9e41aa`（2026-09-29，#806）pyproject.toml **仍钉 `transformers==4.52.1`**，releases 最新 v2.5.0（2026-08-13）未放开；PyPI 无 `indextts` 包（404，vendored editable 接入）→ **升级路径仍被阻塞**，维持复点 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A18 | 无 CVE（GHSA/PYSEC-only） | GHSA-4j2p-28q2-5m79 / PYSEC-2026-3804（2026-10-11 dependabot 告警 #25/#26 已 dismiss） | MEDIUM | **无官方修复版本**（OSV `last_affected=1.14.0` 无 fixed 事件；GitHub 咨询 `patched_versions` 为空；PyPI 最新 1.15.0 未获官方 fixed 标记） | `load_checkpoint_in_model` / `load_checkpoint_and_dispatch` 对 sharded checkpoint 索引 `weight_map` 条目不做路径清洗（`../`/绝对路径 → 任意文件读；命名管道 → DoS） | 函数经 indextts `maskgct/codec_inference.py:291`（`load_checkpoint_and_dispatch`）**可达**，但输入是 `model/` 本地目录权重（入库前人工确认 + SHA-256 复验，LOCAL_RULES 禁区流程），无不可信输入路径；本仓 `app/` 无直调（仅自研 checkpoint.py 同名方法）。**升级阻断**：`accelerate==1.8.1` 为 vendored indextts 精确 pin（index-tts-main/pyproject.toml:31，GOTCHAS #348），升版即破坏引擎依赖图（同 A1–A8 口径）；且无官方修复版本可升 | 2026-10-11 owner 授权 dismiss #25/#26（tolerable_risk，判据入 comment；pip-audit 豁免 PYSEC-2026-3804 已入 security.yml）；**复点维持**：上游发布官方修复并经真机复验 indextts 加载链后升 ≥1.15.0（§4-6），复审 2026-12-31 同批 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
-| A19 | CVE-2025-4565 | PYSEC-2026-1806 / GHSA-8qvm-5x2c-j2w7 | HIGH | 4.25.8（另有 5.29.5 / 6.31.1 并行修复线；3.x 无修复分支） | protobuf 纯 Python 后端 JSON/线格式解析递归组 DoS | 2.9.0 起锁内 protobuf 回落 3.19.6（descript-audiotools==0.7.2 元数据强制 <3.20，见 P1 说明），本条转为真实暴露。可达性：`grep google.protobuf app/` 零命中；protobuf 仅被 tensorboardX 生成物消费（训练实验链，输入是本机自产 event 文件），不解析任何不可信 wire 数据 | 已接受风险（pip-audit 豁免，2026-10-27 登记）；**复点**：audiotools 放开 protobuf 上界后回抬 ≥4.25.8（§4-6） || A20 | CVE-2026-0994 | PYSEC-2026-1805 / GHSA-7gcm-g887-7qv7 | HIGH | 5.29.6（另有 6.33.5；3.x/4.x 无修复线） | protobuf JSON 递归深度绕过 | 同 A19（同一回落成因；同一可达性判据） | 同 A19（pip-audit 豁免，2026-10-27 登记） || P1 | —（历史编号，保留给 protobuf 跟踪条目互链） | 见 **A19/A20** | — | — | — | 2026-10-27 前原计划"随批量升级一起抬"；因 audiotools 引导化（2.9.0）回落 3.19.6 成为前置条件，提前按已接受风险登记（A19/A20） | — || P2 | —（历史编号，与 P1 同源） | 见 **A20** | — | — | — | 同 P1 | — |一句话：**17 个 transformers 公告里没有一个能靠"升个版"现在就消掉** —— A1–A4 要 4.53（被IndexTTS 的精确 pin 挡住，§2），A5–A8 要 5.x 大版本，A9–A16 **上游根本没有修复版本**，只能在 5.x 之后才可能出现。P1/P2 另说。**A17（transformers）/ A18（accelerate）是本仓锁内仅剩的两条可被 dependabot 开单的公告**：均无可行升级路径（引擎钉版阻断 / 无官方修复版本），2026-10-11 起 4 条 open 告警（#23–#26）保持待人工决策，见 §5 状态更新。## 1c. 2026-10-29 复审：AI 栈迁移 5.20.2 后豁免清零（仅 protobuf 2 条存活）
+# 依赖漏洞告警分诊（Dependabot alerts triage）日期：2026-09-21（同日按 CI 真实输出 + api.osv.dev 复核修订过一次）适用：`main` @ PR #100 之后　责任人：仓库所有者状态：**GitHub 上那 20 条 open 告警（10 个公告 × 2 份清单）已于 2026-09-21 全部按 §5 的映射逐条dismiss 完毕**（`requirements-lock.txt`、`launcher/requirements-small.txt` 各计一次）。但**扫描器视角的下界代价比这个大**：transformers 4.52.x 实际带 **16 个公告**，其中 8 个只有 PYSEC 号、没有 GHSA 记录 ——Dependabot 只跟 GHSA，所以那 8 条**根本不开单**，只有 pip-audit（OSV 全源）看得见。也就是说："把 20 条 dismiss 完" ≠ "4.52.x 的风险登记完"。本文 §1 是完整的 16+2 行。号与来源全部绑定证据（§1a），不凭记忆。## 1. 结论速览A1–A8 有 GHSA 记录（= Dependabot 那 16 条告警的来源）；A9–A16 是 PYSEC-only 的 ZDI 系列（Dependabot 不开单，pip-audit 会红）。P1/P2 与 transformers 无关。
+
+（2026-11-04 拆分自 9/10 列表，内容未改；两表按 `#` 同行号对齐）
+
+表 1：公告、修复面与处置
+
+| # | CVE | PYSEC / GHSA | 严重度 | 修复版本 | 处置 |
+|---|---|---|---|---|---|
+| A1 | CVE-2025-5197 | PYSEC-2026-1983 / GHSA-9356-575x-2w9m | MODERATE | 4.53.0 | 已接受风险（pip-audit 豁免） **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A2 | CVE-2025-6051 | PYSEC-2026-1988 / GHSA-rcv9-qm8p-9p6j | MODERATE | 4.53.0 | 已接受风险 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A3 | CVE-2025-6638 | PYSEC-2026-1981 / GHSA-59p9-h35m-wg4g | MODERATE | 4.53.0 | 已接受风险 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A4 | CVE-2025-6921 | PYSEC-2026-1980 / GHSA-4w7r-h757-3r74 | MODERATE | 4.53.0 | 已接受风险 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A5 | CVE-2026-1839 | PYSEC-2026-2288 / GHSA-69w3-r845-3855 | MODERATE（AV:L/UI:R） | 5.0.0rc3 | 已接受风险 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A6 | CVE-2026-4372 | PYSEC-2026-2289 / GHSA-29pf-2h5f-8g72 | **HIGH** | 5.3.0 | 已接受风险；Trivy 侧另需 `.trivyignore.yaml` **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A7 | CVE-2026-5241 | PYSEC-2026-2290 / GHSA-fgcw-684q-jj6r | **HIGH**（AV:N） | 5.5.0 | 已接受风险；Trivy 侧同上 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A8 | CVE-2026-9856 | PYSEC-2026-3929 / GHSA-xrqw-3rrv-vx5w | **HIGH**（AV:N） | 5.10.0 | 已接受风险；Trivy 侧同上 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A9 | CVE-2025-14920 | PYSEC-2025-211 / 无 GHSA | 未评（CVSS3.0 `AV:L/…/UI:R/C:H/I:H/A:H`） | **无** | 已接受风险（Dependabot 不开单） **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A10 | CVE-2025-14921 | PYSEC-2025-212 / 无 GHSA | 同上 | **无** | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A11 | CVE-2025-14924 | PYSEC-2025-213 / 无 GHSA | 同上 | **无** | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A12 | CVE-2025-14926 | PYSEC-2025-214 / 无 GHSA | 同上 | **无** | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A13 | CVE-2025-14927 | PYSEC-2025-215 / 无 GHSA | 同上 | **无** | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A14 | CVE-2025-14928 | PYSEC-2025-216 / 无 GHSA | 同上 | **无** | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A15 | CVE-2025-14929 | PYSEC-2025-217 / 无 GHSA | 同上 | **无** | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A16 | CVE-2025-14930 | PYSEC-2025-218 / 无 GHSA | 同上 | **无** | 同 A9 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A17 | 无 CVE（PYSEC-only） | PYSEC-2026-4174 / GHSA-x9r9-c232-4q39（2026-10-11 dependabot 告警 #23/#24 已 dismiss） | HIGH（影响 4.49.0–5.8.1） | 5.8.2（被引擎 pin `<4.53` 挡住，同 §2 A5–A8 口径） | 已接受风险（pip-audit 豁免，2026-10-02 登记）；2026-10-11 owner 授权 dismiss #23/#24（tolerable_risk，判据入 comment）；**复点维持**：indextts 放开 pin 后升 5.8.2 消解（§4-6）。**2026-10-12 上游复核（本轮实测）**：index-tts/index-tts main @ `d9e41aa`（2026-09-29，#806）pyproject.toml **仍钉 `transformers==4.52.1`**，releases 最新 v2.5.0（2026-08-13）未放开；PyPI 无 `indextts` 包（404，vendored editable 接入）→ **升级路径仍被阻塞**，维持复点 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A18 | 无 CVE（GHSA/PYSEC-only） | GHSA-4j2p-28q2-5m79 / PYSEC-2026-3804（2026-10-11 dependabot 告警 #25/#26 已 dismiss） | MEDIUM | **无官方修复版本**（OSV `last_affected=1.14.0` 无 fixed 事件；GitHub 咨询 `patched_versions` 为空；PyPI 最新 1.15.0 未获官方 fixed 标记） | 2026-10-11 owner 授权 dismiss #25/#26（tolerable_risk，判据入 comment；pip-audit 豁免 PYSEC-2026-3804 已入 security.yml）；**复点维持**：上游发布官方修复并经真机复验 indextts 加载链后升 ≥1.15.0（§4-6），复审 2026-12-31 同批 **已随迁注销（2026-10-29 复审：OSV 查询 0 公告，见 §1c）** |
+| A19 | CVE-2025-4565 | PYSEC-2026-1806 / GHSA-8qvm-5x2c-j2w7 | HIGH | 4.25.8（另有 5.29.5 / 6.31.1 并行修复线；3.x 无修复分支） | 已接受风险（pip-audit 豁免，2026-10-27 登记）；**复点**：audiotools 放开 protobuf 上界后回抬 ≥4.25.8（§4-6） |
+| A20 | CVE-2026-0994 | PYSEC-2026-1805 / GHSA-7gcm-g887-7qv7 | HIGH | 5.29.6（另有 6.33.5；3.x/4.x 无修复线） | 同 A19（pip-audit 豁免，2026-10-27 登记） |
+| P1 | —（历史编号，保留给 protobuf 跟踪条目互链） | 见 **A19/A20** | — | — | — |
+| P2 | —（历史编号，与 P1 同源） | 见 **A20** | — | — | — |
+
+表 2：具体代码路径与可达性判据
+
+| # | 具体代码路径 | 本仓可达性判据 |
+|---|---|---|
+| A1 | `convert_tf_weight_name_to_pt_weight_name()` 正则灾难性回溯 | `grep -rl convert_tf_weight_name_to_pt_weight_name app/ scripts/` → **0 命中**；本仓不做 TF→PT 权重名转换 |
+| A2 | `EnglishNormalizer.normalize_numbers()` 正则 | 同法 **0 命中**（`normalize_numbers` / `EnglishNormalizer` 各 0）；文本前处理走 voxcpm / indextts 自带前端，不用 transformers normalizer |
+| A3 | `MarianTokenizer.remove_language_code()` 正则 | `grep Marian app/ scripts/` → **0 命中**，本仓不加载 Marian 模型 |
+| A4 | `AdamWeightDecay._do_use_weight_decay()` 处理用户可控正则 | **0 命中**；且是**训练期**优化器，本仓不发训练（`training/` 由 AST 门禁隔离） |
+| A5 | `Trainer._load_rng_state()` 调 `torch.load()` 未带 `weights_only=True` | `grep "from transformers import Trainer"` → **0 命中**；`training/trainer.py` 的 `LoRATrainer` 是我们自己的类，不继承 HF `Trainer` |
+| A6 | 恶意 `config.json` 里 `_attn_implementation_internal` 指向攻击者仓库，`AutoModelForCausalLM.from_pretrained()` 加载时 RCE | 前提是**加载别人给的模型目录**。本仓权重全部来自 `model/` 本地目录，入库前人工确认 + SHA-256 复验（`LOCAL_RULES.md` 禁区流程）；唯一从 Hub 取物的是 `security/content_safety.py` 里固定 revision 的 CLIP tokenizer，模型名不接受用户输入 |
+| A7 | LightGlue 模型加载路径 `trust_remote_code` 失效 → 初始化期任意代码执行 | 本仓只加载 TTS 语音模型（voxcpm / indextts / funasr / zipenhancer），无视觉匹配模型；`grep LightGlue` → 0 |
+| A8 | `save_pretrained()` 经 chat template 造成路径穿越任意文件写 | `grep -rn save_pretrained app/ scripts/` → **0 命中**；音色保存写的是我们自己的目录 |
+| A9 | Perceiver 原始 checkpoint 反序列化 | ZDI 系列，入口都是**人工执行权重转换器**：`grep -riE "convert_[a-z_]*original_checkpoint\|PerceiverModel" app/ scripts/` → **0 命中** |
+| A10 | Transformer-XL 原始 checkpoint 反序列化 | 同 A9（`TransformerXL` 0 命中） |
+| A11 | megatron_gpt2 反序列化 | 同 A9（`megatron` 0 命中） |
+| A12 | SEW `convert_config` 代码注入 | 同 A9（`SEWModel` 0 命中） |
+| A13 | SEW-D `convert_config` 代码注入 | 同 A9（`SEWD` 0 命中） |
+| A14 | HuBERT `convert_config` 代码注入 | 同 A9（`HuBERT` 0 命中）；ASR 侧走 funasr 自有权重格式 |
+| A15 | X-CLIP checkpoint 转换反序列化 | 同 A9（`XCLIP` 0 命中）；CLIP 在本仓只做安全判定、且用 `AutoTokenizer` 不换 checkpoint |
+| A16 | GLM4 反序列化 | 同 A9；本仓无 LLM 对话模型 |
+| A17 | `GenerativePreTrainedModel.load_custom_generate()` 在 trust 校验前把远端 `custom_generate/generate.py` 写入 `~/.cache/huggingface/modules`（文件写不可逆；执行仍受 trust 门控） | `grep -rn "load_custom_generate\|custom_generate\|GenerativePreTrainedModel" app/ scripts/` → **0 命中**；本仓只加载 TTS/ASR 权重与 tokenizer，从不走 generative 自定义加载路径；且 `clean_launch.py` 设 `TRANSFORMERS_OFFLINE=1`/`HF_HUB_OFFLINE=1`，离线模式下远端模块拉取本身被禁 |
+| A18 | `load_checkpoint_in_model` / `load_checkpoint_and_dispatch` 对 sharded checkpoint 索引 `weight_map` 条目不做路径清洗（`../`/绝对路径 → 任意文件读；命名管道 → DoS） | 函数经 indextts `maskgct/codec_inference.py:291`（`load_checkpoint_and_dispatch`）**可达**，但输入是 `model/` 本地目录权重（入库前人工确认 + SHA-256 复验，LOCAL_RULES 禁区流程），无不可信输入路径；本仓 `app/` 无直调（仅自研 checkpoint.py 同名方法）。**升级阻断**：`accelerate==1.8.1` 为 vendored indextts 精确 pin（index-tts-main/pyproject.toml:31，GOTCHAS #348），升版即破坏引擎依赖图（同 A1–A8 口径）；且无官方修复版本可升 |
+| A19 | protobuf 纯 Python 后端 JSON/线格式解析递归组 DoS | 2.9.0 起锁内 protobuf 回落 3.19.6（descript-audiotools==0.7.2 元数据强制 <3.20，见 P1 说明），本条转为真实暴露。可达性：`grep google.protobuf app/` 零命中；protobuf 仅被 tensorboardX 生成物消费（训练实验链，输入是本机自产 event 文件），不解析任何不可信 wire 数据 |
+| A20 | protobuf JSON 递归深度绕过 | 同 A19（同一回落成因；同一可达性判据） |
+| P1 | — | 2026-10-27 前原计划"随批量升级一起抬"；因 audiotools 引导化（2.9.0）回落 3.19.6 成为前置条件，提前按已接受风险登记（A19/A20） |
+| P2 | — | 同 P1 |
+
+一句话：**17 个 transformers 公告里没有一个能靠"升个版"现在就消掉** —— A1–A4 要 4.53（被IndexTTS 的精确 pin 挡住，§2），A5–A8 要 5.x 大版本，A9–A16 **上游根本没有修复版本**，只能在 5.x 之后才可能出现。P1/P2 另说。**A17（transformers）/ A18（accelerate）是本仓锁内仅剩的两条可被 dependabot 开单的公告**：均无可行升级路径（引擎钉版阻断 / 无官方修复版本），2026-10-11 起 4 条 open 告警（#23–#26）保持待人工决策，见 §5 状态更新。## 1c. 2026-10-29 复审：AI 栈迁移 5.20.2 后豁免清零（仅 protobuf 2 条存活）
 
 §4-5/§4-6 约定的复审触发条件已于 2026-10-28/29 满足：PR **#238**（merge `b4fa366`）把血统整组迁到
 `transformers==5.20.2 + huggingface-hub==1.33.0 + tokenizers==0.23.3`（引擎 pin 放开 = 我们做了

@@ -21,7 +21,8 @@ use tauri::{
 };
 
 use python_process::{
-    emit_startup_status, resolve_app_dir, resolve_runtime_dir, PythonProcess, PythonState,
+    detect_python_mode, emit_startup_status, resolve_app_dir, resolve_runtime_dir, startup_entry,
+    PythonProcess, PythonState,
 };
 
 /// 应用关键目录集合（更新器、托盘、拖拽等模块共享）
@@ -36,10 +37,17 @@ pub struct AppPaths {
     pub updates_dir: PathBuf,
 }
 
-/// 主窗口导航到后端应用地址
+/// 主窗口导航到后端应用地址。
+///
+/// 入口随运行时形态变化：瘦包首次启动跑在引导解释器上（`app/bootstrap/`，无 torch），
+/// 此时必须落到「下载管理」页而不是首页——首页的推理功能在缺 torch 时不可用，
+/// 把用户丢在那里等于给了个打不开的空壳。
 fn navigate_to_app(app: &AppHandle, port: u16) {
     if let Some(win) = app.get_webview_window(window::MAIN_LABEL) {
-        let url = format!("http://127.0.0.1:{}/", port);
+        let mode = detect_python_mode(&resolve_app_dir());
+        let entry = startup_entry(mode);
+        log::info!("Python 运行时形态: {:?}，导航入口: '{}'", mode, entry);
+        let url = format!("http://127.0.0.1:{}/{}", port, entry);
         match url.parse() {
             Ok(url) => {
                 let _ = win.navigate(url);

@@ -32,11 +32,18 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import logging
 import os
 import shutil
 import sys
 from pathlib import Path
+
+# 中文 Windows 控制台默认 GBK：打印 ✅/❌/🎉 会 UnicodeEncodeError 并以非零码退出，
+# 让「文件已下载完」的任务被判成 failed（真机踩过）。统一把 stdout/stderr 转 UTF-8。
+for _stream in (sys.stdout, sys.stderr):
+    with contextlib.suppress(Exception):
+        _stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("download_models")

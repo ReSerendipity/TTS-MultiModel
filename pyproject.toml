@@ -77,6 +77,9 @@ dependencies = [
     # === AI 生态 ===
     "funasr>=1.0.0",
     "modelscope>=1.9.0",
+    # modelscope 的 audio/vc（Starganv3.py）在运行期直接 `from munch import Munch`，
+    # 但上游元数据未声明该依赖。显式钉住，避免依赖树变动后该类路径 ImportError。
+    "munch>=4.0.0",
     # modelscope 的 pipeline/config 解析在运行期需要 addict；引擎切换路径
     # （_load_voxcpm2_engine 强制 include_denoiser=True）会经 speech_zipenhancer
     # 走到它。缺失时降噪会降级关闭、音质下降，故列为生产依赖而非可选。

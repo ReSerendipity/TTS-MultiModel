@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -420,6 +421,154 @@ def _jsonpath_value(target: Path, path: str, type_: str) -> object:
         return doc
     except (json.JSONDecodeError, OSError, ValueError) as exc:
         return f"__unread__:{type(exc).__name__}: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# F2 补位：**git tag 也是版本位**（release-governance §1 说的"11 处"里没有它）。
+# 上一条闸只钉 `deploy/kubernetes/deployment.yaml` 的镜像 tag，于是出现过 v2.8.0
+# 那样的形状：tag 名写着 2.8.0、tag 指向的提交里 `pyproject.toml` 却不是 2.8.0 ——
+# 一致性测试全绿，因为没有任何一条闸去读 tag 指向的**历史提交**。
+# 这里不做"tag 必须等于当前工作树版本"（发版后主分支必然领先），只钉住
+# "每个 release tag 与它所指向的那次提交自身的版本位一致"。
+# ---------------------------------------------------------------------------
+
+_RELEASE_TAG = re.compile(r"v(\d+\.\d+\.\d+)")
+
+
+def _git(*args: str) -> tuple[int, str]:
+    """跑 git 并返回 (rc, stdout)。git 不存在或不在仓库里时由调用方决定 skip。"""
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return proc.returncode, proc.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return 127, ""
+
+
+def _release_tags() -> list[str] | None:
+    """取仓库里的 `vX.Y.Z` tag；**无法核对**（没 git / 不是 git 仓库）时返回 None。
+
+    刻意不用 `pytest.skip`：`scripts/check_release_readiness.py` 是**直接 import 并调用**
+    这些测试函数的（它把本文件复制进临时目录跑，那里没有 `.git`），`pytest.skip` 抛的是
+    `Skipped` 异常，会把那个脚本整条打断成 traceback + 非零退出（2026-11-08 实测 2 例红）。
+    用返回值把"环境不支持核对"和"核对失败"分开：前者 return，后者 assert。
+    """
+    rc, out = _git("tag", "--list", "v*")
+    if rc != 0:
+        return None
+    return [t for t in out.splitlines() if _RELEASE_TAG.fullmatch(t.strip())]
+
+
+#: 打 tag 时版本位没跟上的**历史** tag（无法用改写历史来修，只能登记）。
+#: 键=tag 名，值=(该 tag 实际自称的版本, 登记理由)。
+#: 这是棘轮，不是豁免清单：条目必须**仍然漂移**才算有效 —— 有人真的重新打过 tag 之后，
+#: `test_known_tag_drift_entries_are_still_accurate` 会红，逼着删掉这一行，免得多一条永久后门。
+#:
+#: v2.0.1：打的是轻量 tag，指向 538cf84（2026-07-23「docs: enhance community engagement…」），
+#: 那次提交的 `pyproject.toml` 还是 2.0.0、`version.json` **文件都还不存在** ——
+#: 即"先发版再补版本位"的旧流程产物。本仓那时还没有本文件这条闸。
+_KNOWN_TAG_DRIFT: dict[str, tuple[str, str]] = {
+    "v2.0.1": ("2.0.0", "2026-07-23 轻量 tag 指向 538cf84，当时版本位仍是 2.0.0 且无 version.json"),
+}
+
+
+def test_release_tags_match_the_version_they_point_at() -> None:
+    """每个 `vX.Y.Z` tag 指向的提交里，`pyproject.toml` 的 version 必须就是 X.Y.Z。
+
+    这条闸能红在三种真事故上：① tag 打错提交（打了下一个版本号、代码还是上一版）；
+    ② hotfix 直接改文件重打同名 tag（同一 tag 指向两个版本）；③ tag 名手滑（v2.8.0 打成 v2.8.10
+    却指向 2.8.0 的提交）。三者在发版当天都只表现为"用户装出来自称旧版本"。
+    """
+    tags = _release_tags()
+    if tags is None:
+        return  # 没 git / 不是仓库：本环境无从核对（readiness 脚本的临时副本就走这条路）
+    if not tags:
+        # 干净的普通克隆一定有 tag（tag 是仓库级的）；空列表只可能是浅克隆没拉 tag。
+        # 这里不 return 成绿：宁可红，也不要"没对象"被当成"通过"；只有浅克隆是已知的不可核对面。
+        shallow = _git("rev-parse", "--is-shallow-repository")[1]
+        if shallow == "true":
+            return
+        raise AssertionError(
+            "仓库里一个 vX.Y.Z release tag 都没有 —— 要么真的从未发版（那 §1 的版本位清单要改口径），"
+            "要么 tag 没跟着仓库走。两种都不该静默通过。"
+        )
+
+    bad: list[str] = []
+    known: list[str] = []
+    for tag in tags:
+        expected = _RELEASE_TAG.fullmatch(tag).group(1)  # type: ignore[union-attr]
+        rc, out = _git("show", f"{tag}:pyproject.toml")
+        if rc != 0:
+            bad.append(f"{tag}：取不到该 tag 指向的 pyproject.toml（tag 可能指向空树/子模块）")
+            continue
+        m = re.search(r'^version\s*=\s*"([^"]+)"', out, re.M)
+        if not m:
+            bad.append(f"{tag}：该提交的 pyproject.toml 里没有 version 行")
+            continue
+        actual = m.group(1)
+        if actual == expected:
+            continue
+        if tag in _KNOWN_TAG_DRIFT and actual == _KNOWN_TAG_DRIFT[tag][0]:
+            known.append(f"{tag}（自称 {actual}）：{_KNOWN_TAG_DRIFT[tag][1]}")
+            continue
+        bad.append(f"{tag}：tag 名说 {expected}，它指向的提交自称 {actual}")
+
+    assert not bad, (
+        "release tag 与它指向的版本位不一致（新打错 tag 会被这里拦住；已登记的历史 tag 见 _KNOWN_TAG_DRIFT）：\n  "
+        + "\n  ".join(bad)
+        + ("\n\n已登记的历史漂移（不影响本条判定）：\n  " + "\n  ".join(known) if known else "")
+    )
+
+
+def test_known_tag_drift_entries_are_still_accurate() -> None:
+    """豁免必须过期即红：tag 被重打/删除、或那份提交后来被修正，条目就成了永久后门。"""
+    if not _KNOWN_TAG_DRIFT:
+        return
+    tags = _release_tags()
+    if tags is None:
+        return  # 没 git / 不是仓库：无从核对（readiness 脚本的临时副本）
+    tagset = set(tags)
+    stale: list[str] = []
+    for tag, (recorded, reason) in _KNOWN_TAG_DRIFT.items():
+        if tag not in tagset:
+            stale.append(f"{tag}：tag 已不存在 —— 删掉这条豁免（{reason}）")
+            continue
+        rc, out = _git("show", f"{tag}:pyproject.toml")
+        if rc != 0:
+            stale.append(f"{tag}：取不到 pyproject.toml，豁免无法核对 —— 删掉或改条目（{reason}）")
+            continue
+        m = re.search(r'^version\s*=\s*"([^"]+)"', out, re.M)
+        actual = m.group(1) if m else ""
+        expected = _RELEASE_TAG.fullmatch(tag).group(1)  # type: ignore[union-attr]
+        if actual == expected:
+            stale.append(f"{tag}：它现在已经**不再**漂移（自称 {actual}）—— 删掉这条豁免")
+        elif actual != recorded:
+            stale.append(f"{tag}：自称版本从 {recorded} 变成了 {actual} —— 同步更新豁免里的值")
+    assert not stale, "已知 tag 漂移的登记过期了：\n  " + "\n  ".join(stale)
+
+
+def test_release_tag_names_do_not_collide() -> None:
+    """同一个版本号只能有一个 tag 名字。
+
+    允许 `v2.9.0`，但不允许 `v2.9.0` 与 `2.9.0` 或 `V2.9.0` 并存 —— 两条不同标签指同一版本，
+    下游 `git describe` 取到哪一条取决于字典序，等于让"当前版本"变成随机的。
+    """
+    rc, out = _git("tag", "--list")
+    if rc != 0:
+        return  # 没 git / 不是仓库：无从核对（readiness 脚本的临时副本，见 `_release_tags` 的说明）
+    lowered: dict[str, list[str]] = {}
+    for tag in [t.strip() for t in out.splitlines() if t.strip()]:
+        m = re.search(r"(?i)^v?(\d+\.\d+\.\d+)$", tag)
+        if not m:
+            continue
+        lowered.setdefault(m.group(1), []).append(tag)
+    collisions = {ver: names for ver, names in lowered.items() if len(names) > 1}
+    assert not collisions, "同一版本号存在多个 tag 名字（git describe 结果会不确定）：" + str(collisions)
 
 
 def test_bundled_changelog_describes_its_own_version() -> None:

@@ -14,9 +14,19 @@
 
 ## 台账模板（每次一行，按时间追加，不得改写历史行）
 
-| 日期 | 音色/persona | 基座 commit@sha256 | 数据 manifest@sha256 | 超参(batch/grad_accum/lr/r/α/iters) | 训练 loss | 验证 loss | 产物 card.yaml 路径 | 备注/结论 |
-|---|---|---|---|---|---|---|---|---|
-| （示例）2026-10-11 | new_persona | 69c1738@abc123… | train@def456… | 1/8/1e-4/8/16/2000 | 0.12 | 0.15 | lora/new_persona/card.yaml | 首跑，听感可接受，未达基线对比 |
+（2026-11-04 拆分自 9 列表，内容未改；两表按「日期 + 音色/persona」对齐，追加记录时两表各加一行）
+
+表 1：复现输入
+
+| 日期 | 音色/persona | 基座 commit@sha256 | 数据 manifest@sha256 | 超参(batch/grad_accum/lr/r/α/iters) |
+|---|---|---|---|---|
+| （示例）2026-10-11 | new_persona | 69c1738@abc123… | train@def456… | 1/8/1e-4/8/16/2000 |
+
+表 2：训练结果与产物
+
+| 日期 | 音色/persona | 训练 loss | 验证 loss | 产物 card.yaml 路径 | 备注/结论 |
+|---|---|---|---|---|---|
+| （示例）2026-10-11 | new_persona | 0.12 | 0.15 | lora/new_persona/card.yaml | 首跑，听感可接受，未达基线对比 |
 
 ## 真跑前检查清单
 

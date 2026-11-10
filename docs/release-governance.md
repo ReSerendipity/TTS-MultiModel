@@ -16,13 +16,16 @@
 - 遵循 **SemVer** `MAJOR.MINOR.PATCH`；预发布用 `-alpha.N` / `-beta.N` / `-rc.N`。
 - **已发布最新 = v2.9.0**（2026-10-27）。
 - **唯一权威版本位**：`pyproject.toml` `[project].version`，由 release-please manifest `.release-please-manifest.json` 的 `"."` 驱动（当前 `2.9.0`）。
-- 必须同步的其它版本位（仓库内跟踪共 11 处，数目以 `tests/test_version_consistency.py::_site_versions()` 实际返回为准）：
+- 必须同步的其它版本位（仓库内跟踪共 12 处；前 11 处数目以 `tests/test_version_consistency.py::_site_versions()` 实际返回为准，第 12 处是 **git tag 名**，由 `test_release_tags_match_the_version_they_point_at` 钉住）：
   `version.json` `$.version`、`config.yaml` 顶层 `version`、`desktop/package.json` `$.version`、
   `desktop/src-tauri/tauri.conf.json` `$.version`、`desktop/src-tauri/Cargo.toml` `$.package.version`、
   `desktop/src-tauri/Cargo.lock`、`scripts/installer/setup.nsi` 的 `!define APP_VERSION`（及其 `OutFile` / `VIProductVersion`）、
-  `deploy/kubernetes/deployment.yaml` 的镜像 tag、`CHANGELOG.md`、本文本句、`scripts/installer/version.json`（装配中间物）。
+  `deploy/kubernetes/deployment.yaml` 的镜像 tag、`CHANGELOG.md`、本文本句、`scripts/installer/version.json`（装配中间物）、
+  **`git tag` 名（`vX.Y.Z`）**——它不是文件里的一行，而是指向上一次发版提交的 ref，同样会漂：
+  tag 与它指向那份提交的 `pyproject.toml` 不一致时，用户装出来的包会自称另一个版本。
   （`desktop/package-lock.json` 在 `.gitignore` 里，不是仓库内版本位。）
 - 版本位漂移由 `tests/test_version_consistency.py::test_all_version_sites_agree` 逐条比对钉住——**漂一处即判红**；失败信息逐条标注哪处「RP 自动」、哪处「手工同步」。
+- **git tag 也上闸（F2，2026-11-08）**：`test_release_tags_match_the_version_they_point_at` 用 `git show <tag>:pyproject.toml` 读**每个 release tag 指向的那次提交**，比对 tag 名与它自称的版本；`test_release_tag_names_do_not_collide` 禁止同版本多 tag 名。历史遗留 `v2.0.1`（轻量 tag 指向 538cf84，那次提交还是 2.0.0、且当时没有 `version.json`）登记在 `_KNOWN_TAG_DRIFT` 里并**逐条断言仍然漂移**——一旦有人重打 tag 修好，`test_known_tag_drift_entries_are_still_accurate` 会红，逼着删掉豁免，不留永久后门。
 - 自动化方式：**release-please（自动位 + 人工补齐）**，备用手工 tag 路径见 §3。
   - **自动位（release-please 直接改）**：
     - `pyproject.toml`（python release-type 自带）；
@@ -85,7 +88,7 @@
 
 ## 7. 发布前检查清单
 
-- [ ] 版本位全部同步（见 §1 清单；`tests/test_version_consistency.py::test_all_version_sites_agree` 绿）
+- [ ] 版本位全部同步（见 §1 清单；`tests/test_version_consistency.py::test_all_version_sites_agree` 与 `::test_release_tags_match_the_version_they_point_at` 均绿）
 - [ ] `version.json` 的 `changelog` / `release_date` 已改本次版本（`test_bundled_changelog_describes_its_own_version` 拦旧说明）
 - [ ] CHANGELOG 已收敛（自动路径由 RP 生成；手工路径 `[Unreleased]` → `[VERSION] - YYYY-MM-DD`）
 - [ ] 全量 pytest 通过（非 GPU 回归 0 failed）
