@@ -12,6 +12,8 @@
 | 历史 | 时点记录（演练留痕、审计快照、已完成的批次报告），只作追溯 |
 | 废弃 | 已被后继文档取代，或文件自身声明作废 |
 
+文档总数 **320（`git ls-files` 口径）**；不含 `.qoder-snapshots/`（17）与 `local/docs-archive/`（本地归档）。
+
 索引范围：`docs/` 全部 Markdown 逐个列出（22 篇根 + 5 篇 ADR + 2 篇 runbooks = 29 篇 tracked）；仓根入口文档逐个列出；`local/`、`_archive/`、`output/`、`.qoder/`、`model/`、`reference_repos/` 为本地归档 / 运行产物 / 第三方副本，只到目录级。
 
 ## 一、入口文档（仓根）

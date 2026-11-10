@@ -1,3 +1,5 @@
+> 状态：历史（2026-11-10 标记）。v2.2.1 整改追踪已完成其阶段使命，保留作追溯；不再作为现行行动清单。
+
 # TTS_MultiModel v2.2.1 — 安全评估整改追踪表（家族复用 Image_MultiModel 流程）
 
 > 配套：Image_MultiModel `docs/_devarchive/SECURITY_ASSESSMENT_v2.0.0.md` 与 `docs/SECURITY_REMEDIATION_TRACKER.md`
