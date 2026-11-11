@@ -43,7 +43,7 @@ Six open-source TTS engines — voice cloning, voice design, multi-character scr
 
 ### 系统架构
 
-![系统架构](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg)
+![系统架构](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6-20261112.svg)
 
 客户端（Web UI / CLI / OpenAI 兼容 API）→ FastAPI 引擎注册表 → 六套本地引擎 + Edge-TTS 在线兜底 → SQLite 历史 / outputs / personas。
 
@@ -183,7 +183,7 @@ The **code is Apache-2.0 and ships with no model weights**. You download weights
 
 ### Architecture
 
-![Architecture](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6.svg)
+![Architecture](https://gcore.jsdelivr.net/gh/ReSerendipity/TTS-MultiModel@main/docs/assets/readme-tts-multimodel-6-20261112.svg)
 
 Clients (web UI / CLI / OpenAI-compatible API) → FastAPI engine registry → six local engines + Edge-TTS online fallback → SQLite history / outputs / personas.
 

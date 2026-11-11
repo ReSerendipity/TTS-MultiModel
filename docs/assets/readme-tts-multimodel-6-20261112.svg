@@ -39,29 +39,33 @@
   <!-- Layer 3: engines -->
   <text x="40" y="316" fill="#8b7cf6" font-size="11" font-weight="600">ENGINES</text>
   <g font-size="12">
-    <rect x="40"  y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
-    <text x="114" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">VoxCPM2</text>
-    <text x="114" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">design · clone · script</text>
+    <rect x="40"  y="328" width="124" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="102" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">VoxCPM2</text>
+    <text x="102" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10">design · clone · script</text>
 
-    <rect x="208" y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
-    <text x="282" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">IndexTTS 2.5</text>
-    <text x="282" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">zero-shot synthesis</text>
+    <rect x="180" y="328" width="124" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="242" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">IndexTTS 2.5</text>
+    <text x="242" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10">zero-shot synthesis</text>
 
-    <rect x="376" y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
-    <text x="450" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">IndexTTS 2.0</text>
-    <text x="450" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">zero-shot synthesis</text>
+    <rect x="320" y="328" width="124" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="382" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">IndexTTS 2.0</text>
+    <text x="382" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10">zero-shot synthesis</text>
 
-    <rect x="544" y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
-    <text x="618" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">OpenVoice VC</text>
-    <text x="618" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">audio-to-audio voice convert</text>
+    <rect x="460" y="328" width="124" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="522" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">Breeze TTS 2</text>
+    <text x="522" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10">local LLM-TTS</text>
 
-    <rect x="712" y="328" width="148" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
-    <text x="786" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">Step-Audio-EditX</text>
-    <text x="786" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10.5">emotion / prosody edit</text>
+    <rect x="600" y="328" width="124" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="662" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">OpenVoice VC</text>
+    <text x="662" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10">voice convert</text>
 
-    <rect x="880" y="328" width="148" height="54" rx="9" fill="#16202a" stroke="#2f6f8f"/>
-    <text x="954" y="352" text-anchor="middle" fill="#bfe3f5" font-weight="600">Edge-TTS</text>
-    <text x="954" y="370" text-anchor="middle" fill="#7fb4cc" font-size="10.5">online CPU fallback</text>
+    <rect x="740" y="328" width="124" height="54" rx="9" fill="#1a1d24" stroke="#2a2e38"/>
+    <text x="802" y="352" text-anchor="middle" fill="#e6e8eb" font-weight="600">Step-Audio-EditX</text>
+    <text x="802" y="370" text-anchor="middle" fill="#9aa0aa" font-size="10">emotion / prosody edit</text>
+
+    <rect x="880" y="328" width="124" height="54" rx="9" fill="#16202a" stroke="#2f6f8f"/>
+    <text x="942" y="352" text-anchor="middle" fill="#bfe3f5" font-weight="600">Edge-TTS</text>
+    <text x="942" y="370" text-anchor="middle" fill="#7fb4cc" font-size="10">online CPU fallback</text>
   </g>
 
   <line x1="520" y1="382" x2="520" y2="420" stroke="#5b6270" stroke-width="1.5" marker-end="url(#arr)"/>
