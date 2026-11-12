@@ -385,7 +385,11 @@ tests/frontend/_rendered/
 # AI 规范与内部工作文档（仅本地保留，不上传远程，2026-08-27）
 AGENTS.md
 # §12.2 结构收敛：local/ 为私有内部文档目录（本仓私有，内容不入库）
-/local/
+/local/*
+!/local/agents/
+/local/agents/*
+!/local/agents/GOTCHAS.md
+!/local/agents/REVISION_LOG.md
 FIX_LOG.md
 docs/FILEMAP.md
 docs/README.md
@@ -406,7 +410,9 @@ data/
 .git.backup/
 
 # AGENTS 瘦身重构下沉子文档（仅本地保留，随 AGENTS.md 一起不入库，2026-09-03）
-docs/agents/
+docs/agents/*
+!docs/agents/GOTCHAS.md
+!docs/agents/REVISION_LOG.md
 
 # --- 2026-09-06 目录整理补齐（方案 A：路径不动，仅排除）---
 pretrained_models/
