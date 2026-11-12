@@ -2,6 +2,57 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。同理，条目中提及的 `docs/project/`、`docs/_devarchive/`、`docs/reports/`、`docs/agents/` 等本地文档路径已于 2026-11-04 迁至 `local/docs-archive/`（本地归档，未随仓库发布），条目内路径按迁移前写法原样保留。
 
+## [2.10.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.9.0...v2.10.0) (2026-11-12)
+
+
+### Features
+
+* **backup:** O4 覆盖边界 —— 备份集从「只有 history.db」变成整集（密钥/版本库/审计日志）并如实记账缺项 ([9fe6986](https://github.com/ReSerendipity/TTS-MultiModel/commit/9fe698683f525cb068b2e5049d65ecb2a88dba84))
+* **desktop:** 原生标题栏 + 单文件安装包 ([17e8b28](https://github.com/ReSerendipity/TTS-MultiModel/commit/17e8b28745f703766e0a576df5031a447ad37e52))
+* **desktop:** 瘦包 + 程序内下载管理（引导态真机口径） ([a24c44d](https://github.com/ReSerendipity/TTS-MultiModel/commit/a24c44d65fc593a6310ec15c94f32d0765f27165))
+* **downloads:** 模型清单（官方源）+ 修复模型下载失败误报 ([6384d48](https://github.com/ReSerendipity/TTS-MultiModel/commit/6384d481ac296b27df81d0cd7584d0f75716b821))
+* **downloads:** 环境包产线（runtime-v1）+ 清单更新 ([cb6f31d](https://github.com/ReSerendipity/TTS-MultiModel/commit/cb6f31d86ebaf798ec5d0292a3a2344aeefbc73c))
+* **f6:** 未检行分类/隔离预案/回滚断言脚本与 B19/B25/B28 决策口径回写 ([e63e517](https://github.com/ReSerendipity/TTS-MultiModel/commit/e63e517d54f923db54799b83f29ec6f31a556614))
+* **ops:** O4 备份链路可修半边——F3 死路径退役、覆盖可判定、调度登记产物（阶段 9） ([56ea027](https://github.com/ReSerendipity/TTS-MultiModel/commit/56ea0279296bdc43a045bbc5bc0299869ebfa2de))
+* **runtime:** 安装模式切「在线拉官方索引」，不再托管 GB 级环境包 ([2faeb91](https://github.com/ReSerendipity/TTS-MultiModel/commit/2faeb9100562451dfce5de128b6f52f2b3dc2d19))
+
+
+### Bug Fixes
+
+* **build:** 打包时显式补拷完整性公钥进卷 ([f5f22d0](https://github.com/ReSerendipity/TTS-MultiModel/commit/f5f22d01b8fb5b6569322a98cae0c936d9b7f6f6))
+* **ci+tests:** build-release 固定 tag 检出防错版资产 + 两处 flaky 用例根治 ([e31664a](https://github.com/ReSerendipity/TTS-MultiModel/commit/e31664a01dd103a743b6fa9693bf07db70541c18))
+* **ci+tests:** build-release 固定 tag 检出防错版资产 + 两处 flaky 用例根治 ([49332cc](https://github.com/ReSerendipity/TTS-MultiModel/commit/49332ccb23431925c88499728550bd716aada68e))
+* **ci:** training-extra hub 上界随 AI 栈迁移改 &lt;2.0 ([daa60fe](https://github.com/ReSerendipity/TTS-MultiModel/commit/daa60fe7486b0cedf95f5a3edbdfe879330788d8))
+* **config:** vram_gb/ram_gb 放宽为 ge=0 修复 F4 校验回退（无权重引擎 0 值为真实语义） ([cabed0f](https://github.com/ReSerendipity/TTS-MultiModel/commit/cabed0fb628c1ce093c533865d5607ea59155ddb))
+* **deps:** G4③ 三份依赖清单的红闭环，并把闸搬进 pytest（脚本被 gitignore，CI 从没跑过） ([1a5b766](https://github.com/ReSerendipity/TTS-MultiModel/commit/1a5b76684e22d8e94a0131041bfa727fa699e82b))
+* **desktop:** 升级 zip 至 9.3.0 并关闭 updater 插件 zip feature，消除 Trivy CRITICAL CVE-2026-115905 ([2d48405](https://github.com/ReSerendipity/TTS-MultiModel/commit/2d484051cc68c43c4ca8824140171c7e125146a0))
+* **desktop:** 统一自适应 CSRF 优雅关闭并补齐壳命令清单 ([b2baed4](https://github.com/ReSerendipity/TTS-MultiModel/commit/b2baed4f2dffc0f729f422394e184e6a3f504a1e))
+* **docs:** F7 文档解释器入口改指仓库唯一解析入口 + F8 钩子漂移登记（阶段 13） ([20d13d6](https://github.com/ReSerendipity/TTS-MultiModel/commit/20d13d647cbd18cd086eae18102454fdc1e15af0))
+* **engines:** backfill transformers 4.52 symbols so IndexTTS 2.5 runs on 5.20.2 ([ba78502](https://github.com/ReSerendipity/TTS-MultiModel/commit/ba7850212903887e25f4b5c6d0237707fff76e55))
+* **engines:** extend indextts_tf_compat shim for transformers 5.20.2 ([ddee738](https://github.com/ReSerendipity/TTS-MultiModel/commit/ddee738ee83eac713084015d177e4ce6d59d9cc0))
+* **engines:** support 4.x check_model_inputs form for breeze vendor on 5.20.2 ([dd19417](https://github.com/ReSerendipity/TTS-MultiModel/commit/dd19417be928a22041f6afbbd890d61b967aed80))
+* **f6:** 执行 D 批隔离 15 条 needs_manual（主表 333→318，回滚实测通过） ([e126584](https://github.com/ReSerendipity/TTS-MultiModel/commit/e1265846f678ce84adb5c2d395103b0cb1aa4319))
+* **generate:** 修四处生成路径缺陷并补异常场景用例，纠正 mypy 基线口径 ([fb4f3f7](https://github.com/ReSerendipity/TTS-MultiModel/commit/fb4f3f77354b2acf37f5511b5c985fb8c7f67c31))
+* **ops:** O4 备份调度注册成文 + O3 切换演练扩多路径 + F8 钩子接线（2026-11-06 整改轮） ([28d41ff](https://github.com/ReSerendipity/TTS-MultiModel/commit/28d41ffc383c54c6b9323346416e5a8d2f8ed021))
+* **scripts:** 修复 download_models.py 里遗留的 stash 冲突标记 ([2eda5a7](https://github.com/ReSerendipity/TTS-MultiModel/commit/2eda5a7785a95b41b3866e0140a18f3e7cd083e7))
+* **server:** type ssl_kwargs as dict[str, Any] for uvicorn kwargs unpack ([9f994dd](https://github.com/ReSerendipity/TTS-MultiModel/commit/9f994dd5ebb7114f9f2b988b355aa94731355a67))
+* **sre:** D-2 降级链修复（自动降级+edge-tts 直连路由+守卫放宽）+ D-1/AGENTS 决策登记（阶段4） ([036e78b](https://github.com/ReSerendipity/TTS-MultiModel/commit/036e78b6e092da36e88b056055172f5ee22ca05e))
+* **sre:** 回滚脚本兼容 merge 提交 + Bus Factor 登记 + 回滚版本位硬停断言（阶段3） ([019436a](https://github.com/ReSerendipity/TTS-MultiModel/commit/019436a15e6d8b09edd2d30c4964f2e7417cd31d))
+
+
+### Documentation
+
+* archive dated drill and remediation records into _archive ([8999597](https://github.com/ReSerendipity/TTS-MultiModel/commit/8999597ff2f10cd7b1cb65d8dfab96c44718a4cb))
+* **readme:** 架构 SVG 补 Breeze TTS 2 引擎并换带日期新名（§8.1.2/§8.1.4） ([d4d71aa](https://github.com/ReSerendipity/TTS-MultiModel/commit/d4d71aad9d1880973dd64262040cc78f5c43f0c6))
+* **readme:** 补充使用边界与合成内容标识说明 ([8be341b](https://github.com/ReSerendipity/TTS-MultiModel/commit/8be341b752126aec7e86d2e8f35fb9b59b7ad85b))
+* **readme:** 首次引导图改为走完四步后的工作台实况（§8.1.4） ([19ca8bb](https://github.com/ReSerendipity/TTS-MultiModel/commit/19ca8bbebcafa9c41a634aed7b40ba24d3ae436a))
+* **security:** post-migration exemption review — retire 18 of 20 pip-audit ignores ([8a0851d](https://github.com/ReSerendipity/TTS-MultiModel/commit/8a0851da8efc1abfd36e6303867951635da61ef8))
+* **security:** post-migration exemption review — retire 18 of 20 pip-audit ignores ([c71c6f5](https://github.com/ReSerendipity/TTS-MultiModel/commit/c71c6f5fef20aea1dbba6618ca117852ebf49309))
+* **template:** sync screenshot provenance section from org PR template ([#231](https://github.com/ReSerendipity/TTS-MultiModel/issues/231)) ([285f891](https://github.com/ReSerendipity/TTS-MultiModel/commit/285f89178e93a2bc095f98a1026af75eb77004a8))
+* 整理文档并建立 docs/INDEX.md（WO-DOC-B01） ([b09f15c](https://github.com/ReSerendipity/TTS-MultiModel/commit/b09f15c882e9da20b94ac87ba14dc18f8a80aa50))
+* 新增 ARCHITECTURE.md（§12.5 通用工程件） ([4097440](https://github.com/ReSerendipity/TTS-MultiModel/commit/4097440bc01e8df5b0f29c903684303747e80250))
+* 迁移 183 篇本地文档至 local、ADR 入库与 SKILL 收敛 ([34ef17f](https://github.com/ReSerendipity/TTS-MultiModel/commit/34ef17fa8bbd649c1b437a3adeaa01982c9a31e2))
+
 ## [2.9.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.8.0...v2.9.0) (2026-10-27)
 
 
