@@ -154,7 +154,7 @@ def compute_voice_fingerprint(
         parts.append(f"{os.path.basename(path)}:{stat.st_size}:{stat.st_mtime_ns}")
     if not parts:
         return ""
-    return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
 class VoiceDerivedCache:
