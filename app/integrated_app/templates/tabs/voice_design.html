@@ -147,6 +147,14 @@
                                         </select>
                                     </div>
                                 </div>
+                                {# 边收边播开关：无 name，仅由 submitStreaming 读取并放进 SSE FormData；
+                                   不参与 htmx 表单提交，避免给 /api/generate/voxcpm_design 带未知字段。 #}
+                                <div class="fg" style="margin-top:6px">
+                                    <label for="vd-prefer-streaming" style="display:flex;align-items:center;gap:6px;font-size:12px">
+                                        <input type="checkbox" id="vd-prefer-streaming" checked>
+                                        {{ "stream_play_while_receiving"|t(lang, default="边收边播（关闭后等整段合成完再显示播放器）") }}
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
@@ -621,6 +629,8 @@
     };
 
     // Streaming generation - generates audio chunks progressively via SSE
+    // 边收边播：每个 audio 块到达即入 Web Audio 队列播放，不再等 done.filename。
+    // prefer_streaming=false 时保留旧行为（整段块攒到 done 再显示内嵌播放器）。
     window.submitStreaming = async function() {
         var form = document.getElementById('vd-form');
         if (!form) return;
@@ -639,28 +649,96 @@
             var emptyState = resultEl.querySelector('#vd-empty-state');
             if (emptyState) emptyState.style.display = 'none';
         }
-        statusEl.innerHTML = '<div class="hint-text">{{ "streaming_gen"|t(lang) }}<div class="progress-bar" style="margin-top:6px"><div class="progress-fill" style="width:0%"></div></div></div>';
+
+        var preferEl = document.getElementById('vd-prefer-streaming');
+        var useStreaming = !preferEl || preferEl.checked;
+        var liveQueue = null;
+        if (useStreaming) {
+            if (window.StreamingPlayback && StreamingPlayback.supported) {
+                // 必须在任何 await 之前创建：AudioContext 的解锁依赖本次点击手势。
+                liveQueue = StreamingPlayback.begin({ label: 'voice-design' });
+            } else {
+                useStreaming = false;
+                if (window.Toast) Toast.show('当前浏览器不支持 Web Audio，已回退整段生成', 'warning');
+            }
+        }
+
+        var progress = (window.StreamingPlayback)
+            ? StreamingPlayback.createProgress(1, { text: text })
+            : { total: 1, currentSegment: 0, chunksInSegment: 0, totalChunks: 0,
+                setTotal: function() {}, startSegment: function() {}, addChunk: function() {},
+                markDone: function() {}, percent: function() { return 0; } };
+
+        var audioChunks = [];        // 仅 prefer_streaming=false 的旧整段路径使用
+        var receivedChunks = 0;
+        var receivedSamples = 0;
+        var sampleRate = 48000;
+        var sawDone = false;
+        var sawError = false;
+        var firstChunkLogged = false;
+        var uiTimer = null;
+        var lastPhaseText = '{{ "streaming_gen"|t(lang) }}';
+
+        if (window.performance && performance.mark) performance.mark('tts-stream-start');
+
+        statusEl.innerHTML = '<div class="stream-panel" role="status" aria-live="polite">'
+            + '<div class="hint-text" data-stream-phase>{{ "streaming_gen"|t(lang) }}</div>'
+            + '<div class="progress-bar" style="margin-top:6px"><div class="progress-fill" data-stream-fill style="width:0%"></div></div>'
+            + '<div class="hint-text" data-stream-stats style="font-size:10px;margin-top:5px;display:flex;gap:10px;flex-wrap:wrap"></div>'
+            + '<div class="hint-text" data-stream-live style="font-size:10px;margin-top:2px;color:#22c55e"></div>'
+            + '</div>';
+        var panel = {
+            phase: statusEl.querySelector('[data-stream-phase]'),
+            fill: statusEl.querySelector('[data-stream-fill]'),
+            stats: statusEl.querySelector('[data-stream-stats]'),
+            live: statusEl.querySelector('[data-stream-live]')
+        };
+
+        function updatePanel(phaseText) {
+            if (!panel || !panel.fill) return;
+            var pct = progress.percent();
+            panel.fill.style.width = pct + '%';
+            if (phaseText) lastPhaseText = phaseText;
+            if (panel.phase) panel.phase.textContent = lastPhaseText + ' · ' + pct.toFixed(1) + '%';
+            var qs = liveQueue ? liveQueue.stats() : null;
+            var audioSeconds = qs ? qs.audioSeconds : (sampleRate ? receivedSamples / sampleRate : 0);
+            var parts = [];
+            parts.push('第 ' + (progress.currentSegment || 0) + '/' + progress.total + ' 段');
+            parts.push('本段 ' + progress.chunksInSegment + ' 块');
+            parts.push('共 ' + progress.totalChunks + ' 块');
+            parts.push('音频 ' + (window.StreamingPlayback ? StreamingPlayback.formatSeconds(audioSeconds) : audioSeconds.toFixed(1)) + 's');
+            if (qs && qs.firstSoundMs !== null) {
+                parts.push('首声 ' + StreamingPlayback.formatSeconds(qs.firstSoundMs / 1000, 2) + 's');
+            }
+            if (qs && qs.remainingSeconds > 0.2) {
+                parts.push('待播 ' + StreamingPlayback.formatSeconds(qs.remainingSeconds) + 's');
+            }
+            if (qs && qs.underruns) parts.push('断流 ' + qs.underruns + ' 次');
+            if (panel.stats) panel.stats.textContent = parts.join(' · ');
+            if (panel.live) {
+                panel.live.textContent = qs
+                    ? ('● 边收边播中' + (qs.remainingSeconds > 0.2
+                        ? '（队列还有 ' + StreamingPlayback.formatSeconds(qs.remainingSeconds) + 's）'
+                        : ''))
+                    : '整段模式：等合成完成后显示播放器';
+            }
+        }
+
+        if (liveQueue) {
+            uiTimer = setInterval(function() { updatePanel(); }, 250);
+        }
 
         var formData = new FormData();
         formData.append('text', text);
         formData.append('persona_name', personaName || '');
+        formData.append('prefer_streaming', useStreaming ? 'true' : 'false');
 
-        var audioChunks = [];
-        var sampleRate = 48000;
-        var totalSegments = 1;
-        var currentSegment = 0;
-        var logEl = statusEl.querySelector('.hint-text');
-        var fillEl = statusEl.querySelector('.progress-fill');
-
-        function updateProgress(pct, msg) {
-            if (fillEl) fillEl.style.width = pct + '%';
-            if (logEl && msg) {
-                logEl.innerHTML = msg + '<div class="progress-bar" style="margin-top:6px"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
+        function finishUiTimer() {
+            if (uiTimer) {
+                clearInterval(uiTimer);
+                uiTimer = null;
             }
         }
-
-        // 注：createWavBlob / playStreamingAudio 已随"流式完成不自动播放、改由
-        // 内嵌播放器（EmbeddedPlayer）点播"一并移除（见 AGENTS.md（本地维护、不随仓库分发） Known Gotchas #9）。
 
         try {
             var csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
@@ -675,6 +753,8 @@
                 if (response.status === 403) {
                     errMsg = (window.I18N && window.I18N['csrf_error']) || '安全验证失败，请刷新页面后重试';
                 }
+                if (liveQueue) liveQueue.stop();
+                finishUiTimer();
                 statusEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">' + errMsg + '</div></div>';
                 if (window.Toast) Toast.show(errMsg, 'error');
                 return;
@@ -693,34 +773,48 @@
                     case 'meta':
                         try {
                             var meta = JSON.parse(currentData);
-                            totalSegments = meta.total_segments || 1;
+                            progress.setTotal(meta.total_segments || 1);
                             sampleRate = meta.sample_rate || 48000;
-                            updateProgress(0, '{{ "streaming_gen"|t(lang) }} - ' + totalSegments + ' segments');
+                            if (liveQueue) liveQueue.setSampleRate(sampleRate);
+                            updatePanel('{{ "streaming_gen"|t(lang) }} - ' + progress.total + ' segments');
                         } catch (e) { /* ignore */ }
                         break;
 
                     case 'progress':
                         try {
                             var prog = JSON.parse(currentData);
-                            currentSegment = prog.segment || 0;
-                            totalSegments = prog.total || 1;
-                            var pct = ((currentSegment - 1) / totalSegments) * 80;
-                            updateProgress(pct, '{{ "generating_segment"|t(lang) }} ' + currentSegment + '/' + totalSegments);
+                            progress.setTotal(prog.total || progress.total);
+                            progress.startSegment(prog.segment || 0);
+                            updatePanel('{{ "generating_segment"|t(lang) }} ' + progress.currentSegment + '/' + progress.total);
+                            console.info('[TTS-Streaming] segment ' + progress.currentSegment + '/' + progress.total
+                                + ' pct=' + progress.percent() + '% chunks=' + progress.totalChunks);
                         } catch (e) { /* ignore */ }
                         break;
 
                     case 'audio':
                         try {
-                            var binaryString = atob(currentData);
-                            var len = binaryString.length;
-                            var bytes = new Uint8Array(len);
-                            for (var j = 0; j < len; j++) {
-                                bytes[j] = binaryString.charCodeAt(j);
+                            var pcm = StreamingPlayback.decodePCM16Base64(currentData);
+                            receivedChunks += 1;
+                            receivedSamples += pcm.length;
+                            progress.addChunk(pcm.length, sampleRate);
+                            if (liveQueue) {
+                                liveQueue.enqueue(pcm);
+                                if (!firstChunkLogged) {
+                                    firstChunkLogged = true;
+                                    var firstStats = liveQueue.stats();
+                                    console.info('[TTS-Streaming] first audio chunk ' + JSON.stringify({
+                                        chunk: receivedChunks,
+                                        firstChunkMs: Math.round(firstStats.firstChunkMs || 0),
+                                        firstSoundMs: Math.round(firstStats.firstSoundMs || 0),
+                                        samples: pcm.length,
+                                        sampleRate: sampleRate
+                                    }));
+                                    if (window.performance && performance.mark) performance.mark('tts-stream-first-audio');
+                                }
+                            } else {
+                                audioChunks.push(pcm);
                             }
-                            var int16Array = new Int16Array(bytes.buffer.slice(0));
-                            audioChunks.push(int16Array);
-                            var currentPct = ((currentSegment) / totalSegments) * 80 + (audioChunks.length / totalSegments) * 20;
-                            updateProgress(Math.min(currentPct, 95), '{{ "received_chunk"|t(lang) }} #' + audioChunks.length);
+                            updatePanel();
                         } catch (e) {
                             console.warn('[Streaming] Audio chunk decode failed:', e);
                         }
@@ -729,17 +823,46 @@
                     case 'done':
                         try {
                             var doneData = JSON.parse(currentData);
-                            updateProgress(100, '{{ "stream_complete"|t(lang) }} - ' + doneData.filename);
-                            // 不再自动播放：结果卡换入内嵌播放器（波形+可拖动进度条），
-                            // 由用户手动点播，避免隐形播放 / 双音源叠加
+                            sawDone = true;
+                            progress.markDone();
+                            updatePanel('{{ "stream_complete"|t(lang) }}');
+                            finishUiTimer();
+                            var metrics = liveQueue ? liveQueue.finish() : null;
+                            if (metrics) {
+                                window.__lastStreamingMetrics = metrics;
+                                console.info('[TTS-Streaming] done', JSON.stringify(metrics));
+                                if (window.performance && performance.mark) performance.mark('tts-stream-done');
+                            } else {
+                                window.__lastStreamingMetrics = {
+                                    label: 'voice-design', mode: 'whole', chunks: receivedChunks,
+                                    samples: receivedSamples,
+                                    audioSeconds: sampleRate ? receivedSamples / sampleRate : 0
+                                };
+                            }
+                            var summary = (metrics && metrics.chunks)
+                                ? ('首声 ' + StreamingPlayback.formatSeconds(metrics.firstSoundMs / 1000, 2) + 's · '
+                                    + metrics.chunks + ' 块 · 音频 ' + StreamingPlayback.formatSeconds(metrics.audioSeconds) + 's · '
+                                    + '断流 ' + metrics.underruns + ' 次')
+                                : ('整段生成 · ' + receivedChunks + ' 块 · 音频 '
+                                    + (sampleRate ? (receivedSamples / sampleRate).toFixed(1) : '0.0') + 's');
+                            // 结果卡换入内嵌播放器（波形+可拖动进度条），由用户手动点播；
+                            // 实时队列若还有积压会继续播完，用户点回放时先停掉实时队列，避免双音源叠加。
                             if (doneData.filename && window.EmbeddedPlayer) {
                                 resultEl.innerHTML = '<div data-audio-filename="' + doneData.filename + '">'
                                     + window.EmbeddedPlayer.html('/api/audio/' + encodeURIComponent(doneData.filename))
-                                    + '<div class="status-message success">生成完成 - ' + doneData.filename + '</div></div>';
+                                    + '<div class="status-message success">生成完成 · ' + summary + ' · ' + doneData.filename + '</div></div>';
                                 window.EmbeddedPlayer.scan();
                                 // 与 htmx 路径共用生成后接线：显示后处理区 + 回填 vd-result-audio。
                                 // 流式此前只做了前者，漏了回填，点「保存为音色」会被后端判为"缺少音频"。
-                                window.wireGenerationResult(resultEl);
+                                if (window.wireGenerationResult) window.wireGenerationResult(resultEl);
+                                if (liveQueue) {
+                                    resultEl.addEventListener('click', function(ev) {
+                                        var target = ev.target;
+                                        if (target && target.closest && target.closest('.ep-play')) {
+                                            liveQueue.stop();
+                                        }
+                                    });
+                                }
                             }
                         } catch (e) {
                             console.warn('[Streaming] Done event parse failed:', e);
@@ -749,6 +872,9 @@
                     case 'error':
                         try {
                             var errData = JSON.parse(currentData);
+                            sawError = true;
+                            if (liveQueue) liveQueue.stop();
+                            finishUiTimer();
                             var errBlock = document.createElement('div');
                             errBlock.className = 'tts-error-block';
                             errBlock.setAttribute('role', 'alert');
@@ -802,7 +928,16 @@
             if (currentEvent && currentData) {
                 processEvent();
             }
+
+            if (!sawDone && !sawError) {
+                // 连接在 done 之前断掉：停止已排队音频并明确提示，不留下“半截播放但无结果”。
+                if (liveQueue) liveQueue.stop();
+                finishUiTimer();
+                statusEl.innerHTML = '<div class="tts-error-block" role="alert"><div class="error-title">{{ "gen_failed"|t(lang) }}</div><div class="error-message">流式连接中断（未收到 done 事件）</div></div>';
+            }
         } catch (err) {
+            if (liveQueue) liveQueue.stop();
+            finishUiTimer();
             var errBlock = document.createElement('div');
             errBlock.className = 'tts-error-block';
             errBlock.setAttribute('role', 'alert');

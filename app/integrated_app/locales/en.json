@@ -739,6 +739,7 @@
   "stream_complete_msg": "Streaming generation complete",
   "stream_generate": "Stream Generate",
   "stream_need_persona": "Streaming requires a saved persona to be selected first",
+  "stream_play_while_receiving": "Play while receiving (disable to wait for full synthesis)",
   "stream_segment_hint": "When enabled, long text will be streamed in segments",
   "streaming_gen": "Streaming Generation...",
   "success_rate": "Success Rate",

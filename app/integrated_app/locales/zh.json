@@ -739,6 +739,7 @@
   "stream_complete_msg": "流式生成已完成",
   "stream_generate": "流式生成",
   "stream_need_persona": "流式生成需要先选择已保存的音色",
+  "stream_play_while_receiving": "边收边播（关闭后等整段合成完再显示播放器）",
   "stream_segment_hint": "启用后长文本将分段流式生成",
   "streaming_gen": "流式生成中...",
   "success_rate": "成功率",

@@ -739,6 +739,7 @@
   "stream_complete_msg": "스트리밍 생성이 완료되었습니다",
   "stream_generate": "스트림 생성",
   "stream_need_persona": "스트림 생성에는 저장된 음성을 먼저 선택해 주세요",
+  "stream_play_while_receiving": "받는 동안 재생(끄면 전체 합성 후 재생)",
   "stream_segment_hint": "활성화 시 긴 텍스트를 세그먼트로 분할 스트리밍",
   "streaming_gen": "스트리밍 생성 중...",
   "success_rate": "성공률",

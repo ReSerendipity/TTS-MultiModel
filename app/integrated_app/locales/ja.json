@@ -739,6 +739,7 @@
   "stream_complete_msg": "ストリーミング生成が完了しました",
   "stream_generate": "ストリーム生成",
   "stream_need_persona": "ストリーム生成には保存済みの音声を選択してください",
+  "stream_play_while_receiving": "受信しながら再生（無効にすると全合成後に再生）",
   "stream_segment_hint": "有効化すると長テキストをセグメント分割でストリーミング",
   "streaming_gen": "ストリーミング生成中...",
   "success_rate": "成功率",
