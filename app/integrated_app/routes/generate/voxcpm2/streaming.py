@@ -20,11 +20,15 @@
     1. 参数校验：pre_validate（引擎就绪 + 文本非空/长度）
     2. 引擎检查：registry.current_engine == voxcpm2
     3. 串行锁：_acquire_streaming_semaphore（信号量 + 超时释放）
-    4. 进度 SSE：分段生成前 yield event: progress(idx/total)；段完成 yield event: audio
-    5. 引擎调用：_generate_segment_async（含硬超时保护）
+    4. 进度 SSE：分段生成前 yield event: progress(idx/total)；段内每产出一个音频块
+       yield event: audio（真增量），不再等整段推理完成
+    5. 引擎调用：_iter_segment_chunks_async（原生 generate_streaming 逐块桥接，含硬超时）
     6. 后处理：SSE 模式段间不后处理（播放时拼接），合并完成后统一后处理
     7. 保存 & History：合并完成后 _merge_and_save_wav + history_db
     8. 响应：StreamingResponse（SSE）或 HTMLResponse（一次性/自动播放）
+
+    回退开关：``prefer_streaming=false`` 时退回“整段 generate 后再发一个 audio 事件”，
+    用于排查流式块解码/前端拼接问题时保留旧行为。
 
 **重构说明（S-R1/R2/R3）**：
     - S-R1: 提取模块级辅助函数消除三路由 90% 重复
@@ -44,8 +48,10 @@ import html
 import io
 import json
 import os
+import threading
 import time
 import wave
+from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import quote
 
@@ -325,6 +331,109 @@ async def _generate_segment_async(
         raise TimeoutError(f"单段生成超时（>{timeout_s:.0f}s）") from e
 
 
+async def _iter_segment_chunks_async(
+    seg_text: str,
+    actual_ref_path: str | None,
+    cfg_value: float,
+    inference_timesteps: int,
+    stream_denoise: bool,
+    timeout_s: float = _GENERATION_HARD_TIMEOUT_S,
+    streaming_prefix_len: int = _STREAMING_DEFAULT_PREFIX_LEN,
+) -> AsyncIterator[np.ndarray]:
+    """把同步 ``generate_streaming`` 桥接成异步逐块生成器。
+
+    Why 需要桥接：
+        ``model.generate_streaming()`` 是同步 Generator，内部每一步都要跑模型
+        （CUDA 推理会阻塞线程）。若直接在事件循环里 ``for`` 消费，会卡死整个
+        FastAPI loop；若先 ``list()`` 再返回，又退化成“整段缓冲”，首包仍要
+        等整段完成。本函数用“执行器线程 + asyncio.Queue”把每个块即时送回
+        事件循环，SSE 路由才能做到真正的边生成边下发。
+
+    回退：
+        模型没有 ``generate_streaming`` 时，调用一次 ``generate`` 并 yield
+        整段，行为与旧路径一致（调用方仍可用 ``prefer_streaming=False``
+        完全绕过本函数）。
+
+    取消/断开：
+        SSE 客户端断开后，调用方会关闭本生成器，``finally`` 设置
+        ``stop_event``；工作线程在下一个块边界退出并关闭底层 Generator。
+        单步模型推理无法被强制中断，这是与旧 ``_generate_segment_async``
+        一致的既有限制。
+    """
+    model = registry.voxcpm_model
+    if model is None:
+        raise RuntimeError("VoxCPM2 模型未加载")
+
+    if not hasattr(model, "generate_streaming"):
+        wav = await _generate_segment_async(
+            seg_text,
+            actual_ref_path,
+            cfg_value,
+            inference_timesteps,
+            stream_denoise,
+            prefer_streaming=False,
+            timeout_s=timeout_s,
+        )
+        yield wav
+        return
+
+    loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+    chunk_queue: asyncio.Queue[Any] = asyncio.Queue()
+    stop_event = threading.Event()
+    worker_error: list[BaseException] = []
+    sentinel = object()
+
+    def _put(item: Any) -> None:
+        # 事件循环已关闭（客户端断开后进程退出等）时丢弃剩余块。
+        with contextlib.suppress(RuntimeError):
+            loop.call_soon_threadsafe(chunk_queue.put_nowait, item)
+
+    def _worker() -> None:
+        generator = None
+        try:
+            generator = model.generate_streaming(
+                text=seg_text,
+                reference_wav_path=actual_ref_path,
+                normalize=True,
+                cfg_value=cfg_value,
+                inference_timesteps=inference_timesteps,
+                denoise=stream_denoise,
+                min_len=_STREAMING_MIN_LEN,
+                max_len=_STREAMING_MAX_LEN,
+                streaming_prefix_len=streaming_prefix_len,
+            )
+            for chunk in generator:
+                if stop_event.is_set():
+                    break
+                _put(chunk)
+        except BaseException as exc:  # noqa: BLE001 - 原样回传给事件循环判定 OOM/超时
+            worker_error.append(exc)
+        finally:
+            if generator is not None:
+                with contextlib.suppress(Exception):
+                    generator.close()
+            _put(sentinel)
+
+    future = loop.run_in_executor(None, _worker)
+    deadline: float = loop.time() + timeout_s
+    try:
+        while True:
+            remaining: float = deadline - loop.time()
+            if remaining <= 0:
+                raise TimeoutError(f"单段流式生成超时（>{timeout_s:.0f}s）")
+            item = await asyncio.wait_for(chunk_queue.get(), timeout=remaining)
+            if item is sentinel:
+                break
+            chunk: np.ndarray = np.asarray(item, dtype=np.float32).reshape(-1)
+            if chunk.size:
+                yield chunk
+        if worker_error:
+            raise worker_error[0]
+    finally:
+        stop_event.set()
+        future.cancel()
+
+
 async def _merge_and_save_wav(
     audio_chunks: list[np.ndarray],
     prefix: str = "streaming",
@@ -413,13 +522,14 @@ async def streaming_sse_generation(
     denoise: str = Form("true"),
     streaming_prefix_len: int = Form(_STREAMING_DEFAULT_PREFIX_LEN, ge=1, le=32),
     segment_chars: int = Form(0, ge=0, le=_STREAMING_MAX_SEGMENT_CHARS),
+    prefer_streaming: str = Form("true"),
 ) -> StreamingResponse:
     """VoxCPM2 SSE 流式生成路由（逐段推送音频 + 进度）。
 
     适合浏览器端 EventSource 消费；事件序列：
     1. ``event: meta`` — 总段数 + 采样率 + 位深（首包）
     2. ``event: progress`` — 每段生成开始时推送
-    3. ``event: audio`` — 每段生成完成后推送 base64 PCM 数据
+    3. ``event: audio`` — 段内每产出一个音频块立即推送 base64 PCM 数据
     4. ``event: done`` — 全部完成，携带合并后 filename + duration
     5. ``event: error`` — 异常时推送（不终止连接，客户端自行决定）
 
@@ -436,6 +546,8 @@ async def streaming_sse_generation(
         inference_timesteps: 每段推理步数。
         denoise: 是否对参考音频降噪（"true"/"false"）。
         segment_chars: 每段目标字符数（0=服务端默认 100；50~500）。
+        prefer_streaming: 是否启用真增量逐块输出；"false" 时退回整段生成后一次下发，
+            用于排查块解码/前端拼接问题（默认 "true"）。
 
     Returns:
         StreamingResponse: media_type=text/event-stream，携带 no-cache / keep-alive。
@@ -470,6 +582,7 @@ async def streaming_sse_generation(
 
     # S-R1: 复用 _parse_bool_form / _merge_dialect 消除重复
     stream_denoise: bool = _parse_bool_form(denoise)
+    prefer_streaming_flag: bool = _parse_bool_form(prefer_streaming)
     instruction = _merge_dialect(instruction, lang)
 
     # S-R2: 统一 persona 加载（allow_missing=True，缺失用默认音色）
@@ -539,27 +652,52 @@ async def streaming_sse_generation(
                 )
                 yield f"event: progress\ndata: {progress}\n\n"
 
-                # S-R1: 复用 _generate_segment_async（含超时保护 + OOM 逃逸）
-                wav_data: np.ndarray = await _generate_segment_async(
-                    gen_text,
-                    actual_ref_path,
-                    cfg_value,
-                    inference_timesteps,
-                    stream_denoise,
-                    streaming_prefix_len=streaming_prefix_len,
-                )
+                # P0-1：真增量路径。原生 generate_streaming 每产出一个块就立即
+                # 转成 PCM16 下发；prefer_streaming=False 时保留旧的整段生成回退。
+                segment_chunks: list[np.ndarray] = []
+                if prefer_streaming_flag:
+                    async for wav_data in _iter_segment_chunks_async(
+                        gen_text,
+                        actual_ref_path,
+                        cfg_value,
+                        inference_timesteps,
+                        stream_denoise,
+                        streaming_prefix_len=streaming_prefix_len,
+                    ):
+                        pcm_data: np.ndarray = (wav_data * 32767).astype(np.int16)
+                        all_chunks.append(pcm_data)
+                        segment_chunks.append(wav_data)
 
-                pcm_data: np.ndarray = (wav_data * 32767).astype(np.int16)
-                all_chunks.append(pcm_data)
+                        b64_data: str = base64.b64encode(pcm_data.tobytes()).decode("ascii")
+                        yield f"event: audio\ndata: {b64_data}\n\n"
+                else:
+                    # 回退开关：整段生成完成后再发一个 audio 事件，行为与改动前一致。
+                    wav_data = await _generate_segment_async(
+                        gen_text,
+                        actual_ref_path,
+                        cfg_value,
+                        inference_timesteps,
+                        stream_denoise,
+                        prefer_streaming=False,
+                        streaming_prefix_len=streaming_prefix_len,
+                    )
+                    pcm_data = (wav_data * 32767).astype(np.int16)
+                    all_chunks.append(pcm_data)
+                    segment_chunks.append(wav_data)
 
-                report = quality_monitor.analyze_chunk(wav_data)
+                    b64_data = base64.b64encode(pcm_data.tobytes()).decode("ascii")
+                    yield f"event: audio\ndata: {b64_data}\n\n"
+
+                if not segment_chunks:
+                    raise RuntimeError(f"第 {idx + 1} 段未产出任何音频块")
+
+                # 质检按“文本段”聚合，避免把 0.1s 级小块误判为极低音量/静音。
+                seg_audio: np.ndarray = np.concatenate(segment_chunks)
+                report = quality_monitor.analyze_chunk(seg_audio)
                 if report.has_issue or report.has_clipping:
                     issue = f"段{idx}: {report.summary or report.issue_description}"
                     quality_issues.append(issue)
                     logger.warning(f"[流式质检] {issue}")
-
-                b64_data: str = base64.b64encode(pcm_data.tobytes()).decode("ascii")
-                yield f"event: audio\ndata: {b64_data}\n\n"
 
             if all_chunks:
                 # S-R1: 复用 _merge_and_save_wav（合并 + 写盘 + 返回时长）

@@ -271,6 +271,16 @@ class ModelRegistry:
     _instance: ModelRegistry | None = None
     _init_done: bool = False
 
+    #: 单一事实源 ``_engines`` 中的保留槽位。
+    #: P0-2：VoxCPM2 主模型 / IndexTTS 引擎 / VoxCPM2Engine 懒包装器都存放于
+    #: 同一字典，旧私有字段改为 property 转发，避免三套状态各写各的。
+    _KEY_VOXCPM_MODEL: str = "voxcpm2"
+    _KEY_INDEXTTS_ENGINE: str = "indextts2"
+    _KEY_VOXCPM_ENGINE_INSTANCE: str = "voxcpm2_engine"
+    _RESERVED_ENGINE_KEYS: frozenset[str] = frozenset(
+        {_KEY_VOXCPM_MODEL, _KEY_INDEXTTS_ENGINE, _KEY_VOXCPM_ENGINE_INSTANCE}
+    )
+
     # ------------------------------------------------------------------
     # Singleton 实现
     # ------------------------------------------------------------------
@@ -299,9 +309,10 @@ class ModelRegistry:
 
         首次 ``ModelRegistry()`` 调用时初始化以下状态：
         - ``_lock``: 可重入锁（RLock）保护所有核心状态字段的线程安全访问
-        - 核心模型状态: ``_voxcpm_model``、``_voxcpm_asr``、``_current_engine`` 等
-        - IndexTTS2 状态: ``_indextts2_engine``、``_indextts2_model_path``
-        - 懒实例化缓存: ``_voxcpm2_engine_instance``
+        - 核心模型状态: ``_voxcpm_asr``、``_current_engine`` 等
+        - 单一事实源: ``_engines`` 字典（VoxCPM2 主模型 / IndexTTS 引擎 /
+          VoxCPM2Engine 懒包装器均以保留 key 存放，旧私有字段为 property 转发）
+        - IndexTTS2 状态: ``_indextts2_model_path``
         - 扩展状态: persona_manager、ffmpeg_pool、gen_tracker、progress_mgr 等
 
         后续调用 ``ModelRegistry()`` 时因 ``_init_done`` 为 True 直接 return，
@@ -315,26 +326,18 @@ class ModelRegistry:
 
         self._lock: threading.RLock = threading.RLock()
 
+        # --- Single source of truth: all engine instances live in _engines ---
+        # P0-2：先建容器，再让旧字段 property 转发到其中的保留 key。
+        self._engines: dict[str, Any] = {}
+
         # --- Core model state (property-backed, thread-safe) ---
-        self._voxcpm_model: Any = None
         self._voxcpm_asr: Any = None
         self._current_engine: str | None = None
         self._current_type: str = ""
         self._current_size: str = ""
 
-        # --- IndexTTS 2.5 state (property-backed, thread-safe) ---
-        self._indextts2_engine: Any = None
+        # --- IndexTTS 2.5 state ---
         self._indextts2_model_path: str = ""
-
-        # --- VoxCPM2Engine 懒实例化缓存（get_current_engine 中创建，clear_voxcpm/clear_all 中清理） ---
-        self._voxcpm2_engine_instance: Any = None
-
-        # --- 通用引擎实例容器（新式引擎，按名称索引） ---
-        # WHY: VoxCPM2/IndexTTS2 因历史原因拥有专属状态字段（_voxcpm_model / _indextts2_engine），
-        # 而通过 config.yaml + engine_registry 声明式接入的新引擎（如 generic_tts_engine）
-        # 统一存放于本字典，key 为引擎名，value 为实现 TTSEngine 协议的引擎实例。
-        # 这样新增引擎无需再为 ModelRegistry 添加专属字段，实现"零改动扩展"。
-        self._engines: dict[str, Any] = {}
 
         # --- Extended VoxCPM2 state ---
         self.voxcpm_enhancer_model: Any = None
@@ -382,6 +385,48 @@ class ModelRegistry:
     # ------------------------------------------------------------------
     # 核心状态属性（线程安全 property 访问器）
     # ------------------------------------------------------------------
+
+    @property
+    def _voxcpm_model(self) -> Any:
+        """旧私有字段兼容转发：读写 ``_engines["voxcpm2"]``。"""
+        with self._lock:
+            return self._engines.get(self._KEY_VOXCPM_MODEL)
+
+    @_voxcpm_model.setter
+    def _voxcpm_model(self, value: Any) -> None:
+        with self._lock:
+            if value is None:
+                self._engines.pop(self._KEY_VOXCPM_MODEL, None)
+            else:
+                self._engines[self._KEY_VOXCPM_MODEL] = value
+
+    @property
+    def _indextts2_engine(self) -> Any:
+        """旧私有字段兼容转发：读写 ``_engines["indextts2"]``。"""
+        with self._lock:
+            return self._engines.get(self._KEY_INDEXTTS_ENGINE)
+
+    @_indextts2_engine.setter
+    def _indextts2_engine(self, value: Any) -> None:
+        with self._lock:
+            if value is None:
+                self._engines.pop(self._KEY_INDEXTTS_ENGINE, None)
+            else:
+                self._engines[self._KEY_INDEXTTS_ENGINE] = value
+
+    @property
+    def _voxcpm2_engine_instance(self) -> Any:
+        """旧私有字段兼容转发：读写 ``_engines["voxcpm2_engine"]`` 懒包装器槽位。"""
+        with self._lock:
+            return self._engines.get(self._KEY_VOXCPM_ENGINE_INSTANCE)
+
+    @_voxcpm2_engine_instance.setter
+    def _voxcpm2_engine_instance(self, value: Any) -> None:
+        with self._lock:
+            if value is None:
+                self._engines.pop(self._KEY_VOXCPM_ENGINE_INSTANCE, None)
+            else:
+                self._engines[self._KEY_VOXCPM_ENGINE_INSTANCE] = value
 
     @property
     def voxcpm_model(self) -> Any:
@@ -458,7 +503,15 @@ class ModelRegistry:
         :meth:`is_voxcpm_ready` / :meth:`is_indextts2_ready` / :meth:`is_engine_ready`。
         """
         with self._lock:
-            return self._voxcpm_model is not None or self._indextts2_engine is not None or bool(self._engines)
+            return (
+                self._engines.get(self._KEY_VOXCPM_MODEL) is not None
+                or self._engines.get(self._KEY_INDEXTTS_ENGINE) is not None
+                or any(
+                    instance is not None
+                    for name, instance in self._engines.items()
+                    if name not in self._RESERVED_ENGINE_KEYS
+                )
+            )
 
     # ------------------------------------------------------------------
     # SSE 通知辅助
@@ -520,7 +573,10 @@ class ModelRegistry:
             control: 是否启用细粒度语音控制特性。
         """
         with self._lock:
-            self._voxcpm_model = model
+            if model is None:
+                self._engines.pop(self._KEY_VOXCPM_MODEL, None)
+            else:
+                self._engines[self._KEY_VOXCPM_MODEL] = model
             self._voxcpm_asr = asr
             self.voxcpm_enhancer_model = enhancer_model
             self.voxcpm_ultimate = ultimate
@@ -551,7 +607,10 @@ class ModelRegistry:
         """
         name = engine_name or EngineName.INDEXTTS2.value
         with self._lock:
-            self._indextts2_engine = engine
+            if engine is None:
+                self._engines.pop(self._KEY_INDEXTTS_ENGINE, None)
+            else:
+                self._engines[self._KEY_INDEXTTS_ENGINE] = engine
             self._current_engine = name
             self._current_type = name
             self._current_size = name
@@ -559,6 +618,11 @@ class ModelRegistry:
 
     def set_engine_loaded(self, name: str, instance: Any) -> None:
         """原子性设置通用新式引擎的已加载状态，并触发 SSE engine_switch 事件。"""
+        if name in self._RESERVED_ENGINE_KEYS:
+            raise ValueError(
+                f"{name!r} 是 ModelRegistry 的保留槽位，请使用 set_voxcpm_loaded / "
+                "set_indextts2_loaded 或对应的旧 property 写入"
+            )
         with self._lock:
             self._engines[name] = instance
             self._current_engine = name
@@ -568,19 +632,29 @@ class ModelRegistry:
 
     def clear_engine(self, name: str) -> None:
         """原子性清除指定通用新式引擎的实例引用，并触发 SSE 通知。"""
+        if name in self._RESERVED_ENGINE_KEYS:
+            raise ValueError(f"{name!r} 是 ModelRegistry 的保留槽位，不能按通用引擎清理")
         with self._lock:
             self._engines.pop(name, None)
         self._notify_sse()
 
     def get_engine_instance(self, name: str) -> Any:
-        """获取指定名称的通用新式引擎实例（线程安全）。"""
+        """获取指定名称的通用新式引擎实例（线程安全）。
+
+        保留槽位（voxcpm2 / indextts2 / voxcpm2_engine）不按“通用引擎”暴露，
+        避免把主模型或懒包装器误当成通用引擎重复计数。
+        """
+        if name in self._RESERVED_ENGINE_KEYS:
+            return None
         with self._lock:
             return self._engines.get(name)
 
     def get_all_engine_instances(self) -> dict[str, Any]:
-        """获取所有已加载的通用新式引擎实例快照（浅拷贝）。"""
+        """获取所有已加载的通用新式引擎实例快照（浅拷贝，不含保留槽位）。"""
         with self._lock:
-            return dict(self._engines)
+            return {
+                name: instance for name, instance in self._engines.items() if name not in self._RESERVED_ENGINE_KEYS
+            }
 
     def clear_voxcpm(self) -> None:
         """原子性清除所有 VoxCPM2 相关引用与标志位，并触发 SSE 通知。
@@ -594,13 +668,13 @@ class ModelRegistry:
             如需完全重置，请使用 :meth:`clear_all`。
         """
         with self._lock:
-            self._voxcpm_model = None
+            self._engines.pop(self._KEY_VOXCPM_MODEL, None)
             self._voxcpm_asr = None
             self.voxcpm_enhancer_model = None
             self.voxcpm_ultimate = False
             self.voxcpm_voiceclone_enabled = False
             self.voxcpm_control_enabled = False
-            self._voxcpm2_engine_instance = None
+            self._engines.pop(self._KEY_VOXCPM_ENGINE_INSTANCE, None)
         self._notify_sse()
 
     def clear_indextts2(self) -> None:
@@ -612,7 +686,7 @@ class ModelRegistry:
             的元信息，用户点击"重新加载"时无需再次选择引擎类型。
         """
         with self._lock:
-            self._indextts2_engine = None
+            self._engines.pop(self._KEY_INDEXTTS_ENGINE, None)
         self._notify_sse()
 
     def clear_all(self) -> None:
@@ -623,9 +697,8 @@ class ModelRegistry:
         - 将 ``current_type`` / ``current_size`` 重置为空字符串
         """
         with self._lock:
-            self._voxcpm_model = None
+            self._engines.clear()
             self._voxcpm_asr = None
-            self._indextts2_engine = None
             self._current_engine = None
             self._current_type = ""
             self._current_size = ""
@@ -633,8 +706,6 @@ class ModelRegistry:
             self.voxcpm_ultimate = False
             self.voxcpm_voiceclone_enabled = False
             self.voxcpm_control_enabled = False
-            self._voxcpm2_engine_instance = None
-            self._engines.clear()
         self._notify_sse()
 
     # ------------------------------------------------------------------
@@ -741,7 +812,9 @@ class ModelRegistry:
                     "control_enabled": self.voxcpm_control_enabled,
                 }
             elif (engine in INDEXTTS_VARIANTS and self._indextts2_engine is not None) or (
-                engine and self._engines.get(engine) is not None
+                engine is not None
+                and engine not in self._RESERVED_ENGINE_KEYS
+                and self._engines.get(engine) is not None
             ):
                 info = {
                     "engine": self._current_engine,
@@ -789,7 +862,7 @@ class ModelRegistry:
             - ``None``：无激活引擎，或引擎实例创建失败。
         """
         if self.current_engine == EngineName.VOXCPM2.value and self.voxcpm_model is not None:
-            if not hasattr(self, "_voxcpm2_engine_instance") or self._voxcpm2_engine_instance is None:
+            if self._voxcpm2_engine_instance is None:
                 try:
                     from .engines.voxcpm2.engine import VoxCPM2Engine
 
@@ -871,7 +944,8 @@ class MultiEngineRegistry:
 
     设计原则:
         - 不破坏现有 ``registry`` 单例的线程安全约定
-        - 通用引擎容器（``_engines``）与专属字段（``_voxcpm_model`` 等）共存
+        - 通用引擎与 VoxCPM2/IndexTTS 保留槽位同存于 ``_engines``，
+          旧专属字段通过 property 转发，不再各自维护实例
         - 新增引擎只需通过 ``register_engine`` 注册，无需修改本类
 
     Usage::
@@ -976,7 +1050,7 @@ class MultiEngineRegistry:
         """获取所有已加载引擎的名称列表。
 
         Returns:
-            引擎名称列表（包括通用容器和专属字段中的引擎）。
+            引擎名称列表（包括通用引擎和 VoxCPM2/IndexTTS 保留槽位）。
         """
         names = list(self._registry.get_all_engine_instances().keys())
         if self._registry.voxcpm_model is not None:

@@ -7,7 +7,7 @@
     "config_models.py": "98a9934a3323c04a1491342a82377197e8dee7e78d35fa9e98a304b9ea373029",
     "engine_interface.py": "e5ba69a754a9b7697325530b0786be2ba385564b379b2a0a431e97b11c1e71a5",
     "model_manager.py": "39db84c5bbb760974b2bf6047cc75c1b1bd5f656001aed0cafa403e22af8b34a",
-    "model_registry.py": "bab990eee3e821214b2a2993d101d30399fb1ca29335b236e9a45b89d4a2b7d1",
+    "model_registry.py": "b4aaad5628d996b20236f84d0fbdd9e5cad45d328214158600eb060c7d626ed9",
     "history_db.py": "dec446d2b8ecb0bc7538af014f3d90228aff5718f3930ed829f0423146d4e9a5",
     "i18n.py": "27e004a6c5dd4c8e5b5c3751e67ebe8dd37e1c49857ac47fd7ee9c9e7c92bb38",
     "auth.py": "df933a3b6a5ee2daa28a8156431fd80b8edf13882a44922983157b2bf2212aa4",
