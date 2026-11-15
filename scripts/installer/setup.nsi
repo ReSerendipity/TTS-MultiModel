@@ -1,11 +1,11 @@
-﻿; TTSMultiModel 桌面版 NSIS 安装器
+; TTSMultiModel 桌面版 NSIS 安装器
 ; 用法：makensis setup.nsi
 Unicode true
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
 Name "TTSMultiModel 桌面版"
-OutFile "TTSMultiModel-Setup-v2.9.0.exe"
+OutFile "TTSMultiModel-Setup-v2.10.0.exe"
 InstallDir "$LOCALAPPDATA\Programs\TTSMultiModel"
 InstallDirRegKey HKCU "Software\TTSMultiModel" "InstallDir"
 RequestExecutionLevel user
@@ -16,7 +16,7 @@ BrandingText "TTSMultiModel"
 ; 版本号：发布时用 -DAPP_VERSION=<pyproject.toml 的 version> 显式传入；下面的默认值只在
 ; 脱离参数编译时兜底，务必与 pyproject.toml 保持一致。
 !ifndef APP_VERSION
-  !define APP_VERSION "2.9.0"
+  !define APP_VERSION "2.10.0"
 !endif
 !define DATA_PREFIX "TTSMultiModel-Data.7z"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\TTSMultiModel"
@@ -161,7 +161,7 @@ Section "TTSMultiModel 桌面版" SEC_APP
 SectionEnd
 
 ; ---------- 版本信息 ----------
-VIProductVersion "2.9.0.0"
+VIProductVersion "2.10.0.0"
 VIAddVersionKey "ProductName" "TTSMultiModel 桌面版"
 VIAddVersionKey "LegalCopyright" "Copyright (C) 2026 TTSMultiModel"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
