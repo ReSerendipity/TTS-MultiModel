@@ -32,8 +32,10 @@
 
 from __future__ import annotations
 
+import bisect
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -49,6 +51,13 @@ DEFAULT_MAX_CHARS = 500
 
 #: 默认最小分块字符数（避免过短的分块）
 DEFAULT_MIN_CHARS = 50
+
+#: 默认可保护片段的正则：特殊 token、SSML/XML 标签、发音标注
+DEFAULT_PROTECTED_PATTERNS: tuple[str, ...] = (
+    r"<\|[^\n|]{1,64}\|>",
+    r"<[^>\n]{1,64}>",
+    r"\[[^\]\n]{1,32}\]",
+)
 
 #: 默认交叉淡入淡出时长（毫秒）
 DEFAULT_FADE_DURATION_MS = 50
@@ -149,18 +158,31 @@ class TextSegmenter:
         2. 停顿标点（，、,:等）— 次优断句点
         3. 空格/换行 — 英文等空格分隔语言的兜底
         4. 强制截断 — 超过 max_chars 时的最后手段
+
+    预算与保护：
+        - max_chars 始终是硬上限；提供 token_counter 时 max_tokens 同时生效（先到者为准）。
+        - protected_patterns 命中的片段（特殊 token / SSML 标签 / 发音标注）不会被切断；
+          若片段本身超预算，则整段独立成块并保留原文。
+        - start_char/end_char 始终是分块文本在原文中的真实区间。
     """
 
     def __init__(
         self,
         max_chars: int = DEFAULT_MAX_CHARS,
         min_chars: int = DEFAULT_MIN_CHARS,
+        max_tokens: int | None = None,
+        token_counter: Callable[[str], int] | None = None,
+        protected_patterns: list[str] | None = None,
     ) -> None:
         """初始化文本分块器。
 
         Args:
-            max_chars: 每个分块的最大字符数。
+            max_chars: 每个分块的最大字符数（硬上限）。
             min_chars: 每个分块的最小字符数（最后一块除外）。
+            max_tokens: 每个分块的最大 token 数，需配合 token_counter 生效。
+            token_counter: 文本 → token 数的可注入计数器；None 时仅按字符预算。
+            protected_patterns: 不可切断片段的正则列表；None 使用默认三类，
+                传空列表表示不保护。
         """
         if max_chars <= 0:
             raise ValueError(f"max_chars 必须为正数，得到: {max_chars}")
@@ -168,9 +190,16 @@ class TextSegmenter:
             raise ValueError(f"min_chars 不能为负数，得到: {min_chars}")
         if min_chars > max_chars:
             raise ValueError(f"min_chars({min_chars}) 不能大于 max_chars({max_chars})")
+        if max_tokens is not None and max_tokens <= 0:
+            raise ValueError(f"max_tokens 必须为正数，得到: {max_tokens}")
 
         self._max_chars = max_chars
         self._min_chars = min_chars
+        self._max_tokens = max_tokens
+        self._token_counter = token_counter
+        patterns = DEFAULT_PROTECTED_PATTERNS if protected_patterns is None else protected_patterns
+        self._protected_patterns: list[str] = list(patterns)
+        self._re_protected = [re.compile(p) for p in self._protected_patterns]
 
         # 编译语言特定的标点正则
         self._re_zh_sentence = re.compile(r"[。！？；\n]+")
@@ -187,6 +216,16 @@ class TextSegmenter:
     def min_chars(self) -> int:
         """最小字符数。"""
         return self._min_chars
+
+    @property
+    def max_tokens(self) -> int | None:
+        """最大 token 数（未配置时为 None）。"""
+        return self._max_tokens
+
+    @property
+    def protected_patterns(self) -> list[str]:
+        """当前生效的受保护片段正则列表。"""
+        return list(self._protected_patterns)
 
     def segment(
         self,
@@ -205,52 +244,49 @@ class TextSegmenter:
         if not text or not text.strip():
             return SegmentResult(segments=[], total_chars=0)
 
-        text = text.strip()
         total_chars = len(text)
+        trimmed_start = len(text) - len(text.lstrip())
+        trimmed_end = len(text.rstrip())
 
-        # 如果文本不超过最大长度，直接返回单个分块
-        if total_chars <= self._max_chars:
+        # 如果文本不超过预算，直接返回单个分块
+        if self._fits(text[trimmed_start:trimmed_end]):
             seg = TextSegment(
-                text=text,
+                text=text[trimmed_start:trimmed_end],
                 index=0,
-                start_char=0,
-                end_char=total_chars,
-                char_count=total_chars,
+                start_char=trimmed_start,
+                end_char=trimmed_end,
+                char_count=trimmed_end - trimmed_start,
             )
             return SegmentResult(
                 segments=[seg],
                 total_chars=total_chars,
             )
 
-        # 按语言选择标点集
-        sentence_endings, pause_marks = self._get_punctuation_sets(lang)
+        # 按语言选择停顿标点集
+        _sentence_endings, pause_marks = self._get_punctuation_sets(lang)
 
-        # 第一步：按句末标点切分为句子
-        sentences = self._split_by_sentence_endings(text, lang)
+        # 受保护片段作为不可分割的原子单元参与装配
+        protected_spans = self._find_protected_spans(text)
+        pieces = self._build_pieces(text, lang, protected_spans)
+        chunks = self._merge_pieces(text, pieces, pause_marks)
 
-        # 第二步：将句子合并为不超过 max_chars 的分块
-        segments = self._merge_into_segments(sentences, sentence_endings, pause_marks)
-
-        # 更新分块的位置信息
+        # 按真实区间生成分块（首尾空白在原文中定位后裁掉）
         result_segments: list[TextSegment] = []
-        current_pos = 0
-        for _i, seg_text in enumerate(segments):
-            seg_text = seg_text.strip()
-            if not seg_text:
+        for chunk_start, chunk_end in chunks:
+            while chunk_start < chunk_end and text[chunk_start].isspace():
+                chunk_start += 1
+            while chunk_end > chunk_start and text[chunk_end - 1].isspace():
+                chunk_end -= 1
+            if chunk_start >= chunk_end:
                 continue
-            seg_len = len(seg_text)
-            # 在原文中查找位置（简化处理：按顺序累积）
-            start = current_pos
-            end = start + seg_len
-            current_pos = end
-
+            seg_text = text[chunk_start:chunk_end]
             result_segments.append(
                 TextSegment(
                     text=seg_text,
                     index=len(result_segments),
-                    start_char=start,
-                    end_char=end,
-                    char_count=seg_len,
+                    start_char=chunk_start,
+                    end_char=chunk_end,
+                    char_count=len(seg_text),
                 )
             )
 
@@ -306,173 +342,220 @@ class TextSegmenter:
         else:
             return _ZH_SENTENCE_ENDINGS | _EN_SENTENCE_ENDINGS, _ZH_PAUSE_MARKS | _EN_PAUSE_MARKS
 
-    def _split_by_sentence_endings(
+    def _get_sentence_pattern(self, lang: str) -> re.Pattern[str]:
+        """获取语言特定的句末标点正则。"""
+        patterns = {
+            "zh": self._re_zh_sentence,
+            "en": self._re_en_sentence,
+            "ja": self._re_ja_sentence,
+            "ko": self._re_ko_sentence,
+        }
+        return patterns.get(lang, self._re_zh_sentence)
+
+    def _sentence_spans(
         self,
         text: str,
+        start: int,
+        end: int,
         lang: str,
-    ) -> list[str]:
-        """按句末标点切分为句子。
+    ) -> list[tuple[int, int]]:
+        """按句末标点切分区间，返回 [start, end) 内的句子偏移区间。
 
-        保留标点在句子末尾。
+        标点保留在句子末尾；纯空白句子被丢弃。
 
         Args:
-            text: 待切分文本。
+            text: 原文。
+            start: 区间起点（含）。
+            end: 区间终点（不含）。
             lang: 语言代码。
 
         Returns:
-            句子列表。
+            句子区间列表。
         """
-        if lang == "zh":
-            pattern = self._re_zh_sentence
-        elif lang == "en":
-            pattern = self._re_en_sentence
-        elif lang == "ja":
-            pattern = self._re_ja_sentence
-        elif lang == "ko":
-            pattern = self._re_ko_sentence
-        else:
-            pattern = self._re_zh_sentence
+        pattern = self._get_sentence_pattern(lang)
+        spans: list[tuple[int, int]] = []
+        last = start
+        for match in pattern.finditer(text, start, end):
+            if text[last : match.end()].strip():
+                spans.append((last, match.end()))
+            last = match.end()
+        if text[last:end].strip():
+            spans.append((last, end))
+        return spans
 
-        # 使用 split 保留分隔符
-        result: list[str] = []
-        last_end = 0
-        for match in pattern.finditer(text):
-            end = match.end()
-            sentence = text[last_end:end]
-            if sentence.strip():
-                result.append(sentence)
-            last_end = end
+    def _find_protected_spans(self, text: str) -> list[tuple[int, int]]:
+        """定位受保护片段在原文中的区间（互不重叠，按位置排序）。"""
+        found: list[tuple[int, int]] = []
+        for pattern in self._re_protected:
+            for match in pattern.finditer(text):
+                span_start, span_end = match.span()
+                if span_end <= span_start:
+                    continue
+                # 已按 start 排序且互不重叠，只需检查左右邻居
+                idx = bisect.bisect_left(found, (span_start,))
+                if idx > 0 and found[idx - 1][1] > span_start:
+                    continue
+                if idx < len(found) and found[idx][0] < span_end:
+                    continue
+                found.insert(idx, (span_start, span_end))
+        return found
 
-        # 处理剩余文本
-        if last_end < len(text):
-            remaining = text[last_end:]
-            if remaining.strip():
-                result.append(remaining)
-
-        return result if result else [text]
-
-    def _merge_into_segments(
+    def _build_pieces(
         self,
-        sentences: list[str],
-        sentence_endings: set[str],
+        text: str,
+        lang: str,
+        protected_spans: list[tuple[int, int]],
+    ) -> list[tuple[int, int, bool]]:
+        """将原文拆为按序拼接的原子片段。
+
+        返回三元组 (start, end, protected)；受保护片段整体作为一个原子片段，
+        其余空白区间按句末标点切成句子片段。
+        """
+        pieces: list[tuple[int, int, bool]] = []
+        pos = 0
+        for span_start, span_end in protected_spans:
+            if span_start > pos:
+                pieces.extend((s, e, False) for s, e in self._sentence_spans(text, pos, span_start, lang))
+            pieces.append((span_start, span_end, True))
+            pos = span_end
+        if pos < len(text):
+            pieces.extend((s, e, False) for s, e in self._sentence_spans(text, pos, len(text), lang))
+        return pieces
+
+    def _merge_pieces(
+        self,
+        text: str,
+        pieces: list[tuple[int, int, bool]],
         pause_marks: set[str],
-    ) -> list[str]:
-        """将句子合并为不超过 max_chars 的分块。
+    ) -> list[tuple[int, int]]:
+        """将原子片段合并为满足预算的分块区间。
 
         合并策略：
-            1. 累积句子直到接近 max_chars
-            2. 如果单个句子超过 max_chars，在停顿标点处二次切分
-            3. 如果仍超长，强制按 max_chars 截断
-
-        Args:
-            sentences: 句子列表。
-            sentence_endings: 句末标点集合。
-            pause_marks: 停顿标点集合。
-
-        Returns:
-            分块文本列表。
+            1. 顺序累积片段，直到再加入一个片段会超出预算
+            2. 单片段超预算时：受保护片段整段成块；普通片段在停顿标点/
+               空格/预算边界处二次切分
+            3. 过短分块（< min_chars）在预算允许时并入前一块
         """
-        segments: list[str] = []
-        current_chunk: list[str] = []
-        current_length = 0
+        chunks: list[tuple[int, int]] = []
+        cur_start: int | None = None
+        cur_end = 0
 
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
+        for piece_start, piece_end, protected in pieces:
+            if not self._fits(text[piece_start:piece_end]):
+                if cur_start is not None:
+                    chunks.append((cur_start, cur_end))
+                    cur_start, cur_end = None, 0
+                if protected:
+                    # 受保护片段本身超预算：整段独立成块，保留原文
+                    chunks.append((piece_start, piece_end))
+                else:
+                    chunks.extend(self._split_free_span(text, piece_start, piece_end, pause_marks))
                 continue
 
-            sentence_len = len(sentence)
-
-            # 单个句子就超过 max_chars：需要二次切分
-            if sentence_len > self._max_chars:
-                # 先保存当前累积的分块
-                if current_chunk:
-                    segments.append("".join(current_chunk))
-                    current_chunk = []
-                    current_length = 0
-
-                # 二次切分超长句子
-                sub_segments = self._split_long_sentence(sentence, pause_marks)
-                segments.extend(sub_segments)
-                continue
-
-            # 检查加入此句子是否会超限
-            if current_length + sentence_len > self._max_chars and current_chunk:
-                # 当前分块已满，保存并开始新分块
-                segments.append("".join(current_chunk))
-                current_chunk = [sentence]
-                current_length = sentence_len
+            if cur_start is None:
+                cur_start, cur_end = piece_start, piece_end
+            elif self._fits(text[cur_start:piece_end]):
+                cur_end = piece_end
             else:
-                # 加入当前分块
-                current_chunk.append(sentence)
-                current_length += sentence_len
+                chunks.append((cur_start, cur_end))
+                cur_start, cur_end = piece_start, piece_end
 
-        # 保存最后一个分块
-        if current_chunk:
-            segments.append("".join(current_chunk))
+        if cur_start is not None:
+            chunks.append((cur_start, cur_end))
 
-        # 合并过短的分块（< min_chars）到前一个分块
-        if self._min_chars > 0 and len(segments) > 1:
-            merged: list[str] = []
-            for seg in segments:
-                if merged and len(seg) < self._min_chars:
-                    # 合并到前一个
-                    merged[-1] = merged[-1] + seg
-                else:
-                    merged.append(seg)
-            segments = merged
+        if self._min_chars > 0 and len(chunks) > 1:
+            merged: list[tuple[int, int]] = []
+            for chunk_start, chunk_end in chunks:
+                if merged and len(text[chunk_start:chunk_end].strip()) < self._min_chars:
+                    prev_start = merged[-1][0]
+                    if self._fits(text[prev_start:chunk_end]):
+                        merged[-1] = (prev_start, chunk_end)
+                        continue
+                merged.append((chunk_start, chunk_end))
+            chunks = merged
 
-        return segments
+        return chunks
 
-    def _split_long_sentence(
+    def _split_free_span(
         self,
-        sentence: str,
+        text: str,
+        start: int,
+        end: int,
         pause_marks: set[str],
-    ) -> list[str]:
-        """将超长句子在停顿标点处二次切分。
+    ) -> list[tuple[int, int]]:
+        """在预算约束下切分不受保护的超长片段。
+
+        优先在停顿标点处断开，其次空格，最后强制按预算截断。
 
         Args:
-            sentence: 超长句子。
+            text: 原文。
+            start: 片段起点（含）。
+            end: 片段终点（不含）。
             pause_marks: 停顿标点集合。
 
         Returns:
-            子段列表。
+            子片段区间列表。
         """
-        if len(sentence) <= self._max_chars:
-            return [sentence]
+        spans: list[tuple[int, int]] = []
+        cur = start
+        while cur < end:
+            if self._fits(text[cur:end]):
+                spans.append((cur, end))
+                break
 
-        result: list[str] = []
-        current_start = 0
-        last_pause = -1
+            cut = self._max_fit_end(text, cur, end)
+            if cut <= cur:
+                # token 预算过小导致无一字符“可计费”时，退回字符硬上限
+                cut = min(end, cur + self._max_chars)
+            if cut >= end:
+                spans.append((cur, end))
+                break
+            cut = self._prefer_break(text, cur, cut, pause_marks)
+            spans.append((cur, cut))
+            cur = cut
 
-        for i, ch in enumerate(sentence):
-            # 记录最近的停顿标点位置
-            if ch in pause_marks:
-                last_pause = i + 1  # 包含标点
+        return spans
 
-            # 达到最大长度
-            if i - current_start + 1 >= self._max_chars:
-                if last_pause > current_start:
-                    # 在最近的停顿标点处断开
-                    result.append(sentence[current_start:last_pause])
-                    current_start = last_pause
-                    last_pause = -1
-                else:
-                    # 没有停顿标点，尝试在空格处断开
-                    space_pos = sentence.rfind(" ", current_start, i + 1)
-                    if space_pos > current_start:
-                        result.append(sentence[current_start:space_pos])
-                        current_start = space_pos + 1
-                    else:
-                        # 强制截断
-                        result.append(sentence[current_start : current_start + self._max_chars])
-                        current_start = current_start + self._max_chars
+    def _max_fit_end(self, text: str, start: int, end: int) -> int:
+        """返回从 start 起在预算内可容纳的最大终点（假定 token 数随长度单调不减）。"""
+        limit = min(end, start + self._max_chars)
+        if self._token_counter is None or self._max_tokens is None:
+            return limit
 
-        # 保存剩余部分
-        if current_start < len(sentence):
-            result.append(sentence[current_start:])
+        best = start
+        low, high = start + 1, limit
+        while low <= high:
+            mid = (low + high) // 2
+            if self._token_counter(text[start:mid]) <= self._max_tokens:
+                best = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+        return best
 
-        return [s for s in result if s.strip()]
+    @staticmethod
+    def _prefer_break(
+        text: str,
+        start: int,
+        cut: int,
+        pause_marks: set[str],
+    ) -> int:
+        """在 (start, cut] 内后向寻找更自然的断点（停顿标点 > 空格）。"""
+        for i in range(cut, start, -1):
+            if text[i - 1] in pause_marks:
+                return i
+        space_pos = text.rfind(" ", start, cut)
+        if space_pos > start:
+            return space_pos
+        return cut
+
+    def _fits(self, candidate: str) -> bool:
+        """判断分块是否同时满足字符硬上限与 token 预算。"""
+        if len(candidate) > self._max_chars:
+            return False
+        if self._token_counter is not None and self._max_tokens is not None:
+            return self._token_counter(candidate) <= self._max_tokens
+        return True
 
 
 # ---------------------------------------------------------------------------
@@ -661,6 +744,34 @@ def get_segmenter(
     if _segmenter_instance is None:
         _segmenter_instance = TextSegmenter(max_chars=max_chars, min_chars=min_chars)
     return _segmenter_instance
+
+
+def build_segmenter(
+    max_chars: int = DEFAULT_MAX_CHARS,
+    min_chars: int = DEFAULT_MIN_CHARS,
+    max_tokens: int | None = None,
+    token_counter: Callable[[str], int] | None = None,
+    protected_patterns: list[str] | None = None,
+) -> TextSegmenter:
+    """按引擎能力装配 TextSegmenter。
+
+    Args:
+        max_chars: 最大字符数（硬上限）。
+        min_chars: 最小字符数。
+        max_tokens: 最大 token 数，需配合 token_counter 生效。
+        token_counter: 文本 → token 数的计数器。
+        protected_patterns: 受保护片段正则；None 使用默认值，[] 表示不保护。
+
+    Returns:
+        配置好的 TextSegmenter 实例。
+    """
+    return TextSegmenter(
+        max_chars=max_chars,
+        min_chars=min_chars,
+        max_tokens=max_tokens,
+        token_counter=token_counter,
+        protected_patterns=protected_patterns,
+    )
 
 
 def segment_text(

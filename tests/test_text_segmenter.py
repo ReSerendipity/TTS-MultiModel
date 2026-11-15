@@ -9,6 +9,9 @@
     5. AudioCrossfader 交叉淡入淡出拼接
     6. 淡入淡出效果
     7. 边界条件与异常处理
+    8. 受保护片段（特殊 token / SSML / 发音标注）不切断
+    9. token 预算与 max_chars 硬上限兜底
+    10. start_char/end_char 与原文切片一致
 """
 
 import os
@@ -22,9 +25,11 @@ if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
 from integrated_app.text_segmenter import (
+    DEFAULT_PROTECTED_PATTERNS,
     AudioCrossfader,
     TextSegment,
     TextSegmenter,
+    build_segmenter,
     crossfade_concat_audio,
     get_segmenter,
     segment_text,
@@ -447,3 +452,184 @@ class TestTextSegment:
         repr_str = repr(seg)
         assert "index=1" in repr_str
         assert "chars=7" in repr_str
+
+
+# ---------------------------------------------------------------------------
+# 受保护片段测试
+# ---------------------------------------------------------------------------
+
+
+class TestProtectedPatterns:
+    """受保护片段（特殊 token / SSML 标签 / 发音标注）不被切断。"""
+
+    @staticmethod
+    def _covering_segments(segments, token, text):
+        """返回完整覆盖 token 区间的分块。"""
+        token_start = text.index(token)
+        return [s for s in segments if s.start_char <= token_start and s.end_char >= token_start + len(token)]
+
+    def test_default_patterns_used_when_none(self):
+        """默认保护三类片段；显式传 [] 表示不保护。"""
+        assert TextSegmenter().protected_patterns == list(DEFAULT_PROTECTED_PATTERNS)
+        assert TextSegmenter(protected_patterns=[]).protected_patterns == []
+
+    @pytest.mark.parametrize("token", ["<|SPECIAL_1|>", "<speak>", "[ni3]"])
+    def test_protected_token_never_split(self, token):
+        """恰好跨在预算边界上的受保护片段不应被切成两半。"""
+        segmenter = TextSegmenter(max_chars=20, min_chars=1)
+        text = "甲" * 17 + token + "乙" * 17
+        result = segmenter.segment(text, "zh")
+        assert len(self._covering_segments(result.segments, token, text)) == 1
+        for seg in result.segments:
+            assert text[seg.start_char : seg.end_char] == seg.text
+
+    def test_oversized_protected_span_is_standalone(self):
+        """受保护片段超过预算时整段独立成块并保留原文。"""
+        token = "<|SPECIAL_" + "A" * 30 + "|>"
+        segmenter = TextSegmenter(max_chars=20, min_chars=2)
+        text = "前缀。" + token + "后缀。"
+        result = segmenter.segment(text, "zh")
+        assert token in result.texts
+        seg = next(s for s in result.segments if s.text == token)
+        assert seg.char_count > segmenter.max_chars
+        assert text[seg.start_char : seg.end_char] == token
+
+    def test_empty_protected_patterns_disables_protection(self):
+        """传 [] 应完全关闭保护（片段可以被切断）。"""
+        token = "<|SPECIAL_1|>"
+        segmenter = TextSegmenter(max_chars=20, min_chars=1, protected_patterns=[])
+        text = "甲" * 18 + token + "乙" * 18
+        result = segmenter.segment(text, "zh")
+        assert self._covering_segments(result.segments, token, text) == []
+
+    def test_custom_patterns_replace_defaults(self):
+        """调用方提供的正则替换默认三类。"""
+        segmenter = TextSegmenter(max_chars=20, min_chars=1, protected_patterns=[r"\{\{[^}]{1,16}\}\}"])
+        text = "甲" * 18 + "{{x}}" + "乙" * 18
+        result = segmenter.segment(text, "zh")
+        assert len(self._covering_segments(result.segments, "{{x}}", text)) == 1
+
+
+# ---------------------------------------------------------------------------
+# token 预算测试
+# ---------------------------------------------------------------------------
+
+
+class TestTokenBudget:
+    """token 预算与 max_chars 硬上限兜底。"""
+
+    def test_token_counter_enforced(self):
+        """提供 token_counter 时应按 token 预算切分。"""
+        segmenter = TextSegmenter(
+            max_chars=1000,
+            min_chars=5,
+            max_tokens=10,
+            token_counter=lambda s: len(s) // 2,
+        )
+        text = "。".join(["一二三四五"] * 12) + "。"
+        result = segmenter.segment(text, "zh")
+        assert result.segment_count > 1
+        for seg in result.segments:
+            assert len(seg.text) // 2 <= segmenter.max_tokens
+
+    def test_max_chars_hard_cap_with_token_counter(self):
+        """token 预算宽松时 max_chars 仍为硬上限。"""
+        segmenter = TextSegmenter(
+            max_chars=10,
+            min_chars=2,
+            max_tokens=100,
+            token_counter=lambda s: len(s) // 2,
+        )
+        text = "一二三四五。" * 10
+        result = segmenter.segment(text, "zh")
+        assert result.segment_count > 1
+        for seg in result.segments:
+            assert seg.char_count <= segmenter.max_chars
+
+    def test_max_tokens_without_counter_falls_back_to_chars(self):
+        """未提供 token_counter 时回退字符预算，max_tokens 不生效。"""
+        segmenter = TextSegmenter(max_chars=10, min_chars=2, max_tokens=1)
+        text = "一二三四五。" * 10
+        result = segmenter.segment(text, "zh")
+        assert result.segment_count > 1
+        for seg in result.segments:
+            assert seg.char_count <= segmenter.max_chars
+
+    def test_invalid_max_tokens(self):
+        """max_tokens <= 0 应抛出 ValueError。"""
+        with pytest.raises(ValueError):
+            TextSegmenter(max_tokens=0)
+
+
+# ---------------------------------------------------------------------------
+# 偏移准确性测试
+# ---------------------------------------------------------------------------
+
+
+class TestOffsetAccuracy:
+    """start_char/end_char 应与分块文本在原文中的真实区间一致。"""
+
+    def test_offsets_match_original_with_whitespace(self):
+        """多分块且原文带首尾空白时，区间仍与原文切片一致。"""
+        segmenter = TextSegmenter(max_chars=20, min_chars=5)
+        text = "  \n" + "这是第一句话。这是第二句话。这是第三句话。" + "\n  "
+        result = segmenter.segment(text, "zh")
+        assert result.segment_count > 1
+        for seg in result.segments:
+            assert text[seg.start_char : seg.end_char] == seg.text
+        assert result.segments[0].start_char == 3
+        assert result.segments[-1].end_char == len(text) - 3
+
+    def test_offsets_single_segment_with_whitespace(self):
+        """单分块时首尾空白被裁掉，但区间落在原文对应位置。"""
+        segmenter = TextSegmenter(max_chars=100, min_chars=5)
+        text = "  你好世界。  "
+        result = segmenter.segment(text, "zh")
+        assert result.segment_count == 1
+        seg = result.segments[0]
+        assert seg.text == "你好世界。"
+        assert (seg.start_char, seg.end_char) == (2, 7)
+
+    def test_offsets_monotonic_and_non_overlapping(self):
+        """多分块区间应递增且互不重叠。"""
+        text = "这是第一句话。这是第二句话，还有停顿。这是第三句话。"
+        segmenter = TextSegmenter(max_chars=12, min_chars=2)
+        result = segmenter.segment(text, "zh")
+        assert result.segment_count > 1
+        prev_end = 0
+        for seg in result.segments:
+            assert seg.start_char >= prev_end
+            assert seg.end_char - seg.start_char == seg.char_count
+            assert text[seg.start_char : seg.end_char] == seg.text
+            prev_end = seg.end_char
+
+
+# ---------------------------------------------------------------------------
+# 工厂函数测试
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSegmenter:
+    """build_segmenter 装配测试。"""
+
+    def test_build_segmenter_passes_params(self):
+        """工厂应把全部参数透传给 TextSegmenter。"""
+        segmenter = build_segmenter(
+            max_chars=80,
+            min_chars=20,
+            max_tokens=32,
+            token_counter=lambda s: len(s) // 2,
+            protected_patterns=[],
+        )
+        assert segmenter.max_chars == 80
+        assert segmenter.min_chars == 20
+        assert segmenter.max_tokens == 32
+        assert segmenter.protected_patterns == []
+
+    def test_build_segmenter_defaults(self):
+        """默认装配保持旧行为（字符预算 + 默认保护）。"""
+        segmenter = build_segmenter()
+        assert segmenter.max_chars == 500
+        assert segmenter.min_chars == 50
+        assert segmenter.max_tokens is None
+        assert segmenter.protected_patterns == list(DEFAULT_PROTECTED_PATTERNS)
