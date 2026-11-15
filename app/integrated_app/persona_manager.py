@@ -36,6 +36,7 @@ import contextlib
 import logging
 import os
 import threading
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -54,6 +55,13 @@ from .persona_metadata import (
     load_persona_metadata,
     save_persona_metadata,
 )
+from .voice_profile import (
+    VoiceDerivedCache,
+    VoiceProfile,
+    VoiceProfileResolution,
+    VoiceReference,
+    compute_voice_fingerprint,
+)
 
 logger: logging.Logger = logging.getLogger("tts_multimodel")
 
@@ -61,6 +69,12 @@ logger: logging.Logger = logging.getLogger("tts_multimodel")
 # 保存 .pt 文件时自动写入 origin 字段，加载时校验来源，防止嵌入被批量导出后无法追溯。
 PERSONA_PT_ORIGIN = "TTS_MultiModel v2.1.0"
 PERSONA_PT_FORMAT_VERSION = 1
+
+#: VoxCPM2 的引擎标识；该引擎的载荷继续走 ``load_persona_embedding``。
+VOICE_PROFILE_ENGINE_VOXCPM2 = "voxcpm2"
+
+#: 进程内每引擎派生缓存（按 (engine, name) 隔离，指纹判新鲜度）。
+VOICE_DERIVED_CACHE: VoiceDerivedCache = VoiceDerivedCache()
 
 
 def _validate_persona_name(name: str) -> tuple[bool, str]:
@@ -233,8 +247,8 @@ def fn_save_persona(
                 daemon=True,
             ).start()
 
-        if name in _persona_embedding_cache:
-            del _persona_embedding_cache[name]
+        # 源文件已被替换：嵌入缓存与每引擎派生缓存都必须失效。
+        invalidate_voice_profile(name)
 
         return f"✅ 音色 [{name}] 已成功固化！", False
 
@@ -531,6 +545,163 @@ def load_persona_embedding(name: str) -> Any | None:
     return result
 
 
+def load_voice_profile(
+    name: str,
+    *,
+    persona_dir: str | None = None,
+) -> VoiceProfile | None:
+    """把音色三件套（.wav/.txt/metadata.json）读成引擎无关的 Voice Profile。
+
+    与 ``load_persona_embedding`` 的分工：本函数只做资产层解析（读盘 + 元数据
+    + 指纹），不触碰 VoxCPM2 嵌入，也不触发模型推理，因此可被任意引擎复用。
+
+    Args:
+        name: 音色名称（``PERSONA_DIR`` 下的裸文件名）。
+        persona_dir: 音色目录；None 时使用模块级 ``PERSONA_DIR``。
+
+    Returns:
+        Optional[VoiceProfile]: 参考音频缺失或名称越界时返回 None。
+    """
+    root = PERSONA_DIR if persona_dir is None else persona_dir
+    wav_path = resolve_bare_in_dir(root, f"{name}.wav")
+    txt_path = resolve_bare_in_dir(root, f"{name}.txt")
+    meta_path = resolve_bare_in_dir(root, f"{name}.metadata.json")
+    if not wav_path or not txt_path or not meta_path:
+        logger.warning(f"[Voice Profile] 音色名越出音色目录，拒绝解析: {name!r}")
+        return None
+    if not os.path.exists(wav_path):
+        return None
+
+    reference_text = ""
+    if os.path.exists(txt_path):
+        with contextlib.suppress(OSError), open(txt_path, encoding="utf-8") as f:
+            reference_text = f.read()
+
+    try:
+        meta = load_persona_metadata(root, name)
+    except Exception as e:  # noqa: BLE001 - 元数据损坏不应阻断音色解析
+        logger.warning(f"[Voice Profile] 音色 [{name}] 元数据加载失败，按默认值解析: {e}")
+        meta = PersonaMetadata(name=name)
+
+    return VoiceProfile(
+        name=name,
+        reference_wav=wav_path,
+        reference_text=reference_text,
+        tags=tuple(meta.tags or ()),
+        category=meta.category or "",
+        voice_type=meta.voice_type or "",
+        language=meta.language or "zh",
+        source=meta.source_audio or "local",
+        consent_state=meta.consent_state,
+        created_at=meta.created_at or "",
+        fingerprint=compute_voice_fingerprint(wav_path, txt_path, meta_path),
+    )
+
+
+def resolve_voice_profile(
+    name: str,
+    engine: str,
+    *,
+    compute: Callable[[VoiceProfile], Any] | None = None,
+    profile: VoiceProfile | None = None,
+    persona_dir: str | None = None,
+) -> VoiceProfileResolution | None:
+    """按引擎解析音色载荷，并走每引擎派生缓存。
+
+    解析顺序：
+        1. 资产层：``profile`` 未提供时先 ``load_voice_profile``；
+        2. 派生层：``VOICE_DERIVED_CACHE`` 按 ``(engine, name)`` 查，指纹一致才命中；
+        3. 未命中：``voxcpm2`` 委托既有 ``load_persona_embedding``（保留 .pt origin
+           校验与 ``EngineNotLoadedError`` 语义）；其他引擎优先调用 ``compute``，
+           未提供时回退为 ``VoiceReference(wav, text, tags)``。
+
+    同一音色在不同引擎下的缓存互不覆盖；源文件被覆盖后指纹变化，旧条目自动
+    失效（对 voxcpm2 还会清掉按名缓存的嵌入，避免继续返回旧转写）。
+
+    Args:
+        name: 音色名称。
+        engine: 引擎标识（如 ``voxcpm2`` / ``indextts2``）。
+        compute: 可选派生函数，签名 ``(VoiceProfile) -> Any``；用于引擎侧编码器。
+        profile: 已解析的画像，避免重复读盘。
+        persona_dir: 音色目录；None 时使用模块级 ``PERSONA_DIR``。
+
+    Returns:
+        Optional[VoiceProfileResolution]: 音色不存在时返回 None。
+
+    Raises:
+        ValueError: ``engine`` 为空。
+    """
+    if not engine:
+        raise ValueError("engine 不能为空")
+    if profile is None:
+        profile = load_voice_profile(name, persona_dir=persona_dir)
+    if profile is None:
+        return None
+
+    hit, payload, stale = VOICE_DERIVED_CACHE.lookup(name, engine, profile.fingerprint)
+    if hit:
+        return VoiceProfileResolution(
+            profile=profile,
+            engine=engine,
+            payload=payload,
+            cache_source="memory",
+        )
+
+    if stale and engine == VOICE_PROFILE_ENGINE_VOXCPM2 and name in _persona_embedding_cache:
+        # Why 只清内存不清 .pt：.pt 是既有的预计算产物，删除会影响存量音色的
+        # 启动速度；内存条目清掉即可让下次调用重新读盘/重算。
+        with contextlib.suppress(Exception):
+            del _persona_embedding_cache[name]
+
+    if engine == VOICE_PROFILE_ENGINE_VOXCPM2:
+        payload = load_persona_embedding(name)
+        if payload is None:
+            return None
+        cache_source = "voxcpm2"
+    elif compute is not None:
+        payload = compute(profile)
+        cache_source = "computed"
+    else:
+        payload = VoiceReference(
+            wav_path=profile.reference_wav,
+            ref_text=profile.reference_text,
+            tags=profile.tags,
+        )
+        cache_source = "reference"
+
+    VOICE_DERIVED_CACHE.put(name, engine, profile.fingerprint, payload)
+    return VoiceProfileResolution(
+        profile=profile,
+        engine=engine,
+        payload=payload,
+        cache_source=cache_source,
+    )
+
+
+def invalidate_voice_profile(
+    name: str | None = None,
+    engine: str | None = None,
+) -> int:
+    """清除音色派生缓存（可按音色与/或引擎收窄）。
+
+    音色保存/删除后必须调用：源文件已变，任何派生载荷都不再可信。按音色清除
+    时同时清掉 ``_persona_embedding_cache`` 的同名条目，与既有保存路径的失效
+    语义保持一致。
+
+    Args:
+        name: 目标音色；None 表示所有音色。
+        engine: 目标引擎；None 表示该音色的所有引擎。
+
+    Returns:
+        int: 派生缓存中实际清除的条目数。
+    """
+    removed = VOICE_DERIVED_CACHE.invalidate(name, engine)
+    if name is not None and name in _persona_embedding_cache:
+        with contextlib.suppress(Exception):
+            del _persona_embedding_cache[name]
+    return removed
+
+
 def pickle_error_cls() -> type:
     """延迟获取 pickle.UnpicklingError，避免顶层 import 开销。"""
     import pickle  # nosec B403 - 仅用于获取 UnpicklingError 异常类做 isinstance 判断，不反序列化不可信数据
@@ -618,9 +789,8 @@ def delete_persona(name: str) -> tuple[bool, str]:
                 # 只回传文件名 + 脱敏后的原因：OSError 原文带绝对路径。
                 errors.append(f"删除 {os.path.basename(path)} 失败: {safe_error_message(e)}")
 
-    if name in _persona_embedding_cache:
-        with contextlib.suppress(Exception):
-            del _persona_embedding_cache[name]
+    # 音色已删除：所有引擎的派生载荷一并失效，避免用已删除音色的缓存继续生成。
+    invalidate_voice_profile(name)
 
     if errors:
         return False, "; ".join(errors)

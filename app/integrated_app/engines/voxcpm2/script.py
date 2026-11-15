@@ -44,6 +44,7 @@ import numpy as np
 from ...exceptions import EngineSwitchError
 from ...gpu_utils import free_gpu_memory, is_oom_error
 from ...resampling import get_declared_sample_rate
+from ...script_planner import ScriptBlock
 from ._base import (
     SAVE_DIR,
     GenerationError,
@@ -645,6 +646,87 @@ def _json_str(s: str | None) -> str:
     return f'"{escaped}"'
 
 
+def generate_script_blocks(
+    model: Any,
+    blocks: list[ScriptBlock],
+    persona_map: dict[str, Any],
+    *,
+    global_cfg: float = 5.0,
+    global_steps: int = 30,
+    per_character_overrides: dict[str, dict[str, Any]] | None = None,
+    denoise_reference: bool = False,
+    progress_cb: Callable[[int, int, str], None] | None = None,
+    stop_event: threading.Event | None = None,
+) -> list[ScriptLine]:
+    """按说话人感知分块逐块生成，块内只允许该块声明的角色。
+
+    与 ``generate_script_lines`` 的差别是两层守卫：
+        1. **块级角色守卫** —— 块文本解析出的角色若不在 ``block.speakers``，
+           直接标记 error，不调用模型；防止规划器/文本被篡改后串音色。
+        2. **块级音色子集** —— 传给生成器的 persona_map 只含本块角色，
+           即使出现大小写差异或同名模糊匹配，也借不到其他块的音色。
+
+    Args:
+        model: 已加载的 VoxCPM2 模型。
+        blocks: ``script_planner.plan_script_segments`` 输出的块列表。
+        persona_map: 全局角色 → 音色映射，函数内部按块裁剪。
+        global_cfg: 默认 CFG。
+        global_steps: 默认推理步数。
+        per_character_overrides: 角色级参数覆盖。
+        denoise_reference: 是否对参考音频降噪。
+        progress_cb: 进度回调，已换算为整笔剧本的行号。
+        stop_event: 取消事件。
+
+    Returns:
+        List[ScriptLine]: 与所有块解析出的行总数等长的结果列表。
+    """
+    parsed_blocks: list[tuple[ScriptBlock, list[ScriptLine]]] = [(block, parse_script(block.text)) for block in blocks]
+    total = sum(len(lines) for _block, lines in parsed_blocks)
+    if total == 0:
+        return []
+
+    results: list[ScriptLine] = []
+    offset = 0
+    for block, lines in parsed_blocks:
+        speaker_index = {s.lower() for s in block.speakers}
+        guarded: list[ScriptLine] = []
+        for line in lines:
+            if line.is_instruction or not line.role:
+                guarded.append(line)
+            elif line.role.lower() not in speaker_index:
+                guarded.append(
+                    line._replace(
+                        error=(f"角色 '{line.role}' 不在本块说话人集合 {list(block.speakers)} 内，拒绝生成以避免串音色")
+                    )
+                )
+            else:
+                guarded.append(line)
+
+        subset = {k: v for k, v in persona_map.items() if str(k).lower() in speaker_index}
+        if progress_cb is not None:
+
+            def local_cb(current: int, _total: int, stage: str, _offset: int = offset) -> None:
+                progress_cb(_offset + current, total, stage)
+
+        else:
+            local_cb = None
+        generated = generate_script_lines(
+            model=model,
+            lines=guarded,
+            persona_map=subset,
+            global_cfg=global_cfg,
+            global_steps=global_steps,
+            per_character_overrides=per_character_overrides,
+            denoise_reference=denoise_reference,
+            progress_cb=local_cb,
+            stop_event=stop_event,
+        )
+        results.extend(generated)
+        offset += len(lines)
+
+    return results
+
+
 @with_generation_context(phase_name="VoxCPM剧本工坊", cleanup_fn=cleanup_temp_files)
 def fn_voxcpm_script_studio(
     script_text: str,
@@ -655,6 +737,7 @@ def fn_voxcpm_script_studio(
     advanced_seed: int,
     lang: str = "中文",
     persona_map_with_wav: dict | None = None,
+    planner_blocks: list[ScriptBlock] | None = None,
 ) -> tuple[tuple | None, str]:
     """VoxCPM 剧本工坊 UI / 路由层入口（向后兼容：函数名/参数/返回 100% 不变）。
 
@@ -662,15 +745,26 @@ def fn_voxcpm_script_studio(
     generate_script_lines + concatenate_lines 新流水线 → 返回 ((sr, wav, filename), msg)。
     新业务代码推荐直接调用 parse_script / generate_script_lines / concatenate_lines
     组合，以便取消控制 / 分段错误排查 / ZIP 导出。
+
+    ``planner_blocks`` 由 ``VoxCPM2Engine.generate_script`` 传入（P1-3）：提供时
+    走 ``generate_script_blocks`` 的块级角色/音色守卫；未提供时保持旧行为。
     """
     from ...model_registry import registry
 
     if persona_map_with_wav:
-        persona_map = {k: {"wav": v, "text": ""} for k, v in persona_map_with_wav.items()}
+        persona_map: dict[str, Any] = {}
+        for key, value in persona_map_with_wav.items():
+            if isinstance(value, dict):
+                persona_map[key] = dict(value)
+            else:
+                persona_map[key] = {"wav": value, "text": ""}
     else:
         persona_map = get_persona_map()
 
-    parsed_lines = parse_script(script_text)
+    if planner_blocks:
+        parsed_lines = [line for block in planner_blocks for line in parse_script(block.text)]
+    else:
+        parsed_lines = parse_script(script_text)
     if not parsed_lines:
         raise GenerationError("剧本解析失败：未找到任何有效 [角色]台词 行")
 
@@ -685,17 +779,30 @@ def fn_voxcpm_script_studio(
         with contextlib.suppress(RuntimeError, ValueError):
             _progress_mgr.advance_segment(f"第 {current}/{total} 行 [{stage}] 合成中...")
 
-    result_lines = generate_script_lines(
-        model=model,
-        lines=parsed_lines,
-        persona_map=persona_map,
-        global_cfg=advanced_cfg,
-        global_steps=advanced_steps,
-        per_character_overrides=None,
-        denoise_reference=bool(advanced_denoise),
-        progress_cb=_cb,
-        stop_event=None,
-    )
+    if planner_blocks:
+        result_lines = generate_script_blocks(
+            model=model,
+            blocks=planner_blocks,
+            persona_map=persona_map,
+            global_cfg=advanced_cfg,
+            global_steps=advanced_steps,
+            per_character_overrides=None,
+            denoise_reference=bool(advanced_denoise),
+            progress_cb=_cb,
+            stop_event=None,
+        )
+    else:
+        result_lines = generate_script_lines(
+            model=model,
+            lines=parsed_lines,
+            persona_map=persona_map,
+            global_cfg=advanced_cfg,
+            global_steps=advanced_steps,
+            per_character_overrides=None,
+            denoise_reference=bool(advanced_denoise),
+            progress_cb=_cb,
+            stop_event=None,
+        )
 
     ok_count = sum(1 for line in result_lines if line.audio is not None and line.error is None)
     fail_count = sum(1 for line in result_lines if line.error is not None and not line.is_instruction)

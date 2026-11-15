@@ -171,6 +171,10 @@ async def generate_voxcpm_script(
     # 3. 构建 persona_map_with_wav：角色名 → 参考音频 WAV 绝对路径
     # ------------------------------------------------------------------
     persona_map_with_wav: dict[str, str] = {}
+    # P1-3：把用户选择的音色同时以 speaker_map 形式下传。VoxCPM2 过去会静默
+    # 忽略该参数，导致调用方以为“speaker_map 配置生效”而实际走 persona_map；
+    # 现在引擎按 Voice Profile 解析 persona_name，并校验引擎归属。
+    speaker_map_payload: dict[str, dict[str, str]] = {}
     if persona_names.strip():
         from ....persona_manager import PERSONA_DIR, load_persona_embedding
 
@@ -181,6 +185,7 @@ async def generate_voxcpm_script(
                 logger.warning(f"[VoxCPM剧本工坊] 音色名格式不合法，已跳过: {pname!r}")
                 continue
             safe_name: str = pname
+            speaker_map_payload[safe_name] = {"persona_name": safe_name, "engine": "voxcpm2"}
             persona_data = load_persona_embedding(safe_name)
             if persona_data is not None:
                 # 兼容不同 .pt 缓存格式：
@@ -217,6 +222,7 @@ async def generate_voxcpm_script(
         engine = registry.get_current_engine()
         return engine.generate_script(
             text,
+            speaker_map=speaker_map_payload if speaker_map_payload else None,
             persona_map=persona_map_with_wav if persona_map_with_wav else None,
             advanced_cfg=cfg,
             advanced_norm=advanced_norm,
@@ -236,6 +242,7 @@ async def generate_voxcpm_script(
         degraded_steps: int = max(steps // 2, 4)
         return engine.generate_script(
             text,
+            speaker_map=speaker_map_payload if speaker_map_payload else None,
             persona_map=persona_map_with_wav if persona_map_with_wav else None,
             advanced_cfg=cfg,
             advanced_norm=advanced_norm,

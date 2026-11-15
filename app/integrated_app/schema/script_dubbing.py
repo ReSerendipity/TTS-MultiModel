@@ -5,7 +5,9 @@
 
 设计文档：docs/plans/SCRIPT_DUBBING_SCHEMA.md
 
-状态：数据类定义（未接入生成流程，供未来剧本工坊功能扩展使用）
+状态：已接入生成流程（``script_planner`` 负责解析 → 说话人感知分块；
+``VoxCPM2Engine.generate_script`` 消费分块结果）。本模块只定义数据结构与
+文本解析，不依赖任何具体引擎，保证多引擎共用同一份剧本语义。
 """
 
 from __future__ import annotations
@@ -74,14 +76,15 @@ class ScriptSegment:
     """剧本段落：解析后的单个台词段落。
 
     Attributes:
-        speaker: 说话人角色名。
-        text: 台词文本。
+        speaker: 说话人角色名；指令段为空串。
+        text: 台词文本；指令段为指令 token（如 ``pause=500``）。
         index: 段落在剧本中的序号（从 0 开始）。
         emotion_override: 本段覆盖的情绪（可选，支持行内标签）。
         speed_override: 本段覆盖的语速（可选）。
         generated_audio: 生成后的音频路径（生成后填充）。
         status: 生成状态。
         error: 失败原因（失败时填充）。
+        is_instruction: True 表示该段是停顿/指令行（不参与推理，只贡献静音）。
     """
 
     speaker: str
@@ -92,6 +95,7 @@ class ScriptSegment:
     generated_audio: str | None = None
     status: SegmentStatus = SegmentStatus.PENDING
     error: str | None = None
+    is_instruction: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """转换为可序列化字典。"""
@@ -104,6 +108,7 @@ class ScriptSegment:
             "generated_audio": self.generated_audio,
             "status": self.status.value,
             "error": self.error,
+            "is_instruction": self.is_instruction,
         }
 
 
@@ -121,6 +126,9 @@ class ScriptConfig:
         concatenate: 是否拼接为完整音频，默认 True。
         segment_pause_ms: 段落间停顿（毫秒），默认 300。
         parallel_generation: 是否并行生成（受单 Worker 限制，默认 False）。
+        max_speakers_per_block: 每个合成块允许出现的最大角色数，默认 3。
+        max_chars_per_block: 每个合成块的最大渲染字符数，默认 300。
+        max_tokens_per_block: 每块 token 预算；需配合 token_counter 生效。
     """
 
     script_text: str
@@ -132,6 +140,9 @@ class ScriptConfig:
     concatenate: bool = True
     segment_pause_ms: int = 300
     parallel_generation: bool = False
+    max_speakers_per_block: int = 3
+    max_chars_per_block: int = 300
+    max_tokens_per_block: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """转换为可序列化字典。"""
@@ -145,6 +156,9 @@ class ScriptConfig:
             "concatenate": self.concatenate,
             "segment_pause_ms": self.segment_pause_ms,
             "parallel_generation": self.parallel_generation,
+            "max_speakers_per_block": self.max_speakers_per_block,
+            "max_chars_per_block": self.max_chars_per_block,
+            "max_tokens_per_block": self.max_tokens_per_block,
         }
 
 
@@ -180,21 +194,42 @@ class ScriptDubbingResult:
         }
 
 
-# 说话人标签正则：匹配行首的 [角色名] 标签
-_SPEAKER_TAG_PATTERN = re.compile(r"^\[([^\]]+)\]\s*(.*)$")
+# 说话人标签正则：匹配行首的 [角色名] 标签，可选 (情绪) 提示
+_SPEAKER_TAG_PATTERN = re.compile(r"^\[([^\]]+)\](?:\(([^)]+)\))?\s*(.*)$")
+
+#: 指令行 token：不参与推理，只贡献静音/停顿（与引擎侧 ``_INSTRUCTION_SET`` 对齐）。
+SCRIPT_INSTRUCTION_TOKENS: frozenset[str] = frozenset({"uv_break", "pause", "silence", "break", "sep", "separator"})
+
+
+def is_instruction_token(token: str) -> bool:
+    """判断方括号 token 是否为指令（而非角色名）。
+
+    Args:
+        token: 方括号内的原始 token，如 ``uv_break`` / ``pause=500``。
+
+    Returns:
+        bool: True 表示停顿/分隔指令。
+    """
+    lowered = (token or "").strip().lower()
+    if lowered in SCRIPT_INSTRUCTION_TOKENS:
+        return True
+    return lowered.startswith("pause=") or lowered.startswith("silence=")
 
 
 def parse_script(script_text: str) -> list[ScriptSegment]:
     """解析带说话人标签的剧本文本为段落列表。
 
-    标签格式：``[角色名] 台词内容``
+    标签格式：``[角色名] 台词内容``，支持 ``[角色名](情绪) 台词内容``；
+    ``[uv_break]`` / ``[pause=500]`` 等指令行解析为 ``is_instruction=True``
+    的段落（不参与推理，仅贡献静音）。
 
     规则：
     - 标签以 ``[`` 开头、``]`` 结尾，中间为角色名称（支持中英文）
     - 标签后紧跟空格，然后是该角色的台词
     - 角色名称在整个剧本中唯一，用于关联角色配置
     - 支持多行台词（同一角色的连续无标签行会被合并）
-    - 空行忽略
+    - 空行忽略；无标签行视为注释忽略
+    - 标签后无台词时仍保留段落（``text=""``），由上层标记为错误，避免静默丢行
 
     Args:
         script_text: 带说话人标签的剧本文本。
@@ -213,40 +248,54 @@ def parse_script(script_text: str) -> list[ScriptSegment]:
     current_text: list[str] = []
     index = 0
 
-    for line in script_text.split("\n"):
-        line = line.strip()
+    def _flush_speech() -> None:
+        """把当前角色台词落成一个段落（空台词也保留，供上层报错）。"""
+        nonlocal index, current_text
+        if current_speaker is None:
+            return
+        segments.append(
+            ScriptSegment(
+                speaker=current_speaker,
+                text=" ".join(current_text).strip(),
+                index=index,
+            )
+        )
+        index += 1
+        current_text = []
+
+    for raw_line in script_text.split("\n"):
+        line = raw_line.strip()
         if not line:
             continue
 
         match = _SPEAKER_TAG_PATTERN.match(line)
         if match:
-            # 保存上一段
-            if current_speaker is not None and current_text:
+            token = match.group(1).strip()
+            emotion_hint = match.group(2)
+            rest = match.group(3).strip()
+
+            _flush_speech()
+            current_speaker = None
+
+            if is_instruction_token(token):
+                text = token if not rest else f"{token} {rest}"
                 segments.append(
                     ScriptSegment(
-                        speaker=current_speaker,
-                        text=" ".join(current_text),
+                        speaker="",
+                        text=text,
                         index=index,
+                        is_instruction=True,
                     )
                 )
                 index += 1
+                continue
 
-            # 开始新段落
-            current_speaker = match.group(1).strip()
-            rest = match.group(2).strip()
-            current_text = [rest] if rest else []
+            current_speaker = token
+            current_text = [f"({emotion_hint}){rest}" if emotion_hint and rest else rest] if rest else []
         elif current_speaker is not None:
             # 续行（同一角色的多行台词）
             current_text.append(line)
 
-    # 保存最后一段
-    if current_speaker is not None and current_text:
-        segments.append(
-            ScriptSegment(
-                speaker=current_speaker,
-                text=" ".join(current_text),
-                index=index,
-            )
-        )
+    _flush_speech()
 
     return segments

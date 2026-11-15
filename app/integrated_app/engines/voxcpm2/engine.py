@@ -312,20 +312,20 @@ class VoxCPM2Engine(TTSEngine, ControllableTTSEngine):
             text: 剧本格式文本，每行或每个 ``[角色名]`` 标签后跟随
                   对应台词。具体格式由子函数 ``fn_voxcpm_script_studio``
                   内部解析（参见 script.py 中的正则）。
-            speaker_map: Protocol 通用占位参数（**VoxCPM2 未使用**）。
-                        IndexTTS2 风格的"说话人名称 → 音色配置"映射，
-                        语义与 VoxCPM2 剧本工坊的需求不匹配，此处有意
-                        忽略，参见下方 Why 注释。
-            persona_map: VoxCPM2 实际使用的映射字典，格式为
-                        ``{角色名(str): 参考音频wav路径(str)}``。
-                        路由层在调用前会将用户选择的 Persona 音色
-                        转换为该格式。若传入 ``None``，子函数会回退
-                        读取所有已注册 Persona 的默认映射。
+            speaker_map: 统一“说话人 → 音色配置”映射，值为参考音频路径或
+                        ``{"persona_name"|"wav"/"reference_audio", "text", "engine"}``。
+                        本引擎会真正消费该参数并按 P1-2 Voice Profile 解析
+                        Persona；声明了非 ``voxcpm2`` 引擎的角色会显式报错，
+                        不再静默忽略。
+            persona_map: 兼容旧调用方的 ``{角色名: 参考音频路径}`` 映射；
+                        与 speaker_map 合并时以后者为准。
             **kwargs: 剧本工坊高级参数透传。包括但不限于：
                       - ``advanced_cfg`` / ``advanced_norm`` /
                         ``advanced_denoise`` / ``advanced_steps`` /
                         ``advanced_seed``：终极克隆级别的精细参数。
                       - ``lang``：语言偏好（默认"中文"）。
+                      - ``max_speakers_per_block`` / ``max_chars_per_block``：
+                        说话人感知分块上限，默认 3 / 300。
 
         Returns:
             tuple[Any, str]: 二元组：
@@ -345,25 +345,40 @@ class VoxCPM2Engine(TTSEngine, ControllableTTSEngine):
                 message="VoxCPM2 引擎未加载，请先加载模型后再使用剧本工坊",
                 engine="voxcpm2",
             )
+        from ...script_planner import prepare_script_request
         from .script import fn_voxcpm_script_studio
 
-        # WHY speaker_map 被"吞掉"，只用 persona_map 透传：
-        # TTSEngine Protocol 的 generate_script 同时声明了 speaker_map
-        # 和 persona_map 两个参数，是为了兼容不同引擎的设计哲学：
-        #   - IndexTTS2 等引擎使用 speaker_map：语义是"剧本中的说话人名
-        #     → 该说话人对应的音色配置对象"，适合说话人集合预先通过
-        #     API 注册的场景。
-        #   - VoxCPM2 剧本工坊使用 persona_map：语义是"角色名 → 该角色
-        #     的参考音频 wav 路径"，直接与 Persona 目录结构耦合，且
-        #     fn_voxcpm_script_studio 的历史实现就是接受
-        #     persona_map_with_wav 参数。
-        # 两者键值结构完全不同，若强行将 speaker_map 转换为 persona_map
-        # 会丢失信息或引入歧义。因此本方法显式忽略 speaker_map，仅将
-        # persona_map（以及 **kwargs 中的高级参数）透传给子函数，
-        # 路由层在调用时应保证构造正确的 persona_map 格式。
+        # Why 现在必须消费 speaker_map（而不是静默忽略）：
+        # Protocol 声明的 speaker_map 是跨引擎统一的“说话人 → 音色配置”入口，
+        # 若继续丢弃，调用方以为配置生效、实际仍用 persona_map 默认音色，属于
+        # 静默错误。这里把它归一化为参考音频绑定；声明了非 VoxCPM2 引擎的角色
+        # 直接报错，由调用方显式转派到对应引擎，绝不做模糊降级。
+        max_speakers = int(kwargs.pop("max_speakers_per_block", 3))
+        max_chars = int(kwargs.pop("max_chars_per_block", 300))
+        request = prepare_script_request(
+            text,
+            speaker_map=speaker_map,
+            persona_map=persona_map,
+            target_engine="voxcpm2",
+            max_speakers=max_speakers,
+            max_chars=max_chars,
+        )
+        if request.unsupported_engines:
+            detail = "、".join(f"{role}({engine})" for role, engine in request.unsupported_engines)
+            raise GenerationError(
+                message=(
+                    f"speaker_map 中以下角色声明了 VoxCPM2 不支持的引擎：{detail}。"
+                    "请改用 persona_map，或切换到对应引擎后再生成。"
+                ),
+                engine="voxcpm2",
+            )
+        for warning in request.warnings:
+            logger.warning(f"[VoxCPM剧本工坊] {warning}")
+
         return fn_voxcpm_script_studio(
             script_text=text,
-            persona_map_with_wav=persona_map,
+            persona_map_with_wav=request.persona_map,
+            planner_blocks=request.plan.blocks,
             **kwargs,
         )
 
