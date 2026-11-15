@@ -25,7 +25,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import tomllib
+import pytest
+
+# tomllib 是 Python 3.11 起才进标准库的；本仓 requires-python >=3.10，CI 的 3.10 作业
+# 会在导入期就收集失败。这条闸核的是三份清单的静态一致性，与解释器版本无关，
+# 因此在 3.10 上整文件跳过，由 3.11–3.13 的矩阵作业继续覆盖。
+tomllib = pytest.importorskip("tomllib", reason="tomllib 仅 Python 3.11+ 提供；3.10 上由 3.11–3.13 矩阵覆盖")
 
 _ROOT = Path(__file__).resolve().parents[1]
 _REQ = _ROOT / "requirements.txt"

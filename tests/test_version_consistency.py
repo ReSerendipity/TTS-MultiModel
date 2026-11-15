@@ -532,6 +532,11 @@ def test_known_tag_drift_entries_are_still_accurate() -> None:
     tags = _release_tags()
     if tags is None:
         return  # 没 git / 不是仓库：无从核对（readiness 脚本的临时副本）
+    rc, out = _git("rev-parse", "--is-shallow-repository")
+    if rc == 0 and out.strip() == "true":
+        # 浅克隆只带当前提交可达的 tag，历史 tag 根本没被拉下来（CI 的 checkout 默认 depth=1）；
+        # 此时"不在 tagset"不等于"tag 已删除"，不能据此判豁免过期。
+        return
     tagset = set(tags)
     stale: list[str] = []
     for tag, (recorded, reason) in _KNOWN_TAG_DRIFT.items():
