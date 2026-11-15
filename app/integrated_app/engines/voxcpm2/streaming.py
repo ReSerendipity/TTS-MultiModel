@@ -186,6 +186,17 @@ def _wav_to_bytes(wav: np.ndarray, sample_rate: int) -> bytes:
     return buf.getvalue()
 
 
+def _normalize_reference_path(value: Any) -> Any:
+    """把空字符串/纯空白归一化为 None（未提供参考音频）。
+
+    下游 VoxCPM 用 `is not None` 判断是否提供参考路径；传 "" 会被当成
+    有效路径并触发 ASR/文件读取失败。非字符串（如 (wav, sr) 元组）原样返回。
+    """
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
 def stream_generate(
     model: Any,
     segments: list[str],
@@ -272,7 +283,7 @@ def stream_generate(
                     ref_path = reference_audio
                 kwargs: dict[str, Any] = dict(
                     text=seg_text,
-                    reference_wav_path=ref_path if ref_path else "",
+                    reference_wav_path=_normalize_reference_path(ref_path),
                     normalize=True,
                     cfg_value=cfg,
                     inference_timesteps=steps,
@@ -472,7 +483,7 @@ def fn_voxcpm_streaming(
         if hasattr(registry.voxcpm_model, "generate_streaming"):
             return registry.voxcpm_model.generate_streaming(
                 text=segments[0],
-                reference_wav_path=ref_audio_path if ref_audio_path else "",
+                reference_wav_path=_normalize_reference_path(ref_audio_path),
                 normalize=True,
                 cfg_value=cfg_value,
                 inference_timesteps=inference_timesteps,
@@ -484,7 +495,7 @@ def fn_voxcpm_streaming(
             logger.warning("[VoxCPM流式生成] 模型不支持 streaming，回退到常规生成")
             wav = registry.voxcpm_model.generate(
                 text=segments[0],
-                reference_wav_path=ref_audio_path if ref_audio_path else "",
+                reference_wav_path=_normalize_reference_path(ref_audio_path),
                 normalize=True,
                 cfg_value=cfg_value,
                 inference_timesteps=inference_timesteps,
@@ -516,7 +527,7 @@ def fn_voxcpm_streaming(
         if hasattr(registry.voxcpm_model, "generate_streaming"):
             for chunk in registry.voxcpm_model.generate_streaming(
                 text=seg,
-                reference_wav_path=ref_audio_path if ref_audio_path else "",
+                reference_wav_path=_normalize_reference_path(ref_audio_path),
                 normalize=True,
                 cfg_value=cfg_value,
                 inference_timesteps=inference_timesteps,
@@ -528,7 +539,7 @@ def fn_voxcpm_streaming(
         else:
             wav = registry.voxcpm_model.generate(
                 text=seg,
-                reference_wav_path=ref_audio_path if ref_audio_path else "",
+                reference_wav_path=_normalize_reference_path(ref_audio_path),
                 normalize=True,
                 cfg_value=cfg_value,
                 inference_timesteps=inference_timesteps,
