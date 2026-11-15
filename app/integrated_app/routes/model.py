@@ -134,10 +134,12 @@ async def model_status(request: Request) -> Response:
         - model_status / current_engine / vram_used_mb / persona_count /
           lora_enabled（新增字段，老前端忽略未知 key）
     """
-    voxcpm2_loaded = registry.voxcpm_model is not None
-    indextts2_loaded = registry.indextts2_engine is not None
-    loaded = voxcpm2_loaded or indextts2_loaded
-    current_engine = registry.current_engine or ""
+    snapshot = registry.get_model_state_snapshot()
+    voxcpm2_loaded = snapshot["voxcpm2_loaded"]
+    indextts2_loaded = snapshot["indextts2_loaded"]
+    loaded = snapshot["model_loaded"]
+    current_engine = snapshot["current_engine"] or ""
+    loaded_engines = snapshot["loaded_engines"]
 
     try:
         persona_count: int = int(get_total_persona_count())
@@ -155,6 +157,7 @@ async def model_status(request: Request) -> Response:
         "engine": current_engine,
         "voxcpm2_loaded": voxcpm2_loaded,
         "indextts2_loaded": indextts2_loaded,
+        "loaded_engines": loaded_engines,
         "queue": _gen_tracker.status_text(),
         "model_status": "loaded" if loaded else "unloaded",
         "current_engine": current_engine,

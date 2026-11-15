@@ -98,3 +98,71 @@ def test_clear_all_empties_single_container():
 
     assert registry._engines == {}
     assert registry.model_loaded is False
+
+
+def test_public_voxcpm_setter_syncs_current_engine_and_snapshot():
+    fake = object()
+    registry.voxcpm_model = fake
+
+    assert registry.current_engine == "voxcpm2"
+    snapshot = registry.get_model_state_snapshot()
+    assert snapshot["voxcpm2_loaded"] is True
+    assert snapshot["current_engine"] == "voxcpm2"
+    assert snapshot["loaded_engines"] == ["voxcpm2"]
+
+    registry.voxcpm_model = None
+    assert registry.current_engine is None
+    assert registry.model_loaded is False
+
+
+def test_public_indextts_setter_preserves_active_variant():
+    registry.set_indextts2_loaded(object(), engine_name="indextts20")
+    replacement = object()
+    registry.indextts2_engine = replacement
+
+    assert registry.indextts2_engine is replacement
+    assert registry.current_engine == "indextts20"
+    assert registry.get_model_state_snapshot()["loaded_engines"] == ["indextts20"]
+
+    registry.indextts2_engine = None
+    assert registry.current_engine is None
+
+
+def test_early_model_store_does_not_activate_current_engine():
+    registry.set_voxcpm_model_instance(object(), sync_current_engine=False)
+
+    assert registry.model_loaded is True
+    assert registry.current_engine is None
+
+
+def test_snapshot_includes_generic_engine_without_legacy_slots():
+    registry.set_engine_loaded("generic_test_engine", object())
+
+    snapshot = registry.get_model_state_snapshot()
+    assert snapshot["model_loaded"] is True
+    assert snapshot["voxcpm2_loaded"] is False
+    assert snapshot["indextts2_loaded"] is False
+    assert snapshot["loaded_engines"] == ["generic_test_engine"]
+
+
+def test_clear_current_engine_promotes_other_reserved_engine():
+    registry.set_indextts2_loaded(object(), engine_name="indextts20")
+    registry.set_voxcpm_loaded(object())
+    assert registry.current_engine == "voxcpm2"
+
+    registry.set_voxcpm_model_instance(None)
+
+    assert registry.current_engine == "indextts20"
+    assert registry.indextts2_engine is not None
+    assert registry.get_model_state_snapshot()["loaded_engines"] == ["indextts20"]
+
+
+def test_clear_current_engine_promotes_generic_engine():
+    registry.set_engine_loaded("generic_test_engine", object())
+    registry.set_voxcpm_loaded(object())
+    assert registry.current_engine == "voxcpm2"
+
+    registry.set_voxcpm_model_instance(None)
+
+    assert registry.current_engine == "generic_test_engine"
+    assert registry.model_loaded is True

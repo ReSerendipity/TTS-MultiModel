@@ -746,6 +746,13 @@ class TestModelService:
         ):
             reg.current_engine = "voxcpm2"
             reg.model_loaded = True
+            reg.get_model_state_snapshot.return_value = {
+                "current_engine": "voxcpm2",
+                "model_loaded": True,
+                "voxcpm2_loaded": True,
+                "indextts2_loaded": False,
+                "loaded_engines": ["voxcpm2"],
+            }
             reg.is_engine_ready.return_value = True
             reg.get_current_model_info.return_value = {"ready": True}
             status = svc.get_model_status()

@@ -410,8 +410,10 @@ def _do_load_voxcpm2_internal(
         else:
             logger.info("  VoxCPM2 使用 CPU 后端运行")
 
-        # Store model in registry early so error handler can clean it up
-        registry.voxcpm_model = new_model
+        # Store model in registry early so error handler can clean it up.
+        # P0-2: 此时 ASR/增强器尚未加载，暂不把 current_engine 切到 voxcpm2；
+        # 完整加载成功后由 set_voxcpm_loaded 原子切换。
+        registry.set_voxcpm_model_instance(new_model, sync_current_engine=False)
 
         # Step 2: Load ASR model
         status_text = "正在加载 ASR 模型..."

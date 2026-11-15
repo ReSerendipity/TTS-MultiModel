@@ -947,8 +947,9 @@ class ModelService:
         """
         from .model_registry import registry
 
-        engine = registry.current_engine
-        loaded = registry.model_loaded
+        snapshot = registry.get_model_state_snapshot()
+        engine = snapshot["current_engine"]
+        loaded = snapshot["model_loaded"]
         ready = registry.is_engine_ready()
         vram_percent = _get_vram_usage_percent()
         info = registry.get_current_model_info()

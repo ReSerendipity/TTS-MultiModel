@@ -216,7 +216,7 @@ def load_engine_specs_from_config(config_models_module: Any | None = None) -> No
         try:
             from .config import get_config
 
-            app_config = get_config()
+            app_config = get_config().pydantic_config
             if app_config and app_config.models and app_config.models.engines:
                 for name, spec in app_config.models.engines.items():
                     _engine_specs[name] = spec
@@ -338,6 +338,9 @@ class ModelRegistry:
 
         # --- IndexTTS 2.5 state ---
         self._indextts2_model_path: str = ""
+        # 保留 IndexTTS 变体名：current_engine 可能被 VoxCPM2 临时占用，
+        # 清空 VoxCPM2 后需要恢复 ``indextts20`` 而不是默认 ``indextts2``。
+        self._indextts2_variant: str | None = None
 
         # --- Extended VoxCPM2 state ---
         self.voxcpm_enhancer_model: Any = None
@@ -436,8 +439,32 @@ class ModelRegistry:
 
     @voxcpm_model.setter
     def voxcpm_model(self, value: Any) -> None:
+        self.set_voxcpm_model_instance(value)
+
+    def set_voxcpm_model_instance(self, model: Any, *, sync_current_engine: bool = True) -> None:
+        """写入 VoxCPM2 主模型实例，并按需同步 ``current_engine``。
+
+        P0-2 完整收敛：旧 ``voxcpm_model`` property 仍保留，但写入实例时不再
+        只改 ``_engines`` 而留下 ``current_engine`` 指向旧引擎。加载早期
+        （ASR / 增强器尚未就绪）需要暂不激活时，可传
+        ``sync_current_engine=False``，由 ``set_voxcpm_loaded`` 在完整加载
+        成功后统一切换。
+
+        Args:
+            model: VoxCPM2 主模型实例；``None`` 表示清除该槽位。
+            sync_current_engine: 是否把 ``current_engine`` 同步为 ``voxcpm2``
+                （``model=None`` 且无其他已加载引擎时同步清空为 ``None``）。
+        """
         with self._lock:
-            self._voxcpm_model = value
+            if model is None:
+                self._engines.pop(self._KEY_VOXCPM_MODEL, None)
+            else:
+                self._engines[self._KEY_VOXCPM_MODEL] = model
+            if sync_current_engine:
+                if model is not None:
+                    self._set_current_engine_unlocked(EngineName.VOXCPM2.value)
+                elif self._current_engine == EngineName.VOXCPM2.value:
+                    self._promote_fallback_engine_unlocked(exclude=EngineName.VOXCPM2.value)
 
     @property
     def voxcpm_asr(self) -> Any:
@@ -458,8 +485,36 @@ class ModelRegistry:
 
     @indextts2_engine.setter
     def indextts2_engine(self, value: Any) -> None:
+        self.set_indextts2_engine_instance(value)
+
+    def set_indextts2_engine_instance(
+        self,
+        engine: Any,
+        *,
+        engine_name: str | None = None,
+        sync_current_engine: bool = True,
+    ) -> None:
+        """写入 IndexTTS 引擎实例，并按需同步 ``current_engine``。
+
+        ``indextts2`` 与 ``indextts20`` 共用同一槽位；未显式传
+        ``engine_name`` 时保留当前变体（若当前不是 IndexTTS 变体则回落 2.5）。
+        """
+        name = engine_name or EngineName.INDEXTTS2.value
         with self._lock:
-            self._indextts2_engine = value
+            if engine is None:
+                self._engines.pop(self._KEY_INDEXTTS_ENGINE, None)
+            else:
+                self._engines[self._KEY_INDEXTTS_ENGINE] = engine
+            if sync_current_engine:
+                if engine is not None:
+                    active_name = engine_name or (
+                        self._current_engine if self._current_engine in INDEXTTS_VARIANTS else name
+                    )
+                    self._indextts2_variant = active_name
+                    self._set_current_engine_unlocked(active_name)
+                elif self._current_engine in INDEXTTS_VARIANTS:
+                    self._indextts2_variant = None
+                    self._promote_fallback_engine_unlocked(exclude=self._current_engine)
 
     @property
     def current_engine(self) -> str | None:
@@ -494,6 +549,38 @@ class ModelRegistry:
         with self._lock:
             self._current_size = value
 
+    def _has_loaded_engine_unlocked(self) -> bool:
+        """锁内辅助：是否存在任一真实引擎实例（不含懒包装器槽位）。"""
+        return any(
+            instance is not None for name, instance in self._engines.items() if name != self._KEY_VOXCPM_ENGINE_INSTANCE
+        )
+
+    def _set_current_engine_unlocked(self, name: str | None) -> None:
+        """锁内辅助：同时更新 current_engine / current_type / current_size。"""
+        self._current_engine = name
+        self._current_type = name or ""
+        self._current_size = name or ""
+
+    def _promote_fallback_engine_unlocked(self, *, exclude: str) -> None:
+        """锁内辅助：清除当前引擎后，优先提升另一保留引擎，其次通用引擎。
+
+        清理槽位时必须同步 current_engine，否则 ``model_loaded=True`` 但
+        ``current_engine`` 指向已卸载引擎，消费方会看到自相矛盾的状态。
+        """
+        if exclude == EngineName.VOXCPM2.value and self._engines.get(self._KEY_INDEXTTS_ENGINE) is not None:
+            self._set_current_engine_unlocked(
+                self._indextts2_variant if self._indextts2_variant in INDEXTTS_VARIANTS else EngineName.INDEXTTS2.value
+            )
+            return
+        if exclude in INDEXTTS_VARIANTS and self._engines.get(self._KEY_VOXCPM_MODEL) is not None:
+            self._set_current_engine_unlocked(EngineName.VOXCPM2.value)
+            return
+        for name, instance in self._engines.items():
+            if name not in self._RESERVED_ENGINE_KEYS and instance is not None:
+                self._set_current_engine_unlocked(name)
+                return
+        self._set_current_engine_unlocked(None)
+
     @property
     def model_loaded(self) -> bool:
         """派生只读属性：任一引擎模型实例存在时返回 ``True``。
@@ -503,15 +590,45 @@ class ModelRegistry:
         :meth:`is_voxcpm_ready` / :meth:`is_indextts2_ready` / :meth:`is_engine_ready`。
         """
         with self._lock:
-            return (
-                self._engines.get(self._KEY_VOXCPM_MODEL) is not None
-                or self._engines.get(self._KEY_INDEXTTS_ENGINE) is not None
-                or any(
-                    instance is not None
-                    for name, instance in self._engines.items()
-                    if name not in self._RESERVED_ENGINE_KEYS
+            return self._has_loaded_engine_unlocked()
+
+    def get_model_state_snapshot(self) -> dict[str, Any]:
+        """返回模型状态的一致性快照（P0-2 单一事实源读取入口）。
+
+        一次持锁读出 ``_engines`` 中的全部实例、``current_engine`` 以及
+        两个保留槽位的布尔状态，避免消费方分别读取多个字段时看到
+        "模型已写入但 current_engine 尚未切换"的中间态。
+
+        Returns:
+            dict: ``current_engine`` / ``model_loaded`` / ``voxcpm2_loaded`` /
+            ``indextts2_loaded`` / ``loaded_engines``。其中
+            ``loaded_engines`` 包含通用新式引擎名；IndexTTS 变体名优先取
+            ``current_engine``（``indextts2`` / ``indextts20``）。
+        """
+        with self._lock:
+            voxcpm2_loaded = self._engines.get(self._KEY_VOXCPM_MODEL) is not None
+            indextts2_loaded = self._engines.get(self._KEY_INDEXTTS_ENGINE) is not None
+            generic_names = [
+                name
+                for name, instance in self._engines.items()
+                if name not in self._RESERVED_ENGINE_KEYS and instance is not None
+            ]
+            loaded_engines: list[str] = list(generic_names)
+            if voxcpm2_loaded:
+                loaded_engines.append(EngineName.VOXCPM2.value)
+            if indextts2_loaded:
+                loaded_engines.append(
+                    self._indextts2_variant
+                    if self._indextts2_variant in INDEXTTS_VARIANTS
+                    else EngineName.INDEXTTS2.value
                 )
-            )
+            return {
+                "current_engine": self._current_engine,
+                "model_loaded": bool(loaded_engines),
+                "voxcpm2_loaded": voxcpm2_loaded,
+                "indextts2_loaded": indextts2_loaded,
+                "loaded_engines": loaded_engines,
+            }
 
     # ------------------------------------------------------------------
     # SSE 通知辅助
@@ -582,9 +699,10 @@ class ModelRegistry:
             self.voxcpm_ultimate = ultimate
             self.voxcpm_voiceclone_enabled = voiceclone
             self.voxcpm_control_enabled = control
-            self._current_engine = EngineName.VOXCPM2.value
-            self._current_type = EngineName.VOXCPM2.value
-            self._current_size = EngineName.VOXCPM2.value
+            if model is not None:
+                self._set_current_engine_unlocked(EngineName.VOXCPM2.value)
+            elif self._current_engine == EngineName.VOXCPM2.value:
+                self._promote_fallback_engine_unlocked(exclude=EngineName.VOXCPM2.value)
         self._notify_sse()
 
     def set_indextts2_loaded(self, engine: Any, engine_name: str | None = None) -> None:
@@ -609,11 +727,13 @@ class ModelRegistry:
         with self._lock:
             if engine is None:
                 self._engines.pop(self._KEY_INDEXTTS_ENGINE, None)
+                self._indextts2_variant = None
+                if self._current_engine in INDEXTTS_VARIANTS:
+                    self._promote_fallback_engine_unlocked(exclude=self._current_engine)
             else:
                 self._engines[self._KEY_INDEXTTS_ENGINE] = engine
-            self._current_engine = name
-            self._current_type = name
-            self._current_size = name
+                self._indextts2_variant = name
+                self._set_current_engine_unlocked(name)
         self._notify_sse()
 
     def set_engine_loaded(self, name: str, instance: Any) -> None:
@@ -1052,13 +1172,7 @@ class MultiEngineRegistry:
         Returns:
             引擎名称列表（包括通用引擎和 VoxCPM2/IndexTTS 保留槽位）。
         """
-        names = list(self._registry.get_all_engine_instances().keys())
-        if self._registry.voxcpm_model is not None:
-            names.append(EngineName.VOXCPM2.value)
-        if self._registry.indextts2_engine is not None:
-            cur = self._registry.current_engine
-            names.append(cur if cur in INDEXTTS_VARIANTS else EngineName.INDEXTTS2.value)
-        return names
+        return list(self._registry.get_model_state_snapshot()["loaded_engines"])
 
 
 # ------------------------------------------------------------------

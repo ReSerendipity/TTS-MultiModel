@@ -132,10 +132,18 @@ def _snapshot_engine_state() -> dict[str, Any]:
     回滚本来就不复用这些引用：见 :func:`_rollback_engine` 的 M-R3 WHY 注释，
     它只按 ``prev_state["engine"]`` 重新走完整加载流程。
     """
+    state = registry.get_model_state_snapshot()
+    if not isinstance(state, dict):
+        # 兼容测试替身 / 第三方旧实现：仍按旧字段读取，不改变快照语义。
+        state = {
+            "current_engine": registry.current_engine,
+            "voxcpm2_loaded": registry.voxcpm_model is not None,
+            "indextts2_loaded": registry.indextts2_engine is not None,
+        }
     return {
-        "engine": registry.current_engine,
-        "had_voxcpm": registry.voxcpm_model is not None,
-        "had_indextts2": registry.indextts2_engine is not None,
+        "engine": state.get("current_engine"),
+        "had_voxcpm": bool(state.get("voxcpm2_loaded")),
+        "had_indextts2": bool(state.get("indextts2_loaded")),
     }
 
 

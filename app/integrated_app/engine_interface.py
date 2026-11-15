@@ -745,6 +745,39 @@ class InMemoryEngineRegistry:
         with self._lock:
             return list(set(list(self._engines.keys()) + list(self._lazy_modules.keys())))
 
+    def _config_metadata(self, name: str) -> dict[str, Any] | None:
+        """从 config.yaml 的声明式引擎规格读取权威元数据。
+
+        P0-2：``_metadata`` 不再是与 ``config.yaml`` 并行的“第三份注册表”。
+        内置引擎的 display_name / 显存 / 语言 / 能力 / 采样率 / requires_gpu
+        以 config 的 ``EngineSpecConfig`` 为准；``_metadata`` 仅作为未配置
+        自定义引擎（测试或插件）的兜底。延迟导入避免模块循环。
+        """
+        try:
+            from . import model_registry as _mr
+
+            spec = _mr.get_engine_spec(name)
+            if spec is None and not _mr._engine_specs:
+                _mr.load_engine_specs_from_config()
+                spec = _mr.get_engine_spec(name)
+            if spec is None:
+                return None
+            meta = {
+                "display_name": spec.display_name or name,
+                "vram_requirement": float(spec.vram_gb),
+                "languages": list(spec.languages),
+                "supported_features": list(spec.supported_features),
+                "sample_rate": int(spec.sample_rate),
+                "requires_gpu": bool(spec.requires_gpu),
+                "quality": spec.quality,
+            }
+            if spec.license:
+                meta["license"] = spec.license
+            return meta
+        except Exception:
+            # config 不可用（精简分发/单测隔离）时回退到注册实参。
+            return None
+
     def get_display_name(self, name: str) -> str:
         """获取引擎的 UI 显示名称。
 
@@ -754,7 +787,7 @@ class InMemoryEngineRegistry:
         Returns:
             str: 元数据中注册的 display_name；若不存在则回退为 name 本身。
         """
-        return self._metadata.get(name, {}).get("display_name", name)
+        return self.get_metadata(name).get("display_name", name)
 
     def get_vram_requirement(self, name: str) -> float:
         """获取引擎的最小显存需求。
@@ -765,7 +798,7 @@ class InMemoryEngineRegistry:
         Returns:
             float: 显存需求（GB），默认回退 6.0。
         """
-        return self._metadata.get(name, {}).get("vram_requirement", 6.0)
+        return self.get_metadata(name).get("vram_requirement", 6.0)
 
     def get_metadata(self, name: str) -> dict[str, Any]:
         """获取单个引擎的完整元数据字典。
@@ -778,7 +811,15 @@ class InMemoryEngineRegistry:
                            supported_features / sample_rate / requires_gpu / quality
                            的元数据字典；未注册时返回空字典 {}。
         """
-        return self._metadata.get(name, {})
+        with self._lock:
+            registered = self._metadata.get(name)
+        if registered is None:
+            return {}
+        merged = dict(registered)
+        config_meta = self._config_metadata(name)
+        if config_meta is not None:
+            merged.update(config_meta)
+        return merged
 
     def get_all_metadata(self) -> dict[str, dict[str, Any]]:
         """获取所有引擎的元数据映射（供前端 UI 批量渲染引擎列表）。
@@ -789,7 +830,9 @@ class InMemoryEngineRegistry:
             dict[str, dict[str, Any]]: key 为引擎标识符 name，
                                       value 为对应引擎的元数据字典。
         """
-        return dict(self._metadata)
+        with self._lock:
+            names = set(self._engines) | set(self._lazy_modules) | set(self._metadata)
+        return {name: self.get_metadata(name) for name in names}
 
     def is_registered(self, name: str) -> bool:
         """检查给定名称的引擎是否已注册（立即或懒导入模式）。

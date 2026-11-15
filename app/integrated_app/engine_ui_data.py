@@ -674,42 +674,82 @@ _ENGINE_UI_REGISTRY: dict[str, EngineUIData] = {
 }
 
 
-def register_engine_ui(ui_data: EngineUIData) -> None:
-    """注册引擎 UI 数据。
+def _metadata_fallback_ui(engine_id: str, meta: dict[str, Any]) -> EngineUIData:
+    """由 engine_registry 元数据生成最小可用 UI 数据。
 
-    Args:
-        ui_data: 引擎 UI 数据实例。
+    P0-2：UI 数据不再独立维护“引擎是否存在”。config.yaml 新增引擎并注册到
+    engine_registry 后，即使尚未编写专属 UI 数据，也能自动出现在引擎列表；
+    专属 ``_ENGINE_UI_REGISTRY`` 仅覆盖展示细节（参数、图标、文案）。
     """
+    vram = float(meta.get("vram_requirement", 4.0) or 0.0)
+    return EngineUIData(
+        engine_id=engine_id,
+        name_i18n=str(meta.get("display_name") or engine_id),
+        description_i18n=f"engine.{engine_id}.description",
+        version="config",
+        min_vram_gb=vram,
+        recommended_vram_gb=max(vram * 1.5, vram),
+        features=[],
+        params=[
+            ParamDefinition(
+                key="text",
+                label_i18n="param.text.label",
+                description_i18n="param.text.description",
+                param_type=ParamType.TEXTAREA,
+                group=ParamGroup.BASIC,
+                required=True,
+            )
+        ],
+        tab_order=900,
+        icon="microphone",
+        sample_rate=int(meta.get("sample_rate", 24000) or 24000),
+    )
+
+
+def _registered_engine_ids() -> set[str]:
+    """读取 engine_registry 的已注册引擎名（唯一存在性事实源）。"""
+    try:
+        from .engine_interface import engine_registry
+
+        return set(engine_registry.list_engines())
+    except Exception:
+        return set()
+
+
+def register_engine_ui(ui_data: EngineUIData) -> None:
+    """注册引擎 UI 数据（展示层覆盖，不改变引擎是否存在）。"""
     _ENGINE_UI_REGISTRY[ui_data.engine_id] = ui_data
 
 
 def get_engine_ui(engine_id: str) -> EngineUIData | None:
-    """获取指定引擎的 UI 数据。
+    """获取指定引擎的 UI 数据；未写专属 UI 的已注册引擎回退到最小数据。"""
+    ui = _ENGINE_UI_REGISTRY.get(engine_id)
+    if ui is not None:
+        return ui
+    if engine_id in _registered_engine_ids():
+        try:
+            from .engine_interface import engine_registry
 
-    Args:
-        engine_id: 引擎 ID。
-
-    Returns:
-        EngineUIData 实例，不存在时返回 None。
-    """
-    return _ENGINE_UI_REGISTRY.get(engine_id)
+            meta = engine_registry.get_metadata(engine_id)
+        except Exception:
+            meta = {}
+        return _metadata_fallback_ui(engine_id, meta)
+    return None
 
 
 def get_all_engine_uis() -> list[EngineUIData]:
     """获取所有已注册引擎的 UI 数据，按 tab_order 排序。
 
-    Returns:
-        EngineUIData 列表。
+    引擎集合 = engine_registry 已注册引擎 ∪ 显式 UI 注册项（后者用于插件/
+    测试覆盖）；生产引擎不再依赖 ``_ENGINE_UI_REGISTRY`` 是否手写。
     """
-    engines = list(_ENGINE_UI_REGISTRY.values())
+    ids = _registered_engine_ids() | set(_ENGINE_UI_REGISTRY)
+    engines = [ui for engine_id in ids if (ui := get_engine_ui(engine_id)) is not None]
     engines.sort(key=lambda e: e.tab_order)
     return engines
 
 
 def get_engine_ids() -> list[str]:
-    """获取所有已注册引擎的 ID 列表。
-
-    Returns:
-        引擎 ID 列表。
-    """
-    return list(_ENGINE_UI_REGISTRY.keys())
+    """获取所有已注册引擎的 ID 列表（同样以 engine_registry 为准）。"""
+    ids = _registered_engine_ids() | set(_ENGINE_UI_REGISTRY)
+    return list(ids)
