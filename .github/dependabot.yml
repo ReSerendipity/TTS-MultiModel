@@ -5,6 +5,7 @@ updates:
   - package-ecosystem: pip
     directory: "/"
     schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
     open-pull-requests-limit: 5
     labels: [dependencies]
     ignore:
@@ -30,6 +31,7 @@ updates:
   - package-ecosystem: npm
     directory: "/tests"
     schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
     open-pull-requests-limit: 5
     labels: [dependencies]
     groups:
@@ -40,6 +42,7 @@ updates:
   - package-ecosystem: github-actions
     directory: "/"
     schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
     open-pull-requests-limit: 5
     labels: [dependencies]
     groups:
