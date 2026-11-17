@@ -1,0 +1,206 @@
+name: Desktop Installer (Windows)
+
+# 单文件安装包产线：Tauri 壳 + 瘦包数据卷 → NSIS 单文件安装器 → 挂到对应 tag 的 Release。
+#
+# 背景：docs/发布与分发-单文件安装包.md 已于 2026-10-31 定案「只发布一个
+# TTSMultiModel-Setup-v<版本>.exe（数据卷内嵌）」，但 Release 里此前一直是
+# whl/tar.gz，安装器只存在于本地 scripts/installer（产物被 gitignore）。
+# 这条 workflow 把「壳编译 → 瘦包数据卷 → makensis → 上传」接到 windows runner 上。
+#
+# 触发：
+#   - workflow_dispatch：输入 tag，对既有 Release 补挂安装器（同名资产跳过）。
+#   - push tag v*：新版本自动出包；Release 不存在时只留 workflow artifact。
+#
+# 产物（约 300 MB 级，不含 torch 与模型权重）：
+#   TTSMultiModel-Setup-v<ver>.exe + .exe.sha256
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '目标 Release tag（如 v2.10.0）；留空则使用触发 ref'
+        required: false
+        type: string
+      dry_run:
+        description: '只构建，不上传 Release'
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-installer-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  installer:
+    name: Build NSIS installer (windows)
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    env:
+      PRODUCT: TTSMultiModel
+      CARGO_BIN: tts-multimodel-desktop
+      PYTHONUTF8: '1'
+
+    steps:
+      - name: Resolve target tag
+        id: target
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "非法 tag：$tag（要求 vX.Y.Z）" }
+          $ver = $tag.Substring(1)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "tag=$tag" -Encoding utf8
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "version=$ver" -Encoding utf8
+          Write-Host "target=$tag version=$ver"
+
+      - name: Checkout tag source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.tag }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Version consistency (tag == version.json)
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.target.outputs.version }}"
+          $vj = Get-Content -LiteralPath version.json -Raw -Encoding utf8 | ConvertFrom-Json
+          if ($vj.version -ne $ver) { throw "version.json=$($vj.version) 与 tag v$ver 不一致" }
+          Write-Host "version.json OK: $($vj.version)"
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Build Tauri shell (release)
+        working-directory: desktop/src-tauri
+        run: cargo build --release --locked
+
+      - name: Stage shell exe and installer metadata
+        shell: pwsh
+        run: |
+          $src = "desktop/src-tauri/target/release/$env:CARGO_BIN.exe"
+          if (-not (Test-Path -LiteralPath $src)) { throw "未找到壳 exe：$src" }
+          New-Item -ItemType Directory -Path scripts/installer -Force | Out-Null
+          Copy-Item -LiteralPath $src -Destination "scripts/installer/$env:PRODUCT.exe" -Force
+          # setup.nsi 的 `File "version.json"` 取的是 scripts/installer/version.json（未入库），
+          # 这里用根 version.json 生成，避免安装器把 app 版本写错。
+          Copy-Item -LiteralPath version.json -Destination scripts/installer/version.json -Force
+          Get-ChildItem -LiteralPath scripts/installer -Filter *.exe | Select-Object Name, Length | Format-Table
+
+      - name: Install NSIS and prepare standalone 7za
+        shell: pwsh
+        run: |
+          choco install nsis --no-progress -y | Out-Host
+          $sevenZip = 'C:\Program Files\7-Zip\7z.exe'
+          if (-not (Test-Path -LiteralPath $sevenZip)) {
+            choco install 7zip --no-progress -y | Out-Host
+          }
+          if (-not (Test-Path -LiteralPath $sevenZip)) { throw '7-Zip 不可用' }
+
+          # 安装器内嵌的是独立版 7za.exe（7z.exe 依赖 7z.dll，不能单独分发）
+          $work = Join-Path $env:RUNNER_TEMP '7za-extra'
+          New-Item -ItemType Directory -Path $work -Force | Out-Null
+          $pkg = Join-Path $work '7z-extra.7z'
+          Invoke-WebRequest -Uri 'https://www.7-zip.org/a/7z2501-extra.7z' -OutFile $pkg
+          & $sevenZip x $pkg "-o$work" -y -bso0 -bsp0
+          if ($LASTEXITCODE -ne 0) { throw "解压 7-Zip Extra 失败：$LASTEXITCODE" }
+          $sevenZa = Join-Path $work '7za.exe'
+          if (-not (Test-Path -LiteralPath $sevenZa)) { throw '7-Zip Extra 内未找到 7za.exe' }
+          New-Item -ItemType Directory -Path dist/tools -Force | Out-Null
+          Copy-Item -LiteralPath $sevenZa -Destination dist/tools/7za.exe -Force
+
+      - name: Build slim data volume
+        shell: pwsh
+        run: |
+          & ./scripts/build_slim_bundle.ps1 -OutDir dist/slim
+          if ($LASTEXITCODE -ne 0) { throw "数据卷构建失败：$LASTEXITCODE" }
+          if (-not (Test-Path -LiteralPath 'dist/slim/TTSMultiModel-Data.7z.001')) {
+            throw '数据卷缺失：dist/slim/TTSMultiModel-Data.7z.001'
+          }
+
+      - name: Compile single-file installer
+        shell: pwsh
+        working-directory: scripts/installer
+        run: |
+          $ver = "${{ steps.target.outputs.version }}"
+          $data = (Resolve-Path -LiteralPath '..\..\dist\slim\TTSMultiModel-Data.7z.001').Path
+          $sevenZa = (Resolve-Path -LiteralPath '..\..\dist\tools\7za.exe').Path
+          $nsis = @(
+            (Join-Path $env:ProgramFiles 'NSIS\makensis.exe'),
+            (Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe')
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $nsis) { throw 'makensis 未找到（NSIS 安装失败？）' }
+          $env:SOURCE_DATE_EPOCH = (git -C (Resolve-Path '..\..').Path log -1 --format=%ct)
+          & $nsis "/DAPP_VERSION=$ver" "/DSRC_DATA=$data" "/DSRC_7ZA=$sevenZa" 'setup.nsi'
+          if ($LASTEXITCODE -ne 0) { throw "makensis 失败：$LASTEXITCODE" }
+          $out = "TTSMultiModel-Setup-v$ver.exe"
+          if (-not (Test-Path -LiteralPath $out)) { throw "未见安装器产物：$out（setup.nsi 的 OutFile 是否仍写死旧版本？）" }
+          Get-Item -LiteralPath $out | Select-Object Name, Length | Format-Table
+
+      - name: Checksum and publish metadata
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.target.outputs.version }}"
+          $out = 'dist/installer-out'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          $exe = Join-Path $out "TTSMultiModel-Setup-v$ver.exe"
+          Copy-Item -LiteralPath "scripts/installer/TTSMultiModel-Setup-v$ver.exe" -Destination $exe -Force
+          $sha = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText("$exe.sha256", "$sha  $([IO.Path]::GetFileName($exe))`n", (New-Object System.Text.UTF8Encoding($false)))
+          Get-ChildItem -LiteralPath $out | Select-Object Name, Length | Format-Table
+
+      - name: Upload to Release
+        if: ${{ !inputs.dry_run }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.target.outputs.tag }}"
+          $ver = "${{ steps.target.outputs.version }}"
+          $out = 'dist/installer-out'
+          $assets = @(
+            "TTSMultiModel-Setup-v$ver.exe",
+            "TTSMultiModel-Setup-v$ver.exe.sha256"
+          )
+
+          $existing = gh release view $tag --json assets --jq '.assets[].name' 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Release $tag 不存在，安装器仅保留在 workflow artifact"
+            exit 0
+          }
+          foreach ($asset in $assets) {
+            if ($existing -contains $asset) { Write-Host "skip existing asset: $asset"; continue }
+            gh release upload $tag (Join-Path $out $asset)
+            if ($LASTEXITCODE -ne 0) { throw "上传失败：$asset" }
+          }
+          Write-Host '--- release assets ---'
+          gh release view $tag --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"'
+          Write-Host "https://github.com/${{ github.repository }}/releases/tag/$tag"
+
+      - name: Upload workflow artifact (fallback)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: TTSMultiModel-Setup-installer
+          path: |
+            dist/installer-out/*
+          if-no-files-found: warn
+          retention-days: 14
