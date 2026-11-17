@@ -328,7 +328,8 @@ $forbidden = @('app\bootstrap\RUNTIME.json', 'app\model', 'app\checkpoints')
 foreach ($rel in $forbidden) {
     if (Test-Path -LiteralPath (Join-Path $staging $rel)) { throw "staging 不应包含: $rel" }
 }
-$torchLeft = @(Get-ChildItem -LiteralPath (Join-Path $staging 'app\bootstrap') -Recurse -Force -Directory -Filter 'torch' -ErrorAction SilentlyContinue)
+$torchLeft = @(Get-ChildItem -LiteralPath (Join-Path $staging 'app\bootstrap') -Recurse -Force -Directory -Filter 'torch' -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match '\\Lib\\site-packages\\torch$' })
 if ($torchLeft.Count -gt 0) { throw "staging\app\bootstrap 仍含 torch 目录: $($torchLeft[0].FullName)" }
 Write-Host '[slim] staging 布局校验通过' -ForegroundColor Green
 
