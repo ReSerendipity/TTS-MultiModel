@@ -39,6 +39,18 @@ updates:
         applies-to: version-updates
         update-types: [minor, patch]
         patterns: ["*"]
+  # desktop/ Tauri 壳的 npm 依赖（@tauri-apps/cli 等）——与 SeedVR2 的 /desktop 覆盖对齐（2026-11-18 审查 F-T4）
+  - package-ecosystem: npm
+    directory: "/desktop"
+    schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule: { interval: monthly }
