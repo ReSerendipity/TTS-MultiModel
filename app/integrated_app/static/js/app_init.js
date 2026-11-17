@@ -2,6 +2,10 @@
 (function() {
 // Initial tab load with correct language parameter - restore from localStorage if available
 document.addEventListener('DOMContentLoaded', function() {
+    // 下载管理是独立整页（content 渲染在 #tab-content 内），不能再用首页标签页
+    // 的 htmx 恢复逻辑覆盖它，否则用户点进 /downloads 几秒后会被“弹回”首页。
+    var currentPath = window.location.pathname.replace(/\/+$/, '');
+    if (currentPath === '/downloads') return;
     var tabContent = document.getElementById('tab-content');
     if (tabContent && window.CURRENT_LANG) {
         // URL query 参数优先级最高，其次是 localStorage，最后是默认值
