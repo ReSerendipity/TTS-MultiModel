@@ -74,7 +74,8 @@ jobs:
       - name: Ensure bundler tolerates scipy torch shim
         shell: pwsh
         run: |
-          $marker = 'site-packages\torch'
+          # 源码里的判定是 -match '\\Lib\\site-packages\\torch$'，标记必须带双反斜杠才匹配得上
+          $marker = 'Lib\\site-packages\\torch'
           if (-not (Select-String -LiteralPath scripts/build_slim_bundle.ps1 -SimpleMatch $marker -Quiet)) {
             Write-Host 'tag 内 bundler 是旧判定，从 main 取修复后的脚本'
             Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ReSerendipity/TTS-MultiModel/main/scripts/build_slim_bundle.ps1' -OutFile scripts/build_slim_bundle.ps1
