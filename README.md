@@ -78,6 +78,8 @@ git clone https://github.com/ReSerendipity/TTS-MultiModel.git
 cd TTS-MultiModel
 ```
 
+> 普通用户可直接下载桌面安装包：[Releases](https://github.com/ReSerendipity/TTS-MultiModel/releases) → `TTSMultiModel-Setup-v<版本>.exe`（单文件，内置便携运行环境，无需另外下载分卷；同批发布 `.sha256` 供校验）。以下为从源码运行的路径。
+
 **Windows**：
 
 ```bat
@@ -217,6 +219,8 @@ After the first-run walkthrough, the Voice Design workbench: engine and mode nav
 git clone https://github.com/ReSerendipity/TTS-MultiModel.git
 cd TTS-MultiModel
 ```
+
+> Regular users can grab the desktop installer from [Releases](https://github.com/ReSerendipity/TTS-MultiModel/releases): `TTSMultiModel-Setup-v<version>.exe` (single file, bundled portable runtime, no separate data parts; a matching `.sha256` is published alongside). Below is the from-source path.
 
 **Windows**:
 
