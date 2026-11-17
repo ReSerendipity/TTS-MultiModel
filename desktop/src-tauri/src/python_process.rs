@@ -362,7 +362,13 @@ pub fn resolve_runtime_dir(app_dir: &Path) -> PathBuf {
     // 2. 瘦包：内置引导解释器 app/bootstrap/。
     //    它只有 Web 依赖、没有 torch，唯一职责是把「下载管理」页跑起来，
     //    让用户可以安装完整运行时与模型。缺这一层时瘦包会直接启动失败。
+    //    WinPython 布局下真正的解释器与 python312.dll/Lib 在 bootstrap/python/，
+    //    根目录的 python.exe 只是启动器；优先嵌套目录，避免根启动器缺 DLL。
     let bootstrap = app_dir.join("bootstrap");
+    let nested_python = bootstrap.join("python");
+    if nested_python.join("python.exe").exists() {
+        return nested_python;
+    }
     if bootstrap.join("python.exe").exists() {
         return bootstrap;
     }
