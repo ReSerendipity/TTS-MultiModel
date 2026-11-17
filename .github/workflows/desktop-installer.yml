@@ -130,10 +130,14 @@ jobs:
       - name: Build slim data volume
         shell: pwsh
         run: |
-          & ./scripts/build_slim_bundle.ps1 -OutDir dist/slim
+          # OutDir 必须是绝对路径：瘦包脚本最终走 build_portable_bundle.ps1，
+          # 里面用 Split-Path -Qualifier 比较盘符，相对路径会直接抛
+          # "Cannot parse path because path ... does not have a qualifier specified."
+          $out = Join-Path $env:GITHUB_WORKSPACE 'dist/slim'
+          & ./scripts/build_slim_bundle.ps1 -OutDir $out
           if ($LASTEXITCODE -ne 0) { throw "数据卷构建失败：$LASTEXITCODE" }
-          if (-not (Test-Path -LiteralPath 'dist/slim/TTSMultiModel-Data.7z.001')) {
-            throw '数据卷缺失：dist/slim/TTSMultiModel-Data.7z.001'
+          if (-not (Test-Path -LiteralPath "$out/TTSMultiModel-Data.7z.001")) {
+            throw "数据卷缺失：$out/TTSMultiModel-Data.7z.001"
           }
 
       - name: Compile single-file installer
