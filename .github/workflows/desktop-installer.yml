@@ -68,6 +68,21 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      # v2.10.0 的 tag 内 bundler 仍按目录名递归判定 torch 残留，会把 scipy 的
+      # _external/array_api_compat/torch 兼容层当成真 torch 而中止；修复在 main 上。
+      # 仅当 tag 版本缺少修复标记时才覆盖 bundler（后续 tag 自带修复则此步为 no-op）。
+      - name: Ensure bundler tolerates scipy torch shim
+        shell: pwsh
+        run: |
+          $marker = 'site-packages\torch'
+          if (-not (Select-String -LiteralPath scripts/build_slim_bundle.ps1 -SimpleMatch $marker -Quiet)) {
+            Write-Host 'tag 内 bundler 是旧判定，从 main 取修复后的脚本'
+            Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ReSerendipity/TTS-MultiModel/main/scripts/build_slim_bundle.ps1' -OutFile scripts/build_slim_bundle.ps1
+            if (-not (Select-String -LiteralPath scripts/build_slim_bundle.ps1 -SimpleMatch $marker -Quiet)) {
+              throw 'bundler overlay 失败：修复标记仍缺失'
+            }
+          }
+
       - name: Version consistency (tag == version.json)
         shell: pwsh
         run: |
