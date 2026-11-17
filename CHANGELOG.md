@@ -2,6 +2,18 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。同理，条目中提及的 `docs/project/`、`docs/_devarchive/`、`docs/reports/`、`docs/agents/` 等本地文档路径已于 2026-11-04 迁至 `local/docs-archive/`（本地归档，未随仓库发布），条目内路径按迁移前写法原样保留。
 
+## [Unreleased]
+
+### Added
+
+* **品牌视觉**：桌面壳图标补白色圆角底，浅色主题配色统一。（`acfeaad`）
+
+### Fixed
+
+* **下载管理页**不再被首页标签内容覆盖（z-index 层级）。（`cb4050c`）
+* **引导运行库**优先使用 `bootstrap/python` 嵌套解释器，修复便携包内引导失败。（`680bc1f`）
+* **桌面壳更新端点**与 `.env.example` 头部正名为现仓名 `TTS-MultiModel`（旧下划线名依赖 GitHub 重定向兜底，见审查 2026-11-18 F-T1）。
+
 ## [2.10.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.9.0...v2.10.0) (2026-11-15)
 
 
