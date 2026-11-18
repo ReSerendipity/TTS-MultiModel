@@ -1,6 +1,6 @@
 {
   "version": "2.11.0",
-  "release_date": "2026-11-15",
+  "release_date": "2026-11-18",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.10.0：本版主干是生成链路的可编排与可观测——VoxCPM2 段内增量流式（SSE 每文本段可多 audio 事件、prefer_streaming 可回退整段）、前端边收边播与联合进度、引擎状态以 config 为单一事实源收敛；文本分块升级为 token 预算 + 受保护片段 + 原文偏移；新增 Voice Profile 资产层与每引擎派生缓存；剧本 Schema 接入生成流程与说话人感知分块（speaker_map 不再静默忽略、不支持角色明确报错）；修复空参考音频路径按未提供处理、语音指纹改用 sha256（bandit B324）；CI 修正浅克隆 tag 判定与 Python 3.10 tomllib 收集失败。"
+  "changelog": "2.11.0：品牌视觉更新——桌面壳图标补白色圆角底；修复便携包 torch 残留判定只看顶层 site-packages、依赖整组迁移 pillow 12.3.0→13.0.0（lock + 便携钉装同批）、桌面壳更新端点与示例头部正名为 TTS-MultiModel、引导运行库优先使用 bootstrap/python 嵌套解释器、Docker Python 3.12 获取链弃 deadsnakes PPA 改 PBS 钉版 + SHA256SUMS 校验、下载管理页不再被首页标签内容覆盖；文档侧补公开台账脱敏与安装器/端点/台账议题记录。"
 }
