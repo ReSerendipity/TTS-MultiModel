@@ -245,11 +245,11 @@ def test_accepted_risk_registers_stay_in_sync():
     assert not problems, "豁免与分诊记录脱节：\n  " + "\n  ".join(problems)
 
 
-@pytest.mark.parametrize("cve", ["CVE-2025-4565", "CVE-2026-0994"])
+@pytest.mark.parametrize("cve", ["CVE-2025-4565", "CVE-2026-0994", "CVE-2025-47273"])
 def test_accepted_cves_are_actually_pinned_versions(cve: str):
     """镜像里真出现过的号才允许被豁免：本条防止"顺手多豁免几个"。
 
-    参数化集合 = protobuf 3.19.6 的现役豁免（§1c 复审结论）。原参数里的
+    参数化集合 = protobuf 3.19.6 现役豁免（§1c 复审结论）+ setuptools A21（Trivy 归因误报，绑定版本是其误报值 70.3.0 而非镜像实装 84.2.1，见 §1 A21）。原参数里的
     CVE-2026-4372/5241/9856 三条 transformers 豁免已随 5.20.2 迁移注销，不再登记。
     """
     ids = {e["id"] for e in _trivy_ignore_entries()}
@@ -332,7 +332,7 @@ def test_pip_audit_ignore_set_equals_the_triage_table():
 def test_d3_d4_guards_are_not_vacuous():
     """变异自证：把三处"写错就静默失效"的地方改坏，本组守卫必须变红。"""
     entries = _trivy_ignore_entries()
-    assert len(entries) == 2, "Trivy 豁免条目数对不上，D3 的解析已失效（2026-10-29 复审后仅剩 protobuf 2）"
+    assert len(entries) == 3, "Trivy 豁免条目数对不上，D3 的解析已失效（protobuf 2 + setuptools A21 归因误报 1）"
     assert all("expiration:" in e["body"] for e in entries)
     assert all("version:" in e["body"] and "versions:" not in e["body"] for e in entries)
 
