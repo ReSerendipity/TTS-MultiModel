@@ -36,3 +36,16 @@ vulnerabilities:
       name: protobuf
       version: "3.19.6"
     expiration: "2026-12-31T00:00:00Z"
+
+  # CVE-2025-47273（GHSA 系，HIGH，修复于 78.1.1）：setuptools PackageIndex 路径穿越。
+  # 【Trivy 误报，非已接受风险】镜像内 setuptools 物理版本是 84.2.1 ≥ 修复版 78.1.1，
+  # 且 84.2.1 已不包含漏洞模块 PackageIndex（PyPI 轮子实证：348 文件零 package_index）。
+  # 证据链（run 44336678982）：两阶段 pip 均 "Successfully installed setuptools-84.2.1"、
+  # 全镜像无任何 setuptools-70.3.0 安装记录、PBS install_only tarball（SHA256 实测匹配）
+  # 零 setuptools 条目；Trivy 自己列出的受影响文件就是 84.2.1 的 METADATA 路径。
+  # 登记目的是放行扫描器归因 bug，到期复审：Trivy 升级后若归因修正，此条自然失效。
+  - id: CVE-2025-47273
+    package:
+      name: setuptools
+      version: "70.3.0"
+    expiration: "2026-12-18T00:00:00Z"
