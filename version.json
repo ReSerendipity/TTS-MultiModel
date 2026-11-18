@@ -1,5 +1,5 @@
 {
-  "version": "2.10.0",
+  "version": "2.11.0",
   "release_date": "2026-11-15",
   "minimum_shell_version": "2.2.2",
   "changelog": "2.10.0：本版主干是生成链路的可编排与可观测——VoxCPM2 段内增量流式（SSE 每文本段可多 audio 事件、prefer_streaming 可回退整段）、前端边收边播与联合进度、引擎状态以 config 为单一事实源收敛；文本分块升级为 token 预算 + 受保护片段 + 原文偏移；新增 Voice Profile 资产层与每引擎派生缓存；剧本 Schema 接入生成流程与说话人感知分块（speaker_map 不再静默忽略、不支持角色明确报错）；修复空参考音频路径按未提供处理、语音指纹改用 sha256（bandit B324）；CI 修正浅克隆 tag 判定与 Python 3.10 tomllib 收集失败。"

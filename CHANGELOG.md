@@ -2,6 +2,34 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。同理，条目中提及的 `docs/project/`、`docs/_devarchive/`、`docs/reports/`、`docs/agents/` 等本地文档路径已于 2026-11-04 迁至 `local/docs-archive/`（本地归档，未随仓库发布），条目内路径按迁移前写法原样保留。
 
+## [2.11.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.10.0...v2.11.0) (2026-11-18)
+
+
+### Features
+
+* **brand:** 紫色图标补白色圆角底 ([46c6939](https://github.com/ReSerendipity/TTS-MultiModel/commit/46c6939f5ff255f6b84a86532a97ed25fde45430))
+
+
+### Bug Fixes
+
+* **bundle:** torch 残留判定只看顶层 site-packages\\torch ([ad419d9](https://github.com/ReSerendipity/TTS-MultiModel/commit/ad419d9c5194d0cc5d902f0df00548abcdb5730f))
+* **deps:** pillow 12.3.0 → 13.0.0 整组迁移（lock + 便携钉装同批） ([a3c5fc5](https://github.com/ReSerendipity/TTS-MultiModel/commit/a3c5fc5030b681024f0dd2efe60c35c9b66c1db8))
+* **desktop:** 壳更新端点与示例头部正名为现仓名 TTS-MultiModel ([82976b4](https://github.com/ReSerendipity/TTS-MultiModel/commit/82976b4bf0822edd5eac79dacae6d5bc2f88b3fc))
+* **desktop:** 引导运行库优先使用 bootstrap/python 嵌套解释器 ([0c5c7f1](https://github.com/ReSerendipity/TTS-MultiModel/commit/0c5c7f115c2e8bd8d2b32f23632475127dc48b17))
+* **docker:** Python 3.12 获取链弃 deadsnakes PPA，改 PBS 钉版 + SHA256SUMS 校验 ([f252ee8](https://github.com/ReSerendipity/TTS-MultiModel/commit/f252ee89fa481010ff3ea3fbed85a871239e86c3))
+* **ui:** 下载管理页不再被首页标签内容覆盖 ([36eabf1](https://github.com/ReSerendipity/TTS-MultiModel/commit/36eabf11b73581f12797e919229c36d1393abe28))
+
+
+### Documentation
+
+* **changelog:** 补 [Unreleased] 收录发版后未推送条目 ([d45a4d1](https://github.com/ReSerendipity/TTS-MultiModel/commit/d45a4d112701f19e9bf8eb0684ed7971b59fe0bf))
+* **ledger:** 公开台账脱敏本机路径并补迁移记录；dependabot 补冷却期 ([6ecb58e](https://github.com/ReSerendipity/TTS-MultiModel/commit/6ecb58e7ac613125be77c17b27ece773cb45e88c))
+* **ledger:** 公开台账脱敏本机路径并补迁移记录；dependabot 补冷却期 ([92bcf55](https://github.com/ReSerendipity/TTS-MultiModel/commit/92bcf557bbaeb4e78e34b3d3023878d5122111e1))
+* **ledger:** 补记 lock/venv 漂移判据与 PPA 脆弱性（[#210](https://github.com/ReSerendipity/TTS-MultiModel/issues/210) [#211](https://github.com/ReSerendipity/TTS-MultiModel/issues/211)） ([92c61ea](https://github.com/ReSerendipity/TTS-MultiModel/commit/92c61ea89e29ed92c31129c68252bb192aa84a1b))
+* **ledger:** 补记安装器只在本地构建（[#204](https://github.com/ReSerendipity/TTS-MultiModel/issues/204)） ([db0e84f](https://github.com/ReSerendipity/TTS-MultiModel/commit/db0e84f4153d3a3960c627ae2c2e4b16a394eabc))
+* **ledger:** 补记端点旧名重定向兜底与 worktree 残留（[#208](https://github.com/ReSerendipity/TTS-MultiModel/issues/208) [#209](https://github.com/ReSerendipity/TTS-MultiModel/issues/209)） ([37cae1d](https://github.com/ReSerendipity/TTS-MultiModel/commit/37cae1d4b5c839da295e6d7371d6567879b1a1c8))
+* **readme:** 补充桌面单文件安装包入口 ([bcba335](https://github.com/ReSerendipity/TTS-MultiModel/commit/bcba33502c25b4607567e208c81dc48c6b58dab5))
+
 ## [Unreleased]
 
 ### Added
