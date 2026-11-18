@@ -945,7 +945,7 @@
   "downloads.size": "용량",
   "downloads.path": "경로",
   "downloads.models": "모델 가중치",
-  "downloads.models_desc": "가중치는 HuggingFace / ModelScope에서 내려받으며 이어받기를 지원합니다. 동시에 하나의 다운로드만 실행됩니다.",
+  "downloads.models_desc": "가중치는 ModelScope 공식 공개 저장소를 우선 사용하고 HuggingFace는 폴백으로만 사용합니다. 이어받기를 지원하며 동시에 하나의 다운로드만 실행됩니다.",
   "downloads.mode_bootstrap": "부트스트랩(런타임 미설치)",
   "downloads.mode_full": "전체 런타임",
   "downloads.mode_system": "시스템 Python",

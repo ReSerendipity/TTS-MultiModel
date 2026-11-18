@@ -945,7 +945,7 @@
   "downloads.size": "Size",
   "downloads.path": "Path",
   "downloads.models": "Model weights",
-  "downloads.models_desc": "Weights are fetched from HuggingFace / ModelScope with resume support. Only one download runs at a time.",
+  "downloads.models_desc": "Weights are fetched from ModelScope official public repos first, with HuggingFace only as fallback; resume is supported and only one download runs at a time.",
   "downloads.mode_bootstrap": "Bootstrap (runtime missing)",
   "downloads.mode_full": "Full runtime",
   "downloads.mode_system": "System Python",

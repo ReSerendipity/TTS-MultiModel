@@ -5,8 +5,8 @@
 设计目标（对应分发审计「第 2 章 / 缺口 #1」）：
     把零散的 per-engine 下载脚本（仅 indextts2 / indextts20 有）收敛为一个
     统一入口，覆盖全部 7 个模型 / 权重集合，并固化「国内社区优先」策略：
-        1. **优先 Hugging Face 镜像社区** https://hf-mirror.com （国内通畅）；
-        2. **缺失 / 失败时回退魔搭社区** ModelScope （国内通畅）；
+        1. **优先魔搭 ModelScope 官方公开仓**（国内直连）；HF 镜像仅兜底。
+        2. **ModelScope 不可用 / 受限时回退 Hugging Face 镜像** https://hf-mirror.com；
         3. 个别权重仅 ModelScope 有（如 speech_zipenhancer）→ 直连 ModelScope。
     下载均走官方 SDK 的 snapshot_download，**天然断点续传**（缓存目录 + 本地目录
     分离，重复运行只补缺失分片，不重下）。
@@ -26,7 +26,7 @@
 
 依赖：
     pip install huggingface_hub modelscope
-    （HF 镜像无需额外依赖；ModelScope 回退需要 modelscope）
+    （魔搭主源需要 modelscope；HF 镜像兜底需要 huggingface_hub）
 """
 
 from __future__ import annotations
@@ -348,11 +348,11 @@ def _clone_code_repo(entry: dict) -> bool:
 
 
 def download_one(entry: dict, source: str, do_verify: bool) -> bool:
-    """按「HF 镜像优先、ModelScope 回退」策略下载单个模型集合。
+    """按「ModelScope 优先、HF 镜像兜底」策略下载单个模型集合。
 
     Args:
         entry: MODEL_REGISTRY 中的一项。
-        source: "auto"（镜像优先）/ "hf" / "modelscope"。
+        source: "auto"（魔搭优先）/ "hf" / "modelscope"。
         do_verify: 是否做哈希/体积校验。
 
     Returns:
@@ -372,33 +372,36 @@ def download_one(entry: dict, source: str, do_verify: bool) -> bool:
         logger.info("  注意: %s", entry["note"])
 
     success = False
-    # 决定尝试顺序
-    want_hf = source in ("auto", "hf") and entry["hf_repo"]
-    want_ms = source in ("auto", "modelscope") and entry["ms_repo"]
-
-    if source == "hf":
-        want_ms = False
+    # 决定尝试顺序：auto = 魔搭优先；hf = 只用 HF 镜像；modelscope = 只用魔搭。
     if source == "modelscope":
         want_hf = False
+        want_ms = bool(entry["ms_repo"])
+    elif source == "hf":
+        want_hf = bool(entry["hf_repo"])
+        want_ms = False
+    else:  # auto
+        want_hf = bool(entry["hf_repo"])
+        want_ms = bool(entry["ms_repo"])
 
-    if want_hf:
+    # auto / modelscope：先走魔搭官方公开仓（国内直连）。失败才回退 HF 镜像。
+    if want_ms:
+        try:
+            _download_modelscope(entry["ms_repo"], local_dir)
+            success = True
+        except Exception as e:  # 网络失败 / 仓库缺失 / 依赖缺失 → 回退
+            logger.warning("[ModelScope] 下载失败: %s", e)
+            if not want_hf:
+                logger.error("[%s] ModelScope 下载失败且无 HF 回退，终止", name)
+                return False
+            logger.info("[%s] 回退到 HF 镜像…", name)
+
+    if not success and want_hf:
         _set_hf_mirror()
         try:
             _download_hf(entry["hf_repo"], local_dir)
             success = True
-        except Exception as e:  # 镜像缺失 / 网络失败 / 依赖缺失 → 回退
-            logger.warning("[HF] 下载失败: %s", e)
-            if not want_ms:
-                logger.error("[%s] HF 下载失败且无 ModelScope 回退，终止", name)
-                return False
-            logger.info("[%s] 回退到 ModelScope…", name)
-
-    if not success and want_ms:
-        try:
-            _download_modelscope(entry["ms_repo"], local_dir)
-            success = True
         except Exception as e:
-            logger.error("[ModelScope] 下载失败: %s", e)
+            logger.error("[HF] 下载失败: %s", e)
             return False
 
     if not success:
@@ -419,7 +422,7 @@ def download_one(entry: dict, source: str, do_verify: bool) -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="TTS_MultiModel 统一模型下载器（HF 镜像优先，ModelScope 回退）")
+    parser = argparse.ArgumentParser(description="TTS_MultiModel 统一模型下载器（ModelScope 优先，HF 镜像兜底）")
     parser.add_argument(
         "--model",
         action="append",
@@ -432,7 +435,7 @@ def main() -> int:
         "--source",
         choices=["auto", "hf", "modelscope"],
         default="auto",
-        help="下载源策略：auto=HF 镜像优先、失败回退魔搭；hf=只用镜像；modelscope=只用魔搭",
+        help="下载源策略：auto=魔搭优先、失败回退 HF 镜像；hf=只用 HF 镜像；modelscope=只用魔搭",
     )
     parser.add_argument("--no-verify", action="store_true", help="跳过 SHA256 / 体积校验")
     args = parser.parse_args()

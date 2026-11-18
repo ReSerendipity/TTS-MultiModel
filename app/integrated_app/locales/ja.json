@@ -945,7 +945,7 @@
   "downloads.size": "使用量",
   "downloads.path": "パス",
   "downloads.models": "モデル重み",
-  "downloads.models_desc": "重みは HuggingFace / ModelScope からダウンロードし、レジュームに対応します。同時に実行できるダウンロードは 1 件のみです。",
+  "downloads.models_desc": "重みは ModelScope の公式公開リポジトリを優先し、HuggingFace はフォールバックのみ。レジューム対応、同時ダウンロードは 1 件のみです。",
   "downloads.mode_bootstrap": "ブートストラップ（ランタイム未導入）",
   "downloads.mode_full": "フルランタイム",
   "downloads.mode_system": "システム Python",
