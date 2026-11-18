@@ -33,15 +33,15 @@ ARG PBS_FILE=cpython-3.12.16+20261110-x86_64-unknown-linux-gnu-install_only.tar.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl git git-lfs ffmpeg ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -fsSL --retry 5 --retry-all-errors -o /tmp/pbs.tar.gz \
+    && curl -fsSL --retry 5 --retry-all-errors -o /tmp/${PBS_FILE} \
          "https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/${PBS_FILE}" \
     && curl -fsSL --retry 5 --retry-all-errors -o /tmp/SHA256SUMS \
          "https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/SHA256SUMS" \
     && cd /tmp && grep -F "${PBS_FILE}" SHA256SUMS | sha256sum -c - \
-    && mkdir -p /opt/python312 && tar -xzf pbs.tar.gz -C /opt/python312 --strip-components=1 \
+    && mkdir -p /opt/python312 && tar -xzf "${PBS_FILE}" -C /opt/python312 --strip-components=1 \
     && ln -s /opt/python312/bin/python3.12 /usr/local/bin/python3.12 \
     && python3.12 -m ensurepip --upgrade \
-    && rm -f /tmp/pbs.tar.gz /tmp/SHA256SUMS
+    && rm -f /tmp/${PBS_FILE} /tmp/SHA256SUMS
 
 RUN git lfs install
 
@@ -76,15 +76,15 @@ ARG PBS_FILE=cpython-3.12.16+20261110-x86_64-unknown-linux-gnu-install_only.tar.
 RUN apt-get update && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -fsSL --retry 5 --retry-all-errors -o /tmp/pbs.tar.gz \
+    && curl -fsSL --retry 5 --retry-all-errors -o /tmp/${PBS_FILE} \
          "https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/${PBS_FILE}" \
     && curl -fsSL --retry 5 --retry-all-errors -o /tmp/SHA256SUMS \
          "https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/SHA256SUMS" \
     && cd /tmp && grep -F "${PBS_FILE}" SHA256SUMS | sha256sum -c - \
-    && mkdir -p /opt/python312 && tar -xzf pbs.tar.gz -C /opt/python312 --strip-components=1 \
+    && mkdir -p /opt/python312 && tar -xzf "${PBS_FILE}" -C /opt/python312 --strip-components=1 \
     && ln -s /opt/python312/bin/python3.12 /usr/local/bin/python3.12 \
     && python3.12 -m ensurepip --upgrade \
-    && rm -f /tmp/pbs.tar.gz /tmp/SHA256SUMS \
+    && rm -f /tmp/${PBS_FILE} /tmp/SHA256SUMS \
     && groupadd -r ttsuser \
     && useradd -r -g ttsuser -m -d /home/ttsuser -s /sbin/nologin ttsuser
 
