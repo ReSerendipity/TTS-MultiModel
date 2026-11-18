@@ -41,6 +41,7 @@ RUN apt-get update \
     && mkdir -p /opt/python312 && tar -xzf "${PBS_FILE}" -C /opt/python312 --strip-components=1 \
     && ln -s /opt/python312/bin/python3.12 /usr/local/bin/python3.12 \
     && python3.12 -m ensurepip --upgrade \
+    && python3.12 -m pip install --no-cache-dir --upgrade "setuptools>=78.1.1" \
     && rm -f /tmp/${PBS_FILE} /tmp/SHA256SUMS
 
 RUN git lfs install
@@ -84,6 +85,7 @@ RUN apt-get update && apt-get upgrade -y \
     && mkdir -p /opt/python312 && tar -xzf "${PBS_FILE}" -C /opt/python312 --strip-components=1 \
     && ln -s /opt/python312/bin/python3.12 /usr/local/bin/python3.12 \
     && python3.12 -m ensurepip --upgrade \
+    && python3.12 -m pip install --no-cache-dir --upgrade "setuptools>=78.1.1" \
     && rm -f /tmp/${PBS_FILE} /tmp/SHA256SUMS \
     && groupadd -r ttsuser \
     && useradd -r -g ttsuser -m -d /home/ttsuser -s /sbin/nologin ttsuser
