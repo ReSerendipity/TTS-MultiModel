@@ -7,6 +7,7 @@
 
 ### Features
 
+* **downloads:** 模型下载默认改为魔搭官方公开仓优先，HF 镜像仅兜底；运行时改指公开仓 `ReSerendipity/TTSMultiModel-Runtime`（cu132 / torch 2.13.0，支持 sm_120）
 * **brand:** 紫色图标补白色圆角底 ([46c6939](https://github.com/ReSerendipity/TTS-MultiModel/commit/46c6939f5ff255f6b84a86532a97ed25fde45430))
 
 

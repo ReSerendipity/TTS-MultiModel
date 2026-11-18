@@ -1,26 +1,31 @@
 {
   "schema": 1,
-  "note": "下载管理页的环境包清单基线。发版时由 scripts/build_slim_bundle.ps1 -Mode runtime 覆盖为含真实分卷名与 SHA256 的版本；volumes 为空表示尚未发布环境包，页面会提示清单缺失。",
+  "note": "下载管理页的环境包清单基线。模型走魔搭官方公开仓（HF 镜像仅兜底）；runtime 指向魔搭公开仓 ReSerendipity/TTSMultiModel-Runtime，按分卷下载后离线安装。",
   "runtime": {
     "version": "1",
     "tag": "runtime-v1",
-    "base_url": "https://github.com/ReSerendipity/TTS-MultiModel/releases/download/runtime-v1",
+    "base_url": "https://modelscope.cn/models/ReSerendipity/TTSMultiModel-Runtime/resolve/master",
     "python": "3.12.10",
-    "torch": "2.5.1+cu124",
-    "cuda": "cu124",
+    "torch": "2.13.0+cu132",
+    "cuda": "cu132",
     "packages": [
-      "torch==2.5.1",
-      "torchvision==0.20.1",
-      "torchaudio==2.5.1"
+      "torch==2.13.0",
+      "torchvision==0.28.0",
+      "torchaudio==2.11.0"
     ],
-    "size_bytes": 2551514962,
-    "built_at": "2026-11-01T01:56:38Z",
-    "min_app_version": "2.9.0",
-    "volumes": [],
-    "install_mode": "online",
-    "index_url": "https://download.pytorch.org/whl/cu124",
-    "pip_extra_index": "https://pypi.tuna.tsinghua.edu.cn/simple",
-    "note": "install_mode=online：页内点安装时后端直接 pip 官方索引安装 （torch 家族 + 生态包），无需下载预置分卷。"
+    "size_bytes": 1957742166,
+    "built_at": "2026-11-18T03:03:08Z",
+    "min_app_version": "2.11.0",
+    "volumes": [
+      {
+        "name": "TTS-MultiModel-Runtime-cu132.zip.001",
+        "size": 1957742166,
+        "sha256": "4f8d890f7ae1e4cbcd7ce13b01f21162854ab7c2cda3c7e7d2829cb21735997c"
+      }
+    ],
+    "install_mode": "archive",
+    "size_bytes_kind": "download",
+    "note": "install_mode=archive：从魔搭公开仓 ReSerendipity/TTSMultiModel-Runtime 下载分卷，校验 SHA256 后离线安装 torch 家族（Python 3.12.10 + torch 2.13.0+cu132，适配 sm_120）。"
   },
   "models": [
     {

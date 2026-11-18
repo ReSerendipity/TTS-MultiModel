@@ -945,7 +945,7 @@
   "downloads.size": "占用",
   "downloads.path": "路径",
   "downloads.models": "模型权重",
-  "downloads.models_desc": "权重从 HuggingFace / ModelScope 下载，支持断点续传；同一时刻只跑一个下载任务。",
+  "downloads.models_desc": "权重优先从魔搭 ModelScope 官方公开仓下载，HF 镜像仅兜底；支持断点续传，同一时刻只跑一个下载任务。",
   "downloads.mode_bootstrap": "引导模式（未装环境）",
   "downloads.mode_full": "完整运行时",
   "downloads.mode_system": "系统 Python",

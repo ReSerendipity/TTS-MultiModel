@@ -16,7 +16,7 @@
        下载 → 逐卷校验 SHA256 → 合并 → 解压 → ``pip install --no-index``
        装进**引导解释器自身**的 site-packages，装完写 ``RUNTIME.json``。
     2. 模型权重：不自己托管，复用 ``model_download_manager``（其内部再调
-       ``scripts/download_models.py`` 的 hf-mirror → HF → ModelScope 多源回退），
+       ``scripts/download_models.py`` 的 ModelScope → HF 镜像 → HF 官方多源回退），
        避免第二套下载逻辑漂移。
 """
 
@@ -293,8 +293,8 @@ def catalog_view() -> dict:
                 "tier": item["tier"],
                 "size_hint_gb": item["size_hint_gb"],
                 "is_default": False,
-                # 模型走 HF/ModelScope，不占我们的带宽与 Release 配额
-                "source": "huggingface / modelscope",
+                # 模型走 ModelScope 官方公开仓；HF 镜像仅兜底
+                "source": "modelscope（官方公开仓）",
             }
             for item in scan_models()
         ],

@@ -2,5 +2,5 @@
   "version": "2.11.0",
   "release_date": "2026-11-18",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.11.0：品牌视觉更新——桌面壳图标补白色圆角底；修复便携包 torch 残留判定只看顶层 site-packages、依赖整组迁移 pillow 12.3.0→13.0.0（lock + 便携钉装同批）、桌面壳更新端点与示例头部正名为 TTS-MultiModel、引导运行库优先使用 bootstrap/python 嵌套解释器、Docker Python 3.12 获取链弃 deadsnakes PPA 改 PBS 钉版 + SHA256SUMS 校验、下载管理页不再被首页标签内容覆盖；文档侧补公开台账脱敏与安装器/端点/台账议题记录。"
+  "changelog": "2.11.0：品牌视觉更新——桌面壳图标补白色圆角底；模型/运行时下载源迁移至魔搭公开仓（模型走官方公开仓、HF 仅兜底，运行时改用 ReSerendipity/TTSMultiModel-Runtime，cu132 / torch 2.13.0 适配 sm_120）；修复下载管理页被首页覆盖、便携包 torch 残留判定、pillow 13.0.0 整组迁移、桌面壳端点正名、bootstrap 嵌套解释器优先；Docker Python 3.12 改 PBS 钉版 + SHA256SUMS 校验。"
 }
