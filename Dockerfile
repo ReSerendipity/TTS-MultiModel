@@ -16,36 +16,32 @@ ENV PYTHONUNBUFFERED=1
 
 # P1-1（云原生评估 2026-09-05）：Python 3.10 → 3.12，与 CI（ci.yml 3.12）及
 # README 推荐版本统一，消除"测的是 3.12、发的是 3.10"漂移。
-# Ubuntu 22.04 官方源无 3.12，经 deadsnakes PPA 提供（torch/funasr 等全量依赖均有 cp312 wheel）。
 # --no-install-recommends：不拉 idle/lib2to3 等推荐包，减小体积与 CVE 面。
-# 索引就绪守卫：apt-get update 对「某个索引没抓下来」只打一行
-#   W: Some index files failed to download. They have been ignored, or old ones used instead.
-# 然后 **返回 0**。deadsnakes 的 PPA 一抖，这一步就静默带着半套索引往下走，真正的报错落在
-# 下一行、且长得完全不像网络问题：E: Unable to locate package python3.12。
-# 2026-09-21 实测（docker-build.yml run 35598902698 / 35599696780 红，35607107888 绿）：
-#   红的两次日志里有 Ign:7 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 Packages，
-#   绿的那次同一行是 Get:7 ... Packages [44.3 kB]。同一条 update-alternatives: error:
-#   alternative path /usr/share/man/man7/bash-builtins.7.gz 在绿色 run 里也出现 → 它是
-#   apt-get upgrade 期间的良性噪声，不是构建失败的原因（先前误把它当根因，已推翻）。
-# 所以：把「PPA 索引里真查得到 python3.12」当作继续装的前置条件，取不到就重试，
-# 5 轮仍取不到就地硬停说清原因——不带着半套索引继续构建。
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common git git-lfs ffmpeg ca-certificates \
-    && add-apt-repository -y ppa:deadsnakes/ppa \
-    && for i in 1 2 3 4 5; do \
-         apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30; \
-         if apt-cache show python3.12 >/dev/null 2>&1; then break; fi; \
-         if [ "$i" = 5 ]; then \
-           echo "E: deadsnakes 索引重试 5 轮仍查不到 python3.12 —— 是 PPA 侧或网络故障，不是本仓依赖声明问题。" >&2; \
-           echo "   可手工核对：curl -sI https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu/dists/jammy/main/binary-amd64/Packages.gz" >&2; \
-           exit 1; \
-         fi; \
-         echo "W: deadsnakes 索引未就绪，15s 后第 $((i+1)) 轮重试" >&2; sleep 15; \
-       done \
-    && apt-get install -y --no-install-recommends \
-    python3.12 python3.12-venv \
+#
+# Python 3.12 获取链 2026-11-18 重构（审查批次遗留项①）：弃 launchpad deadsnakes
+# PPA，改用 astral-sh/python-build-standalone 的 GitHub Releases 钉版。
+# 动因：PPA 索引抖动已两次把 main 的 docker 流水线打红（2026-09-21 run
+# 35598902698/35599696780；2026-11-17 run 44117415148/44129119161，5 轮×15s
+# 守卫也扛不住 launchpad 侧的小时级故障，而 runner 到 github.com 的链路
+# 从未抖过）。钉版 = 发行 tag 20261110 → cpython 3.12.16，SHA256SUMS 同源
+# 下载、逐字校验通过才解压——不引入「装到一半的半套索引」这类静默漂移。
+# 升级 Python 补丁版时：改下方两个 ARG（对照 release 资产名）。
+# CUDA 基底维持 12.1（noble/CUDA≥12.4 才有 ubuntu24.04 变体，换基底需 GPU
+# 冒烟重验 torch 钉版，另立决定，不在本次范围）。
+ARG PBS_TAG=20261110
+ARG PBS_FILE=cpython-3.12.16+20261110-x86_64-unknown-linux-gnu-install_only.tar.gz
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl git git-lfs ffmpeg ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && python3.12 -m ensurepip --upgrade
+    && curl -fsSL --retry 5 --retry-all-errors -o /tmp/pbs.tar.gz \
+         "https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/${PBS_FILE}" \
+    && curl -fsSL --retry 5 --retry-all-errors -o /tmp/SHA256SUMS \
+         "https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/SHA256SUMS" \
+    && cd /tmp && grep -F "${PBS_FILE}" SHA256SUMS | sha256sum -c - \
+    && mkdir -p /opt/python312 && tar -xzf pbs.tar.gz -C /opt/python312 --strip-components=1 \
+    && ln -s /opt/python312/bin/python3.12 /usr/local/bin/python3.12 \
+    && python3.12 -m ensurepip --upgrade \
+    && rm -f /tmp/pbs.tar.gz /tmp/SHA256SUMS
 
 RUN git lfs install
 
@@ -69,28 +65,26 @@ ENV PYTHONUNBUFFERED=1
 
 # 安全更新：拉取 Ubuntu 22.04 安全补丁，修复 Trivy 扫描发现的 14 个 HIGH CVE
 # （openssl CVE-2026-45447、gnupg/dirmngr CVE-2025-68973 等；修复版本均已在 22.04 安全仓库发布）。
-# 基础镜像 nvidia/cuda:12.1.0-runtime-ubuntu22.04 自带未打补丁的 openssl/libssl3/dirmngr 等，
 # 不显式升级则 Trivy 安全门禁会因未修复的高危漏洞持续报红。DEBIAN_FRONTEND=noninteractive 已设，无交互阻塞。
 # ⚠ 可复现性提示（P2-2）：upgrade 的补丁集随构建日期漂移，如需可复现构建请锁定基础镜像 digest 并定期 bump。
-# ⚠ python3.12-venv 必装：Ubuntu/deadsnakes 的 python3.12 拆包，ensurepip 由 python3.12-venv 提供；
-#   漏装则下一步 `python3.12 -m ensurepip --upgrade` 报 "No module named ensurepip" 直接构建失败
-#   （与 builder 阶段 :25 保持一致，两处必须同装）。
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common ca-certificates ffmpeg \
-    && add-apt-repository -y ppa:deadsnakes/ppa \
-    && for i in 1 2 3 4 5; do \
-         apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30; \
-         if apt-cache show python3.12 >/dev/null 2>&1; then break; fi; \
-         if [ "$i" = 5 ]; then \
-           echo "E: deadsnakes 索引重试 5 轮仍查不到 python3.12（原因与修法见 builder 阶段同一段守卫的注释）。" >&2; \
-           exit 1; \
-         fi; \
-         echo "W: deadsnakes 索引未就绪，15s 后第 $((i+1)) 轮重试" >&2; sleep 15; \
-       done \
-    && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends python3.12 python3.12-venv \
+# ⚠ Python 3.12 来源与 builder 阶段一致（python-build-standalone 钉版 20261110 =
+#   cpython 3.12.16，SHA256SUMS 校验后解压、软链 /usr/local/bin/python3.12）——
+#   两阶段必须用同一 PBS_TAG/PBS_FILE，否则 builder 编译的 wheel 与 runtime
+#   解释器 minor 版本错位（PBS 无 Ubuntu 拆包问题，无需 python3.12-venv）。
+ARG PBS_TAG=20261110
+ARG PBS_FILE=cpython-3.12.16+20261110-x86_64-unknown-linux-gnu-install_only.tar.gz
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends curl ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL --retry 5 --retry-all-errors -o /tmp/pbs.tar.gz \
+         "https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/${PBS_FILE}" \
+    && curl -fsSL --retry 5 --retry-all-errors -o /tmp/SHA256SUMS \
+         "https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/SHA256SUMS" \
+    && cd /tmp && grep -F "${PBS_FILE}" SHA256SUMS | sha256sum -c - \
+    && mkdir -p /opt/python312 && tar -xzf pbs.tar.gz -C /opt/python312 --strip-components=1 \
+    && ln -s /opt/python312/bin/python3.12 /usr/local/bin/python3.12 \
     && python3.12 -m ensurepip --upgrade \
+    && rm -f /tmp/pbs.tar.gz /tmp/SHA256SUMS \
     && groupadd -r ttsuser \
     && useradd -r -g ttsuser -m -d /home/ttsuser -s /sbin/nologin ttsuser
 
