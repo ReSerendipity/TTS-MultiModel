@@ -2,6 +2,14 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。同理，条目中提及的 `docs/project/`、`docs/_devarchive/`、`docs/reports/`、`docs/agents/` 等本地文档路径已于 2026-11-04 迁至 `local/docs-archive/`（本地归档，未随仓库发布），条目内路径按迁移前写法原样保留。
 
+## [2.11.1](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.11.0...v2.11.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **downloads:** 运行时检测优先识别 `bootstrap/python` 嵌套解释器，并要求 `site-packages/torch` 真实存在，修复状态页显示“未安装环境”或“已安装”但实际无 torch 的问题；卸载 bootstrap 子树时只清理 torch 家族与 RUNTIME.json，不删除正在使用的解释器
+* **installer:** `setup.nsi` 的 OutFile 改为跟随 `APP_VERSION`，避免版本升级后仍产出旧文件名
+
 ## [2.11.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.10.0...v2.11.0) (2026-11-18)
 
 

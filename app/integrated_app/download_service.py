@@ -68,11 +68,22 @@ def _runtime_dir() -> str:
 
     瘦包里解释器叫 ``bootstrap/``，环境装进去后**目录名不变**（只多了 torch），
     所以不能只看 ``runtime/``；两个都可能有 python.exe，优先 ``runtime/``。
+
+    TTS 的 WinPython 布局还可能把真正的解释器与 torch 放在
+    ``bootstrap/python/``（根目录的 python.exe 只是启动器）。若嵌套目录里有
+    RUNTIME.json，它就是已安装环境，必须优先返回嵌套目录，否则状态页永远
+    读不到元信息，显示成“未装环境”。
     """
     runtime = os.path.join(PROJECT_ROOT, RUNTIME_DIRNAME)
     if os.path.isfile(os.path.join(runtime, _exe_name())):
         return runtime
     bootstrap = os.path.join(PROJECT_ROOT, BOOTSTRAP_DIRNAME)
+    nested = os.path.join(bootstrap, "python")
+    if os.path.isfile(os.path.join(nested, _exe_name())) and (
+        os.path.isfile(os.path.join(nested, RUNTIME_META_NAME))
+        or not os.path.isfile(os.path.join(bootstrap, _exe_name()))
+    ):
+        return nested
     if os.path.isfile(os.path.join(bootstrap, _exe_name())):
         return bootstrap
     return runtime
@@ -243,11 +254,13 @@ def build_runtime_status() -> dict:
     files, size = _dir_stats(runtime_dir) if os.path.isdir(runtime_dir) else (0, 0)
     version = app_version()
     min_app = meta.get("min_app_version")
+    # RUNTIME.json 只证明“曾经装过”，不能证明 torch 还在：瘦包覆盖安装或手工
+    # 删除 site-packages\torch 后会留下孤零零的元信息。三项同时成立才算已安装。
+    torch_present = os.path.isdir(os.path.join(_site_packages(runtime_dir), "torch"))
     return {
         "present": present,
-        # 判「已装环境」只能看 RUNTIME.json 是否存在，不能用 bool(meta)：
-        # 空对象也是合法元信息（构建期字段全缺），用真假值会把已装环境判成未装。
-        "installed": raw_meta is not None,
+        "installed": raw_meta is not None and present and torch_present,
+        "torch_present": torch_present,
         "mode": _current_mode(),
         "path": runtime_dir,
         "executable": exe if present else None,
@@ -604,7 +617,12 @@ def uninstall_runtime() -> None:
     target = _runtime_dir()
     if not os.path.isdir(target):
         return
-    if os.path.basename(os.path.normpath(target)) == BOOTSTRAP_DIRNAME:
+    bootstrap = os.path.abspath(os.path.join(PROJECT_ROOT, BOOTSTRAP_DIRNAME))
+    target_abs = os.path.abspath(target)
+    # bootstrap 根目录，或 WinPython 的 bootstrap/python 嵌套解释器：正在用它跑
+    # 后端，不能整目录删；只清理 torch 家族包和 RUNTIME.json。
+    in_bootstrap = target_abs == bootstrap or target_abs.startswith(bootstrap + os.sep)
+    if in_bootstrap:
         site = _site_packages(target)
         if os.path.isdir(site):
             for entry in os.listdir(site):

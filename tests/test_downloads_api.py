@@ -48,6 +48,13 @@ def _make_app_dir(tmp_path, runtime_name: str = "bootstrap") -> os.PathLike[str]
     return tmp_path
 
 
+def _make_torch_package(root) -> None:
+    """在引导态运行时里造一个真实可导入的 torch 包目录。"""
+    site_torch = root / "bootstrap" / "Lib" / "site-packages" / "torch"
+    site_torch.mkdir(parents=True, exist_ok=True)
+    (site_torch / "__init__.py").write_text("", encoding="utf-8")
+
+
 @pytest.fixture()
 def boot_root(tmp_path, monkeypatch):
     """把 download_service 的根目录与运行时目录都指到临时打包态目录。"""
@@ -66,13 +73,23 @@ def test_present_without_meta_is_not_installed(boot_root):
 
 
 def test_installed_follows_runtime_meta(boot_root):
-    """装完环境后写 RUNTIME.json → installed=True 且带出版本信息。"""
+    """装完环境后写 RUNTIME.json 且 torch 包真实存在 → installed=True 且带出版本信息。"""
     meta = {"runtime_version": "1", "torch": "2.13.0+cu132", "cuda": "cu132", "python": "3.12.10"}
+    _make_torch_package(boot_root)
     (boot_root / "bootstrap" / ds.RUNTIME_META_NAME).write_text(json.dumps(meta), encoding="utf-8")
     status = ds.build_runtime_status()
     assert status["installed"] is True
+    assert status["torch_present"] is True
     assert status["torch_version"] == "2.13.0+cu132"
     assert status["cuda"] == "cu132"
+
+
+def test_meta_without_torch_is_not_installed(boot_root):
+    """RUNTIME.json 还在但 torch 被删掉时，不得继续报 installed=True。"""
+    (boot_root / "bootstrap" / ds.RUNTIME_META_NAME).write_text("{}", encoding="utf-8")
+    status = ds.build_runtime_status()
+    assert status["installed"] is False
+    assert status["torch_present"] is False
 
 
 def test_bundled_torch_without_meta_is_still_not_installed(boot_root):
@@ -89,6 +106,7 @@ def test_ready_requires_runtime_meta_and_a_model(boot_root, monkeypatch):
     assert ds.build_status()["ready"] is False  # 只有权重、没装环境
 
     (boot_root / "bootstrap" / ds.RUNTIME_META_NAME).write_text("{}", encoding="utf-8")
+    _make_torch_package(boot_root)
     monkeypatch.setattr(ds, "scan_models", lambda: [{"name": "m", "present": False}])
     assert ds.build_status()["ready"] is False  # 装了环境、没权重
 
