@@ -19,6 +19,7 @@
 | `docs/runbooks/2026-11-06-o3-multipath-failover-drill.md` | `_archive/执行记录/2026-11/2026-11-06-o3-multipath-failover-drill.md` | 2026-11-08 | 执行记录（O3 扩展） | 把 O3 切换演练从单路径扩到多路径（进程内离线扩展），属主裁决单点本体接受为既定形态 | 是：`docs/README.md` |
 | `docs/runbooks/2026-11-06-o4-schedule-registration.md` | `_archive/执行记录/2026-11/2026-11-06-o4-schedule-registration.md` | 2026-11-08 | 执行记录（O4 注册） | 备份调度注册进 Windows 任务计划 + 回读证明 + 下次时间与触发人成文 | 是：`docs/README.md`、`docs/SRE_RUNBOOK.md`、`docs/TODO.md` |
 | （新建，非迁移） | `_archive/执行记录/2026-11/2026-11-09-o4-schedule-deregistration.md` | 2026-11-09 | 执行记录（O4 取消注册） | 把已注册的每日备份调度 TTS-MultiModel-Backup-Daily 从任务计划程序移除（删前导出 XML 备份可重建），本机回到无自动每日备份 | 是：`docs/SRE_RUNBOOK.md` §3.3、`docs/TODO.md` O4 段 |
+| `docs/TODO.md`（节选 10 段：D-1/D-2/G1/G4/F4/G5/R4/F3/F7/F8） | `_archive/执行记录/2026-11/2026-11-19-todo-closed-sections.md` | 2026-11-19 | 执行记录（TODO 已闭环段） | 把 10 个已闭环段原文迁出活动 TODO，活跃文件只留标题与指针；O4/F6 未闭环项留置 | 是：`docs/TODO.md` 指针、`docs/SRE_RUNBOOK.md` 等文本引用 |
 
 ## 未归档（活动文档，判定理由）
 
