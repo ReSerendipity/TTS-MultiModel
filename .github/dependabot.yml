@@ -23,6 +23,23 @@ updates:
       # 不变量由 tests/test_torch_track_consistency.py 机器核对。
       - dependency-name: "torch"
       - dependency-name: "torchvision"
+      # omegaconf/hydra-core/antlr4 三角互斥：hydra-core 1.3.8 requires_dist
+      # "omegaconf<2.4" 且 "antlr4-python3-runtime==4.9.*"，omegaconf 2.3.x 又钉
+      # antlr4==4.9.*。2026-11-17 的组 PR（#253）把 antlr4 顶到 4.13.2 令锁不可解
+      # （pip-audit / check_pin_crossconflicts 双红）。三处成对 ignore，等
+      # hydra-core 放开 omegaconf>=2.4 上界后一并解除。
+      - dependency-name: "omegaconf"
+      - dependency-name: "hydra-core"
+      - dependency-name: "antlr4-python3-runtime"
+      # sympy 1.14.0（当前最新）requires_dist "mpmath<1.4,>=1.1.0"，PyPI 无任何
+      # sympy 版本可搭配 mpmath>=1.4。#253 把锁顶到 1.4.1 令 ResolutionImpossible。
+      # 与家族仓 VOSR2-Lite 同一条 ignore（2026-11-19 落地）；解除条件见其注释。
+      - dependency-name: "mpmath"
+      # pydantic 端补齐：pydantic-core/pydantic_core 已 ignore，但组 PR 仍会单独
+      # 顶 pydantic（requirements-small 直钉），造成 core 不跟的错位对（#253 实测
+      # pydantic==2.14.3 要求 core==2.50.4 而锁停在 2.50.1）。两端一起 freeze，
+      # 升级走显式重锁。
+      - dependency-name: "pydantic"
     groups:
       minor-and-patch:
         applies-to: version-updates
