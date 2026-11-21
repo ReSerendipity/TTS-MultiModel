@@ -339,3 +339,76 @@ class TestVendorChain:
         assert hasattr(cg, "_crop_past_key_values")
         assert hasattr(gu, "NEED_SETUP_CACHE_CLASSES_MAPPING")
         assert hasattr(mu, "SequenceSummary")
+
+
+# ---------------------------------------------------------------------------
+# 长文本提前 EOS 自愈（engine 层，不改 vendor）
+# ---------------------------------------------------------------------------
+
+
+class _SequenceRuntime:
+    """按调用次序返回指定样本数的 fake runtime（用于测重试）。"""
+
+    sample_rate = 24000
+
+    def __init__(self, sizes: list[int]) -> None:
+        self._sizes = list(sizes)
+        self.calls = 0
+
+    def iter_audio_chunks(self, inputs: Any, request_id: str, seed: int) -> Any:
+        import numpy as np
+
+        size = self._sizes[min(self.calls, len(self._sizes) - 1)]
+        self.calls += 1
+        yield type("Chunk", (), {"audio": np.ones(size, dtype=np.float32) * 0.1})()
+
+
+class TestShortAudioRetry:
+    """Breeze backbone 无 min_new_tokens 约束，长文本偶发提前 EOS → 换 seed 重试。"""
+
+    LONG_TEXT = "夜色慢慢沉下来，城市的灯光一盏接一盏亮起。" * 3  # ≥20 个 CJK 字
+
+    def _engine(self, tmp_path: Any, sizes: list[int]) -> Any:
+        """构造带可控 runtime 的 engine（复用本文件的打桩方式）。"""
+        import integrated_app.engines.breeze_tts2.vendor.breeze_infer.runtime as br_runtime
+        import integrated_app.engines.breeze_tts2.vendor.breeze_infer.templates as br_templates
+
+        engine = _make_engine(tmp_path)
+        engine._runtime = _SequenceRuntime(sizes)
+        engine._tokenizer = object()
+        engine._model = object()
+        engine._audio_tokenizer = object()
+        engine._loaded = True
+        br_runtime.set_all_seeds = lambda seed: None
+        br_templates.prepare_inputs = lambda *a, **k: {"input_ids": None}
+        return engine
+
+    def test_retries_on_short_audio_and_keeps_longer(self, tmp_path: Any, monkeypatch: Any):
+        """第 1 次过短 → 换 seed 重试，保留两次中较长的音频。"""
+        engine = self._engine(tmp_path, sizes=[2400, 24000 * 8])  # 0.1s → 8s
+        audio = engine._generate_audio(text=self.LONG_TEXT, seed=-1)
+        assert audio.size == 24000 * 8
+        assert engine._runtime.calls == 2
+
+    def test_all_short_raises_generation_error(self, tmp_path: Any):
+        """连续过短 → 明确报错，不再静默返回废音频。"""
+        from integrated_app.exceptions import GenerationError
+
+        engine = self._engine(tmp_path, sizes=[2400])  # 每次都 0.1s
+        with pytest.raises(GenerationError, match="提前 EOS"):
+            engine._generate_audio(text=self.LONG_TEXT, seed=-1)
+        assert engine._runtime.calls == 3  # 1 + _SHORT_AUDIO_MAX_RETRIES
+
+    def test_short_text_skips_retry(self, tmp_path: Any):
+        """短文本本就该短（含 mock 的 0.1s），不触发重试。"""
+        engine = self._engine(tmp_path, sizes=[2400])
+        audio = engine._generate_audio(text="你好", seed=-1)
+        assert audio.size == 2400
+        assert engine._runtime.calls == 1
+
+    def test_normal_length_no_retry(self, tmp_path: Any):
+        """一次就够长时不重试。"""
+        engine = self._engine(tmp_path, sizes=[24000 * 8])
+        audio = engine._generate_audio(text=self.LONG_TEXT, seed=7)
+        assert audio.size == 24000 * 8
+        assert engine._runtime.calls == 1

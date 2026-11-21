@@ -90,6 +90,18 @@ _MAX_NEW_TOKENS = 1500
 _MAX_SEQ_LEN = 2048
 _REPETITION_PENALTY = 1.1
 
+#: Breeze 的 backbone 生成循环没有 min_new_tokens（vendor 的 _sampling_params 也
+#: 不提取该字段），模型可能在任意步输出 EOS → 中文长文本偶发 0.88~13 秒的
+#: "假成功"（仍返回 ok:true）。以下为本仓 engine 层的自愈参数（不改 vendor）：
+#:   - 时长下限按 ~10 字/秒估算，只拦明显异常的提前 EOS，不干扰正常语速；
+#:   - 只对"长文本"启用（短文本本就该短，且 mock 测试用极短文本）；
+#:   - 检出过短就换 seed 重试，最多 _SHORT_AUDIO_MAX_RETRIES 次。
+_MIN_SECONDS_PER_CJK = 0.10
+_MIN_SECONDS_PER_LATIN_WORD = 0.15
+_SHORT_AUDIO_MIN_CJK = 20  # 低于此字数不做时长自愈
+_SHORT_AUDIO_MIN_LATIN_WORDS = 15  # 或低于此英文词数
+_SHORT_AUDIO_MAX_RETRIES = 2
+
 #: Voice Design / Voice Direction 的官方推荐 CFG；纯文本/纯克隆模板无负分支，必须为 1.0
 _CFG_INSTRUCTION_DEFAULT = 4.0
 _CFG_NO_NEGATIVE = 1.0
@@ -376,43 +388,97 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
                 "CFG 引导仅在 Voice Design / Voice Direction（带 instruction）下有效",
             )
 
-        seed = self._resolve_seed(seed)
         from .vendor.breeze_infer.runtime import set_all_seeds
 
-        with _INFER_LOCK:
-            try:
-                set_all_seeds(seed)
-                inputs = prepare_inputs(
-                    self._tokenizer,
-                    self._audio_tokenizer,
-                    self._model,
-                    [request],
-                    template,
-                    guidance_scale=cfg_scale,
-                    guidance_scale_ref=None,
-                    guidance_scale_ins=None,
-                )
-                chunks = [
-                    np.asarray(chunk.audio, dtype=np.float32)
-                    for chunk in self._runtime.iter_audio_chunks(inputs, request_id=request["id"], seed=seed)
-                ]
-            except (ValidationError, FileNotFoundError):
-                raise
-            except Exception as exc:  # noqa: BLE001
-                err = str(exc).lower()
-                if "out of memory" in err or "cuda oom" in err:
-                    raise GenerationError(
-                        f"Breeze TTS 2 推理触发 CUDA OOM: {exc}（eager 峰值约 7.5GiB，"
-                        "请缩短文本或释放其他显存占用后重试）",
-                    ) from exc
-                raise GenerationError(f"Breeze TTS 2 推理失败: {type(exc).__name__}: {exc}") from exc
+        # 时长下限：仅拦"明显提前 EOS"的假成功，正常语速（4~6 字/秒）远高于此。
+        cjk_count = sum(1 for ch in text if "\u4e00" <= ch <= "\u9fff")
+        latin_words = sum(1 for w in text.split() if any(ch.isalpha() for ch in w))
+        is_long_text = cjk_count >= _SHORT_AUDIO_MIN_CJK or latin_words >= _SHORT_AUDIO_MIN_LATIN_WORDS
+        min_seconds = (
+            max(1.0, cjk_count * _MIN_SECONDS_PER_CJK + latin_words * _MIN_SECONDS_PER_LATIN_WORD)
+            if is_long_text
+            else 0.0  # 短文本：不做时长下限校验，保持原行为（含 mock 测试）
+        )
+        attempts = _SHORT_AUDIO_MAX_RETRIES + 1 if is_long_text else 1
 
-        if not chunks:
-            raise GenerationError("Breeze TTS 2 未产出任何音频块")
-        audio = np.concatenate(chunks)
-        if audio.size == 0:
-            raise GenerationError("Breeze TTS 2 产出空音频（长度为 0）")
-        return audio
+        best_audio: np.ndarray | None = None
+        last_seed = seed
+        with _INFER_LOCK:
+            for attempt in range(attempts):
+                # 首次严格尊重用户 seed（含 -1 的随机取值）；重试时一律取新的
+                # 随机 seed——实测同一 seed 段（2024/2025/2026）可能连续提前 EOS，
+                # 顺延 +1 毫无帮助，换到全新种子才可能命中正常输出。
+                cur_seed = self._resolve_seed(seed) if attempt == 0 else self._resolve_seed(-1)
+                last_seed = cur_seed
+                try:
+                    set_all_seeds(cur_seed)
+                    inputs = prepare_inputs(
+                        self._tokenizer,
+                        self._audio_tokenizer,
+                        self._model,
+                        [request],
+                        template,
+                        guidance_scale=cfg_scale,
+                        guidance_scale_ref=None,
+                        guidance_scale_ins=None,
+                    )
+                    chunks = [
+                        np.asarray(chunk.audio, dtype=np.float32)
+                        for chunk in self._runtime.iter_audio_chunks(inputs, request_id=request["id"], seed=cur_seed)
+                    ]
+                except (ValidationError, FileNotFoundError):
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    err = str(exc).lower()
+                    if "out of memory" in err or "cuda oom" in err:
+                        raise GenerationError(
+                            f"Breeze TTS 2 推理触发 CUDA OOM: {exc}（eager 峰值约 7.5GiB，"
+                            "请缩短文本或释放其他显存占用后重试）",
+                        ) from exc
+                    raise GenerationError(f"Breeze TTS 2 推理失败: {type(exc).__name__}: {exc}") from exc
+
+                if not chunks:
+                    if attempt == attempts - 1:
+                        raise GenerationError("Breeze TTS 2 未产出任何音频块")
+                    continue
+
+                audio = np.concatenate(chunks)
+                if audio.size == 0:
+                    if attempt == attempts - 1:
+                        raise GenerationError("Breeze TTS 2 产出空音频（长度为 0）")
+                    continue
+
+                duration = audio.size / SAMPLE_RATE
+                if best_audio is None or audio.size > best_audio.size:
+                    best_audio = audio
+                if duration >= min_seconds:
+                    if attempt > 0:
+                        logger.info(
+                            "Breeze 前 %s 次生成因提前 EOS 过短，换 seed=%s 后重试成功（%.2fs，下限 %.2fs）",
+                            attempt,
+                            cur_seed,
+                            audio.size / SAMPLE_RATE,
+                            min_seconds,
+                        )
+                    break
+                logger.warning(
+                    "Breeze 第 %s/%s 次生成疑似提前 EOS：时长 %.2fs < 下限 %.2fs（seed=%s），换 seed 重试",
+                    attempt + 1,
+                    attempts,
+                    duration,
+                    min_seconds,
+                    cur_seed,
+                )
+
+        assert best_audio is not None  # 循环必然赋值或抛错
+        final_seconds = best_audio.size / SAMPLE_RATE
+        if final_seconds < min_seconds:
+            raise GenerationError(
+                f"Breeze TTS 2 连续 {attempts} 次生成均疑似提前 EOS（最长仅 {final_seconds:.2f}s，"
+                f"文本约需 ≥{min_seconds:.1f}s，最后 seed={last_seed}）。"
+                "这是上游 backbone 无 min_new_tokens 约束导致的已知不稳定；请重试或换用其它引擎。",
+            )
+        return best_audio
 
     # ------------------------------------------------------------------
     # TTSEngine 协议实现
