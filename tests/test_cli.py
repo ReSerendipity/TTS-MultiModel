@@ -544,7 +544,10 @@ class TestBuildParser:
         assert args.cfg_value == 2.0
         assert args.inference_timesteps == 10
         assert args.normalize is False
-        assert args.hf_model_id == "openbmb/VoxCPM2"
+        # --hf-model-id 默认必须是 None（不能是 DEFAULT_HF_MODEL_ID）：
+        # load_model 靠 None 判断「用户未指定来源」，从而优先使用 config 里的
+        # 本地权重（离线优先）。见 get_default_local_model_path。
+        assert args.hf_model_id is None
 
     def test_lora_defaults(self):
         from integrated_app.cli import _build_parser

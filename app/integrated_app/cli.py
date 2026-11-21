@@ -365,17 +365,48 @@ def validate_batch_args(args, parser):
 # -----------------------------
 
 
-def load_model(args):
-    """加载 VoxCPM 模型，支持本地路径和 HuggingFace Hub 两种方式。
+def get_default_local_model_path() -> str | None:
+    """返回 config.yaml 配置的本地 VoxCPM2 权重目录；不可用时返回 None。
 
-    加载流程：
-        1. 解析 ZipEnhancer 路径（参数优先，其次环境变量 ZIPENHANCER_MODEL_PATH）
-        2. 若提供 LoRA 权重路径，构建 LoRAConfig
-        3. 若指定 --model-path，从本地目录加载
-        4. 否则从 HuggingFace Hub 下载/加载（--local-files-only 控制是否允许联网）
+    为什么需要它：本项目是离线优先形态（`start_portable.py` 强制 OFFLINE，
+    桌面包只带 `model/` 目录，不会有 HuggingFace 缓存）。但 legacy CLI 此前在
+    未传 `--model-path` 时无条件走 `from_pretrained`，于是：
+        - 离线环境必然失败；
+        - 缓存不完整时抛 `Expecting value: line 1 column 1`（空 config.json）。
+    service_layer / HTTP 路径一直读 config 的本地权重，只有 legacy CLI 不一致。
+
+    Returns:
+        绝对路径字符串（目录存在时），否则 ``None``。
+    """
+    try:
+        from integrated_app.config import get_voxcpm2_model_path
+
+        path = get_voxcpm2_model_path()
+    except Exception:  # noqa: BLE001 - 配置异常不应阻断模型加载，交由下游回退
+        return None
+    return path if os.path.isdir(path) else None
+
+
+def load_model(args):
+    """加载 VoxCPM 模型，按优先级解析模型来源。
+
+    模型来源回退链（自上而下，命中即返回）：
+        1. ``--model-path``：用户显式指定的本地目录
+        2. ``--hf-model-id``：用户显式指定的 Hub 仓库（尊重联网意图）
+        3. ``config.yaml`` 的 ``voxcpm2.model_path``：离线优先，存在即用
+        4. ``openbmb/VoxCPM2``：最后才走 Hub 默认仓库（历史行为）
+
+    为什么第 3 步在 Hub 之前：本项目交付形态是离线的（桌面包只带 `model/`，
+    没有 HF 缓存），而之前未传 `--model-path` 时无条件走 Hub，导致离线环境下
+    ``batch`` 等 legacy 命令必然失败（HF 缓存残缺时表现为
+    ``Expecting value: line 1 column 1``）。service_layer 与 HTTP 路径本就优先
+    本地权重，此处补齐一致性。
+
+    ZipEnhancer 路径：参数优先，其次环境变量 ``ZIPENHANCER_MODEL_PATH``。
+    若提供 ``--lora-path``，先构建 LoRAConfig 再加载权重。
 
     Args:
-        args: argparse 解析后的命名空间对象，需包含模型路径、LoRA 参数等属性。
+        args: argparse 解析后的命名空间对象，需包含 model_path / hf_model_id 等属性。
 
     Returns:
         VoxCPM: 加载完成的 VoxCPM 模型实例。
@@ -409,40 +440,58 @@ def load_model(args):
             f"lm={lora_config.enable_lm}, dit={lora_config.enable_dit}, proj={lora_config.enable_proj}"
         )
 
-    # 从本地路径加载模型
-    if args.model_path:
+    def _load_from_local(local_path: str, source_label: str):
+        """从本地目录加载模型；失败时记录日志并退出。"""
         try:
             model = VoxCPM(
-                voxcpm_model_path=args.model_path,
+                voxcpm_model_path=local_path,
                 zipenhancer_model_path=zipenhancer_path,
                 enable_denoiser=not args.no_denoiser,
                 optimize=not args.no_optimize,
                 lora_config=lora_config,
                 lora_weights_path=lora_weights_path,
             )
-            logger.info("模型已加载 (本地)。")
+            logger.info(f"模型已加载 ({source_label}): {local_path}")
             return model
         except Exception as e:
-            logger.error(f"模型加载失败 (本地): {e}")
+            logger.error(f"模型加载失败 ({source_label}): {e}")
             sys.exit(1)
 
-    # 从 Hugging Face Hub 加载模型
-    try:
-        model = VoxCPM.from_pretrained(
-            hf_model_id=args.hf_model_id,
-            load_denoiser=not args.no_denoiser,
-            zipenhancer_model_id=zipenhancer_path,
-            cache_dir=args.cache_dir,
-            local_files_only=args.local_files_only,
-            optimize=not args.no_optimize,
-            lora_config=lora_config,
-            lora_weights_path=lora_weights_path,
-        )
-        logger.info("模型已加载 (from_pretrained)。")
-        return model
-    except Exception as e:
-        logger.error(f"模型加载失败 (from_pretrained): {e}")
-        sys.exit(1)
+    def _load_from_hub(repo_id: str):
+        """从 Hugging Face Hub 加载模型；失败时记录日志并退出。"""
+        try:
+            model = VoxCPM.from_pretrained(
+                hf_model_id=repo_id,
+                load_denoiser=not args.no_denoiser,
+                zipenhancer_model_id=zipenhancer_path,
+                cache_dir=args.cache_dir,
+                local_files_only=args.local_files_only,
+                optimize=not args.no_optimize,
+                lora_config=lora_config,
+                lora_weights_path=lora_weights_path,
+            )
+            logger.info(f"模型已加载 (from_pretrained: {repo_id})。")
+            return model
+        except Exception as e:
+            logger.error(f"模型加载失败 (from_pretrained: {repo_id}): {e}")
+            sys.exit(1)
+
+    # ① 用户显式指定本地目录
+    if args.model_path:
+        return _load_from_local(args.model_path, "本地")
+
+    # ② 用户显式指定 Hub 仓库 → 尊重联网意图（不再回退本地）
+    if getattr(args, "hf_model_id", None):
+        return _load_from_hub(args.hf_model_id)
+
+    # ③ 未指定来源 → 离线优先，使用 config 里的本地权重
+    local_default = get_default_local_model_path()
+    if local_default:
+        logger.info(f"未指定模型来源，使用 config 本地权重: {local_default}")
+        return _load_from_local(local_default, "本地默认")
+
+    # ④ 本地也没有 → 回落 Hub 默认仓库（历史行为）
+    return _load_from_hub(DEFAULT_HF_MODEL_ID)
 
 
 # -----------------------------
@@ -917,7 +966,7 @@ def _add_model_args(parser):
 
     添加的参数：
         --model-path: 本地模型路径
-        --hf-model-id: HuggingFace 仓库 ID（默认 openbmb/VoxCPM2）
+        --hf-model-id: HuggingFace 仓库 ID（默认不指定 → 见 `load_model` 的回退链）
         --cache-dir: Hub 下载缓存目录
         --local-files-only: 仅使用本地文件（禁用网络）
         --no-denoiser: 不加载去噪模型
@@ -928,11 +977,17 @@ def _add_model_args(parser):
         parser: argparse.ArgumentParser 或子解析器实例。
     """
     parser.add_argument("--model-path", type=str, help="Local model path for the selected engine")
+    # default 必须为 None 而非 DEFAULT_HF_MODEL_ID：`load_model` 需要区分「用户显式
+    # 指定了 HF 仓库」与「未指定」。前者应尊重用户选择走 Hub，后者应优先离线使用
+    # config 里的本地权重（详见 load_model 的三级回退说明）。
     parser.add_argument(
         "--hf-model-id",
         type=str,
-        default=DEFAULT_HF_MODEL_ID,
-        help=f"Hugging Face repo id (default: {DEFAULT_HF_MODEL_ID})",
+        default=None,
+        help=(
+            "Hugging Face repo id. Default: use the local weights from config.yaml "
+            f"(voxcpm2.model_path) when present, otherwise {DEFAULT_HF_MODEL_ID}"
+        ),
     )
     parser.add_argument("--cache-dir", type=str, help="Cache directory for Hub downloads")
     parser.add_argument("--local-files-only", action="store_true", help="Disable network access")

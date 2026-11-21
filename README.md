@@ -189,6 +189,19 @@ tts-multimodel generate design --text "你好" --control "calm male voice" --jso
 - **模型自动补载**：服务端引擎未加载时，CLI 自动调用一次 `/api/model/load` 并重试一次，仍失败报 `NOT_READY`(3)。
 - 走 HTTP 的范围：`generate` 全部生成类子命令与 `batch`；`persona`/`history`/`model` 等毫秒级操作始终直调。`generate script --persona-map`（角色→任意路径映射）HTTP 端点无法表达，自动回落直调。
 
+#### 模型来源回退链（离线优先）
+
+未显式指定模型来源时，CLI 按以下优先级解析（`load_model`）：
+
+| 优先级 | 来源 | 触发条件 |
+|---|---|---|
+| 1 | `--model-path <dir>` | 用户显式指定本地目录 |
+| 2 | `--hf-model-id <repo>` | 用户显式指定 Hub 仓库（尊重联网意图，不再回退本地） |
+| 3 | `config.yaml` 的 `voxcpm2.model_path` | **默认**：本地权重存在即用（离线可用） |
+| 4 | `openbmb/VoxCPM2` | 本地也不存在时回落 Hub 默认仓库 |
+
+> 第 3 步是离线优先的保证。项目交付形态不带 HuggingFace 缓存（桌面包只带 `model/`），此前实现会无条件走 Hub，导致离线环境下 `batch` 等 legacy 命令失败；若 HF 缓存残缺（`config.json` 为空），报错表现为 `Expecting value: line 1 column 1 (char 0)`。`generate`（service 层）与 HTTP 路径一直读本地权重，此处补齐一致性。
+
 > CLI 全功能扩展的架构与分阶段路线图见 [`docs/adr/0005-cli-full-feature-expansion.md`](docs/adr/0005-cli-full-feature-expansion.md)。
 
 **桌面安装包用户**：安装器会把 `tts-multimodel` 命令注册到当前用户 PATH（开始菜单也有「TTSMultiModel CLI」快捷方式），因此桌面版同样能直接用上面的命令，无需 `pip install`。前提是在桌面应用「下载管理」页装好运行环境（torch 家族）与至少一套模型；命令默认使用随包目录下的 VoxCPM2 权重，也可显式传 `--model-path` / `--hf-model-id` 覆盖。卸载时安装器会从 PATH 精确移除该条目。若安装前已打开终端/AI Agent，需重开一个会话才能看到新命令。
