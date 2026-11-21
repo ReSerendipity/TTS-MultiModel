@@ -1,5 +1,5 @@
 {
-  "version": "2.11.2",
+  "version": "2.12.0",
   "release_date": "2026-11-18",
   "minimum_shell_version": "2.2.2",
   "changelog": "2.11.2：容器镜像构建修复——两阶段 ensurepip 后升级 setuptools>=78.1.1，消除基础镜像的 Trivy HIGH 发现；桌面、安装器与部署清单版本位随版同步。"
