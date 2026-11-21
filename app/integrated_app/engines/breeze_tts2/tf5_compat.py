@@ -72,7 +72,23 @@ logger = logging.getLogger("tts_multimodel")
 
 
 def apply() -> None:
-    """安装上述七处兼容补丁；幂等，无缺失符号时自动 no-op。"""
+    """安装上述七处兼容补丁；幂等，无缺失符号时自动 no-op。
+
+    **仅作用于 transformers 5.x**：Breeze 上游要求 4.57.3，该版本原生代码正常，
+    任何补丁都可能改变权重绑定/采样语义（实测 4.x 下强装 5.x 的
+    ``_install_no_init_weights`` 会直接 ``ModuleNotFoundError``）。
+    在 4.x 下整体 no-op，保证官方 4.57.3 路径与上游零偏差。
+    """
+    import transformers
+
+    major = int(transformers.__version__.split(".", 1)[0])
+    if major < 5:
+        logger.debug(
+            "[breeze_tf5_compat] transformers %s 无需 5.x 兼容补丁，跳过",
+            transformers.__version__,
+        )
+        return
+
     _install_check_model_inputs()
     _install_no_init_weights()
     _install_default_rope_fn()

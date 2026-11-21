@@ -443,6 +443,30 @@ def run_breeze(args: Any, parser: Any, mode: str) -> Result:
         if mismatch is not None:
             return mismatch
 
+    # transformers 5.x 下的 Breeze 兼容层产物已人工试听确认是噪音；
+    # 委托给隔离的 4.57.3 venv 执行（4.x 环境原生正常，无需委托）。
+    from integrated_app.breeze_runtime import run_isolated_breeze, should_delegate
+
+    if should_delegate():
+        data = run_isolated_breeze(args, mode)
+        if data is None:
+            return Result.failure("Breeze 隔离环境调用异常", "INTERNAL_ERROR", command=f"breeze-{mode}")
+        if "error" in data:
+            return Result.failure(data["error"], data.get("error_code", "BUSINESS_ERROR"), command=f"breeze-{mode}")
+        # 子进程 data 已含 audio_path / duration / engine / params；
+        # engine 必须放在 data 内（Result 顶层无该字段）。
+        data.setdefault("engine", "breeze-tts2")
+        result = Result.success(data=data, command=f"breeze-{mode}")
+        # 委托路径直接返回，绕过了 main() 的 -o 复制；在此补上，
+        # 否则用户指定的 --output 不生效（音频只落在 service 默认路径）。
+        if getattr(args, "output", None):
+            from integrated_app.cli_service import _copy_to_requested_output
+
+            # 用绝对路径，避免父进程 cwd 与子进程不一致导致路径漂移
+            out_path = os.path.abspath(os.path.expanduser(str(args.output)))
+            result = _copy_to_requested_output(result, out_path)
+        return result
+
     try:
         engine, err = _load_breeze()
     except Exception as exc:  # noqa: BLE001 - 依赖/权重缺失统一转未就绪

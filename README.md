@@ -157,6 +157,18 @@ tts-multimodel postprocess        --audio a.wav --tempo 1.1 --enhance
 
 > 依赖缺失的引擎（如 Breeze / Voicebox / Step-Audio）会返回 `NOT_READY`（退出码 3）并给出明确指引，不会静默失败。
 
+#### Breeze TTS 2 的依赖隔离（重要）
+
+Breeze 上游要求 **transformers 4.57.3 + qwen-tts 0.1.1**，而本项目全局锁 `transformers>=5.20.2`（其它引擎与安全公告所需）。实测在 5.x 兼容层下 Breeze 产物是**噪音**（人工试听确认）；4.57.3 下正常。因此 CLI 在检测到 transformers 5.x 时会**自动把 Breeze 生成委托给隔离 venv**：
+
+```bash
+python scripts/setup_breeze_venv.py        # 一键创建（默认 D:/breeze-venv，或项目根 .venv-breeze）
+# 也可用 TTS_BREEZE_VENV 环境变量指定已有 venv
+tts-multimodel generate breeze-design --text "..." --control "一位低沉成熟的男声" --json
+```
+
+未创建隔离环境时，Breeze 命令返回 `NOT_READY` 并给出上述指引，不会退回 5.x 噪音路径。环境路径优先级：`TTS_BREEZE_VENV` > `D:/breeze-venv` > 项目根 `.venv-breeze`。
+
 完整命令族（`--help` 查看每个子命令）：
 
 ```bash
