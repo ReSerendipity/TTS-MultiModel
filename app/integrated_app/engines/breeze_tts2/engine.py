@@ -202,6 +202,7 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
         logger.info("[BreezeTTS2] 开始加载模型（bf16 eager，device=%s）...", device)
         start = time.time()
         try:
+            from .tf5_compat import fix_non_persistent_buffers
             from .vendor.breeze_infer.runtime import (
                 load_runtime,
                 update_generation_config_for_breeze,
@@ -214,6 +215,9 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
             tokenizer, model, audio_tokenizer = load_runtime(
                 Path(self.model_dir), device=device, attn_implementation="eager"
             )
+            # transformers 5.x：非持久 buffer 加载后被 empty_like 物化成垃圾值，
+            # 须按 vendor 构造逻辑重算（见 tf5_compat.fix_non_persistent_buffers）
+            fix_non_persistent_buffers(model, audio_tokenizer)
             update_generation_config_for_breeze(model)
             # Windows/12GB 级显卡约束：全部 fast 阶段关闭（CUDA Graph 不可用），
             # 见模块 docstring「运行模式约束」。
