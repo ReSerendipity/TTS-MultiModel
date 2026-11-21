@@ -17,7 +17,9 @@ import pytest
 from integrated_app.cli_output import EXIT_NOT_READY, EXIT_USAGE_ERROR
 from integrated_app.cli_service_ext import (
     _audio_tuple_to_result,
+    _check_breeze_instruction_language,
     _default_output,
+    _has_cjk,
     _resolve_audio_path,
     run_convert,
     run_edit,
@@ -154,3 +156,53 @@ class TestParamValidation:
         from integrated_app.cli_output import Result
 
         assert Result.failure("x", "NOT_READY").exit_code() == EXIT_NOT_READY
+
+
+class TestBreezeInstructionLanguage:
+    """Breeze 要求 --control 语言与 --text 一致（模型卡约束）。
+
+    语言不匹配会静默产出 1.6 秒废音频却返回 ok:true，属必须拦截的静默失败。
+    """
+
+    def test_has_cjk(self):
+        assert _has_cjk("夜色慢慢沉下来") is True
+        assert _has_cjk("The night falls") is False
+        assert _has_cjk("hello 世界") is True
+        assert _has_cjk("") is False
+
+    def test_zh_text_en_instruction_rejected(self):
+        result = _check_breeze_instruction_language(
+            "夜色慢慢沉下来，城市的灯光亮起。", "deep calm mature male voice", "breeze-design"
+        )
+        assert result is not None
+        assert result.ok is False
+        assert result.error_code == "USAGE_ERROR"
+        assert "中文" in result.error and "英文" in result.error
+        assert "低沉成熟的男声" in result.error  # 给出中文示例
+
+    def test_en_text_zh_instruction_rejected(self):
+        result = _check_breeze_instruction_language("The night slowly falls", "一位低沉成熟的男声", "breeze-design")
+        assert result is not None and result.ok is False
+        assert result.error_code == "USAGE_ERROR"
+        assert "clear voice" in result.error  # 给出英文示例
+
+    def test_zh_text_zh_instruction_ok(self):
+        assert (
+            _check_breeze_instruction_language("夜色慢慢沉下来", "一位低沉成熟的男声，平稳温暖", "breeze-design")
+            is None
+        )
+
+    def test_en_text_en_instruction_ok(self):
+        assert (
+            _check_breeze_instruction_language(
+                "The night slowly falls", "a warm, thoughtful young woman", "breeze-design"
+            )
+            is None
+        )
+
+    def test_no_instruction_skips_check(self):
+        """无 --control 时退化为默认音色朗读，不校验。"""
+        assert _check_breeze_instruction_language("夜色慢慢沉下来", "", "breeze-design") is None
+
+    def test_empty_text_skips_check(self):
+        assert _check_breeze_instruction_language("", "a warm voice", "breeze-design") is None

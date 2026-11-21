@@ -397,20 +397,58 @@ def _load_breeze() -> tuple[Any, Result | None]:
     return engine, None
 
 
+def _has_cjk(text: str) -> bool:
+    """文本是否含 CJK 表意文字（用于 Breeze 的指令-文本语言一致性校验）。"""
+    return any("\u4e00" <= ch <= "\u9fff" for ch in text)
+
+
+def _check_breeze_instruction_language(text: str, instruction: str, command: str) -> Result | None:
+    """Breeze 要求 instruction 语言与目标 text 一致，否则会静默产出极短废音频。
+
+    模型卡原文：「Match the instruction language to the target text」。实测中文
+    text + 英文 instruction 只出 1.6 秒音频，却仍返回 ok:true——属静默失败。
+    此处提前拦截并给出明确错误。clone 模式无 instruction，不校验。
+
+    Returns:
+        不匹配时返回 Result.failure（USAGE_ERROR），匹配/无指令时返回 None。
+    """
+    if not instruction.strip() or not text.strip():
+        return None
+    if _has_cjk(text) != _has_cjk(instruction):
+        text_lang = "中文" if _has_cjk(text) else "英文"
+        ins_lang = "中文" if _has_cjk(instruction) else "英文"
+        return Result.failure(
+            f"Breeze 要求 --control 的语言与 --text 一致：当前 --text 是{text_lang}，"
+            f"--control 是{ins_lang}。语言不一致会静默产出极短音频。"
+            f"请把 --control 改成{text_lang}描述（例："
+            f"{'一位低沉成熟的男声，平稳温暖' if _has_cjk(text) else 'a warm, thoughtful young woman with a clear voice'}）。",
+            "USAGE_ERROR",
+            command=command,
+        )
+    return None
+
+
 def run_breeze(args: Any, parser: Any, mode: str) -> Result:
     """Breeze TTS 2：design / clone / direction 三模式。"""
     _setup_offline_env()
+
+    text = args.text
+    instruction = getattr(args, "control", "") or ""
+    seed = getattr(args, "seed", -1)
+    cfg_scale = getattr(args, "cfg_scale", 4.0)
+
+    # 语言一致性是纯参数校验，放在引擎加载之前（避免白等数十秒加载再失败）
+    if mode in ("design", "direction"):
+        mismatch = _check_breeze_instruction_language(text, instruction, f"breeze-{mode}")
+        if mismatch is not None:
+            return mismatch
+
     try:
         engine, err = _load_breeze()
     except Exception as exc:  # noqa: BLE001 - 依赖/权重缺失统一转未就绪
         return Result.failure(f"Breeze 引擎加载失败: {exc}", "NOT_READY", command=f"breeze-{mode}")
     if err is not None:
         return err
-
-    text = args.text
-    instruction = getattr(args, "control", "") or ""
-    seed = getattr(args, "seed", -1)
-    cfg_scale = getattr(args, "cfg_scale", 4.0)
 
     if mode == "design":
         params = {"instruction": instruction, "cfg_scale": cfg_scale, "seed": seed}
