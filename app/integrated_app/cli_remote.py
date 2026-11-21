@@ -553,6 +553,10 @@ def supports_remote(args: Any, sub: str) -> bool:
         engine = getattr(args, "engine", None)
         if engine is not None and str(engine) != "voxcpm2":
             return False
+    # HTTP 的 /api/generate/indextts2 端点固定加载 2.5；
+    # emotion 显式指定 2.0 时语义无法表达，回落直调。
+    if sub == "emotion" and str(getattr(args, "engine", "") or "") == "indextts20":
+        return False
     return not (sub == "script" and getattr(args, "persona_map", None))
 
 

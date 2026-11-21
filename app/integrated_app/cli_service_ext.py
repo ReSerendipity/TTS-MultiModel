@@ -304,9 +304,15 @@ def run_script(args: Any, parser: Any) -> Result:
 
 
 def run_emotion(args: Any, parser: Any) -> Result:
-    """IndexTTS2 情感合成：参考音色 + 情感文本/音频/8 维向量。"""
+    """IndexTTS 情感合成：参考音色 + 情感文本/音频/8 维向量。
+
+    引擎由 ``--engine`` 决定：``indextts2``（2.5，默认）或 ``indextts20``（2.0）。
+    两者共用同一推理代码包与引擎槽位，仅权重目录不同。
+    """
     _setup_offline_env()
-    ready = _ensure_engine_ready("indextts2")
+    engine_name = getattr(args, "engine", None) or "indextts2"
+    label = "IndexTTS 2.0" if engine_name == "indextts20" else "IndexTTS 2.5"
+    ready = _ensure_engine_ready(engine_name)
     if ready is not None:
         ready.command = "emotion"
         return ready
@@ -315,7 +321,7 @@ def run_emotion(args: Any, parser: Any) -> Result:
 
     engine = registry.get_current_engine()
     if engine is None:
-        return Result.failure("IndexTTS2 引擎实例不可用", "NOT_READY", command="emotion")
+        return Result.failure(f"{label} 引擎实例不可用", "NOT_READY", command="emotion")
 
     ref = getattr(args, "reference_audio", None)
     if not ref or not os.path.isfile(ref):
@@ -351,9 +357,9 @@ def run_emotion(args: Any, parser: Any) -> Result:
         "duration_factor": getattr(args, "duration_factor", 1.0),
         "lang": getattr(args, "lang", None),
     }
-    log("执行 IndexTTS2 情感合成 ...")
+    log(f"执行 {label} 情感合成 ...")
     # 默认落到 outputs/（引擎在 output_path=None 时会写系统临时目录）
-    target = getattr(args, "output", None) or _default_output("indextts2_emotion")
+    target = getattr(args, "output", None) or _default_output(f"{engine_name}_emotion")
     sample_rate, audio, path = engine.synthesize(
         text=args.text,
         spk_audio_prompt=ref,
@@ -368,9 +374,9 @@ def run_emotion(args: Any, parser: Any) -> Result:
         seed=getattr(args, "seed", None),
     )
     return _audio_tuple_to_result(
-        ((sample_rate, audio, path), "IndexTTS2 情感合成完成"),
+        ((sample_rate, audio, path), f"{label} 情感合成完成"),
         command="emotion",
-        engine="indextts2",
+        engine=engine_name,
         params=params,
     )
 

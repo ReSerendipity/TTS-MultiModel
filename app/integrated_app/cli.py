@@ -1166,7 +1166,7 @@ Examples:
     )
 
     # --- IndexTTS2 情感合成 ---
-    gen_emotion = gen_sub.add_parser("emotion", help="IndexTTS2 emotion synthesis (text/audio/8-dim vector)")
+    gen_emotion = gen_sub.add_parser("emotion", help="IndexTTS emotion synthesis (text/audio/8-dim vector)")
     gen_emotion.add_argument("--text", "-t", required=True, help="Text to synthesize")
     gen_emotion.add_argument("--reference-audio", "-ra", required=True, help="Speaker reference audio")
     gen_emotion.add_argument("--emotion-text", help="Natural-language emotion description")
@@ -1174,6 +1174,13 @@ Examples:
     gen_emotion.add_argument("--emotion-vector", help="8 comma-separated floats (happy,angry,sad,...)")
     gen_emotion.add_argument("--emotion-alpha", type=float, default=0.8, help="Emotion strength 0-1 (default 0.8)")
     gen_emotion.add_argument("--duration-factor", type=float, default=1.0, help="Duration scale (default 1.0)")
+    # IndexTTS 2.0 与 2.5 共用同一推理代码包，仅权重目录不同（见 ServiceLayer.load_model）
+    gen_emotion.add_argument(
+        "--engine",
+        choices=["indextts2", "indextts20"],
+        default="indextts2",
+        help="IndexTTS version: indextts2 = 2.5 (default), indextts20 = 2.0",
+    )
     gen_emotion.add_argument("--lang", help="Language code")
     _add_seed_arg(gen_emotion)
     gen_emotion.add_argument("--output", "-o", help="Optional output path")

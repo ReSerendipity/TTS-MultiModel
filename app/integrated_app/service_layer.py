@@ -800,7 +800,9 @@ class ModelService:
         """加载指定引擎的模型。
 
         Args:
-            engine: 引擎名称（"voxcpm2" 或 "indextts2"）。
+            engine: 引擎名称（``voxcpm2`` / ``indextts2`` / ``indextts20``）。
+                ``indextts20`` 与 ``indextts2`` 共用同一推理代码包与引擎槽位，
+                仅权重目录（IndexTTS-2.0 vs IndexTTS-2.5）与注册名不同。
 
         Returns:
             LoadResult 包含加载结果信息。
@@ -809,7 +811,7 @@ class ModelService:
 
         start_time = time.time()
         try:
-            from .model_manager import load_indextts2, load_voxcpm2
+            from .model_manager import load_indextts2, load_indextts20, load_voxcpm2
 
             if engine == "voxcpm2":
                 # 消费 generator 获取最终状态
@@ -837,27 +839,35 @@ class ModelService:
                         load_time=load_time,
                     )
 
-            elif engine == "indextts2":
+            elif engine in ("indextts2", "indextts20"):
+                # 2.0 与 2.5 共用同一推理代码包与引擎槽位（互斥），
+                # 仅权重目录（IndexTTS-2.0 / IndexTTS-2.5）与注册名不同。
+                is_v20 = engine == "indextts20"
+                label = "IndexTTS 2.0" if is_v20 else "IndexTTS 2.5"
+                loader = load_indextts20 if is_v20 else load_indextts2
+
                 final_status = ""
-                for status_tuple in load_indextts2():
+                for status_tuple in loader():
                     final_status = status_tuple[0]
                 load_time = time.time() - start_time
 
                 from .model_registry import registry
 
+                # is_indextts2_ready 的判据是 `_current_engine in INDEXTTS_VARIANTS`，
+                # 两个变体都覆盖，故此处无需按版本分支。
                 if registry.is_indextts2_ready():
-                    logger.info(f"[ModelService] IndexTTS2 加载成功，耗时 {load_time:.1f}s")
+                    logger.info(f"[ModelService] {label} 加载成功，耗时 {load_time:.1f}s")
                     return LoadResult(
                         success=True,
-                        message="IndexTTS 2.5 加载成功",
-                        engine="indextts2",
+                        message=f"{label} 加载成功",
+                        engine=engine,
                         load_time=load_time,
                     )
                 else:
                     return LoadResult(
                         success=False,
-                        message=final_status or "IndexTTS 2.5 加载失败",
-                        engine="indextts2",
+                        message=final_status or f"{label} 加载失败",
+                        engine=engine,
                         load_time=load_time,
                     )
 
