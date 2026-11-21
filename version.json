@@ -1,5 +1,5 @@
 {
-  "version": "2.12.0",
+  "version": "2.13.0",
   "release_date": "2026-11-21",
   "minimum_shell_version": "2.2.2",
   "changelog": "2.12.0：备份集整集化——从只有 history.db 变为密钥/版本库/审计日志整集并如实记账缺项；新增 GPU 真实合成 10 条黄金基线脚本与锁集交叉约束检查；桌面 zip 升级至 9.3.0 消除 Trivy CRITICAL（CVE-2026-115905）；品牌图标视觉更新。"
