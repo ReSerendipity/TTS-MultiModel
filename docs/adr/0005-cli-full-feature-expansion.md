@@ -306,3 +306,55 @@ tts-multimodel batch --input texts.txt --output-dir ./outs --resume
    不影响引擎自身配置，也不污染 `--json` 的 stdout。
 4. **`sync_from_filesystem` 返回的是最新 mtime 而非条目数**：字段名从 `synced`
    改为 `latest_mtime`，避免误导 agent。
+
+## P3 实施记录（2026-11-21 已完成）
+
+### 交付物
+
+| 文件 | 类型 | 内容 |
+|---|---|---|
+| `app/integrated_app/cli_service_ops.py` | 新增 | 运维域适配：model（status/load/unload/switch）、engines（list/info）、download（catalog/status/start/uninstall）、lora（list/load/unload/toggle/state）、train（start/stop/log） |
+| `app/integrated_app/cli.py` | 修改 | 注册 5 个命令组；新增 `_dispatch_result` 统一异常收口 |
+| `tests/test_cli_service_ops.py` | 新增 | 15 例 |
+
+### 新增命令
+
+```bash
+tts-multimodel model status | load --engine E | unload | switch --engine E
+tts-multimodel engines list | info --engine-id ID
+tts-multimodel download catalog | status | start --kind runtime|model [--target K] | uninstall --kind ... 
+tts-multimodel lora list | load --path P | unload | toggle --enable|--disable | state
+tts-multimodel train start --train-manifest M [--save-path DIR] [...] | stop | log [--tail N]
+```
+
+### 实测结果
+
+| 动作 | 结果 | 证据 |
+|---|---|---|
+| engines list / info | ✅ | 7 个引擎及 capabilities |
+| model status | ✅ | 未加载态正确 |
+| model load voxcpm2 | ✅ | 36.27s 加载成功 |
+| download catalog / status | ✅ | 环境包 + 模型清单与 present 状态 |
+| lora list | ✅ | 空库返回 count=0 |
+| lora state（未加载） | ✅ | `NOT_READY`(3)，不再抛栈 |
+| train log（无日志） | ✅ | 明确报「日志目录不存在」 |
+
+### 重要使用约束：CLI 进程隔离
+
+每个 CLI 调用是**独立进程**，因此：
+
+- `model load` 加载的显存会在进程退出时释放，**对后续独立的 CLI 命令无效**；
+- 生产用法是让 `generate` 系列命令自行加载（它们内部已处理），
+- 需要跨命令保持模型状态时使用 P4 的 `serve`（同一服务进程内 model 命令才有持续意义）。
+
+这一点必须写进用户文档，否则 agent 会误以为 `model load` 能"预热"后续调用。
+
+### P3 期间修复的缺陷
+
+1. **`abspath("")` 陷阱**：`os.path.abspath(getattr(args, "save_path", "") or "")` 在未传参时得到
+   **当前工作目录**（不是空串），导致 `train log` 误读 `<cwd>/logs/app.log`（5.7 万行应用日志）。
+   改为先判 None/空再取默认（`_resolve_save_path`）。
+2. **引擎未加载时抛栈**：`fn_voxcpm_get_lora_state()` 等直接抛 `EngineSwitchError`，CLI 打印
+   Python traceback 而非结构化错误。新增 `_dispatch_result` 统一收口：`EngineSwitchError` /
+   `EngineNotLoadedError` → `NOT_READY`(3)，其他 `TTSError` → `BUSINESS_ERROR`(1)，
+   未预期异常也转 Result（不再崩栈）。

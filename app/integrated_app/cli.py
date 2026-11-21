@@ -987,6 +987,29 @@ def _add_lora_args(parser):
     )
 
 
+def _dispatch_result(fn, args, *, command: str = ""):
+    """调用 handler 并把已知异常统一转成 Result（CLI 不向用户抛堆栈）。
+
+    - ``EngineSwitchError`` / ``EngineNotLoadedError`` → ``NOT_READY``（退出码 3）
+    - 其他 ``TTSError`` → ``BUSINESS_ERROR``（退出码 1）
+    - 未预期异常 → ``BUSINESS_ERROR``，消息带异常类型便于排查
+    """
+    from integrated_app.cli_output import Result
+
+    try:
+        return fn(args)
+    except Exception as exc:  # noqa: BLE001 - 统一收口，避免 CLI 崩栈
+        try:
+            from integrated_app.exceptions import EngineNotLoadedError, EngineSwitchError, TTSError
+        except Exception:  # pragma: no cover - 异常模块不可用属极端情况
+            return Result.failure(f"内部错误: {type(exc).__name__}: {exc}", "BUSINESS_ERROR", command=command)
+        if isinstance(exc, (EngineSwitchError, EngineNotLoadedError)):
+            return Result.failure(str(exc), "NOT_READY", command=command)
+        if isinstance(exc, TTSError):
+            return Result.failure(str(exc), "BUSINESS_ERROR", command=command)
+        return Result.failure(f"内部错误: {type(exc).__name__}: {exc}", "BUSINESS_ERROR", command=command)
+
+
 def _build_parser():
     """构建并返回完整的 argparse 参数解析器。
 
@@ -1201,6 +1224,75 @@ Examples:
     h_sync.add_argument("--output-dir", help="Directory to scan (default: outputs/)")
     h_sync.add_argument("--since", type=float, default=0.0, help="Only files newer than this mtime")
 
+    # ---- 模型管理（ADR-0005 P3）----
+    model_parser = subparsers.add_parser("model", help="Model lifecycle: status / load / unload / switch")
+    model_sub = model_parser.add_subparsers(dest="model_command")
+    model_sub.add_parser("status", help="Show current engine / ready / VRAM")
+    m_load = model_sub.add_parser("load", help="Load an engine into GPU")
+    m_load.add_argument("--engine", default="voxcpm2", choices=["voxcpm2", "indextts2", "indextts20"])
+    model_sub.add_parser("unload", help="Unload the current model and free VRAM")
+    m_switch = model_sub.add_parser("switch", help="Switch the active engine")
+    m_switch.add_argument("--engine", default="voxcpm2", choices=["voxcpm2", "indextts2", "indextts20"])
+
+    # ---- 引擎发现 ----
+    engines_parser = subparsers.add_parser("engines", help="Discover registered engines and capabilities")
+    engines_sub = engines_parser.add_subparsers(dest="engines_command")
+    engines_sub.add_parser("list", help="List all registered engines")
+    e_info = engines_sub.add_parser("info", help="Show one engine's metadata and capabilities")
+    e_info.add_argument("--engine-id", required=True, help="Engine id, e.g. voxcpm2")
+
+    # ---- 下载管理 ----
+    download_parser = subparsers.add_parser("download", help="Runtime / model download management")
+    download_sub = download_parser.add_subparsers(dest="download_command")
+    download_sub.add_parser("catalog", help="Show downloadable runtime and models")
+    download_sub.add_parser("status", help="Show install status")
+    d_start = download_sub.add_parser("start", help="Install runtime or a model")
+    d_start.add_argument("--kind", required=True, choices=["runtime", "model"], help="What to install")
+    d_start.add_argument("--target", default="", help="Model key when --kind model")
+    d_uninstall = download_sub.add_parser("uninstall", help="Uninstall runtime or a model")
+    d_uninstall.add_argument("--kind", required=True, choices=["runtime", "model"])
+    d_uninstall.add_argument("--target", default="", help="Model key when --kind model")
+
+    # ---- LoRA ----
+    lora_parser = subparsers.add_parser("lora", help="LoRA weights: list / load / unload / toggle / state")
+    lora_sub = lora_parser.add_subparsers(dest="lora_command")
+    lora_sub.add_parser("list", help="List checkpoints under lora/")
+    l_load = lora_sub.add_parser("load", help="Load LoRA weights")
+    l_load.add_argument("--path", required=True, help="LoRA checkpoint path")
+    lora_sub.add_parser("unload", help="Unload LoRA and roll back base weights")
+    l_toggle = lora_sub.add_parser("toggle", help="Enable or disable the loaded LoRA")
+    l_toggle.add_argument("--enable", dest="enabled", action="store_true", help="Enable LoRA")
+    l_toggle.add_argument("--disable", dest="enabled", action="store_false", help="Disable LoRA")
+    l_toggle.set_defaults(enabled=None)
+    lora_sub.add_parser("state", help="Show current LoRA state")
+
+    # ---- 训练 ----
+    train_parser = subparsers.add_parser("train", help="LoRA fine-tuning: start / stop / log")
+    train_sub = train_parser.add_subparsers(dest="train_command")
+
+    t_start = train_sub.add_parser("start", help="Start a training subprocess in background")
+    t_start.add_argument("--train-manifest", required=True, help="Training manifest file")
+    t_start.add_argument("--pretrained-path", help="Base model dir (default: model/VoxCPM2)")
+    t_start.add_argument("--val-manifest", default="", help="Validation manifest file")
+    t_start.add_argument("--save-path", help="Output dir (default: lora/finetune)")
+    t_start.add_argument("--sample-rate", type=int, default=48000, help="Sample rate (default 48000)")
+    t_start.add_argument("--batch-size", type=int, default=1, help="Batch size (default 1)")
+    t_start.add_argument("--grad-accum", type=int, default=1, help="Gradient accumulation steps")
+    t_start.add_argument("--num-workers", type=int, default=0, help="Dataloader workers")
+    t_start.add_argument("--num-iters", type=int, default=1000, help="Training iterations")
+    t_start.add_argument("--log-interval", type=int, default=10, help="Log interval")
+    t_start.add_argument("--valid-interval", type=int, default=200, help="Validation interval")
+    t_start.add_argument("--save-interval", type=int, default=200, help="Checkpoint interval")
+    t_start.add_argument("--learning-rate", type=float, default=1e-4, help="Learning rate")
+    t_start.add_argument("--weight-decay", type=float, default=0.01, help="Weight decay")
+
+    t_stop = train_sub.add_parser("stop", help="Stop the training subprocess")
+    t_stop.add_argument("--save-path", help="Training output dir (to locate PID)")
+
+    t_log = train_sub.add_parser("log", help="Show the training log tail")
+    t_log.add_argument("--save-path", help="Training output dir (to locate logs)")
+    t_log.add_argument("--tail", type=int, default=80, help="Number of trailing lines (default 80)")
+
     design_parser = subparsers.add_parser("design", help="Generate speech with voice design")
     _add_common_generation_args(design_parser)
     _add_prompt_reference_args(design_parser)
@@ -1414,31 +1506,31 @@ def main():
             parser.error(f"`generate {sub}` requires --text")
 
         if sub == "design":
-            result = cli_service.run_design(args, parser)
+            result = _dispatch_result(lambda a: cli_service.run_design(a, parser), args, command=sub)
         elif sub == "clone":
             if not getattr(args, "reference_audio", None):
                 parser.error("`generate clone` requires --reference-audio")
-            result = cli_service.run_clone(args, parser)
+            result = _dispatch_result(lambda a: cli_service.run_clone(a, parser), args, command=sub)
         elif sub == "ultimate":
-            result = cli_service_ext.run_ultimate(args, parser)
+            result = _dispatch_result(lambda a: cli_service_ext.run_ultimate(a, parser), args, command=sub)
         elif sub == "prompt-continue":
-            result = cli_service_ext.run_prompt_continue(args, parser)
+            result = _dispatch_result(lambda a: cli_service_ext.run_prompt_continue(a, parser), args, command=sub)
         elif sub == "script":
-            result = cli_service_ext.run_script(args, parser)
+            result = _dispatch_result(lambda a: cli_service_ext.run_script(a, parser), args, command=sub)
         elif sub == "emotion":
-            result = cli_service_ext.run_emotion(args, parser)
+            result = _dispatch_result(lambda a: cli_service_ext.run_emotion(a, parser), args, command=sub)
         elif sub == "breeze-design":
-            result = cli_service_ext.run_breeze(args, parser, "design")
+            result = _dispatch_result(lambda a: cli_service_ext.run_breeze(a, parser, "design"), args, command=sub)
         elif sub == "breeze-clone":
-            result = cli_service_ext.run_breeze(args, parser, "clone")
+            result = _dispatch_result(lambda a: cli_service_ext.run_breeze(a, parser, "clone"), args, command=sub)
         elif sub == "breeze-direction":
-            result = cli_service_ext.run_breeze(args, parser, "direction")
+            result = _dispatch_result(lambda a: cli_service_ext.run_breeze(a, parser, "direction"), args, command=sub)
         elif sub == "edge":
-            result = cli_service_ext.run_edge(args, parser)
+            result = _dispatch_result(lambda a: cli_service_ext.run_edge(a, parser), args, command=sub)
         elif sub == "convert":
-            result = cli_service_ext.run_convert(args, parser)
+            result = _dispatch_result(lambda a: cli_service_ext.run_convert(a, parser), args, command=sub)
         elif sub == "edit":
-            result = cli_service_ext.run_edit(args, parser)
+            result = _dispatch_result(lambda a: cli_service_ext.run_edit(a, parser), args, command=sub)
         else:
             parser.error(f"Unknown generate subcommand: {sub}")
         return emit(result, as_json=as_json)
@@ -1448,7 +1540,10 @@ def main():
         from integrated_app import cli_service_ext
         from integrated_app.cli_output import emit
 
-        return emit(cli_service_ext.run_postprocess(args, parser), as_json=as_json)
+        return emit(
+            _dispatch_result(lambda a: cli_service_ext.run_postprocess(a, parser), args, command="postprocess"),
+            as_json=as_json,
+        )
 
     # ---- 音色库 / 历史记录（ADR-0005 P2）----
     if args.command in ("persona", "history"):
@@ -1477,7 +1572,41 @@ def main():
         handler = handlers.get((args.command, sub))
         if handler is None:
             parser.error(f"Unknown {args.command} subcommand: {sub}")
-        return emit(handler(args), as_json=as_json)
+        return emit(_dispatch_result(handler, args, command=f"{args.command}-{sub}"), as_json=as_json)
+
+    # ---- 模型 / 引擎 / 下载 / LoRA / 训练（ADR-0005 P3）----
+    if args.command in ("model", "engines", "download", "lora", "train"):
+        from integrated_app import cli_service_ops
+        from integrated_app.cli_output import emit
+
+        sub = getattr(args, f"{args.command}_command", None)
+        if sub is None:
+            parser.error(f"`{args.command}` requires a subcommand (use --help to list them)")
+
+        handlers = {
+            ("model", "status"): cli_service_ops.cmd_model_status,
+            ("model", "load"): cli_service_ops.cmd_model_load,
+            ("model", "unload"): cli_service_ops.cmd_model_unload,
+            ("model", "switch"): cli_service_ops.cmd_model_switch,
+            ("engines", "list"): cli_service_ops.cmd_engines_list,
+            ("engines", "info"): cli_service_ops.cmd_engines_info,
+            ("download", "catalog"): cli_service_ops.cmd_download_catalog,
+            ("download", "status"): cli_service_ops.cmd_download_status,
+            ("download", "start"): cli_service_ops.cmd_download_start,
+            ("download", "uninstall"): cli_service_ops.cmd_download_uninstall,
+            ("lora", "list"): cli_service_ops.cmd_lora_list,
+            ("lora", "load"): cli_service_ops.cmd_lora_load,
+            ("lora", "unload"): cli_service_ops.cmd_lora_unload,
+            ("lora", "toggle"): cli_service_ops.cmd_lora_toggle,
+            ("lora", "state"): cli_service_ops.cmd_lora_state,
+            ("train", "start"): cli_service_ops.cmd_train_start,
+            ("train", "stop"): cli_service_ops.cmd_train_stop,
+            ("train", "log"): cli_service_ops.cmd_train_log,
+        }
+        handler = handlers.get((args.command, sub))
+        if handler is None:
+            parser.error(f"Unknown {args.command} subcommand: {sub}")
+        return emit(_dispatch_result(handler, args, command=f"{args.command}-{sub}"), as_json=as_json)
 
     # ---- 顶层 design/clone：默认 legacy（保护现有行为），--service 走服务层 ----
     if args.command == "design":
@@ -1487,7 +1616,7 @@ def main():
             from integrated_app.cli_output import emit
             from integrated_app.cli_service import run_design
 
-            return emit(run_design(args, parser), as_json=as_json)
+            return emit(_dispatch_result(lambda a: run_design(a, parser), args, command="design"), as_json=as_json)
         return cmd_design(args, parser)
 
     if args.command == "clone":
@@ -1497,7 +1626,7 @@ def main():
             from integrated_app.cli_output import emit
             from integrated_app.cli_service import run_clone
 
-            return emit(run_clone(args, parser), as_json=as_json)
+            return emit(_dispatch_result(lambda a: run_clone(a, parser), args, command="clone"), as_json=as_json)
         return cmd_clone(args, parser)
 
     if args.command == "batch":
