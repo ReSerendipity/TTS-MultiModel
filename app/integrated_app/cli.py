@@ -859,6 +859,16 @@ def _add_engine_arg(parser):
     )
 
 
+def _add_seed_arg(parser):
+    """添加 --seed 参数（-1 表示随机）。"""
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=-1,
+        help="Random seed (-1 for random, default: -1)",
+    )
+
+
 def _add_prompt_reference_args(parser):
     """向 argparse 解析器添加提示音频和参考音频相关参数（内部函数）。
 
@@ -998,8 +1008,8 @@ Examples:
 
     subparsers = parser.add_subparsers(dest="command")
 
-    # ---- generate 命令族：统一服务层入口（ADR-0005 P0）----
-    generate_parser = subparsers.add_parser("generate", help="Generate speech via unified service layer")
+    # ---- generate 命令族：统一服务层入口（ADR-0005 P0/P1）----
+    generate_parser = subparsers.add_parser("generate", help="Generate speech via unified service layer / engines")
     gen_sub = generate_parser.add_subparsers(dest="generate_command")
 
     gen_design = gen_sub.add_parser("design", help="Voice design via service layer (--engine effective)")
@@ -1012,6 +1022,112 @@ Examples:
     _add_prompt_reference_args(gen_clone)
     _add_engine_arg(gen_clone)
     gen_clone.add_argument("--output", "-o", help="Optional output path (copies from service result)")
+
+    # --- VoxCPM2 扩展动作 ---
+    gen_ultimate = gen_sub.add_parser("ultimate", help="VoxCPM2 ultimate clone (reference audio + transcript)")
+    _add_common_generation_args(gen_ultimate)
+    _add_seed_arg(gen_ultimate)
+    gen_ultimate.add_argument("--reference-audio", "-ra", required=True, help="Reference audio path")
+    gen_ultimate.add_argument("--ref-text", default="", help="Exact transcript of the reference audio")
+    gen_ultimate.add_argument(
+        "--denoise-strength", type=float, default=0.5, help="Denoise strength 0.0-1.0 (default 0.5)"
+    )
+    gen_ultimate.add_argument("--output", "-o", help="Optional output path")
+
+    gen_prompt = gen_sub.add_parser("prompt-continue", help="VoxCPM2 prompt continuation (audio + its text)")
+    _add_common_generation_args(gen_prompt)
+    gen_prompt.add_argument("--prompt-audio", "-pa", required=True, help="Prompt audio path")
+    gen_prompt.add_argument("--prompt-text", "-pt", help="Text of the prompt audio")
+    gen_prompt.add_argument("--prompt-file", help="File containing the prompt audio transcript")
+    gen_prompt.add_argument("--output", "-o", help="Optional output path")
+
+    gen_script = gen_sub.add_parser("script", help="VoxCPM2 script studio ([speaker] line format)")
+    gen_script.add_argument("--input", "-i", required=True, help="Script file ([speaker] line per row)")
+    gen_script.add_argument("--lang", default="中文", help="Language (default: 中文)")
+    _add_seed_arg(gen_script)
+    gen_script.add_argument("--cfg-value", type=float, default=2.0, help="CFG scale (default 2.0)")
+    gen_script.add_argument("--normalize", action="store_true", help="Enable normalization")
+    gen_script.add_argument("--denoise-strength", type=float, default=0.5, help="Denoise strength 0.0-1.0")
+    gen_script.add_argument("--inference-timesteps", type=int, default=10, help="Inference steps (default 10)")
+    gen_script.add_argument("--output", "-o", help="Optional output path")
+    gen_script.add_argument(
+        "--persona-map",
+        action="append",
+        metavar="ROLE=AUDIO",
+        help="Map a script role to a reference audio file (repeatable), e.g. --persona-map 旁白=narr.wav",
+    )
+
+    # --- IndexTTS2 情感合成 ---
+    gen_emotion = gen_sub.add_parser("emotion", help="IndexTTS2 emotion synthesis (text/audio/8-dim vector)")
+    gen_emotion.add_argument("--text", "-t", required=True, help="Text to synthesize")
+    gen_emotion.add_argument("--reference-audio", "-ra", required=True, help="Speaker reference audio")
+    gen_emotion.add_argument("--emotion-text", help="Natural-language emotion description")
+    gen_emotion.add_argument("--emotion-audio", help="Emotion reference audio")
+    gen_emotion.add_argument("--emotion-vector", help="8 comma-separated floats (happy,angry,sad,...)")
+    gen_emotion.add_argument("--emotion-alpha", type=float, default=0.8, help="Emotion strength 0-1 (default 0.8)")
+    gen_emotion.add_argument("--duration-factor", type=float, default=1.0, help="Duration scale (default 1.0)")
+    gen_emotion.add_argument("--lang", help="Language code")
+    _add_seed_arg(gen_emotion)
+    gen_emotion.add_argument("--output", "-o", help="Optional output path")
+
+    # --- Breeze TTS 2 ---
+    gen_bz_design = gen_sub.add_parser("breeze-design", help="Breeze TTS 2 voice design")
+    gen_bz_design.add_argument("--text", "-t", required=True, help="Text to synthesize")
+    gen_bz_design.add_argument("--control", help="Voice description instruction")
+    gen_bz_design.add_argument("--cfg-scale", type=float, default=4.0, help="CFG scale (default 4.0)")
+    _add_seed_arg(gen_bz_design)
+    gen_bz_design.add_argument("--output", "-o", help="Optional output path")
+
+    gen_bz_clone = gen_sub.add_parser("breeze-clone", help="Breeze TTS 2 voice clone (needs ref-text)")
+    gen_bz_clone.add_argument("--text", "-t", required=True, help="Text to synthesize")
+    gen_bz_clone.add_argument("--reference-audio", "-ra", required=True, help="Reference audio path")
+    gen_bz_clone.add_argument("--ref-text", required=True, help="Exact transcript of the reference audio")
+    _add_seed_arg(gen_bz_clone)
+    gen_bz_clone.add_argument("--output", "-o", help="Optional output path")
+
+    gen_bz_dir = gen_sub.add_parser("breeze-direction", help="Breeze TTS 2 voice direction (clone + instruction)")
+    gen_bz_dir.add_argument("--text", "-t", required=True, help="Text to synthesize")
+    gen_bz_dir.add_argument("--reference-audio", "-ra", required=True, help="Reference audio path")
+    gen_bz_dir.add_argument("--control", required=True, help="Direction instruction (tone/emotion/pace)")
+    gen_bz_dir.add_argument("--ref-text", default="", help="Transcript of the reference audio")
+    gen_bz_dir.add_argument("--cfg-scale", type=float, default=4.0, help="CFG scale (default 4.0)")
+    _add_seed_arg(gen_bz_dir)
+    gen_bz_dir.add_argument("--output", "-o", help="Optional output path")
+
+    # --- Edge-TTS 在线兜底 ---
+    gen_edge = gen_sub.add_parser("edge", help="Edge-TTS online synthesis (no local weights, MP3)")
+    gen_edge.add_argument("--text", "-t", required=True, help="Text to synthesize")
+    gen_edge.add_argument("--lang", default="zh", help="Language hint (default zh)")
+    gen_edge.add_argument("--output", "-o", help="Optional output path")
+
+    # --- Voicebox 音色转换 ---
+    gen_convert = gen_sub.add_parser("convert", help="Voicebox timbre conversion (audio to audio)")
+    gen_convert.add_argument("--source-audio", required=True, help="Source speech audio")
+    gen_convert.add_argument("--target-audio", required=True, help="Target timbre reference audio")
+    gen_convert.add_argument("--tau", type=float, default=0.3, help="Conversion strength 0-1 (default 0.3)")
+    gen_convert.add_argument("--output", "-o", help="Optional output path")
+
+    # --- Step-Audio-EditX 音频编辑 ---
+    gen_edit = gen_sub.add_parser("edit", help="Step-Audio-EditX audio editing (emotion/style/prosody/speed)")
+    gen_edit.add_argument("--source-audio", required=True, help="Source audio path")
+    gen_edit.add_argument("--source-text", required=True, help="Exact transcript of the source audio")
+    gen_edit.add_argument(
+        "--edit-type", required=True, choices=["emotion", "style", "paralinguistic", "speed", "vad", "denoise"]
+    )
+    gen_edit.add_argument("--edit-info", default="", help="Sub-type/label, e.g. happy / serious / faster")
+    gen_edit.add_argument("--target-text", help="Target text (may contain [Laughter] tags)")
+    gen_edit.add_argument("--output", "-o", help="Optional output path")
+
+    # --- 顶层后处理（不依赖生成模型）---
+    post = subparsers.add_parser("postprocess", help="Post-process an existing audio file")
+    post.add_argument("--audio", required=True, help="Input audio file")
+    post.add_argument("--tempo", type=float, default=1.0, help="Tempo factor (default 1.0)")
+    post.add_argument("--lufs", type=float, default=-16.0, help="Target loudness LUFS (default -16)")
+    post.add_argument("--enhance", action="store_true", help="Enable voice enhancement")
+    post.add_argument("--trim-silence", action="store_true", help="Trim leading/trailing silence")
+    post.add_argument("--denoise", action="store_true", help="Enable denoise")
+    post.add_argument("--no-normalize", dest="normalize", action="store_false", help="Disable loudness normalization")
+    post.add_argument("--output", "-o", help="Output path (default: <input>_post.wav)")
 
     design_parser = subparsers.add_parser("design", help="Generate speech with voice design")
     _add_common_generation_args(design_parser)
@@ -1192,26 +1308,65 @@ def main():
 
     validate_ranges(args, parser)
 
-    # ---- generate 命令族：统一服务层（ADR-0005 P0）----
+    # ---- generate 命令族：统一服务层 / 各引擎（ADR-0005 P0/P1）----
     if args.command == "generate":
+        from integrated_app import cli_service, cli_service_ext
         from integrated_app.cli_output import emit
-        from integrated_app.cli_service import run_clone, run_design
 
-        if getattr(args, "generate_command", None) is None:
-            parser.error("`generate` requires a subcommand (design | clone)")
+        sub = getattr(args, "generate_command", None)
+        if sub is None:
+            parser.error("`generate` requires a subcommand (use --help to list them)")
 
-        if args.text is None:
-            parser.error("`generate` requires --text")
+        text_required = {
+            "design",
+            "clone",
+            "ultimate",
+            "prompt-continue",
+            "emotion",
+            "breeze-design",
+            "breeze-clone",
+            "breeze-direction",
+            "edge",
+        }
+        if sub in text_required and not getattr(args, "text", None):
+            parser.error(f"`generate {sub}` requires --text")
 
-        if args.generate_command == "design":
-            result = run_design(args, parser)
-        elif args.generate_command == "clone":
+        if sub == "design":
+            result = cli_service.run_design(args, parser)
+        elif sub == "clone":
             if not getattr(args, "reference_audio", None):
                 parser.error("`generate clone` requires --reference-audio")
-            result = run_clone(args, parser)
+            result = cli_service.run_clone(args, parser)
+        elif sub == "ultimate":
+            result = cli_service_ext.run_ultimate(args, parser)
+        elif sub == "prompt-continue":
+            result = cli_service_ext.run_prompt_continue(args, parser)
+        elif sub == "script":
+            result = cli_service_ext.run_script(args, parser)
+        elif sub == "emotion":
+            result = cli_service_ext.run_emotion(args, parser)
+        elif sub == "breeze-design":
+            result = cli_service_ext.run_breeze(args, parser, "design")
+        elif sub == "breeze-clone":
+            result = cli_service_ext.run_breeze(args, parser, "clone")
+        elif sub == "breeze-direction":
+            result = cli_service_ext.run_breeze(args, parser, "direction")
+        elif sub == "edge":
+            result = cli_service_ext.run_edge(args, parser)
+        elif sub == "convert":
+            result = cli_service_ext.run_convert(args, parser)
+        elif sub == "edit":
+            result = cli_service_ext.run_edit(args, parser)
         else:
-            parser.error(f"Unknown generate subcommand: {args.generate_command}")
+            parser.error(f"Unknown generate subcommand: {sub}")
         return emit(result, as_json=as_json)
+
+    # ---- 顶层后处理：纯音频处理，不需要生成模型 ----
+    if args.command == "postprocess":
+        from integrated_app import cli_service_ext
+        from integrated_app.cli_output import emit
+
+        return emit(cli_service_ext.run_postprocess(args, parser), as_json=as_json)
 
     # ---- 顶层 design/clone：默认 legacy（保护现有行为），--service 走服务层 ----
     if args.command == "design":
@@ -1241,4 +1396,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # 必须用 sys.exit 传出语义化退出码：桌面 shim 以 `python cli.py` 直跑，
+    # 若只调用 main() 而不取返回值，失败场景会错误地以 0 退出，
+    # AI agent 无法据退出码判断成功/失败。
+    sys.exit(main())

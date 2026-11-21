@@ -143,6 +143,20 @@ tts-multimodel generate design --text "你好" --control "warm female voice" --e
 tts-multimodel design --service --text "你好" -o out.wav --json
 ```
 
+多引擎 / 多动作入口（`generate --help` 查看全部）：
+
+```bash
+tts-multimodel generate ultimate  --text "..." --reference-audio ref.wav [--ref-text "..."]
+tts-multimodel generate emotion   --text "..." --reference-audio ref.wav --emotion-text "开心"
+tts-multimodel generate script    --input script.txt --persona-map 旁白=narr.wav
+tts-multimodel generate edge      --text "..." --lang zh          # 在线兜底，无需权重
+tts-multimodel generate convert   --source-audio a.wav --target-audio b.wav   # 需 openvoice
+tts-multimodel generate edit      --source-audio a.wav --source-text "..." --edit-type emotion --edit-info happy
+tts-multimodel postprocess        --audio a.wav --tempo 1.1 --enhance
+```
+
+> 依赖缺失的引擎（如 Breeze / Voicebox / Step-Audio）会返回 `NOT_READY`（退出码 3）并给出明确指引，不会静默失败。
+
 > CLI 全功能扩展的架构与分阶段路线图见 [`docs/adr/0005-cli-full-feature-expansion.md`](docs/adr/0005-cli-full-feature-expansion.md)。
 
 **桌面安装包用户**：安装器会把 `tts-multimodel` 命令注册到当前用户 PATH（开始菜单也有「TTSMultiModel CLI」快捷方式），因此桌面版同样能直接用上面的命令，无需 `pip install`。前提是在桌面应用「下载管理」页装好运行环境（torch 家族）与至少一套模型；命令默认使用随包目录下的 VoxCPM2 权重，也可显式传 `--model-path` / `--hf-model-id` 覆盖。卸载时安装器会从 PATH 精确移除该条目。若安装前已打开终端/AI Agent，需重开一个会话才能看到新命令。

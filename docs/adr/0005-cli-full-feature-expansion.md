@@ -179,3 +179,70 @@ cli.py                     # 入口：全局选项解析 + 子命令分发 + 输
 按路线图实现 `generate` 子命令族的其余动作：ultimate / prompt-continue / script / emotion(IndexTTS) /
 breeze / edge / convert / edit / postprocess。每个动作遵循同一模式：`cli_service.py` 加 adapter →
 `cli.py` 注册子命令 → `cli_output` 统一输出 → 冒烟测试。
+
+## P1 实施记录（2026-11-21 已完成）
+
+### 交付物
+
+| 文件 | 类型 | 内容 |
+|---|---|---|
+| `app/integrated_app/cli_service_ext.py` | 新增 | 9 个动作适配：ultimate / prompt-continue / script / emotion / breeze(design/clone/direction) / edge / convert / edit / postprocess |
+| `app/integrated_app/cli.py` | 修改 | 注册 12 个 generate 子命令 + 顶层 postprocess；`--persona-map`；`sys.exit(main())` 修复退出码 |
+| `tests/test_cli_service_ext.py` | 新增 | 13 个用例：两种元组顺序、路径解析、默认输出、真机后处理、参数校验 |
+| README.md / ADR | 修改 | P1 用法与实施记录 |
+
+### 命令总览（本轮新增 10 个动作）
+
+```bash
+tts-multimodel generate ultimate        --text T --reference-audio R [--ref-text RT] [--denoise-strength S]
+tts-multimodel generate prompt-continue --text T --prompt-audio P --prompt-text PT
+tts-multimodel generate script          --input SCRIPT.txt [--persona-map 角色=音频 ...]
+tts-multimodel generate emotion         --text T --reference-audio R (--emotion-text ET | --emotion-audio EA | --emotion-vector 8floats)
+tts-multimodel generate breeze-design   --text T [--control C] [--cfg-scale N]
+tts-multimodel generate breeze-clone    --text T --reference-audio R --ref-text RT
+tts-multimodel generate breeze-direction --text T --reference-audio R --control C
+tts-multimodel generate edge            --text T [--lang zh]
+tts-multimodel generate convert         --source-audio S --target-audio G [--tau 0.3]
+tts-multimodel generate edit            --source-audio S --source-text ST --edit-type emotion --edit-info happy
+tts-multimodel postprocess              --audio A [--tempo 1.1] [--enhance] [--trim-silence]
+```
+
+### 实测结果（本机 RTX 5070 Ti）
+
+| 动作 | 结果 | 证据 |
+|---|---|---|
+| postprocess | ✅ 通过 | 3.68s → 1.1x → 3.345s |
+| ultimate | ✅ 通过 | 3.88s 音频；自动 ASR 转写参考音频 |
+| prompt-continue | ✅ 通过 | 1.92s 音频 |
+| script（音色库角色） | ✅ 通过 | 3/3 段，11.48s，2 角色 |
+| script（--persona-map） | ✅ 通过 | 3/3 段，9.88s（"旁白"库里无，显式映射成功） |
+| emotion（IndexTTS2） | ✅ 通过 | 3.31s / 1.75s；情感文本生效 |
+| edge（Edge-TTS） | ✅ 通过 | 18144 字节 MP3 |
+| breeze-design | ⛔ 阻塞 | vendored 代码 `no_init_weights` 在 transformers 5.20 已移除（**项目级既有问题**） |
+| convert（OpenVoice） | ⛔ 阻塞 | `from openvoice import ToneColorConverter` 与新版权威路径 `openvoice.api` 不符；PyPI 无包（**项目级既有问题**） |
+| edit（Step-Audio） | ⛔ 无权重 | 正确返回 `NOT_READY`(3) + 下载指引 |
+
+> 6/10 真机出音频；4/10 因底层依赖/权重缺失不可用，但 CLI 代码路径与错误码语义均已验证。
+> 两个项目级阻塞建议单独立项（不属 CLI 范围）：① Breeze 与 transformers 5.x 的兼容；
+> ② voicebox 的 openvoice 依赖声明与 API 路径。
+
+### P1 期间修复的真实缺陷
+
+1. **退出码丢失**：`if __name__ == "__main__": main()` 丢弃返回值，导致失败场景 EXIT=0，
+   agent 无法判断成败。改为 `sys.exit(main())`（桌面 shim 直跑同样受益）。
+2. **临时目录产物**：IndexTTS2 / Voicebox / Step-Audio 在 `output_path=None` 时写系统临时目录，
+   易被清理。改为默认落到 `outputs/`（`_default_output`）。
+3. **剧本角色缺音色**：原本只能依赖音色库；新增 `--persona-map ROLE=AUDIO` 让 agent 直接给映射，
+   并在部分段失败时输出可操作 warnings。
+
+### 新增坑点
+
+1. **引擎返回元组顺序不一致**：VoxCPM2/IndexTTS 是 `(sample_rate, audio, ref)`，Breeze 是
+   `(audio, sample_rate, ref)`。`_audio_tuple_to_result(audio_first=...)` 必须显式区分，否则采样率与
+   数组错位。
+2. **引擎不读配置**：`VoiceboxEngine()` / `StepAudioEditXEngine()` 不自行解析 `config.yaml` 的
+   `model_dir`，必须由调用方传绝对路径。正确做法是复用路由层单例工厂
+   （`_get_voicebox_engine` / `_get_editx_engine`，其 `request` 形参未使用，可传 None），
+   避免 CLI 另写一套配置逻辑漂移。
+3. **Edge-TTS 产物是 MP3 且无时长**：`_synthesize_edge_tts_wav` 返回 `(filename, size)`，
+   duration 暂记 0（后续可用 ffprobe/mutagen 补）。
