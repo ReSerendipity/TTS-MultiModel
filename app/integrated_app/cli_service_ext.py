@@ -508,7 +508,7 @@ def run_convert(args: Any, parser: Any) -> Result:
         # 纯 CLI 场景传 None 安全。
         from integrated_app.routes.generate.voicebox.convert import _get_voicebox_engine
 
-        engine, err = _get_voicebox_engine(None)
+        engine, err = _get_voicebox_engine(None)  # type: ignore[arg-type]  # request 形参未使用
         if engine is None:
             return Result.failure(f"Voicebox 加载失败: {err}", "NOT_READY", command="convert")
     except Exception as exc:  # noqa: BLE001
@@ -545,7 +545,7 @@ def run_edit(args: Any, parser: Any) -> Result:
         # 同 convert：复用路由层工厂保证模型路径与 Web 一致（request 未使用，传 None）
         from integrated_app.routes.generate.step_audio_editx.edit import _get_editx_engine
 
-        engine, err = _get_editx_engine(None)
+        engine, err = _get_editx_engine(None)  # type: ignore[arg-type]  # request 形参未使用
         if engine is None:
             return Result.failure(
                 f"Step-Audio-EditX 加载失败（可能缺少 vLLM 或权重）: {err}", "NOT_READY", command="edit"
@@ -584,7 +584,7 @@ def run_postprocess(args: Any, parser: Any) -> Result:
         return Result.failure(f"音频文件不存在: {src}", "USAGE_ERROR", command="postprocess")
 
     audio, sample_rate = sf.read(src)
-    params = {
+    params: dict[str, Any] = {
         "tempo_factor": getattr(args, "tempo", 1.0),
         "target_lufs": getattr(args, "lufs", -16.0),
         "voice_enhancement": bool(getattr(args, "enhance", False)),

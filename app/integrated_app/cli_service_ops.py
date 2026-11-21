@@ -91,9 +91,14 @@ def cmd_engines_info(args: Any) -> Result:
     if not engine_id:
         return Result.failure("需要 --engine-id", "USAGE_ERROR", command="engines-info")
     try:
-        return Result.success(data=engine_info(engine_id), command="engines-info")
+        info = engine_info(engine_id)
     except Exception as exc:  # noqa: BLE001 - 未知引擎/内部异常统一转业务失败
         return Result.failure(f"查询引擎失败: {exc}", "BUSINESS_ERROR", command="engines-info")
+    # engine_info 在未知引擎时返回 JSONResponse（HTTP 语义），CLI 转成业务失败
+    if not isinstance(info, dict):
+        detail = getattr(info, "body", info)
+        return Result.failure(f"引擎不可用: {engine_id}（{detail}）", "BUSINESS_ERROR", command="engines-info")
+    return Result.success(data=info, command="engines-info")
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +142,7 @@ def cmd_download_start(args: Any) -> Result:
                 f"未知模型: {target}；可用: {', '.join(sorted(available))}", "USAGE_ERROR", command="download-start"
             )
 
-    last_report = {"stage": "", "pct": -1}
+    last_report: dict[str, Any] = {"stage": "", "pct": -1}
 
     def on_progress(stage: str, ratio: float, message: str) -> None:
         pct = int(max(0.0, min(1.0, ratio)) * 100)
@@ -293,7 +298,7 @@ def cmd_train_start(args: Any) -> Result:
                 f"已有训练在运行（PID {old_pid}）；如需重启请先 train stop", "BUSINESS_ERROR", command="train-start"
             )
 
-    cfg = {
+    cfg: dict[str, Any] = {
         "pretrained_path": os.path.abspath(
             getattr(args, "pretrained_path", "") or os.path.join(PROJECT_ROOT, "model", "VoxCPM2")
         ),
