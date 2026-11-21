@@ -34,14 +34,23 @@ import sys
 import time
 from pathlib import Path
 
+import soundfile as sf
+
+# 包上下文兜底：本文件既可被 `python -m integrated_app.cli` 调用，也会被桌面 shim
+# 以脚本方式直跑（`bootstrap\python.exe ...\integrated_app\cli.py`）。后者没有包
+# 上下文，相对导入会抛 "attempted relative import with no known parent package"。
+# 把 integrated_app 的父目录加入 sys.path 后，下面统一使用绝对导入，两种入口都成立
+# （开发布局 app\integrated_app、桌面布局 <InstallDir>\app\app\integrated_app 一致）。
+_PKG_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PKG_PARENT not in sys.path:
+    sys.path.insert(0, _PKG_PARENT)
+
 # vendor 化：优先从项目内 app/integrated_app/vendor 加载 voxcpm 源码包，
 # 不依赖 references/ 下随时可能被删除的克隆学习仓库
 if os.path.isdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")):
     _vendor_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
     if _vendor_dir not in sys.path:
         sys.path.insert(0, _vendor_dir)
-
-import soundfile as sf
 
 logger = logging.getLogger("tts_multimodel.cli")
 
@@ -839,6 +848,17 @@ def _add_common_generation_args(parser):
     parser.add_argument("--normalize", action="store_true", help="Enable text normalization")
 
 
+def _add_engine_arg(parser):
+    """添加 --engine 参数（统一服务层入口，真正生效）。"""
+    parser.add_argument(
+        "--engine",
+        type=str,
+        choices=["voxcpm2", "indextts2"],
+        default="voxcpm2",
+        help="TTS engine to use via the unified service layer (default: voxcpm2)",
+    )
+
+
 def _add_prompt_reference_args(parser):
     """向 argparse 解析器添加提示音频和参考音频相关参数（内部函数）。
 
@@ -957,24 +977,59 @@ def _build_parser():
         argparse.ArgumentParser: 配置完成的参数解析器实例。
     """
     parser = argparse.ArgumentParser(
-        description="VoxCPM CLI - Multi-engine voice design, cloning, and batch processing",
+        description="TTS MultiModel CLI - Multi-engine TTS (AI-agent friendly, --json output)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   tts-multimodel design --text "Hello world" --output out.wav
-  tts-multimodel design --text "Hello world" --control "warm female voice" --output out.wav
+  tts-multimodel generate design --text "Hello" --engine voxcpm2 --json
   tts-multimodel clone --text "Hello" --reference-audio ref.wav --output out.wav
   tts-multimodel batch --input texts.txt --output-dir ./outs --reference-audio ref.wav
         """,
     )
 
+    # 全局：结构化 JSON 输出（AI agent 用）；日志一律走 stderr
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Emit machine-readable JSON to stdout (logs go to stderr)",
+    )
+
     subparsers = parser.add_subparsers(dest="command")
+
+    # ---- generate 命令族：统一服务层入口（ADR-0005 P0）----
+    generate_parser = subparsers.add_parser("generate", help="Generate speech via unified service layer")
+    gen_sub = generate_parser.add_subparsers(dest="generate_command")
+
+    gen_design = gen_sub.add_parser("design", help="Voice design via service layer (--engine effective)")
+    _add_common_generation_args(gen_design)
+    _add_engine_arg(gen_design)
+    gen_design.add_argument("--output", "-o", help="Optional output path (copies from service result)")
+
+    gen_clone = gen_sub.add_parser("clone", help="Voice clone via service layer (--engine effective)")
+    _add_common_generation_args(gen_clone)
+    _add_prompt_reference_args(gen_clone)
+    _add_engine_arg(gen_clone)
+    gen_clone.add_argument("--output", "-o", help="Optional output path (copies from service result)")
 
     design_parser = subparsers.add_parser("design", help="Generate speech with voice design")
     _add_common_generation_args(design_parser)
     _add_prompt_reference_args(design_parser)
     _add_model_args(design_parser)
     _add_lora_args(design_parser)
+    design_parser.add_argument(
+        "--engine",
+        type=str,
+        choices=["voxcpm2", "indextts2"],
+        default=None,
+        help="Engine to use (with --service; legacy mode ignores this)",
+    )
+    design_parser.add_argument(
+        "--service",
+        action="store_true",
+        help="Use unified service layer (recommended for AI agents; --engine effective)",
+    )
     design_parser.add_argument("--output", "-o", required=True, help="Output audio file path")
 
     clone_parser = subparsers.add_parser("clone", help="Clone a voice with reference/prompt audio")
@@ -982,6 +1037,18 @@ Examples:
     _add_prompt_reference_args(clone_parser)
     _add_model_args(clone_parser)
     _add_lora_args(clone_parser)
+    clone_parser.add_argument(
+        "--engine",
+        type=str,
+        choices=["voxcpm2", "indextts2"],
+        default=None,
+        help="Engine to use (with --service; legacy mode ignores this)",
+    )
+    clone_parser.add_argument(
+        "--service",
+        action="store_true",
+        help="Use unified service layer (recommended for AI agents; --engine effective)",
+    )
     clone_parser.add_argument("--output", "-o", required=True, help="Output audio file path")
 
     batch_parser = subparsers.add_parser("batch", help="Batch-generate one line per output file")
@@ -1105,19 +1172,66 @@ def main():
     )
     _sys.stderr.flush()
 
+    # --json 允许出现在任意位置（含子命令之后）：argparse 的全局选项默认只能放在
+    # 子命令前，但 AI agent 自然会把 --json 写在末尾。这里先从 argv 中提取并剔除，
+    # 再交给 argparse 解析，避免在每个子解析器重复声明造成 dest 默认值互相覆盖。
+    argv = list(sys.argv[1:])
+    as_json = "--json" in argv
+    if as_json:
+        argv = [a for a in argv if a != "--json"]
+
     parser = _build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+
+    # JSON 模式：隔离第三方库的 stdout 输出（如 funasr 的版本横幅），
+    # 保证 stdout 只有一行合法 JSON，日志/横幅全部走 stderr。
+    if as_json:
+        from integrated_app.cli_output import begin_json_mode
+
+        begin_json_mode()
 
     validate_ranges(args, parser)
 
+    # ---- generate 命令族：统一服务层（ADR-0005 P0）----
+    if args.command == "generate":
+        from integrated_app.cli_output import emit
+        from integrated_app.cli_service import run_clone, run_design
+
+        if getattr(args, "generate_command", None) is None:
+            parser.error("`generate` requires a subcommand (design | clone)")
+
+        if args.text is None:
+            parser.error("`generate` requires --text")
+
+        if args.generate_command == "design":
+            result = run_design(args, parser)
+        elif args.generate_command == "clone":
+            if not getattr(args, "reference_audio", None):
+                parser.error("`generate clone` requires --reference-audio")
+            result = run_clone(args, parser)
+        else:
+            parser.error(f"Unknown generate subcommand: {args.generate_command}")
+        return emit(result, as_json=as_json)
+
+    # ---- 顶层 design/clone：默认 legacy（保护现有行为），--service 走服务层 ----
     if args.command == "design":
         if not args.text:
             parser.error("`design` requires --text")
+        if getattr(args, "service", False) is True:
+            from integrated_app.cli_output import emit
+            from integrated_app.cli_service import run_design
+
+            return emit(run_design(args, parser), as_json=as_json)
         return cmd_design(args, parser)
 
     if args.command == "clone":
         if not args.text or not args.output:
             parser.error("`clone` requires --text and --output")
+        if getattr(args, "service", False) is True:
+            from integrated_app.cli_output import emit
+            from integrated_app.cli_service import run_clone
+
+            return emit(run_clone(args, parser), as_json=as_json)
         return cmd_clone(args, parser)
 
     if args.command == "batch":

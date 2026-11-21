@@ -132,6 +132,21 @@ tts-multimodel batch --input texts.txt --output-dir ./outs --reference-audio ref
 
 CLI 目前覆盖 VoxCPM2 的 design / clone / batch 三种模式；IndexTTS 合成、极致克隆、剧本工坊、音色库、语音转换与音频编辑、LoRA 训练等请使用 Web UI 或 HTTP API（含 OpenAI 兼容的 `POST /v1/audio/speech`）。
 
+**给 AI Agent / 脚本用（结构化输出）**：任意命令加 `--json` 可输出单行 JSON 到 stdout（日志走 stderr，可直接 `json.loads`），并带语义化退出码（0 成功 / 1 业务失败 / 2 参数错误 / 3 环境未就绪）：
+
+```bash
+# 统一服务层入口：--engine 真正生效（voxcpm2 / indextts2）
+tts-multimodel generate design --text "你好" --control "warm female voice" --engine voxcpm2 --json
+# 返回: {"ok":true,"command":"design","data":{"audio_path":"...","duration":3.5,"engine":"voxcpm2",...}}
+
+# 顶层 design/clone 加 --service 也可走统一服务层（默认仍为 legacy 直调，保持兼容）
+tts-multimodel design --service --text "你好" -o out.wav --json
+```
+
+> CLI 全功能扩展的架构与分阶段路线图见 [`docs/adr/0005-cli-full-feature-expansion.md`](docs/adr/0005-cli-full-feature-expansion.md)。
+
+**桌面安装包用户**：安装器会把 `tts-multimodel` 命令注册到当前用户 PATH（开始菜单也有「TTSMultiModel CLI」快捷方式），因此桌面版同样能直接用上面的命令，无需 `pip install`。前提是在桌面应用「下载管理」页装好运行环境（torch 家族）与至少一套模型；命令默认使用随包目录下的 VoxCPM2 权重，也可显式传 `--model-path` / `--hf-model-id` 覆盖。卸载时安装器会从 PATH 精确移除该条目。若安装前已打开终端/AI Agent，需重开一个会话才能看到新命令。
+
 ### 常见问题（FAQ）
 
 1. **一定要有 GPU 吗？** 本地引擎建议 GPU，但项目注册了 Edge-TTS 在线兜底引擎，无 GPU 也能在 CPU 上体验完整界面与在线合成；要跑 VoxCPM2 / IndexTTS 等本地引擎则建议 6.5 GB+ 显存。
