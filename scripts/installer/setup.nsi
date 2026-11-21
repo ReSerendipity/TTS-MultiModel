@@ -3,6 +3,12 @@
 Unicode true
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
+!include "StrFunc.nsh"
+; CLI 全局命令：PATH 增删需要字符串搜索/替换。安装段与卸载段各用一套函数
+; （StrFunc 的 un 版本必须单独 Using，且不能在同一个宏里混用 install/uninstall 调用）。
+${Using:StrFunc} StrStr
+${Using:StrFunc} UnStrStr
+${Using:StrFunc} UnStrRep
 
 Name "TTSMultiModel 桌面版"
 InstallDir "$LOCALAPPDATA\Programs\TTSMultiModel"
@@ -31,6 +37,75 @@ OutFile "TTSMultiModel-Setup-v2.12.0.exe"
 
 Var StartMenuFolder
 Var TOOLSDIR
+
+; ---------- CLI 全局命令：把 $INSTDIR 追加到当前用户 PATH（幂等）----------
+; 无参数：直接使用 $INSTDIR。函数内部用 $0/$1/$2/$3 须自行压栈保存。
+; 只在 PATH 中不存在该条目时追加，避免重复安装/升级产生重复项。
+Function AddToUserPath
+  Push $0
+  Push $1
+  Push $2
+  Push $3
+  ReadRegStr $1 HKCU "Environment" "Path"
+  ${StrStr} $2 "$1" "$INSTDIR"
+  ${If} $2 == ""
+    ${If} $1 == ""
+      StrCpy $1 "$INSTDIR"
+    ${Else}
+      ; 避免前一条目无尾随分号时粘连
+      StrCpy $3 "$1" 1 -1
+      ${If} $3 == ";"
+        StrCpy $1 "$1$INSTDIR"
+      ${Else}
+        StrCpy $1 "$1;$INSTDIR"
+      ${EndIf}
+    ${EndIf}
+    WriteRegExpandStr HKCU "Environment" "Path" "$1"
+    ; 广播环境变量变更，让新开的终端/AI agent 立即看到 CLI 命令
+    SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
+    DetailPrint "已将 CLI 命令目录加入当前用户 PATH: $INSTDIR"
+  ${Else}
+    DetailPrint "CLI 命令目录已在当前用户 PATH 中，跳过"
+  ${EndIf}
+  Pop $3
+  Pop $2
+  Pop $1
+  Pop $0
+FunctionEnd
+
+; ---------- 卸载：从当前用户 PATH 精确移除 $INSTDIR 条目 ----------
+Function un.RemoveFromUserPath
+  Push $0
+  Push $1
+  Push $2
+  Push $3
+  ReadRegStr $1 HKCU "Environment" "Path"
+  ${UnStrStr} $2 "$1" "$INSTDIR"
+  ${IfNot} $2 == ""
+    ; 先按 ";<entry>" 与 "<entry>;" 两种粘连清理，再兜底精确替换，最后折叠重复分号
+    ${UnStrRep} $1 "$1" ";$INSTDIR" ""
+    ${UnStrRep} $1 "$1" "$INSTDIR;" ""
+    ${UnStrRep} $1 "$1" "$INSTDIR" ""
+    ${UnStrRep} $1 "$1" ";;" ";"
+    ${UnStrRep} $1 "$1" ";;" ";"
+    ; 去掉首尾分号
+    StrCpy $3 "$1" 1
+    ${If} $3 == ";"
+      StrCpy $1 "$1" "" 1
+    ${EndIf}
+    StrCpy $3 "$1" 1 -1
+    ${If} $3 == ";"
+      StrCpy $1 "$1" -1
+    ${EndIf}
+    WriteRegExpandStr HKCU "Environment" "Path" "$1"
+    SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
+    DetailPrint "已从当前用户 PATH 移除 CLI 命令目录: $INSTDIR"
+  ${EndIf}
+  Pop $3
+  Pop $2
+  Pop $1
+  Pop $0
+FunctionEnd
 
 ; ---------- 终止运行中的 TTSMultiModel（壳 + 其 Python 子进程）----------
 !macro KillRunning
@@ -123,6 +198,12 @@ Section "TTSMultiModel 桌面版" SEC_APP
     Abort
   ${EndIf}
 
+  ; ---------- CLI 全局命令：内嵌 shim + 注册当前用户 PATH ----------
+  ; shim 放在安装根目录（PATH 加入的是这一层），运行时再定位 app\bootstrap
+  SetOutPath "$INSTDIR"
+  File "tts-multimodel.cmd"
+  Call AddToUserPath
+
   ; 校验瘦包布局：归档根必须解开成 $INSTDIR\app\，且引导解释器就位
   ; （壳靠 app\bootstrap\python.exe 起后端并把用户带到「下载管理」页）
   ${IfNot} ${FileExists} "$INSTDIR\app\start_portable.py"
@@ -138,6 +219,8 @@ Section "TTSMultiModel 桌面版" SEC_APP
   !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
     CreateDirectory "$SMPROGRAMS\$StartMenuFolder"
     CreateShortcut "$SMPROGRAMS\$StartMenuFolder\TTSMultiModel.lnk" "$INSTDIR\TTSMultiModel.exe"
+    ; CLI 快捷方式：打开命令行窗口并运行 shim，方便不熟终端的用户发现 CLI
+    CreateShortcut "$SMPROGRAMS\$StartMenuFolder\TTSMultiModel CLI.lnk" "$SYSDIR\cmd.exe" '/k "$INSTDIR\tts-multimodel.cmd" --help'
   !insertmacro MUI_STARTMENU_WRITE_END
   CreateShortcut "$DESKTOP\TTSMultiModel.lnk" "$INSTDIR\TTSMultiModel.exe"
 
@@ -183,7 +266,10 @@ Section "Uninstall"
   Delete "$DESKTOP\TTSMultiModel.lnk"
   !insertmacro MUI_STARTMENU_GETFOLDER Application $StartMenuFolder
   Delete "$SMPROGRAMS\$StartMenuFolder\TTSMultiModel.lnk"
+  Delete "$SMPROGRAMS\$StartMenuFolder\TTSMultiModel CLI.lnk"
   RMDir "$SMPROGRAMS\$StartMenuFolder"
+  ; CLI 全局命令：从当前用户 PATH 精确移除安装目录（先删注册表键前处理）
+  Call un.RemoveFromUserPath
   ; 清理注册表
   DeleteRegKey HKCU "Software\TTSMultiModel"
   DeleteRegKey HKCU "${UNINST_KEY}"
