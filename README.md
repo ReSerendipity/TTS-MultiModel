@@ -173,6 +173,22 @@ tts-multimodel serve                                    # 完整 HTTP：/v1 + SS
 
 > `serve` 用于需要 OpenAI 兼容接口（`POST /v1/audio/speech`）或 SSE 的场景；其余能力均可由 CLI 直调，无需起服务。
 
+#### 复用已运行的服务（省去每次生成的模型加载）
+
+CLI 每条命令都是独立进程，`generate *` 直调时每次都要重新加载模型（约 36–41s）。若本机已有常驻 HTTP 服务（桌面版 GUI 运行时会自动拉起，或手工 `tts-multimodel serve` 放在后台），`generate` 与 `batch` 会**自动发现并复用**它，单次生成可降到约 7–9s：
+
+```bash
+tts-multimodel serve --port 7901 &                # 起一次常驻服务（也可用桌面版 GUI）
+tts-multimodel generate design --text "你好" --control "calm male voice" --json
+# 第 1 次含模型加载（≤60s）；此后每次走 HTTP 复用常驻模型（约 7–9s），
+# JSON 的 data.transport 字段为 "http"（直调时无此字段），日志可见「发现常驻服务」
+```
+
+- **服务发现优先级**：`--server URL` > 环境变量 `TTS_CLI_SERVER` > `app/.server_port`（服务启动时自动写入，已 gitignore）。
+- **降级保证**：没有服务、服务停止或超时时，自动回落现有直调路径（stderr 有一条提示）；`--no-remote` 可强制直调（CI/测试用）。
+- **模型自动补载**：服务端引擎未加载时，CLI 自动调用一次 `/api/model/load` 并重试一次，仍失败报 `NOT_READY`(3)。
+- 走 HTTP 的范围：`generate` 全部生成类子命令与 `batch`；`persona`/`history`/`model` 等毫秒级操作始终直调。`generate script --persona-map`（角色→任意路径映射）HTTP 端点无法表达，自动回落直调。
+
 > CLI 全功能扩展的架构与分阶段路线图见 [`docs/adr/0005-cli-full-feature-expansion.md`](docs/adr/0005-cli-full-feature-expansion.md)。
 
 **桌面安装包用户**：安装器会把 `tts-multimodel` 命令注册到当前用户 PATH（开始菜单也有「TTSMultiModel CLI」快捷方式），因此桌面版同样能直接用上面的命令，无需 `pip install`。前提是在桌面应用「下载管理」页装好运行环境（torch 家族）与至少一套模型；命令默认使用随包目录下的 VoxCPM2 权重，也可显式传 `--model-path` / `--hf-model-id` 覆盖。卸载时安装器会从 PATH 精确移除该条目。若安装前已打开终端/AI Agent，需重开一个会话才能看到新命令。

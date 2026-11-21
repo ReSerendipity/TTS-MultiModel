@@ -1040,6 +1040,25 @@ Examples:
         help="Emit machine-readable JSON to stdout (logs go to stderr)",
     )
 
+    # 全局：传输层选择（复用已运行的常驻服务，详见 cli_remote.py 模块文档）。
+    # 与 --json 一样允许写在子命令之后——由 main() 的 argv 预提取实现，
+    # 这里声明是为了 help 文案与命名空间默认值。
+    parser.add_argument(
+        "--server",
+        type=str,
+        default=None,
+        help=(
+            "Base URL of a running server (e.g. http://127.0.0.1:7901). "
+            "Default: auto-discover via app/.server_port / TTS_CLI_SERVER"
+        ),
+    )
+    parser.add_argument(
+        "--no-remote",
+        action="store_true",
+        dest="no_remote",
+        help="Force direct in-process execution, skip server discovery (for CI/tests)",
+    )
+
     subparsers = parser.add_subparsers(dest="command")
 
     # ---- generate 命令族：统一服务层入口（ADR-0005 P0/P1）----
@@ -1486,7 +1505,21 @@ def main():
         argv = [a for a in argv if a != "--json"]
 
     parser = _build_parser()
+
+    # --server / --no-remote 同样允许写在子命令之后：沿用 --json 的 argv 预提取方案
+    from integrated_app.cli_remote import extract_transport_args
+
+    server_arg, no_remote_arg, argv, transport_error = extract_transport_args(argv)
+    if transport_error:
+        parser.error(transport_error)
+
     args = parser.parse_args(argv)
+
+    # 预提取结果回填命名空间（argparse 只能解析位于子命令之前的全局参数）
+    if server_arg is not None:
+        args.server = server_arg
+    if no_remote_arg:
+        args.no_remote = True
 
     # JSON 模式：隔离第三方库的 stdout 输出（如 funasr 的版本横幅），
     # 保证 stdout 只有一行合法 JSON，日志/横幅全部走 stderr。
@@ -1519,6 +1552,18 @@ def main():
         }
         if sub in text_required and not getattr(args, "text", None):
             parser.error(f"`generate {sub}` requires --text")
+
+        # ---- 传输层选择：发现常驻服务时把有模型加载成本的命令改走 HTTP ----
+        # 无服务 / 非 HTTP 命令 / --no-remote 时静默走下方直调分支（默认行为不变）。
+        from integrated_app import cli_remote
+
+        remote = None
+        if sub in cli_remote.HTTP_CAPABLE_SUBS:
+            remote = cli_remote.remote_for_args(args)
+        if remote is not None and cli_remote.supports_remote(args, sub):
+            from integrated_app.cli_output import emit
+
+            return emit(cli_remote.run_generate(args, parser, sub, remote), as_json=as_json)
 
         if sub == "design":
             result = _dispatch_result(lambda a: cli_service.run_design(a, parser), args, command=sub)
@@ -1671,6 +1716,30 @@ def main():
         return cmd_clone(args, parser)
 
     if args.command == "batch":
+        # ---- 传输层选择：发现常驻服务时逐条走 HTTP（收益 = 条数 × 单次加载时间）----
+        # 解析/校验逻辑复用本模块现有函数（cmd_batch 的同名前置步骤），
+        # --resume 跳过判定由 cli_remote.run_batch_tasks 保持一致。
+        from integrated_app import cli_remote
+
+        remote = cli_remote.remote_for_args(args)
+        if (
+            remote is not None
+            and not getattr(args, "prompt_audio", None)
+            and not getattr(args, "reference_audio", None)
+            and not getattr(args, "control", None)
+        ):
+            # HTTP 的 voxcpm_design 端点强制要求音色描述（引擎 ValidationError），
+            # 而 legacy 直调 batch 无 --control 时用 VoxCPM 默认音色——语义不同，
+            # 该场景回落直调，保持默认行为完全不变。
+            remote = None
+        if remote is not None:
+            input_file = require_file_exists(args.input, parser, "input file")
+            Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+            tasks = _parse_batch_input(input_file, args, parser)
+            if not tasks:
+                sys.exit("Error: Input file is empty or contains no valid tasks")
+            prompt_text = validate_batch_args(args, parser)
+            return cli_remote.run_batch_tasks(args, tasks, prompt_text, remote)
         return cmd_batch(args, parser)
 
     return _dispatch_legacy(args, parser)
