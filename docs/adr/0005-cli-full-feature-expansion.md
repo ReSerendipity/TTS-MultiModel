@@ -1,8 +1,8 @@
 # ADR-0005: CLI 全功能扩展（AI-agent 优先）
 
-- 状态： Accepted（P0 已实施并验证，2026-11-21）
+- 状态： Implemented（P0–P4 全部完成，2026-11-21）
 - 日期： 2026-11-21
-- 决策者： owner（本轮范围选择：架构重构先行）
+- 决策者： owner（本轮范围选择：架构重构先行，后续按轮扩展）
 
 ## 背景与目标
 
@@ -358,3 +358,64 @@ tts-multimodel train start --train-manifest M [--save-path DIR] [...] | stop | l
    Python traceback 而非结构化错误。新增 `_dispatch_result` 统一收口：`EngineSwitchError` /
    `EngineNotLoadedError` → `NOT_READY`(3)，其他 `TTSError` → `BUSINESS_ERROR`(1)，
    未预期异常也转 Result（不再崩栈）。
+
+## P4 实施记录（2026-11-21 已完成）
+
+### 交付物
+
+| 文件 | 类型 | 内容 |
+|---|---|---|
+| `app/integrated_app/cli_service_system.py` | 新增 | `serve`（完整 FastAPI）+ system health/gpu/logs/settings；配置递归脱敏 |
+| `app/integrated_app/cli.py` | 修改 | 注册 `serve` 与 `system` 命令组 |
+| `tests/test_cli_service_system.py` | 新增 | 9 例（含脱敏与尾读） |
+
+### 新增命令
+
+```bash
+tts-multimodel serve [--host 127.0.0.1] [--port 7869]   # 完整 HTTP：/v1 + SSE + Web UI
+tts-multimodel system health | gpu | logs [--tail N] | settings
+```
+
+### 实测结果
+
+| 动作 | 结果 | 证据 |
+|---|---|---|
+| system health | ✅ | 平台/CPU/内存/GPU 11.91GB/模型全就位 |
+| system gpu | ✅ | 显存四元组 |
+| system logs --tail 3 | ✅ | 正确读取 logs/app.log |
+| system settings | ✅ | 完整配置快照，敏感字段脱敏 |
+| **serve** | ✅ | 启动后自检 16/16；`/v1/models` 200（tts-1/tts-1-hd）、`/api/system/health/ping` 200、`/api/engines/list` 200 |
+
+### 重要说明
+
+- `serve` 是"双模式混合"的 HTTP 侧：OpenAI `/v1/audio/speech`、SSE `/api/sse/events`、
+  Web UI 页面这些强绑 `Request`/`app.state` 的能力，通过 `serve` 实现 100% 覆盖。
+- **启动耗时约 20-30 秒**（import torch + create_app + 完整性自检），期间端口尚未监听；
+  脚本轮询时应留足等待窗口。
+- `serve` 与 `model load` 的关系：只有同一 `serve` 进程内，`model load` 的状态才对后续
+  请求持续有效；独立 CLI 命令之间不共享显存（见 P3 说明）。
+
+## 最终命令总览（P0–P4 完成态）
+
+```
+tts-multimodel
+├── generate design|clone|ultimate|prompt-continue|script|emotion
+│           |breeze-design|breeze-clone|breeze-direction|edge|convert|edit
+├── design|clone|batch（legacy 兼容；design/clone 支持 --service）
+├── postprocess
+├── persona list|show|save|delete
+├── history list|stats|hide|clear|recycle|restore|purge|export|sync
+├── model status|load|unload|switch
+├── engines list|info
+├── download catalog|status|start|uninstall
+├── lora list|load|unload|toggle|state
+├── train start|stop|log
+├── system health|gpu|logs|settings
+└── serve
+```
+
+覆盖度对照（约 100 个 HTTP 端点 / 7 个引擎 / 37 类功能）：
+
+- **直调覆盖**：全部合成动作、音色管理、历史管理、模型管理、下载管理、LoRA、训练、只读运维；
+- **serve 覆盖**：OpenAI `/v1` 兼容面、SSE、HTMX 页面、settings 写入、shutdown 等强绑 HTTP 的能力；
+- **明确不支持**：需要交互式 Web UI 的操作（如页面内拖拽、实时表单预览）——本就不属于 CLI 语义。

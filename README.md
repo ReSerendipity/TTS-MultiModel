@@ -157,6 +157,22 @@ tts-multimodel postprocess        --audio a.wav --tempo 1.1 --enhance
 
 > 依赖缺失的引擎（如 Breeze / Voicebox / Step-Audio）会返回 `NOT_READY`（退出码 3）并给出明确指引，不会静默失败。
 
+完整命令族（`--help` 查看每个子命令）：
+
+```bash
+tts-multimodel persona  list|show|save|delete          # 音色库
+tts-multimodel history  list|stats|hide|clear|recycle|restore|purge|export|sync
+tts-multimodel model    status|load|unload|switch       # 模型生命周期
+tts-multimodel engines  list|info                       # 引擎能力发现
+tts-multimodel download catalog|status|start|uninstall   # 环境包/模型下载
+tts-multimodel lora     list|load|unload|toggle|state    # LoRA 权重
+tts-multimodel train    start|stop|log                   # LoRA 微调
+tts-multimodel system   health|gpu|logs|settings         # 只读运维视图
+tts-multimodel serve                                    # 完整 HTTP：/v1 + SSE + Web UI
+```
+
+> `serve` 用于需要 OpenAI 兼容接口（`POST /v1/audio/speech`）或 SSE 的场景；其余能力均可由 CLI 直调，无需起服务。
+
 > CLI 全功能扩展的架构与分阶段路线图见 [`docs/adr/0005-cli-full-feature-expansion.md`](docs/adr/0005-cli-full-feature-expansion.md)。
 
 **桌面安装包用户**：安装器会把 `tts-multimodel` 命令注册到当前用户 PATH（开始菜单也有「TTSMultiModel CLI」快捷方式），因此桌面版同样能直接用上面的命令，无需 `pip install`。前提是在桌面应用「下载管理」页装好运行环境（torch 家族）与至少一套模型；命令默认使用随包目录下的 VoxCPM2 权重，也可显式传 `--model-path` / `--hf-model-id` 覆盖。卸载时安装器会从 PATH 精确移除该条目。若安装前已打开终端/AI Agent，需重开一个会话才能看到新命令。

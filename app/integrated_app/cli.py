@@ -1293,6 +1293,21 @@ Examples:
     t_log.add_argument("--save-path", help="Training output dir (to locate logs)")
     t_log.add_argument("--tail", type=int, default=80, help="Number of trailing lines (default 80)")
 
+    # ---- serve：拉起完整 FastAPI（覆盖 /v1、SSE、页面等 HTTP 专属能力）----
+    serve_parser = subparsers.add_parser("serve", help="Start the full HTTP server (OpenAI /v1, SSE, Web UI)")
+    serve_parser.add_argument("--host", default="127.0.0.1", help="Bind address (default 127.0.0.1)")
+    serve_parser.add_argument("--port", type=int, default=7869, help="Port (default 7869, auto-increment if busy)")
+
+    # ---- 系统运维（只读视图）----
+    system_parser = subparsers.add_parser("system", help="Read-only system views: health / gpu / logs / settings")
+    system_sub = system_parser.add_subparsers(dest="system_command")
+    system_sub.add_parser("health", help="Environment health: platform / memory / GPU / models")
+    system_sub.add_parser("gpu", help="GPU device and VRAM usage")
+    s_logs = system_sub.add_parser("logs", help="Tail the application log")
+    s_logs.add_argument("--file", help="Explicit log file (default: newest under logs/)")
+    s_logs.add_argument("--tail", type=int, default=100, help="Number of trailing lines (default 100)")
+    system_sub.add_parser("settings", help="Current config snapshot (secrets masked)")
+
     design_parser = subparsers.add_parser("design", help="Generate speech with voice design")
     _add_common_generation_args(design_parser)
     _add_prompt_reference_args(design_parser)
@@ -1607,6 +1622,32 @@ def main():
         if handler is None:
             parser.error(f"Unknown {args.command} subcommand: {sub}")
         return emit(_dispatch_result(handler, args, command=f"{args.command}-{sub}"), as_json=as_json)
+
+    # ---- serve：完整 HTTP 服务（ADR-0005 P4，阻塞运行）----
+    if args.command == "serve":
+        from integrated_app.cli_service_system import cmd_serve
+
+        return cmd_serve(args)
+
+    # ---- 系统运维（ADR-0005 P4）----
+    if args.command == "system":
+        from integrated_app import cli_service_system
+        from integrated_app.cli_output import emit
+
+        sub = getattr(args, "system_command", None)
+        if sub is None:
+            parser.error("`system` requires a subcommand (health | gpu | logs | settings)")
+
+        system_handlers = {
+            "health": cli_service_system.cmd_system_health,
+            "gpu": cli_service_system.cmd_system_gpu,
+            "logs": cli_service_system.cmd_system_logs,
+            "settings": cli_service_system.cmd_system_settings,
+        }
+        handler = system_handlers.get(sub)
+        if handler is None:
+            parser.error(f"Unknown system subcommand: {sub}")
+        return emit(_dispatch_result(handler, args, command=f"system-{sub}"), as_json=as_json)
 
     # ---- 顶层 design/clone：默认 legacy（保护现有行为），--service 走服务层 ----
     if args.command == "design":
