@@ -34,6 +34,7 @@
 | [`CODING_STANDARDS.md`](CODING_STANDARDS.md) | 入库内容的可移植性、依赖与 Git 卫生约束 | 现行 | 2026-11-10 |
 | [`DOD.md`](DOD.md) | 完成定义（Definition of Done） | 现行 | 2026-11-10 |
 | [`EXCEPTION_SUPPRESSION_LEDGER.md`](EXCEPTION_SUPPRESSION_LEDGER.md) | 异常吞没（except…: pass）分级台账与治理进度 | 现行 | 2026-11-10 |
+| [`GOTCHAS.md`](GOTCHAS.md) | 踩坑记录（触发场景 / 现象 / 正确做法），当前含 transformers 5.x 迁移与引擎依赖 7 条 | 现行 | 2026-11-21 |
 | [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) | TTS MultiModel 隐私政策 | 现行 | 2026-11-10 |
 | [`README.md`](README.md) | docs 分层导读（安全 / 许可 / 规范 / 运维 / 发布治理分组） | 现行 | 2026-11-10 |
 | [`SECURITY.md`](SECURITY.md) | 安全政策与漏洞披露渠道（GitHub 只认仓根 SECURITY.md / .github 策略入口，本文件为规范正文） | 现行 | 2026-11-10 |
