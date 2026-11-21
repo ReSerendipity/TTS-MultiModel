@@ -2,6 +2,21 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。同理，条目中提及的 `docs/project/`、`docs/_devarchive/`、`docs/reports/`、`docs/agents/` 等本地文档路径已于 2026-11-04 迁至 `local/docs-archive/`（本地归档，未随仓库发布），条目内路径按迁移前写法原样保留。
 
+## [2.11.2](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.11.1...v2.11.2) (2026-11-19)
+
+
+### Bug Fixes
+
+* **docker:** 两阶段 ensurepip 后升级 setuptools&gt;=78.1.1，消 Trivy HIGH ([6006254](https://github.com/ReSerendipity/TTS-MultiModel/commit/600625478924ed5426e34b6931660ec9bd14fb3a))
+* **security:** setuptools A21 分诊登记 + D3 计数连动，补全豁免三处同步 ([ed6c3dc](https://github.com/ReSerendipity/TTS-MultiModel/commit/ed6c3dc0e83a0080854e6c7ac6698307e67461e5))
+* **security:** Trivy setuptools 70.3.0 归因误报按 §10.4 登记豁免（带证据链与到期） ([5dd2308](https://github.com/ReSerendipity/TTS-MultiModel/commit/5dd2308811287396c2a9a904744b4809178f48cf))
+
+
+### Documentation
+
+* **ledger:** 补记 Trivy setuptools 归因误报取证链（[#212](https://github.com/ReSerendipity/TTS-MultiModel/issues/212)） ([490e561](https://github.com/ReSerendipity/TTS-MultiModel/commit/490e561b24ee37149e6a9d2f25e3e713e27312db))
+* **todo:** 归档 10 个已闭环段至 _archive（§18.4 A 轨） ([5f8ee67](https://github.com/ReSerendipity/TTS-MultiModel/commit/5f8ee674bf47251f2c22ca6b24da43801077a995))
+
 ## [2.11.1](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.11.0...v2.11.1) (2026-11-18)
 
 

@@ -1,6 +1,6 @@
 {
-  "version": "2.11.1",
+  "version": "2.11.2",
   "release_date": "2026-11-18",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.11.1：修复运行时状态检测只读 bootstrap 根、漏掉 bootstrap/python 嵌套解释器的问题——优先识别带 RUNTIME.json 的嵌套运行时；同时要求 site-packages/torch 真实存在，避免只剩 RUNTIME.json 时仍显示“已安装”；卸载 bootstrap 子树时只清理 torch 家族与 RUNTIME.json，不删除正在使用的解释器。"
+  "changelog": "2.11.2：容器镜像构建修复——两阶段 ensurepip 后升级 setuptools>=78.1.1，消除基础镜像的 Trivy HIGH 发现；桌面、安装器与部署清单版本位随版同步。"
 }
