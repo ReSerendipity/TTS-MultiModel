@@ -567,10 +567,15 @@ def cmd_batch(args, parser):
     total = len(tasks)
     success_count = 0
     fail_count = 0
+    skip_count = 0
+    resume_mode = bool(getattr(args, "resume", False))
     start_time = time.time()
 
     logger.info(f"\n{'=' * 50}")
-    logger.info(f"Batch processing: {total} tasks | Format: {output_format.upper()} | Engine: {engine or 'auto'}")
+    logger.info(
+        f"Batch processing: {total} tasks | Format: {output_format.upper()} | Engine: {engine or 'auto'}"
+        f"{' | resume' if resume_mode else ''}"
+    )
     logger.info(f"{'=' * 50}\n")
 
     for i, task in enumerate(tasks, 1):
@@ -579,6 +584,21 @@ def cmd_batch(args, parser):
         task_output_name = task.get("output")
 
         try:
+            # 确定输出文件名（resume 判定需要提前算出来）
+            if task_output_name:
+                out_name = task_output_name
+                if not out_name.endswith(f".{output_format}"):
+                    out_name = f"{out_name}.{output_format}"
+            else:
+                out_name = f"output_{i:03d}.{output_format}"
+            output_file = output_dir / out_name
+
+            # resume：已存在且非空视为已完成，直接跳过（断点续跑）
+            if resume_mode and output_file.is_file() and output_file.stat().st_size > 0:
+                skip_count += 1
+                logger.info(f"[{i}/{total}] SKIP (already exists): {out_name}")
+                continue
+
             final_text = build_final_text(text, control)
             audio_array = model.generate(
                 text=final_text,
@@ -591,15 +611,6 @@ def cmd_batch(args, parser):
                 denoise=args.denoise and (prompt_audio_path is not None or reference_audio_path is not None),
             )
 
-            # 确定输出文件名
-            if task_output_name:
-                out_name = task_output_name
-                if not out_name.endswith(f".{output_format}"):
-                    out_name = f"{out_name}.{output_format}"
-            else:
-                out_name = f"output_{i:03d}.{output_format}"
-
-            output_file = output_dir / out_name
             sample_rate = model.tts_model.sample_rate
 
             if output_format == "mp3":
@@ -623,7 +634,7 @@ def cmd_batch(args, parser):
     elapsed_total = time.time() - start_time
     logger.info(f"\n{'=' * 50}")
     logger.info(
-        f"Batch complete: {success_count}/{total} succeeded, {fail_count} failed "
+        f"Batch complete: {success_count}/{total} succeeded, {fail_count} failed, {skip_count} skipped "
         f"| Total time: {elapsed_total:.1f}s | Avg: {elapsed_total / max(success_count, 1):.2f}s/task"
     )
     logger.info(f"Output: {output_dir.resolve()}")
@@ -1129,6 +1140,67 @@ Examples:
     post.add_argument("--no-normalize", dest="normalize", action="store_false", help="Disable loudness normalization")
     post.add_argument("--output", "-o", help="Output path (default: <input>_post.wav)")
 
+    # ---- 音色库管理（ADR-0005 P2）----
+    persona_parser = subparsers.add_parser("persona", help="Manage the voice persona library")
+    persona_sub = persona_parser.add_subparsers(dest="persona_command")
+
+    p_list = persona_sub.add_parser("list", help="List personas (optional keyword filter)")
+    p_list.add_argument("--keyword", default="", help="Case-insensitive name filter")
+
+    p_show = persona_sub.add_parser("show", help="Show one persona with consent state")
+    p_show.add_argument("--name", required=True, help="Persona name")
+
+    p_save = persona_sub.add_parser("save", help="Save a persona from a reference audio")
+    p_save.add_argument("--name", required=True, help="Persona name")
+    p_save.add_argument("--audio", required=True, help="Reference audio path")
+    p_save.add_argument("--ref-text", default="", help="Transcript of the reference audio")
+    p_save.add_argument("--overwrite", action="store_true", help="Overwrite if the persona exists")
+    p_save.add_argument(
+        "--consent", default="self", choices=["self", "granted", "unverified"], help="Voice consent state"
+    )
+
+    p_delete = persona_sub.add_parser("delete", help="Delete a persona and its files")
+    p_delete.add_argument("--name", required=True, help="Persona name")
+
+    # ---- 历史记录管理（ADR-0005 P2）----
+    history_parser = subparsers.add_parser("history", help="Manage generation history")
+    history_sub = history_parser.add_subparsers(dest="history_command")
+
+    h_list = history_sub.add_parser("list", help="List history records (paginated)")
+    h_list.add_argument("--limit", type=int, default=20, help="Page size (default 20)")
+    h_list.add_argument("--offset", type=int, default=0, help="Offset (default 0)")
+    h_list.add_argument("--keyword", default="", help="Search keyword")
+    h_list.add_argument("--time-filter", default="all", help="Time filter (default all)")
+    h_list.add_argument("--duration-filter", default="all", help="Duration filter (default all)")
+    h_list.add_argument("--include-hidden", action="store_true", help="Include hidden records")
+    h_list.add_argument("--include-missing", action="store_true", help="Include records whose files are gone")
+
+    history_sub.add_parser("stats", help="Aggregate history statistics")
+
+    h_hide = history_sub.add_parser("hide", help="Hide records by filename (recoverable)")
+    h_hide.add_argument("--files", required=True, help="Comma-separated filenames")
+
+    h_clear = history_sub.add_parser("clear", help="Clear all history")
+    h_clear.add_argument("--hard", action="store_true", help="Physically delete (default: soft hide)")
+
+    h_recycle = history_sub.add_parser("recycle", help="List recycle bin (hidden records)")
+    h_recycle.add_argument("--limit", type=int, default=50, help="Page size (default 50)")
+    h_recycle.add_argument("--offset", type=int, default=0, help="Offset (default 0)")
+
+    h_restore = history_sub.add_parser("restore", help="Restore records from recycle bin by ID")
+    h_restore.add_argument("--ids", required=True, help="Comma-separated record IDs")
+
+    h_purge = history_sub.add_parser("purge", help="Physically purge expired recycle records")
+    h_purge.add_argument("--keep-days", type=int, default=30, help="Retention days (default 30)")
+
+    h_export = history_sub.add_parser("export", help="Export history audio files to a ZIP")
+    h_export.add_argument("--files", required=True, help="Comma-separated filenames")
+    h_export.add_argument("--output", "-o", help="Output ZIP path")
+
+    h_sync = history_sub.add_parser("sync", help="Sync filesystem audio into history DB")
+    h_sync.add_argument("--output-dir", help="Directory to scan (default: outputs/)")
+    h_sync.add_argument("--since", type=float, default=0.0, help="Only files newer than this mtime")
+
     design_parser = subparsers.add_parser("design", help="Generate speech with voice design")
     _add_common_generation_args(design_parser)
     _add_prompt_reference_args(design_parser)
@@ -1202,6 +1274,11 @@ Examples:
         choices=["voxcpm2", "indextts2"],
         default=None,
         help="TTS engine to use (default: auto)",
+    )
+    batch_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume mode: skip items whose output file already exists and is non-empty",
     )
     _add_model_args(batch_parser)
     _add_lora_args(batch_parser)
@@ -1288,6 +1365,11 @@ def main():
     )
     _sys.stderr.flush()
 
+    # CLI 直跑时没有应用层的 logging 配置，logger.info 全部被丢弃（batch 进度、
+    # 加载状态等用户看不到）。这里给 root logger 装一个 stderr handler：
+    # 已有 handler 时 basicConfig 是 no-op，不会覆盖引擎自身的日志配置。
+    logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s", stream=_sys.stderr)
+
     # --json 允许出现在任意位置（含子命令之后）：argparse 的全局选项默认只能放在
     # 子命令前，但 AI agent 自然会把 --json 写在末尾。这里先从 argv 中提取并剔除，
     # 再交给 argparse 解析，避免在每个子解析器重复声明造成 dest 默认值互相覆盖。
@@ -1367,6 +1449,35 @@ def main():
         from integrated_app.cli_output import emit
 
         return emit(cli_service_ext.run_postprocess(args, parser), as_json=as_json)
+
+    # ---- 音色库 / 历史记录（ADR-0005 P2）----
+    if args.command in ("persona", "history"):
+        from integrated_app import cli_service_data
+        from integrated_app.cli_output import emit
+
+        sub = getattr(args, f"{args.command}_command", None)
+        if sub is None:
+            parser.error(f"`{args.command}` requires a subcommand (use --help to list them)")
+
+        handlers = {
+            ("persona", "list"): cli_service_data.cmd_persona_list,
+            ("persona", "show"): cli_service_data.cmd_persona_show,
+            ("persona", "save"): cli_service_data.cmd_persona_save,
+            ("persona", "delete"): cli_service_data.cmd_persona_delete,
+            ("history", "list"): cli_service_data.cmd_history_list,
+            ("history", "stats"): cli_service_data.cmd_history_stats,
+            ("history", "hide"): cli_service_data.cmd_history_hide,
+            ("history", "clear"): cli_service_data.cmd_history_clear,
+            ("history", "recycle"): cli_service_data.cmd_history_recycle,
+            ("history", "restore"): cli_service_data.cmd_history_restore,
+            ("history", "purge"): cli_service_data.cmd_history_purge,
+            ("history", "export"): cli_service_data.cmd_history_export,
+            ("history", "sync"): cli_service_data.cmd_history_sync,
+        }
+        handler = handlers.get((args.command, sub))
+        if handler is None:
+            parser.error(f"Unknown {args.command} subcommand: {sub}")
+        return emit(handler(args), as_json=as_json)
 
     # ---- 顶层 design/clone：默认 legacy（保护现有行为），--service 走服务层 ----
     if args.command == "design":

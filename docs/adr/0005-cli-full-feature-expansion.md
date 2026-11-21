@@ -246,3 +246,63 @@ tts-multimodel postprocess              --audio A [--tempo 1.1] [--enhance] [--t
    避免 CLI 另写一套配置逻辑漂移。
 3. **Edge-TTS 产物是 MP3 且无时长**：`_synthesize_edge_tts_wav` 返回 `(filename, size)`，
    duration 暂记 0（后续可用 ffprobe/mutagen 补）。
+
+## P2 实施记录（2026-11-21 已完成）
+
+### 交付物
+
+| 文件 | 类型 | 内容 |
+|---|---|---|
+| `app/integrated_app/cli_service_data.py` | 新增 | 数据域适配：persona（list/show/save/delete）+ history（list/stats/hide/clear/recycle/restore/purge/export/sync） |
+| `app/integrated_app/cli.py` | 修改 | 注册 `persona` / `history` 命令组；`batch --resume`；补 logging 配置 |
+| `tests/test_cli_service_data.py` | 新增 | 16 例（含 ZIP 路径遍历防护） |
+
+### 新增命令
+
+```bash
+tts-multimodel persona list [--keyword K]
+tts-multimodel persona show --name N
+tts-multimodel persona save --name N --audio A [--ref-text T] [--overwrite] [--consent self|granted|unverified]
+tts-multimodel persona delete --name N
+
+tts-multimodel history list [--limit 20] [--offset 0] [--keyword K] [--include-hidden]
+tts-multimodel history stats
+tts-multimodel history hide --files a.wav,b.wav
+tts-multimodel history clear [--hard]
+tts-multimodel history recycle [--limit 50]
+tts-multimodel history restore --ids 1,2,3
+tts-multimodel history purge [--keep-days 30]
+tts-multimodel history export --files a.wav,b.wav -o out.zip
+tts-multimodel history sync [--output-dir DIR]
+
+tts-multimodel batch --input texts.txt --output-dir ./outs --resume
+```
+
+### 实测结果
+
+| 动作 | 结果 | 证据 |
+|---|---|---|
+| persona list | ✅ | 6 个音色，字段固定（name/status/file_size/created_at/description） |
+| persona show | ✅ | 含 `consent_state=unverified` 与 ref_text 全文 |
+| history stats | ✅ | 709 条记录、4 个引擎 |
+| history list | ✅ | 分页 + 完整字段（含 HMAC/feedback 等） |
+| history export | ✅ | 生成合法 ZIP，1 个文件 |
+| history hide（不存在文件） | ✅ | hidden=0，不误伤 |
+| history recycle | ✅ | 回收站列表 |
+| history sync | ✅ | 返回最新 mtime |
+| history purge（keep 99999） | ✅ | purged=0，安全 |
+| batch --resume | ✅ | 2 个已存在输出全部 SKIP，0.0s |
+
+### P2 期间发现并处理的问题
+
+1. **`get_persona_detail_table` 列序与直觉不同**：实际为
+   `name / status / file_size / created_at / description`（不是 名称/描述/路径/大小/时间）。
+   直接按直觉映射会导致字段错位，已按其 docstring 修正。
+2. **`PersonaService.get_persona` 存在既有解包 bug**：`wav_path, ref_text = embedding`
+   抛 `ValueError: not enough values to unpack`。CLI 绕开该服务，直接读
+   `persona_manager` 表格 + 磁盘文件（不改动既有代码，避免超出本轮范围）。
+3. **CLI 完全没有 logging 配置**：`logger.info` 全被丢弃，batch 的进度/跳过/汇总用户看不见。
+   在 `main()` 补 `logging.basicConfig(..., stream=stderr)`；有 handler 时是 no-op，
+   不影响引擎自身配置，也不污染 `--json` 的 stdout。
+4. **`sync_from_filesystem` 返回的是最新 mtime 而非条目数**：字段名从 `synced`
+   改为 `latest_mtime`，避免误导 agent。
