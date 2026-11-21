@@ -149,14 +149,20 @@ class VoiceboxEngine:
                 f"VoiceboxEngine: 模型目录不存在: {model_dir}。请下载 OpenVoice ToneColorConverter 权重到该目录。"
             )
 
-        # 懒导入依赖
+        # 懒导入依赖（openvoice 新版权威路径为 openvoice.api；旧版从包根导出）
         try:
             import torch
-            from openvoice import ToneColorConverter
         except ImportError as e:
-            raise ImportError(
-                f"VoiceboxEngine: 缺少依赖 openvoice。请安装: pip install openvoice (原始错误: {e})"
-            ) from e
+            raise ImportError(f"VoiceboxEngine: 缺少依赖 torch。请安装: pip install torch (原始错误: {e})") from e
+        try:
+            from openvoice.api import ToneColorConverter
+        except ImportError:
+            try:
+                from openvoice import ToneColorConverter
+            except ImportError as e:
+                raise ImportError(
+                    f"VoiceboxEngine: 缺少依赖 openvoice。请安装: pip install openvoice (原始错误: {e})"
+                ) from e
 
         # 自动检测设备
         if self.device is None:
@@ -324,7 +330,11 @@ class VoiceboxEngine:
         try:
             import torch
 
-            # 提取目标说话人嵌入
+            # 提取说话人嵌入：src/tgt 均须由各自音频提取（OpenVoice SE 形状
+            # (1, 256, 1)）。convert 直接以 src_se/tgt_se 作为 enc_q/dec 的
+            # 条件向量，不会对源音频重编码——src_se 用占位/零向量会导致
+            # 形状不匹配或音色错乱
+            src_se = self._extract_speaker_embedding(source_audio, torch)
             tgt_se = self._extract_speaker_embedding(target_audio, torch)
 
             # 执行音色转换
@@ -337,7 +347,7 @@ class VoiceboxEngine:
 
             self._converter.convert(
                 audio_src_path=source_audio,
-                src_se=self._src_se,
+                src_se=src_se,
                 tgt_se=tgt_se,
                 output_path=output_path,
                 tau=tau,
@@ -403,7 +413,9 @@ class VoiceboxEngine:
         with torch.no_grad():
             # ToneColorConverter 内部通常有 extract_se 方法或通过 ref_enc 提取
             if hasattr(self._converter, "extract_se"):
-                se = self._converter.extract_se(audio_tensor, sr)
+                # OpenVoice 的 extract_se 需要文件路径（内部自行 librosa.load
+                # 并重采样到引擎采样率），传音频 tensor 会触发 soundfile TypeError
+                se = self._converter.extract_se(str(audio_path))
             elif hasattr(self._converter, "ref_enc"):
                 # 直接调用参考编码器
                 mel = self._converter.extract_mel(audio_tensor, sr)
