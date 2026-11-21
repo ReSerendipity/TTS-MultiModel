@@ -436,13 +436,21 @@ _RELEASE_TAG = re.compile(r"v(\d+\.\d+\.\d+)")
 
 
 def _git(*args: str) -> tuple[int, str]:
-    """跑 git 并返回 (rc, stdout)。git 不存在或不在仓库里时由调用方决定 skip。"""
+    """跑 git 并返回 (rc, stdout)。git 不存在或不在仓库里时由调用方决定 skip。
+
+    必须显式 ``encoding="utf-8"``：``text=True`` 会用系统默认编码解码子进程输出，
+    中文 Windows 上是 GBK；git 输出含非 GBK 字节时，``subprocess`` 的读取线程会抛
+    ``UnicodeDecodeError``（'gbk' codec can't decode byte ...），表现为 stdout 缺失、
+    版本/tag 断言在全量测试中随机变红（单独跑又通过）。显式 UTF-8 + replace 兜底。
+    """
     try:
         proc = subprocess.run(
             ["git", *args],
             cwd=str(PROJECT_ROOT),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=30,
         )
         return proc.returncode, proc.stdout.strip()
