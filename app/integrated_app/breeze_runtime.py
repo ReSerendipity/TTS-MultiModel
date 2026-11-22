@@ -146,6 +146,11 @@ def run_isolated_breeze(args: Any, mode: str) -> dict[str, Any] | None:
         # 统一转绝对路径：子进程 cwd=项目根，父进程 cwd 可能不同（如 app/），
         # 相对路径会在两处各解析一次，导致重复产物（outputs/ 与 app/outputs/）。
         cmd += ["--output", str(Path(output).expanduser().resolve())]
+    # 关键：委托子进程必须 --no-remote（进程内直跑 4.57.3）。
+    # 否则 venv CLI 会自动发现常驻服务并把请求 HTTP 弹回本服务——本服务再委托
+    # venv……形成递归，表现为信号量互等 / 「系统繁忙（等待超时）」。
+    # （2026-11-22 安装版实测踩坑：首跑 90s 废音频 + 后续全部等待超时。）
+    cmd.append("--no-remote")
     cmd.append("--json")
 
     try:

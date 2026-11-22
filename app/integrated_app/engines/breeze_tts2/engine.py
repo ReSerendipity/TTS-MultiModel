@@ -356,7 +356,7 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
 
         args = argparse.Namespace(
             text=text,
-            control=None,
+            control=instruction,  # design/direction 的 instruction 经 --control 传入 venv CLI
             reference_audio=ref_audio_path,
             ref_text=ref_text,
             cfg_scale=cfg_scale,
