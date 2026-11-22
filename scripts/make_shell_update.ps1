@@ -22,7 +22,7 @@ param(
     [string]$OutDir = '',
     [string]$Changelog = '',
     [string]$RepoOwner = 'ReSerendipity',
-    [string]$RepoName = 'TTS_MultiModel'
+    [string]$RepoName = 'TTS-MultiModel'
 )
 
 $ErrorActionPreference = 'Stop'

@@ -13,8 +13,8 @@ desktop/
 │   └── desktop-bridge.js     # 前端桥接：托盘/通知/拖拽/更新对话框/标题联动（浏览器模式自动降级）
 └── src-tauri/
     ├── Cargo.toml            # Rust 依赖
-    ├── tauri.conf.json       # 应用配置（productName/identifier/updater）
-    ├── capabilities/main.json# IPC 权限：core+notification+updater，remote 放行 127.0.0.1
+    ├── tauri.conf.json       # 应用配置（productName/identifier）
+    ├── capabilities/main.json# IPC 权限：core+notification+自研 updater 命令，remote 放行 127.0.0.1
     └── src/
         ├── main.rs           # 入口：单实例/插件注册/命令/窗口事件/watchdog/退出兜底
         ├── python_process.rs # Python 子进程生命周期（启动/健康检查/重启/进程树终止）
@@ -70,6 +70,11 @@ cargo build         # 产出 target/debug/tts-multimodel-desktop.exe
 
 ## 增量更新契约
 
+- 唯一更新路线：`updater.rs` 扫描 Release 资产里的 `app-v{version}.zip`，只换代码，
+  `runtime/` `model/` `data/` `logs/` 原样保留（无需重下 torch 与权重）
+- 产线：`.github/workflows/shell-update.yml` 在 `v*` tag push 时跑
+  `scripts/make_shell_update.ps1`，把 `app-v{ver}.zip` / `.sha256` / `shell-update.json` /
+  `SHA256SUMS.txt` 挂到同 tag Release（与 `desktop-installer.yml` 的全量安装包并行，但面向不同入口）
 - GitHub Release 上传 `app-v{version}.zip`（zip 根 = app/ 目录内容）+ `.sha256`
 - 更新包内必须含 `version.json`（`{"version","release_date","minimum_shell_version","changelog"}`）
 - 执行序列：下载 → SHA256 校验 → 解压 `app.new/` → 停 Python（taskkill /T）→ 原子换载
@@ -83,8 +88,8 @@ cargo build         # 产出 target/debug/tts-multimodel-desktop.exe
 - 托盘「检查更新」在启动页阶段结果仅托盘标记，对话框等页面就绪后手动检查再弹。
 - 拖拽多文件落**文件夹**才切批量；散文件取首个进单文件流程。
 - GitHub 未认证 API 限速 60/h；自动检查有 10 分钟节流。
-- 壳更新（`tauri-plugin-updater`）的 `pubkey` 已替换为 TTS MultiModel 自有密钥对
-  （2026-09-10 生成，私钥离线备份于本机 backups/，严禁入库）。
+- 更新只走**自研 `updater.rs` 原子换载**一条路线（代码增量 zip → app.new/ → 换名 → 健康检查 → 失败回滚）；
+  曾注册但从未调用的 `tauri-plugin-updater` 已移除，避免配置与实现两队维护。
 - WebView2 缺失（LTSC）时启动失败，AI-3 安装包需带引导（Tauri 默认 bootstrapper）。
 
 ## 交接与后续

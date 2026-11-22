@@ -6,7 +6,6 @@
   "permissions": [
     "core:default",
     "notification:default",
-    "updater:default",
     "allow-read-dragged-file",
     "allow-check-update",
     "allow-get-pending-update",

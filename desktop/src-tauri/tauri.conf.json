@@ -30,16 +30,5 @@
         "installMode": "currentUser"
       }
     }
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFGQkUxRTY0MUIyNkU0NkQKUldSdDVDWWJaQjYrcis2MDB0OUh5Y05yUW1XV3VJNWo5a2IvSXVBM2Q0Wmk4cW82cTN0ZlVoS2QK",
-      "endpoints": [
-        "https://github.com/ReSerendipity/TTS-MultiModel/releases/latest/download/shell-update.json"
-      ],
-      "windows": {
-        "installMode": "passive"
-      }
-    }
   }
 }

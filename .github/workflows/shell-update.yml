@@ -1,0 +1,116 @@
+name: Shell Update (Windows)
+
+# 桌面壳「检查更新」用的代码增量包产线。
+#
+# 背景：桌面壳只保留一条更新路线（自研 updater.rs 原子换载）。它从 Release
+# 资产里找 app-v{ver}.zip，只替换 app/ 代码，保留 runtime/ model/ data/ logs/。
+# 本 workflow 在 tag push 时产出该 zip 并挂到同 tag 的 Release——否则老用户
+# 点「检查更新」会扫到新版本但找不到包。
+#
+# 触发：push tag v*（与 desktop-installer.yml 并行）；另支持手动补发。
+# 产物（几 MB 级，不含 torch / 模型 / 用户数据）：
+#   app-v{ver}.zip / .zip.sha256 / shell-update.json / SHA256SUMS.txt
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '目标 Release tag（如 v2.12.0）；留空则使用触发 ref'
+        required: false
+        type: string
+      dry_run:
+        description: '只构建，不上传 Release'
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shell-update-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  shell-update:
+    name: Build shell increment (windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Resolve target tag
+        id: target
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "非法 tag：$tag（要求 vX.Y.Z）" }
+          $ver = $tag.Substring(1)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "tag=$tag" -Encoding utf8
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "version=$ver" -Encoding utf8
+          Write-Host "target=$tag version=$ver"
+
+      - name: Checkout tag source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.tag }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Version consistency (tag == version.json)
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.target.outputs.version }}"
+          $vj = Get-Content -LiteralPath version.json -Raw -Encoding utf8 | ConvertFrom-Json
+          if ($vj.version -ne $ver) { throw "version.json=$($vj.version) 与 tag v$ver 不一致" }
+          Write-Host "version.json OK: $($vj.version)"
+
+      - name: Build increment zip
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.target.outputs.version }}"
+          $changelog = (Get-Content -LiteralPath version.json -Raw -Encoding utf8 | ConvertFrom-Json).changelog
+          .\scripts\make_shell_update.ps1 -Version $ver -Changelog $changelog -OutDir 'dist/shell-update'
+          if ($LASTEXITCODE -ne 0) { throw "make_shell_update.ps1 失败" }
+          Get-ChildItem -LiteralPath 'dist/shell-update' | Select-Object Name, Length
+
+      - name: Upload to Release
+        if: ${{ !inputs.dry_run }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.target.outputs.tag }}"
+          $ver = "${{ steps.target.outputs.version }}"
+          $dir = 'dist/shell-update'
+          $assets = @(
+            "app-v$ver.zip",
+            "app-v$ver.zip.sha256",
+            'shell-update.json',
+            'SHA256SUMS.txt'
+          )
+          $existing = gh release view $tag --json assets --jq '.assets[].name' 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Release $tag 不存在，增量包仅保留在 workflow artifact"
+            exit 0
+          }
+          foreach ($asset in $assets) {
+            $path = Join-Path $dir $asset
+            if (-not (Test-Path -LiteralPath $path)) { throw "缺少产物：$asset" }
+            if ($existing -contains $asset) { Write-Host "skip existing asset: $asset"; continue }
+            gh release upload $tag $path
+            if ($LASTEXITCODE -ne 0) { throw "上传失败：$asset" }
+          }
+          Write-Host '--- release assets ---'
+          gh release view $tag --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"'
+
+      - name: Upload workflow artifact (fallback)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: shell-update-${{ steps.target.outputs.version }}
+          path: dist/shell-update/
+          if-no-files-found: warn
