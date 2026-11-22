@@ -2,6 +2,16 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。同理，条目中提及的 `docs/project/`、`docs/_devarchive/`、`docs/reports/`、`docs/agents/` 等本地文档路径已于 2026-11-04 迁至 `local/docs-archive/`（本地归档，未随仓库发布），条目内路径按迁移前写法原样保留。
 
+## [2.12.5](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.12.4...v2.12.5) (2026-11-22)
+
+
+### Bug Fixes
+
+* **ui:** 语言下拉菜单点击无响应根治——TTSApp.lang 桥接补挂 openMenu；部分 WebView2 环境下 JS 注入样式表不参与级联，菜单落到文档末尾不可见，改为关键样式内联 + 挂载自测缩放偏移 + 视口下方放不下自动向上弹；静态资源缓存版本位独立化 ([9974305](https://github.com/ReSerendipity/TTS-MultiModel/commit/9974305))
+* **types:** 修复 14 个 mypy 类型错误（engine 委托返回三元组注解 / load_fn Callable 注解 / Response.body 经 bytes() 解码 / finally 释放信号量判空），棘轮基线收紧 89→87 ([0bf07b1](https://github.com/ReSerendipity/TTS-MultiModel/commit/0bf07b1))
+* **i18n:** zh-tw/en/ja/ko 词表补齐引擎条与徽章三态键（engine_load_switch / engine_mismatch_prefix / engine_needed / badge_env_only / badge_ready），五词表键集一致
+
+
 ## [2.12.0](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.11.2...v2.12.0) (2026-11-21)
 
 

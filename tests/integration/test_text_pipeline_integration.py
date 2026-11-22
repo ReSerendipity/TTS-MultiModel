@@ -203,8 +203,9 @@ class TestTextPipelineIntegration:
         text = "数量是100个，比例50%，日期2024年3月15日"
         processed, lang = frontend.process(text)
 
-        # 规范化后应该包含中文数字
-        assert "一百" in processed or "100" in processed
+        # 规范化后应该包含中文数字。本机装有 G2P 后端（pypinyin）时 frontend
+        # 会输出拼音序列，中文数字对应 "yì bǎi"；无后端环境则保留原文形态。
+        assert "一百" in processed or "100" in processed or "yì bǎi" in processed
 
         # G2P 应能处理
         g2p_result = g2p.convert(processed, lang)

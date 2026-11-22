@@ -960,5 +960,10 @@
   "downloads.done": "完成",
   "downloads.confirm_uninstall": "確定解除安裝執行環境？解除後需重新安裝才能推理。",
   "downloads.confirm_uninstall_model": "確定刪除該模型的權重檔案？",
-  "downloads.no_models": "未設定可下載的模型"
+  "downloads.no_models": "未設定可下載的模型",
+  "engine_load_switch": "切換並載入",
+  "engine_mismatch_prefix": "目前引擎",
+  "engine_needed": "本頁需要",
+  "badge_env_only": "環境已裝 · 權重未齊",
+  "badge_ready": "環境與權重已就緒"
 }

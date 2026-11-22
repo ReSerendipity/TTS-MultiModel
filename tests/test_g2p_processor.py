@@ -14,8 +14,14 @@ class TestG2PProcessor:
         assert self.g2p.process("", "zh") == ""
 
     def test_process_returns_text(self):
-        assert self.g2p.process("你好世界", "zh") == "你好世界"
-        assert self.g2p.process("Hello", "en") == "Hello"
+        """pypinyin / g2p_en 后端存在时输出对应音素序列；缺失时透传原文。"""
+        zh = self.g2p.process("你好世界", "zh")
+        en = self.g2p.process("Hello", "en")
+        assert isinstance(zh, str) and zh.strip()
+        assert isinstance(en, str) and en.strip()
+        if self.g2p._get_manager() is None:  # 无后端环境：透传原文
+            assert zh == "你好世界"
+            assert en == "Hello"
 
     def test_is_available(self):
         assert self.g2p.is_available("zh") is True

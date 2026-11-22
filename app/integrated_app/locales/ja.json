@@ -960,5 +960,10 @@
   "downloads.done": "完了",
   "downloads.confirm_uninstall": "ランタイムをアンインストールしますか？再度推論するには再インストールが必要です。",
   "downloads.confirm_uninstall_model": "このモデルの重みファイルを削除しますか？",
-  "downloads.no_models": "ダウンロード可能なモデルが設定されていません"
+  "downloads.no_models": "ダウンロード可能なモデルが設定されていません",
+  "engine_load_switch": "切替えて読込",
+  "engine_mismatch_prefix": "現在のエンジン",
+  "engine_needed": "このページが必要とするエンジン",
+  "badge_env_only": "環境導入済み · 重み未取得",
+  "badge_ready": "環境と重みは準備完了"
 }

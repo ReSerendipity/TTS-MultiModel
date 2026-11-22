@@ -960,5 +960,10 @@
   "downloads.done": "완료",
   "downloads.confirm_uninstall": "런타임을 제거할까요? 다시 추론하려면 재설치해야 합니다.",
   "downloads.confirm_uninstall_model": "이 모델의 가중치 파일을 삭제할까요?",
-  "downloads.no_models": "다운로드 가능한 모델이 구성되지 않았습니다"
+  "downloads.no_models": "다운로드 가능한 모델이 구성되지 않았습니다",
+  "engine_load_switch": "전환 후 로드",
+  "engine_mismatch_prefix": "현재 엔진",
+  "engine_needed": "이 페이지 필요",
+  "badge_env_only": "환경 설치됨 · 가중치 미완",
+  "badge_ready": "환경·가중치 준비 완료"
 }
