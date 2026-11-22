@@ -277,6 +277,24 @@ $bootStats = Copy-TTSMultiModelTree -Source $runtimeRoot -Dest $bootDest -Exclud
 $totals.Files += $bootStats.Files
 $totals.Bytes += $bootStats.Bytes
 Write-Host ("    · {0,-22} {1,6} 文件 / {2}" -f 'bootstrap', $bootStats.Files, (Format-TTSMultiModelSize $bootStats.Bytes))
+# 5.1) 规范化嵌套解释器目录名：必须为 python\（壳与后端均优先探测 bootstrap\python\python.exe）
+# WinPython 解出来叫 python-3.12.x 等名字；名字对不上时壳/后端会退到根启动器 python.exe，
+# 而根目录只有裸 exe（无 DLL/Lib），启动后静默回退系统 Python——真机必挂（2026-11-22 演示实测）。
+$realPy = Get-ChildItem -LiteralPath $bootDest -Recurse -Force -Filter 'python.exe' -ErrorAction SilentlyContinue |
+    Where-Object { Test-Path (Join-Path $_.Directory.FullName 'Lib\os.py') } |
+    Sort-Object { $_.FullName.Length } | Select-Object -First 1
+if ($realPy -and (Split-Path $realPy.Directory.FullName -Leaf) -ne 'python') {
+    $desired = Join-Path $bootDest 'python'
+    if (Test-Path -LiteralPath $desired) {
+        Remove-TTSMultiModelTreeFast -Path $desired
+    }
+    Rename-Item -LiteralPath $realPy.Directory.FullName -NewName 'python' -Force
+    Write-Host '  已规范化嵌套解释器目录为 bootstrap\python\（壳/后端优先布局）'
+}
+# 布局断言：嵌套解释器必须就位，否则壳/后端退化为裸启动器 → 系统 Python
+if (-not (Test-Path -LiteralPath (Join-Path $bootDest 'python\python.exe'))) {
+    throw 'bootstrap\python\python.exe 缺失：嵌套解释器目录名必须为 python（壳与后端优先探测该布局）'
+}
 if (-not (Test-Path -LiteralPath (Join-Path $bootDest 'python.exe'))) {
     # WinPython 真实布局是 <root>\python-3.12.x\python.exe，而壳找的是 <app>\bootstrap\python.exe
     $inner = Get-ChildItem -LiteralPath $bootDest -Recurse -Force -Filter 'python.exe' -ErrorAction SilentlyContinue |
@@ -331,6 +349,15 @@ foreach ($rel in $forbidden) {
 $torchLeft = @(Get-ChildItem -LiteralPath (Join-Path $staging 'app\bootstrap') -Recurse -Force -Directory -Filter 'torch' -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -match '\\Lib\\site-packages\\torch$' })
 if ($torchLeft.Count -gt 0) { throw "staging\app\bootstrap 仍含 torch 目录: $($torchLeft[0].FullName)" }
+# 自包含自检：嵌套解释器 sys.prefix 必须落在 bootstrap 内，且 Web 依赖可导入。
+# 防止「裸 exe 兜底 → 静默回退系统 Python」一类布局回归（2026-11-22 演示实测踩坑）。
+$bootPy = Join-Path $staging 'app\bootstrap\python\python.exe'
+if (-not (Test-Path -LiteralPath $bootPy)) { throw 'staging 布局不完整，缺少: app\bootstrap\python\python.exe' }
+$bootProbe = Invoke-TTSMultiModelNative -Exe $bootPy -Arguments @('-c', 'import sys; assert "bootstrap" in sys.prefix.lower(), "prefix=" + sys.prefix; import fastapi, uvicorn')
+if ($bootProbe.ExitCode -ne 0) {
+    throw "bootstrap 自包含自检失败（Web 依赖异常）: $(($bootProbe.Text | Select-Object -Last 3) -join ' | ')"
+}
+Write-Host '  自包含自检通过：bootstrap 内置解释器 Web 依赖可导入' -ForegroundColor Green
 Write-Host '[slim] staging 布局校验通过' -ForegroundColor Green
 
 Write-Host ("[slim] staging 合计: {0} 文件 / {1}" -f $totals.Files, (Format-TTSMultiModelSize $totals.Bytes)) -ForegroundColor Cyan
