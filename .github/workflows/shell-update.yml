@@ -89,7 +89,10 @@ jobs:
         run: |
           $ver = "${{ steps.target.outputs.version }}"
           $changelog = (Get-Content -LiteralPath version.json -Raw -Encoding utf8 | ConvertFrom-Json).changelog
-          .\scripts\make_shell_update.ps1 -Version $ver -Changelog $changelog -InstallRoot 'install-root' -OutDir 'dist/shell-update'
+          # 绝对路径：脚本打包时会 Set-Location 到 staging，相对 OutDir 会被解析到 staging 下
+          $outDir = Join-Path (Get-Location) 'dist/shell-update'
+          $installDir = Join-Path (Get-Location) 'install-root'
+          .\scripts\make_shell_update.ps1 -Version $ver -Changelog $changelog -InstallRoot $installDir -OutDir $outDir
           if ($LASTEXITCODE -ne 0) { throw "make_shell_update.ps1 失败" }
           Get-ChildItem -LiteralPath 'dist/shell-update' | Select-Object Name, Length
 
