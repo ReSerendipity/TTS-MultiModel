@@ -182,6 +182,7 @@ window.TTSTheme = {
 // @deprecated 使用 TTSApp.lang 替代，此 window 挂载点将在未来版本移除
 window.TTSLang = {
     toggle: window.toggleLang,
+    openMenu: window.openLangMenu,
     set: window.setLang,
     init: initLanguage
 };
