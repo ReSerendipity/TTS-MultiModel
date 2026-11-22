@@ -1,4 +1,4 @@
-version: "2.12.3"
+version: "2.12.4"
 
 server:
   host: "127.0.0.1"

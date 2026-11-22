@@ -1,6 +1,6 @@
 {
-  "version": "2.12.3",
+  "version": "2.12.4",
   "release_date": "2026-11-22",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.12.3：修复安装器产物名写死旧版本号（OutFile 改用 APP_VERSION 插值）。其余同 2.12.1：瘦包 bootstrap 布局规范化与自包含自检、壳固定标准端口 7869、顶部引擎标签补 Breeze TTS 2、生成区常驻引擎状态条、下载徽章三态化、语言下拉直选、表单草稿持久化。"
+  "changelog": "2.12.4：修复 Breeze TTS 2 噪音问题——Web 引擎层接入隔离 venv 委托（transformers>=5 时进程内不加载权重，生成委托 4.57.3 venv 原生推理），委托子进程 --no-remote 杜绝服务递归，instruction 经 --control 传递。切换 Breeze 即用对应环境，0 额外显存。其余同 2.12.3。"
 }
