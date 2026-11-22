@@ -23,7 +23,7 @@ BrandingText "TTSMultiModel"
 !ifndef APP_VERSION
   !define APP_VERSION "2.12.0"
 !endif
-OutFile "TTSMultiModel-Setup-v2.12.0.exe"
+OutFile "TTSMultiModel-Setup-v${APP_VERSION}.exe"
 !define DATA_PREFIX "TTSMultiModel-Data.7z"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\TTSMultiModel"
 !define APP_ICON "${__FILEDIR__}\..\..\desktop\src-tauri\icons\icon.ico"
