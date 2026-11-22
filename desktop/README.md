@@ -2,7 +2,7 @@
 
 TTS MultiModel 语音合成工具的桌面壳：Tauri v2 外壳 + 侧载 Python 运行时 + WebView2，
 将原有的「浏览器 + 本地 FastAPI」形态封装为原生桌面应用（托盘、通知、拖拽、
-窗口状态记忆、增量更新）。
+窗口状态记忆、完整安装包更新）。
 
 ## 目录结构
 
@@ -25,7 +25,7 @@ desktop/
         ├── notification.rs   # Windows Toast（前台抑制、声音开关）
         ├── drag_drop.rs      # 文件拖拽白名单 + read_dragged_file 命令
         ├── config.rs         # %APPDATA%/TTSMultiModel/{config.json,window_state.json} 原子读写
-        └── updater.rs        # 增量更新：GitHub 检查/semver/下载/SHA256/原子换载/回滚
+        └── updater.rs        # 完整包更新：GitHub 检查/semver/下载/SHA256/静默安装
 ```
 
 ## 开发环境要求
@@ -68,18 +68,19 @@ cargo build         # 产出 target/debug/tts-multimodel-desktop.exe
 | `window_state.json` | 窗口大小/位置/最大化状态（DPI 归一 + 位置合法性校验） |
 | `updates/` | 更新包下载缓存（不污染应用树） |
 
-## 增量更新契约
+## 更新契约（单一路线：完整安装包）
 
-- 唯一更新路线：`updater.rs` 扫描 Release 资产里的 `app-v{version}.zip`，只换代码，
-  `runtime/` `model/` `data/` `logs/` 原样保留（无需重下 torch 与权重）
-- 产线：`.github/workflows/shell-update.yml` 在 `v*` tag push 时跑
-  `scripts/make_shell_update.ps1`，把 `app-v{ver}.zip` / `.sha256` / `shell-update.json` /
-  `SHA256SUMS.txt` 挂到同 tag Release（与 `desktop-installer.yml` 的全量安装包并行，但面向不同入口）
-- GitHub Release 上传 `app-v{version}.zip`（zip 根 = app/ 目录内容）+ `.sha256`
-- 更新包内必须含 `version.json`（`{"version","release_date","minimum_shell_version","changelog"}`）
-- 执行序列：下载 → SHA256 校验 → 解压 `app.new/` → 停 Python（taskkill /T）→ 原子换载
-  → 重启 + 健康检查 → 失败自动回滚（旧版 `app.bak/` 还原）
-- 详见 `docs/tauri-migration/AI-2-交付与交接说明.md` §2
+- 官网下载与应用内「检查更新」拿到**同一个文件**：`TTSMultiModel-Setup-v{version}.exe`
+  （由 `.github/workflows/desktop-installer.yml` 在 `v*` tag push 时产出并挂到 Release）
+- 历史版本曾并存一条代码增量路线（`app-v{ver}.zip` + 原子换载），已移除：
+  维护两条产线/两类资产得不偿失，且 Tauri v2 官方 updater 在 Windows 上同样复用完整 NSIS 安装包
+- 执行序列（`updater.rs`）：扫 Release 资产 → 下载完整 exe → SHA256 校验 →
+  以 `/S` 静默启动 NSIS → 安装器自带 `KillRunning` 杀掉壳与 Python 后覆盖安装 → 用户手动重开
+- 用户数据不丢：安装段只覆盖同名文件、不删整个 `$INSTDIR`；`runtime/` `model/` `data/`
+  `logs/` 保留（只有卸载段才 `RMDir /r "$INSTDIR"`）
+- 与 Tauri 官方 updater 的差异：官方传 `/S /UPDATE /ARGS` 并让安装器自动重启应用；
+  本项目 NSIS 是自写的（不认 `/UPDATE`），故只用 `/S`，装完提示用户手动重启
+- 旧式 `app.bak/` 原子换载/自动回滚随增量路线一并退役
 
 ## 已知问题与限制
 
@@ -88,8 +89,7 @@ cargo build         # 产出 target/debug/tts-multimodel-desktop.exe
 - 托盘「检查更新」在启动页阶段结果仅托盘标记，对话框等页面就绪后手动检查再弹。
 - 拖拽多文件落**文件夹**才切批量；散文件取首个进单文件流程。
 - GitHub 未认证 API 限速 60/h；自动检查有 10 分钟节流。
-- 更新只走**自研 `updater.rs` 原子换载**一条路线（代码增量 zip → app.new/ → 换名 → 健康检查 → 失败回滚）；
-  曾注册但从未调用的 `tauri-plugin-updater` 已移除，避免配置与实现两队维护。
+- 更新只走**自研 `updater.rs` + 完整安装包**一条路线；曾注册但从未调用的 `tauri-plugin-updater`、以及旧的代码增量 zip 产线均已移除，避免两套资产/两队维护。
 - WebView2 缺失（LTSC）时启动失败，AI-3 安装包需带引导（Tauri 默认 bootstrapper）。
 
 ## 交接与后续

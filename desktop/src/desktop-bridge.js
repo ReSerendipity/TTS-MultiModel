@@ -323,6 +323,14 @@
       else tryShowOnUpdateWindow(info);
     });
     listen("update-progress", function (p) { renderProgress(p); });
+    // 单一路线：下载完整安装包后启动 NSIS，应用会被安装器关闭。
+    // 不会出现 update-done（那时进程已退出），改为提示用户安装完手动重开。
+    listen("update-installing", function (r) {
+      var body = document.getElementById("sdu-body");
+      var actions = document.getElementById("sdu-actions");
+      if (body) body.innerHTML = '<div style="color:#27ae60;font-weight:600;font-size:16px;text-align:center;padding:20px 0">✓ ' + escapeHtml((r && r.message) || "安装程序即将启动，应用会关闭；安装完成后请重新启动。") + "</div>";
+      if (actions) actions.innerHTML = "";
+    });
     listen("update-done", function (r) {
       notifyShell("TTSMultiModel 更新完成", (r && r.message) || "应用已更新到最新版本");
       var body = document.getElementById("sdu-body");

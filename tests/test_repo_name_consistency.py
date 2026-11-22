@@ -74,9 +74,32 @@ class TestSingleUpdateRoute:
         for perm in ("allow-check-update", "allow-start-update"):
             assert perm in caps, f"自研命令权限 {perm} 被误删"
 
-    def test_shell_update_workflow_exists(self):
-        """tag push 必须产出 app-v{ver}.zip，否则老用户检查更新无包可下。"""
-        wf = _read(".github/workflows/shell-update.yml")
-        assert "make_shell_update.ps1" in wf, "增量包 workflow 未调用生成脚本"
-        assert "'v*'" in wf, "增量包 workflow 未在 tag push 时触发"
-        assert "app-v$ver.zip" in wf, "增量包 workflow 未上传 app-v zip"
+    def test_shell_update_workflow_removed(self):
+        """单一路线：不保留增量包产线，官网与检查更新共用同一个完整安装包。"""
+        wf = ROOT / ".github" / "workflows" / "shell-update.yml"
+        assert not wf.exists(), "增量包 workflow 应已移除（单一完整包路线）"
+
+    def test_installer_workflow_still_publishes_installer(self):
+        """删增量产线时不能误删唯一的全量安装包产线。"""
+        wf = _read(".github/workflows/desktop-installer.yml")
+        assert "TTSMultiModel-Setup-v$ver.exe" in wf, "全量安装包产线被误删"
+        assert "'v*'" in wf, "全量安装包 workflow 未在 tag push 时触发"
+
+
+class TestFullInstallerUpdateRoute:
+    """桌面检查更新下载完整安装包，与官网同源。"""
+
+    def test_asset_template_is_full_installer(self):
+        src = _read("desktop/src-tauri/src/updater.rs")
+        assert 'ASSET_TEMPLATE: &str = "TTSMultiModel-Setup-v{version}.exe"' in src, (
+            "更新资产不是完整安装包（应为 TTSMultiModel-Setup-v{version}.exe）"
+        )
+        assert "app-v{version}.zip" not in src, "仍残留旧增量包模板"
+
+    def test_installer_kills_and_overwrites(self):
+        """完整包重装可行依赖安装器自带 KillRunning，且不删用户数据目录。"""
+        nsi = _read("scripts/installer/setup.nsi")
+        assert "!macro KillRunning" in nsi, "安装器缺少关闭运行中实例的宏"
+        # 安装段不得删整个安装目录（只有 Uninstall 段才允许）
+        install_section = nsi.split('Section "TTSMultiModel 桌面版"', 1)[1].split('Section "Uninstall"', 1)[0]
+        assert 'RMDir /r "$INSTDIR"' not in install_section, "安装段会删整个安装目录，老用户重装会丢 runtime/model/data"
