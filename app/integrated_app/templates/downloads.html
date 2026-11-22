@@ -203,9 +203,21 @@
         var data = state.status;
         if (!data) return;
         var running = runtimeTask();
-        setText('dlMode', modeLabel(data.mode));
+        // 徽章三态化（B6）：此前只按解释器路径显示「引导模式（未装环境）」，
+        // 环境/权重就绪后与「环境与权重已就绪」并存，语义矛盾。
+        // 现按功能状态显示三态；路径模式信息移入 title 提示。
+        var rtInstalled = !!(data.runtime && data.runtime.installed);
+        var badgeText = !rtInstalled
+            ? t('downloads.mode_bootstrap', 'Bootstrap')
+            : (data.ready
+                ? t('downloads.badge_ready', '环境与权重已就绪')
+                : t('downloads.badge_env_only', '环境已装 · 权重未齐'));
+        setText('dlMode', badgeText);
         var badge = document.getElementById('dlMode');
-        if (badge) badge.classList.toggle('is-ready', !!data.ready);
+        if (badge) {
+            badge.classList.toggle('is-ready', !!data.ready);
+            badge.title = modeLabel(data.mode);
+        }
         setText('dlReadyText', data.ready
             ? t('downloads.ready', 'Ready')
             : t('downloads.not_ready', 'Runtime or weights not installed yet'));

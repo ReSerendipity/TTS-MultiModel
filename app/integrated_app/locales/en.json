@@ -960,5 +960,7 @@
   "downloads.done": "Done",
   "downloads.confirm_uninstall": "Uninstall the runtime? You must reinstall it to synthesize again.",
   "downloads.confirm_uninstall_model": "Delete the weight files of this model?",
-  "downloads.no_models": "No downloadable models configured"
+  "downloads.no_models": "No downloadable models configured",
+  "badge_ready": "Environment & weights ready",
+  "badge_env_only": "Env installed · weights pending"
 }

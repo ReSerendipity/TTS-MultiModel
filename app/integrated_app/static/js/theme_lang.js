@@ -98,6 +98,44 @@ window.toggleLang = function() {
     window.location.href = url.toString();
 };
 
+// ============================================================
+// Language Menu — 直选下拉（B4：循环切换无法直达目标语言）
+// ============================================================
+window._langMenuEl = null;
+window._langMenuClose = function () {
+    var m = window._langMenuEl;
+    if (m) { m.remove(); window._langMenuEl = null; }
+    document.removeEventListener('click', window._langMenuClose);
+};
+window.openLangMenu = function (ev, anchorEl) {
+    ev.stopPropagation();
+    if (window._langMenuEl) { window._langMenuClose(); return; }
+    var urlParams = new URLSearchParams(window.location.search);
+    var cur = urlParams.get('lang') || localStorage.getItem('app_lang') || 'zh-CN';
+    if (cur === 'zh-Hant' || cur === 'zh-tw') cur = 'zh-TW';
+    else if (cur.startsWith('zh')) cur = 'zh-CN';
+    var menu = document.createElement('div');
+    menu.className = 'lang-menu';
+    window._langMenuEl = menu;
+    window._supportedLangs.forEach(function (lg) {
+        var item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'lang-menu-item' + (lg === cur ? ' current' : '');
+        item.innerHTML = '<span>' + (window._langLabels[lg] || lg) + '</span><span class="lang-menu-code">' + lg + '</span>';
+        item.onclick = function (e) {
+            e.stopPropagation();
+            window._langMenuClose();
+            window.setLang(lg);
+        };
+        menu.appendChild(item);
+    });
+    document.body.appendChild(menu);
+    var r = anchorEl.getBoundingClientRect();
+    menu.style.top = (r.bottom + 6) + 'px';
+    menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 150)) + 'px';
+    setTimeout(function () { document.addEventListener('click', window._langMenuClose); }, 0);
+};
+
 window.setLang = function(lang) {
     if (!window._supportedLangs.includes(lang)) return;
 
@@ -147,4 +185,19 @@ window.TTSLang = {
     set: window.setLang,
     init: initLanguage
 };
+})();
+
+// Language menu styles (injected once)
+(function () {
+    var css = '.lang-menu{position:fixed;z-index:10000;min-width:150px;background:rgba(24,20,34,.97);'
+        + 'border:1px solid rgba(139,92,246,.4);border-radius:10px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.5);}'
+        + '.lang-menu-item{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;'
+        + 'padding:8px 12px;border:none;background:transparent;color:rgba(237,233,250,.92);font-size:13px;'
+        + 'border-radius:6px;cursor:pointer;text-align:left;}'
+        + '.lang-menu-item:hover{background:rgba(139,92,246,.18);}'
+        + '.lang-menu-item.current{background:rgba(139,92,246,.28);font-weight:600;}'
+        + '.lang-menu-code{opacity:.55;font-size:11px;}';
+    var st = document.createElement('style');
+    st.textContent = css;
+    document.head.appendChild(st);
 })();
