@@ -68,12 +68,28 @@ jobs:
           if ($vj.version -ne $ver) { throw "version.json=$($vj.version) 与 tag v$ver 不一致" }
           Write-Host "version.json OK: $($vj.version)"
 
+      - name: Assemble minimal install root
+        shell: pwsh
+        run: |
+          # make_shell_update.ps1 按「已安装目录」取 app/ + 根文件；CI 只有源码，
+          # 且 start_portable.py 随 §12.2 下沉到 scripts/，故在此造最小安装根。
+          # 只复制增量包白名单条目（与脚本内 $topInclude 一致）。
+          $rootDir = 'install-root'
+          New-Item -ItemType Directory -Path $rootDir -Force | Out-Null
+          foreach ($f in @('config.yaml', 'version.json', 'start.bat', 'LICENSE', 'README.md')) {
+            if (Test-Path -LiteralPath $f) { Copy-Item -LiteralPath $f -Destination (Join-Path $rootDir $f) -Force }
+          }
+          if (-not (Test-Path -LiteralPath 'scripts/start_portable.py')) { throw 'scripts/start_portable.py 缺失' }
+          Copy-Item -LiteralPath 'scripts/start_portable.py' -Destination (Join-Path $rootDir 'start_portable.py') -Force
+          Copy-Item -LiteralPath 'app' -Destination (Join-Path $rootDir 'app') -Recurse -Force
+          Get-ChildItem -LiteralPath $rootDir | Select-Object Name
+
       - name: Build increment zip
         shell: pwsh
         run: |
           $ver = "${{ steps.target.outputs.version }}"
           $changelog = (Get-Content -LiteralPath version.json -Raw -Encoding utf8 | ConvertFrom-Json).changelog
-          .\scripts\make_shell_update.ps1 -Version $ver -Changelog $changelog -OutDir 'dist/shell-update'
+          .\scripts\make_shell_update.ps1 -Version $ver -Changelog $changelog -InstallRoot 'install-root' -OutDir 'dist/shell-update'
           if ($LASTEXITCODE -ne 0) { throw "make_shell_update.ps1 失败" }
           Get-ChildItem -LiteralPath 'dist/shell-update' | Select-Object Name, Length
 
