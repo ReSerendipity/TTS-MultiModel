@@ -290,6 +290,8 @@ def build_status() -> dict:
         "ready": bool(runtime["installed"] and runtime["compatible"] and any(m["present"] for m in models)),
         "runtime": runtime,
         "models": models,
+        # Breeze 需要独立的 4.57.3 环境（主环境 5.x 下产物是噪音）
+        "breeze_venv": build_breeze_venv_status(),
         "model_root": os.path.join(PROJECT_ROOT, "model"),
     }
 
@@ -766,3 +768,142 @@ def get_download_manager() -> DownloadManager:
 
 def _unused(*args: Any) -> None:  # 占位：保留扩展点
     return None
+
+
+# ------------------------------------------------ Breeze 隔离环境 --------
+# Breeze 上游要求 transformers 4.57.3，本项目主环境锁 5.x（5.x 下 Breeze
+# 产物经人工试听确认是噪音）。安装页提供一键建隔离 venv，不改动主环境依赖。
+# 本段只用标准库 + subprocess，引导解释器（无 torch）亦可运行。
+
+_BREEZE_VENV_REQUIRED = {"transformers": "4.57.3", "qwen-tts": "0.1.1"}
+
+
+def _breeze_venv_dir() -> str:
+    """隔离 venv 目录：环境变量优先，其次 D 盘，最后项目内。"""
+    env = os.environ.get("TTS_BREEZE_VENV", "").strip()
+    if env:
+        return os.path.abspath(os.path.expanduser(env))
+    if sys.platform == "win32" and os.path.isdir("D:/"):
+        return "D:/breeze-venv"
+    if sys.platform == "win32" and os.environ.get("USERPROFILE"):
+        return os.path.join(os.environ["USERPROFILE"], "breeze-venv")
+    return os.path.join(PROJECT_ROOT, ".venv-breeze")
+
+
+def _breeze_venv_python(venv_dir: str) -> str | None:
+    exe = (
+        os.path.join(venv_dir, "Scripts", "python.exe")
+        if sys.platform == "win32"
+        else os.path.join(venv_dir, "bin", "python")
+    )
+    return exe if os.path.isfile(exe) else None
+
+
+def _breeze_venv_versions(python: str) -> dict[str, str]:
+    """从隔离 venv 读已装的 transformers / qwen-tts 版本（超时 10s）。"""
+    try:
+        completed = subprocess.run(
+            [
+                python,
+                "-c",
+                "import importlib.metadata as m;"
+                "print('transformers=' + m.version('transformers'));"
+                "print('qwen-tts=' + m.version('qwen-tts'))",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    versions: dict[str, str] = {}
+    for line in (completed.stdout or "").splitlines():
+        if "=" in line:
+            k, v = line.strip().split("=", 1)
+            versions[k] = v
+    return versions
+
+
+def build_breeze_venv_status() -> dict:
+    """Breeze 隔离环境就位情况（供下载页展示）。"""
+    venv_dir = _breeze_venv_dir()
+    python = _breeze_venv_python(venv_dir)
+    versions = _breeze_venv_versions(python) if python else {}
+    installed = bool(python) and all(versions.get(name) == expected for name, expected in _BREEZE_VENV_REQUIRED.items())
+    files, size = _dir_stats(venv_dir) if os.path.isdir(venv_dir) else (0, 0)
+    return {
+        "installed": installed,
+        "present": bool(python),
+        "path": venv_dir,
+        "python": python,
+        "transformers": versions.get("transformers"),
+        "qwen_tts": versions.get("qwen-tts"),
+        "required": dict(_BREEZE_VENV_REQUIRED),
+        "file_count": files,
+        "size_bytes": size,
+    }
+
+
+def install_breeze_venv(
+    on_progress: ProgressCb | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+) -> dict:
+    """创建隔离 venv 并安装官方依赖（transformers 4.57.3 + qwen-tts）。
+
+    复用主环境的 torch（``--system-site-packages``），避免重复下载数 GB。
+    安装是同步的（pip 两次），进度按阶段上报；不纳入分卷下载 task 系统。
+
+    Returns:
+        与 ``build_breeze_venv_status()`` 同构的 dict（含最新状态）。
+    """
+    venv_dir = _breeze_venv_dir()
+
+    def report(stage: str, ratio: float, message: str) -> None:
+        if on_progress:
+            on_progress(stage, ratio, message)
+
+    if should_cancel and should_cancel():
+        return build_breeze_venv_status()
+
+    if not _breeze_venv_python(venv_dir):
+        report("venv", 0.05, f"创建隔离环境: {venv_dir}")
+        os.makedirs(os.path.dirname(venv_dir) or ".", exist_ok=True)
+        result = subprocess.run(
+            [sys.executable, "-m", "venv", "--system-site-packages", venv_dir],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"创建 venv 失败: {(result.stderr or '')[-500:]}")
+        if should_cancel and should_cancel():
+            return build_breeze_venv_status()
+
+    python = _breeze_venv_python(venv_dir)
+    if python is None:
+        raise RuntimeError(f"venv 解释器不存在: {venv_dir}")
+
+    report("deps", 0.25, "安装 transformers==4.57.3 + qwen-tts==0.1.1 ...")
+    result = subprocess.run(
+        [
+            python,
+            "-m",
+            "pip",
+            "install",
+            "transformers==4.57.3",
+            "qwen-tts==0.1.1",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"安装依赖失败: {(result.stderr or '')[-800:]}")
+
+    report("verify", 0.9, "校验版本 ...")
+    status = build_breeze_venv_status()
+    if not status["installed"]:
+        raise RuntimeError(f"安装后版本不符: transformers={status['transformers']}, qwen-tts={status['qwen_tts']}")
+    report("done", 1.0, "Breeze 隔离环境就绪")
+    return status

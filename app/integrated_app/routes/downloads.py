@@ -17,15 +17,18 @@ import 了 ModelManager → 推理引擎 → torch，一旦照抄就会把本路
 from __future__ import annotations
 
 import logging
+import threading
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from ..download_service import (
+    build_breeze_venv_status,
     build_status,
     catalog_view,
     get_download_manager,
+    install_breeze_venv,
     runtime_catalog,
     scan_models,
     uninstall_model,
@@ -173,3 +176,61 @@ async def uninstall(request: Request, payload: ComponentRequest):
         logger.info("[downloads] 已卸载模型: %s", target)
         return _ok({"uninstalled": f"model:{target}"})
     return _err("BAD_REQUEST", "kind 必须是 runtime 或 model+target", 400)
+
+
+# ------------------------------------------------ Breeze 隔离环境 --------
+# 同步 pip 可能耗时数分钟，用后台线程跑；前端轮询 /breeze-venv/progress。
+# 单例状态：同一时刻只允许一个安装任务。
+_BREEZE_INSTALL_LOCK = threading.Lock()
+_BREEZE_INSTALL_STATE: dict = {"running": False, "stage": "", "ratio": 0.0, "message": "", "error": ""}
+
+
+def _breeze_progress(stage: str, ratio: float, message: str) -> None:
+    with _BREEZE_INSTALL_LOCK:
+        _BREEZE_INSTALL_STATE.update(stage=stage, ratio=ratio, message=message)
+
+
+def _run_breeze_install() -> None:
+    try:
+        install_breeze_venv(on_progress=_breeze_progress)
+    except Exception as exc:  # noqa: BLE001 - 后台线程异常须写回状态供前端展示
+        logger.exception("[downloads] Breeze 隔离环境安装失败")
+        with _BREEZE_INSTALL_LOCK:
+            _BREEZE_INSTALL_STATE["error"] = str(exc)
+    finally:
+        with _BREEZE_INSTALL_LOCK:
+            _BREEZE_INSTALL_STATE["running"] = False
+
+
+@router.get("/breeze-venv")
+async def breeze_venv_status(request: Request) -> dict:
+    """Breeze 隔离环境状态（是否安装、transformers/qwen-tts 版本）。"""
+    denied = _deny_remote(request)
+    if denied:
+        return denied
+    with _BREEZE_INSTALL_LOCK:
+        progress = dict(_BREEZE_INSTALL_STATE)
+    data = build_breeze_venv_status()
+    data["installing"] = progress["running"]
+    data["progress"] = {k: progress[k] for k in ("stage", "ratio", "message", "error")}
+    return _ok(data)
+
+
+@router.post("/breeze-venv/install")
+async def breeze_venv_install(request: Request) -> dict:
+    """后台启动 Breeze 隔离环境安装（幂等：已就绪/进行中直接返回）。"""
+    denied = _deny_remote(request)
+    if denied:
+        return denied
+    with _BREEZE_INSTALL_LOCK:
+        if _BREEZE_INSTALL_STATE["running"]:
+            return _ok({"started": False, "reason": "already_running"})
+        status = build_breeze_venv_status()
+        if status["installed"]:
+            return _ok({"started": False, "reason": "already_installed"})
+        _BREEZE_INSTALL_STATE.update(running=True, stage="", ratio=0.0, message="准备安装...", error="")
+    # 用线程而非 asyncio.create_task：安装是阻塞 subprocess，不能阻塞事件循环
+    thread = threading.Thread(target=_run_breeze_install, name="breeze-venv-install", daemon=True)
+    thread.start()
+    logger.info("[downloads] Breeze 隔离环境安装启动: %s", status["path"])
+    return _ok({"started": True, "path": status["path"]})

@@ -51,6 +51,31 @@
         <p class="dl-progress-text dl-hidden" id="dlRuntimeProgressText"></p>
     </div>
 
+    <!-- Breeze 隔离环境 -->
+    <div class="dl-card">
+        <div class="dl-section-head">
+            <div>
+                <h3 class="dl-section-title">{{ "downloads.breeze_venv"|t(lang, default="Breeze 专用环境") }}</h3>
+                <p class="dl-section-desc">{{ "downloads.breeze_venv_desc"|t(lang, default="Breeze 需要 transformers 4.57.3（主环境为 5.x，不兼容）。安装独立环境后即可正常使用 Breeze 引擎；不影响其它引擎。") }}</p>
+            </div>
+            <div class="dl-actions">
+                <button class="dl-btn dl-btn-primary" id="dlInstallBreeze" type="button">
+                    {{ "downloads.install"|t(lang, default="安装") }}
+                </button>
+            </div>
+        </div>
+        <dl class="dl-kv">
+            <dt>{{ "downloads.status"|t(lang, default="状态") }}</dt><dd id="dlBreezeStatus">—</dd>
+            <dt>transformers</dt><dd id="dlBreezeTransformers">—</dd>
+            <dt>qwen-tts</dt><dd id="dlBreezeQwen">—</dd>
+            <dt>{{ "downloads.path"|t(lang, default="路径") }}</dt><dd class="dl-mono" id="dlBreezePath">—</dd>
+        </dl>
+        <div class="dl-progress dl-hidden" id="dlBreezeProgress">
+            <div class="dl-progress-bar" id="dlBreezeBar" style="width:0%"></div>
+        </div>
+        <p class="dl-progress-text dl-hidden" id="dlBreezeProgressText"></p>
+    </div>
+
     <!-- 模型权重 -->
     <div class="dl-card">
         <div class="dl-section-head">
@@ -126,6 +151,7 @@
 
     var POLL_MS = 1000;
     var pollTimer = null;
+    var breezeTimer = null;
     var state = { status: null, tasks: [] };
 
     function csrf() { return typeof window.getCsrfToken === 'function' ? window.getCsrfToken() : ''; }
@@ -244,6 +270,62 @@
             list.appendChild(empty);
         }
         setText('dlModelRoot', (t('downloads.path', 'Path') + ': ') + (data.model_root || ''));
+        renderBreezeStatus(data.breeze_venv || null);
+    }
+
+    function renderBreezeStatus(breeze) {
+        if (!breeze) return;
+        var installed = !!breeze.installed;
+        setText('dlBreezeStatus', installed
+            ? t('downloads.breeze_ready', 'Ready')
+            : (breeze.present ? t('downloads.breeze_outdated', 'Needs update') : t('downloads.breeze_missing', 'Not installed')));
+        setText('dlBreezeTransformers', breeze.transformers || '—');
+        setText('dlBreezeQwen', breeze.qwen_tts || '—');
+        setText('dlBreezePath', breeze.path || '—');
+        show('dlInstallBreeze', !installed && !breeze.installing);
+        show('dlBreezeProgress', !!breeze.installing);
+        show('dlBreezeProgressText', !!breeze.installing);
+        if (breeze.installing && breeze.progress) {
+            var pct = Math.max(0, Math.min(100, (breeze.progress.ratio || 0) * 100));
+            var bar = document.getElementById('dlBreezeBar');
+            if (bar) bar.style.width = pct.toFixed(1) + '%';
+            setText('dlBreezeProgressText', (breeze.progress.message || breeze.progress.stage || '') + ' · ' + pct.toFixed(0) + '%');
+        }
+        if (breeze.progress && breeze.progress.error) {
+            setText('dlBreezeStatus', t('downloads.error', 'Error') + ': ' + breeze.progress.error);
+        }
+    }
+
+    function installBreeze() {
+        api('/api/downloads/breeze-venv/install', { method: 'POST', body: '{}' })
+            .then(function (resp) {
+                if (!resp.success) {
+                    alert((resp.error && resp.error.message) || t('downloads.error', 'Error'));
+                    return;
+                }
+                startBreezePolling();
+                refreshBreeze();
+            })
+            .catch(function (err) { alert(String(err)); });
+    }
+
+    function refreshBreeze() {
+        return api('/api/downloads/breeze-venv').then(function (resp) {
+            if (resp && resp.success) {
+                renderBreezeStatus(resp.data || {});
+                if (resp.data && resp.data.installing) startBreezePolling();
+                else stopBreezePolling();
+            }
+        });
+    }
+
+    function startBreezePolling() {
+        if (breezeTimer) return;
+        breezeTimer = setInterval(refreshBreeze, POLL_MS);
+    }
+
+    function stopBreezePolling() {
+        if (breezeTimer) { clearInterval(breezeTimer); breezeTimer = null; }
     }
 
     function renderRuntimeProgress() {
@@ -372,6 +454,8 @@
     });
     document.getElementById('dlUninstallRuntime').addEventListener('click', uninstallRuntime);
     document.getElementById('dlRefresh').addEventListener('click', refresh);
+    var breezeBtn = document.getElementById('dlInstallBreeze');
+    if (breezeBtn) breezeBtn.addEventListener('click', installBreeze);
 
     refresh();
 })();

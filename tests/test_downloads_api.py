@@ -188,3 +188,64 @@ def test_loopback_guard_blocks_foreign_host(boot_root):
     client = _client()
     assert client.post("/api/downloads/cancel", json={"kind": "runtime"}).status_code == 403
     assert client.post("/api/downloads/uninstall", json={"kind": "runtime"}).status_code == 403
+
+
+# ------------------------------------------- Breeze 隔离环境（新增） ----
+
+
+class TestBreezeVenvStatus:
+    """Breeze 隔离环境状态判据与 API（下载页第三张卡片）。"""
+
+    def test_status_includes_breeze_venv(self, monkeypatch, tmp_path):
+        """build_status 必须带 breeze_venv，前端才能渲染。"""
+        monkeypatch.setattr(ds, "PROJECT_ROOT", str(tmp_path))
+        monkeypatch.setenv("TTS_BREEZE_VENV", str(tmp_path / "none"))
+        status = ds.build_status()
+        assert "breeze_venv" in status
+        bv = status["breeze_venv"]
+        assert bv["installed"] is False
+        assert bv["required"]["transformers"] == "4.57.3"
+        assert bv["required"]["qwen-tts"] == "0.1.1"
+
+    def test_venv_dir_priority(self, monkeypatch, tmp_path):
+        """环境变量优先于默认路径。"""
+        target = tmp_path / "custom-venv"
+        monkeypatch.setenv("TTS_BREEZE_VENV", str(target))
+        assert ds._breeze_venv_dir() == str(target)
+
+    def test_python_missing_reports_not_installed(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("TTS_BREEZE_VENV", str(tmp_path / "none"))
+        status = ds.build_breeze_venv_status()
+        assert status["installed"] is False
+        assert status["present"] is False
+        assert status["python"] is None
+
+    def test_install_bad_venv_path_raises(self, monkeypatch, tmp_path):
+        """venv 创建后解释器仍缺失时给出明确错误，不静默成功。"""
+        monkeypatch.setenv("TTS_BREEZE_VENV", str(tmp_path / "venv"))
+        # 让 venv 命令变成 no-op，python 就不会出现
+        monkeypatch.setattr(ds.subprocess, "run", lambda *a, **k: type("R", (), {"returncode": 0, "stderr": ""})())
+        with pytest.raises(RuntimeError, match="解释器不存在"):
+            ds.install_breeze_venv()
+
+    def test_api_status_and_install(self, monkeypatch, tmp_path):
+        """API：GET status 200 含 installing；POST install 启动后台线程。"""
+        monkeypatch.setattr(ds, "PROJECT_ROOT", str(tmp_path))
+        monkeypatch.setenv("TTS_BREEZE_VENV", str(tmp_path / "none"))
+        monkeypatch.setattr(downloads_route, "_deny_remote", lambda request: None)
+
+        app = FastAPI()
+        app.include_router(downloads_route.router)
+        client = TestClient(app)
+
+        resp = client.get("/api/downloads/breeze-venv")
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["installed"] is False
+        assert "installing" in data
+
+        # 幂等：已安装时不启动
+        monkeypatch.setattr(downloads_route, "build_breeze_venv_status", lambda: {"installed": True, "path": "x"})
+        resp = client.post("/api/downloads/breeze-venv/install", json={})
+        assert resp.status_code == 200
+        assert resp.json()["data"]["reason"] == "already_installed"

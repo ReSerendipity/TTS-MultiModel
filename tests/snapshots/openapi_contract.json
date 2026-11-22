@@ -32,6 +32,22 @@
       ]
     }
   },
+  "/api/downloads/breeze-venv": {
+    "GET": {
+      "operationId": "breeze_venv_status_api_downloads_breeze_venv_get",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
+  "/api/downloads/breeze-venv/install": {
+    "POST": {
+      "operationId": "breeze_venv_install_api_downloads_breeze_venv_install_post",
+      "status_codes": [
+        "200"
+      ]
+    }
+  },
   "/api/downloads/cancel": {
     "POST": {
       "operationId": "cancel_api_downloads_cancel_post",

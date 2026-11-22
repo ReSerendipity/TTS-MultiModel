@@ -2,5 +2,5 @@
   "version": "2.12.0",
   "release_date": "2026-11-21",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.12.0：备份集整集化——从只有 history.db 变为密钥/版本库/审计日志整集并如实记账缺项；新增 GPU 真实合成 10 条黄金基线脚本与锁集交叉约束检查；桌面 zip 升级至 9.3.0 消除 Trivy CRITICAL（CVE-2026-115905）；品牌图标视觉更新。"
+  "changelog": "2.12.0：备份集整集化——从只有 history.db 变为密钥/版本库/审计日志整集并如实记账缺项；新增 GPU 真实合成 10 条黄金基线脚本与锁集交叉约束检查；桌面 zip 升级至 9.3.0 消除 Trivy CRITICAL（CVE-2026-115905）；品牌图标视觉更新；Breeze TTS 2 音质修复：上游要求 transformers 4.57.3，主环境 5.x 兼容层产物为噪音；改为自动委托隔离 venv，下载页提供一键安装入口；并拦截指令语言不匹配静默失败、长文本提前 EOS 自愈、接通 IndexTTS 2.0 引擎。"
 }
