@@ -116,12 +116,23 @@ window.openLangMenu = function (ev, anchorEl) {
     else if (cur.startsWith('zh')) cur = 'zh-CN';
     var menu = document.createElement('div');
     menu.className = 'lang-menu';
+    // 关键样式内联：不依赖样式表级联——部分 WebView2 环境下 JS 注入的规则不参与
+    // 级联，菜单会按普通流布局落到文档末尾（表现为点击后无任何可见变化）
+    menu.style.cssText = 'position:fixed;z-index:10000;min-width:150px;background:rgba(24,20,34,.97);'
+        + 'border:1px solid rgba(139,92,246,.4);border-radius:10px;padding:6px;'
+        + 'box-shadow:0 8px 24px rgba(0,0,0,.5);';
     window._langMenuEl = menu;
     window._supportedLangs.forEach(function (lg) {
         var item = document.createElement('button');
         item.type = 'button';
         item.className = 'lang-menu-item' + (lg === cur ? ' current' : '');
+        item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;'
+            + 'padding:8px 12px;border:none;background:transparent;color:rgba(237,233,250,.92);'
+            + 'font-size:13px;border-radius:6px;cursor:pointer;text-align:left;'
+            + (lg === cur ? 'background:rgba(139,92,246,.28);font-weight:600;' : '');
         item.innerHTML = '<span>' + (window._langLabels[lg] || lg) + '</span><span class="lang-menu-code">' + lg + '</span>';
+        item.onmouseenter = function () { item.style.background = 'rgba(139,92,246,.18)'; };
+        item.onmouseleave = function () { item.style.background = lg === cur ? 'rgba(139,92,246,.28)' : 'transparent'; };
         item.onclick = function (e) {
             e.stopPropagation();
             window._langMenuClose();
@@ -129,10 +140,26 @@ window.openLangMenu = function (ev, anchorEl) {
         };
         menu.appendChild(item);
     });
+    // 先隐藏挂载，量出「fixed 坐标 → 视口坐标」的缩放/偏移（宿主带 zoom/transform
+    // 时两套坐标不同），再按锚点换算目标位置；下方放不下则向上弹（侧栏底栏按钮场景）
+    menu.style.top = '0px';
+    menu.style.left = '0px';
+    menu.style.visibility = 'hidden';
     document.body.appendChild(menu);
+    var probe = menu.getBoundingClientRect();
+    var scale = (menu.offsetWidth > 0 && probe.width > 0) ? (probe.width / menu.offsetWidth) : 1;
+    if (!isFinite(scale) || scale <= 0) scale = 1;
+    var ox = probe.left, oy = probe.top;
     var r = anchorEl.getBoundingClientRect();
-    menu.style.top = (r.bottom + 6) + 'px';
-    menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 150)) + 'px';
+    var menuH = menu.offsetHeight * scale;
+    var menuW = menu.offsetWidth * scale;
+    var vy = r.bottom + 6;
+    if (vy + menuH > window.innerHeight - 8) vy = r.top - menuH - 6;
+    if (vy < 8) vy = 8;
+    var vx = Math.max(8, Math.min(r.left, window.innerWidth - menuW - 8));
+    menu.style.top = ((vy - oy) / scale) + 'px';
+    menu.style.left = ((vx - ox) / scale) + 'px';
+    menu.style.visibility = '';
     setTimeout(function () { document.addEventListener('click', window._langMenuClose); }, 0);
 };
 
