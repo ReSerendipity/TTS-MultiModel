@@ -353,7 +353,9 @@ if ($torchLeft.Count -gt 0) { throw "staging\app\bootstrap 仍含 torch 目录: 
 # 防止「裸 exe 兜底 → 静默回退系统 Python」一类布局回归（2026-11-22 演示实测踩坑）。
 $bootPy = Join-Path $staging 'app\bootstrap\python\python.exe'
 if (-not (Test-Path -LiteralPath $bootPy)) { throw 'staging 布局不完整，缺少: app\bootstrap\python\python.exe' }
-$bootProbe = Invoke-TTSMultiModelNative -Exe $bootPy -Arguments @('-c', 'import sys; assert "bootstrap" in sys.prefix.lower(), "prefix=" + sys.prefix; import fastapi, uvicorn')
+# 注意：PS 传参给 python -c 时内层双引号会被剥掉，故断言不使用字符串字面量——
+# prefix 必须等于解释器自身所在目录（bootstrap\python），等价于「未回退系统 Python」。
+$bootProbe = Invoke-TTSMultiModelNative -Exe $bootPy -Arguments @('-c', 'import os, sys; assert os.path.normpath(sys.prefix) == os.path.normpath(os.path.dirname(sys.executable)); import fastapi, uvicorn')
 if ($bootProbe.ExitCode -ne 0) {
     throw "bootstrap 自包含自检失败（Web 依赖异常）: $(($bootProbe.Text | Select-Object -Last 3) -join ' | ')"
 }
