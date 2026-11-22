@@ -1,6 +1,6 @@
 {
-  "version": "2.12.4",
+  "version": "2.12.5",
   "release_date": "2026-11-22",
   "minimum_shell_version": "2.2.2",
-  "changelog": "2.12.4：修复 Breeze TTS 2 噪音问题——Web 引擎层接入隔离 venv 委托（transformers>=5 时进程内不加载权重，生成委托 4.57.3 venv 原生推理），委托子进程 --no-remote 杜绝服务递归，instruction 经 --control 传递。切换 Breeze 即用对应环境，0 额外显存。其余同 2.12.3。"
+  "changelog": "2.12.5：根治语言下拉菜单点击无响应——部分 WebView2 环境下 JS 注入样式表不参与级联，菜单落到文档末尾不可见。修复后菜单/菜单项关键样式全部内联，挂载后自测缩放偏移（兼容宿主 zoom/transform），视口下方放不下自动向上弹。静态资源缓存版本位独立化。"
 }
