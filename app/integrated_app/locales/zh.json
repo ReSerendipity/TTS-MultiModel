@@ -960,5 +960,8 @@
   "downloads.done": "完成",
   "downloads.confirm_uninstall": "确定卸载运行环境？卸载后需重新安装才能推理。",
   "downloads.confirm_uninstall_model": "确定删除该模型的权重文件？",
-  "downloads.no_models": "未配置可下载的模型"
+  "downloads.no_models": "未配置可下载的模型",
+  "engine_mismatch_prefix": "当前引擎",
+  "engine_needed": "本页需要",
+  "engine_load_switch": "切换并加载"
 }
