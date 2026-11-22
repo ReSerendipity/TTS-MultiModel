@@ -41,6 +41,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import gc
 import logging
 import math
@@ -139,13 +140,19 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
         self._model: Any = None
         self._audio_tokenizer: Any = None
         self._runtime: Any = None
+        # transformers>=5 时生成委托给隔离 venv（4.57.3），进程内不加载权重
+        self._delegate: bool = False
 
     # ------------------------------------------------------------------
     # 生命周期
     # ------------------------------------------------------------------
 
     def is_ready(self) -> bool:
-        """权重与流式 runtime 均就绪时返回 True。"""
+        """委托态：venv 在位即就绪；原生态：权重与流式 runtime 均就绪。"""
+        if self._delegate:
+            from integrated_app.breeze_runtime import breeze_venv_python
+
+            return self._loaded and breeze_venv_python() is not None
         return self._loaded and self._runtime is not None
 
     def _validate_model_files(self) -> None:
@@ -167,6 +174,10 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
     def load(self) -> None:
         """加载 tokenizer / 主模型（bf16 eager）/ 音频 tokenizer 并构建流式 runtime。
 
+        transformers>=5 时走**委托模式**：进程内不加载权重（5.x 兼容层产物经人工
+        试听确认是噪音），生成委托给隔离 venv（transformers 4.57.3）的 CLI 子进程。
+        venv 缺失时抛带创建指引的 EngineLoadError——绝不静默退回 5.x 噪音路径。
+
         Raises:
             EngineLoadError: 权重缺失或加载失败。
             InsufficientVRAMError: CUDA 空闲显存明显不足（软门禁）或加载中 OOM。
@@ -176,6 +187,22 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
             return
 
         self._validate_model_files()
+        from integrated_app.breeze_runtime import should_delegate
+
+        if should_delegate():
+            from integrated_app.breeze_runtime import breeze_venv_python, setup_hint
+
+            venv_py = breeze_venv_python()
+            if venv_py is None:
+                raise EngineLoadError(setup_hint())
+            self._delegate = True
+            self._loaded = True
+            self._runtime = "delegated"
+            logger.info(
+                "[BreezeTTS2] transformers>=5：委托隔离 venv %s（进程内不加载权重）",
+                venv_py,
+            )
+            return
 
         from ...gpu_backend import GPUBackend, GPUBackendManager
 
@@ -262,6 +289,7 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
 
     def unload(self) -> None:
         """释放权重与 runtime 引用（幂等；CUDA 下顺带清空缓存）。"""
+        self._delegate = False
         self._runtime = None
         self._model = None
         self._audio_tokenizer = None
@@ -279,6 +307,8 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
 
     def get_memory_info(self) -> dict[str, Any]:
         """返回显存快照（无 CUDA 时返回空 dict），供路由/监控使用。"""
+        if self._delegate:
+            return {}  # 委托态进程内无权重，无显存占用
         try:
             import torch
 
@@ -303,6 +333,54 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
             raise EngineNotLoadedError(
                 "Breeze TTS 2 引擎未加载，请先在设置中切换/加载该引擎",
             )
+
+    def _delegate_generate(
+        self,
+        mode: str,
+        *,
+        text: str,
+        instruction: str | None = None,
+        ref_audio_path: str | None = None,
+        ref_text: str | None = None,
+        cfg_scale: float | None = None,
+        seed: int | None = None,
+    ) -> tuple[Any, str]:
+        """把一次生成委托给隔离 venv 的 CLI 子进程，回读音频进 SAVE_DIR。
+
+        隔离 venv 里的 CLI 是 4.57.3 原生推理（无兼容层），产物即正式音频；
+        回读后按引擎命名约定落到 SAVE_DIR，路由层拿到的元组结构与原生态一致。
+        """
+        import argparse
+
+        from integrated_app.breeze_runtime import run_isolated_breeze
+
+        args = argparse.Namespace(
+            text=text,
+            control=None,
+            reference_audio=ref_audio_path,
+            ref_text=ref_text,
+            cfg_scale=cfg_scale,
+            seed=self._resolve_seed(seed),
+            output=None,
+        )
+        data = run_isolated_breeze(args, mode)
+        if data is None:
+            raise EngineLoadError("Breeze 隔离环境调用异常（子进程无输出）")
+        if "error" in data:
+            raise RuntimeError(data["error"])
+        audio_path = data.get("audio_path")
+        if not audio_path or not os.path.isfile(audio_path):
+            raise EngineLoadError(f"隔离环境未返回音频文件: {audio_path}")
+
+        import soundfile as sf
+
+        audio, _sr = sf.read(audio_path, dtype="float32")
+        os.makedirs(SAVE_DIR, exist_ok=True)
+        filename = f"breeze_tts2_{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.wav"
+        sf.write(os.path.join(SAVE_DIR, filename), audio, SAMPLE_RATE, subtype="PCM_16")
+        with contextlib.suppress(OSError):
+            os.remove(audio_path)  # 清理失败不影响交付
+        return (audio, SAMPLE_RATE, filename)
 
     @staticmethod
     def _resolve_seed(seed: int | None) -> int:
@@ -500,6 +578,16 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
         has_ins = bool(instruction and instruction.strip())
         cfg = float(kwargs.get("cfg_scale", _CFG_INSTRUCTION_DEFAULT if has_ins else _CFG_NO_NEGATIVE))
         seed = int(kwargs.get("seed", -1))
+        if self._delegate:
+            audio, sr, filename = self._delegate_generate(
+                "design",
+                text=text,
+                instruction=instruction or None,
+                cfg_scale=cfg,
+                seed=seed,
+            )
+            mode = "voice design" if has_ins else "默认音色朗读"
+            return (audio, SAMPLE_RATE, filename), f"Breeze TTS 2 {mode} 完成（seed={seed}）: {filename}"
         audio = self._generate_audio(
             text=text,
             instruction=instruction or None,
@@ -526,6 +614,16 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
         """
         ref_text = kwargs.get("ref_text") or instruction
         seed = int(kwargs.get("seed", -1))
+        if self._delegate:
+            audio, sr, filename = self._delegate_generate(
+                "clone",
+                text=text,
+                ref_audio_path=reference_audio_path,
+                ref_text=ref_text,
+                cfg_scale=_CFG_NO_NEGATIVE,
+                seed=seed,
+            )
+            return (audio, SAMPLE_RATE, filename), f"Breeze TTS 2 voice clone 完成（seed={seed}）: {filename}"
         audio = self._generate_audio(
             text=text,
             instruction=None,
@@ -565,6 +663,21 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
             raise ValidationError("Voice Direction 必须提供参考音频的准确转写（ref_text）")
         if ref_audio_path is None:
             raise ValidationError("Voice Direction 必须提供参考音频（ref_audio_path）")
+        if self._delegate:
+            audio, sr, filename = self._delegate_generate(
+                "direction",
+                text=text,
+                instruction=instruction,
+                ref_audio_path=ref_audio_path,
+                ref_text=str(ref_text),
+                cfg_scale=float(advanced_cfg),
+                seed=advanced_seed,
+            )
+            return (
+                (audio, SAMPLE_RATE, filename),
+                f"Breeze TTS 2 voice direction 完成（cfg={advanced_cfg}, seed={advanced_seed}; "
+                f"denoise/steps 为扩散系参数，本引擎忽略）: {filename}",
+            )
         audio = self._generate_audio(
             text=text,
             instruction=instruction,
@@ -618,6 +731,20 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
         if has_ref and not has_ins:
             cfg = _CFG_NO_NEGATIVE  # 纯克隆模板无负分支
         seed = self._resolve_seed(int(kwargs.get("seed", -1)))
+
+        if self._delegate:
+            # 委托态无进程内流式 runtime：整段合成后以单 chunk 交付
+            audio, sr, filename = self._delegate_generate(
+                "clone" if has_ref else "design",
+                text=text,
+                instruction=instruction or None,
+                ref_audio_path=reference_audio_path,
+                ref_text=ref_text,
+                cfg_scale=cfg,
+                seed=seed,
+            )
+            yield (audio, f"Breeze TTS 2 流式生成完成（委托隔离环境，seed={seed}）: {filename}")
+            return
 
         from .vendor.breeze_infer.runtime import set_all_seeds
         from .vendor.breeze_infer.templates import get_template, prepare_inputs, select_template_name
