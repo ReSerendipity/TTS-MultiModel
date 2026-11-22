@@ -1,8 +1,8 @@
 {
-  "total_errors": 89,
-  "files_with_errors": 26,
+  "total_errors": 87,
+  "files_with_errors": 27,
   "files_checked": 0,
   "per_file_errors": {},
-  "last_updated": "2026-11-15",
-  "note": "mypy 棘轮基线。错误数增加则 CI 阻断；减少则自动更新本文件（ratchet down）。"
+  "last_updated": "2026-11-22",
+  "note": "mypy 棘轮基线。错误数增加则 CI 阻断；减少则自动更新本文件（ratchet down）。2.12.5 前修复 engine/model/streaming 共 14 个（89→87，口径=precheck.ps1）。"
 }

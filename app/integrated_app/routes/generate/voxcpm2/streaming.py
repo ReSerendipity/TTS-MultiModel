@@ -564,7 +564,7 @@ async def streaming_sse_generation(
         # 因此此处保持原行为——直接返回非 SSE 的错误 HTML 片段，
         # 前端 HTMX 层会正确显示。
         return StreamingResponse(
-            iter([error.body.decode("utf-8", errors="replace")]),
+            iter([bytes(error.body).decode("utf-8", errors="replace")]),
             media_type="text/html",
             status_code=error.status_code,
         )
@@ -575,7 +575,7 @@ async def streaming_sse_generation(
             f"文本过长（{len(text)}字），请分段生成或使用剧本工坊（限制 {_STREAMING_MAX_TOTAL_CHARS} 字）",
         )
         return StreamingResponse(
-            iter([err_html.body.decode("utf-8", errors="replace")]),
+            iter([bytes(err_html.body).decode("utf-8", errors="replace")]),
             media_type="text/html",
             status_code=err_html.status_code,
         )
@@ -591,7 +591,7 @@ async def streaming_sse_generation(
     actual_ref_path, persona_error = await _load_streaming_persona(request, persona_name, allow_missing=True)
     if persona_error is not None:
         return StreamingResponse(
-            iter([persona_error.body.decode("utf-8", errors="replace")]),
+            iter([bytes(persona_error.body).decode("utf-8", errors="replace")]),
             media_type="text/html",
             status_code=persona_error.status_code,
         )
@@ -602,7 +602,7 @@ async def streaming_sse_generation(
     semaphore, sem_error = await _acquire_streaming_semaphore(request)
     if sem_error is not None:
         return StreamingResponse(
-            iter([sem_error.body.decode("utf-8", errors="replace")]),
+            iter([bytes(sem_error.body).decode("utf-8", errors="replace")]),
             media_type="text/html",
             status_code=sem_error.status_code,
         )
@@ -893,7 +893,8 @@ async def streaming_generation(
         return _error_html(request, _safe_error_msg(e))
     finally:
         # S-R3: 确保信号量释放（E4 资源安全）
-        semaphore.release()
+        if semaphore is not None:
+            semaphore.release()
 
 
 # ====================================================================
@@ -1079,7 +1080,8 @@ async def streaming_audio_generation(
         return _error_html(request, _safe_error_msg(e))
     finally:
         # S-R3: 确保信号量释放（E4 资源安全）
-        semaphore.release()
+        if semaphore is not None:
+            semaphore.release()
 
 
 # ====================================================================

@@ -344,7 +344,7 @@ class BreezeTTSEngine(BaseControllableTTSEngine):
         ref_text: str | None = None,
         cfg_scale: float | None = None,
         seed: int | None = None,
-    ) -> tuple[Any, str]:
+    ) -> tuple[np.ndarray, int, str]:
         """把一次生成委托给隔离 venv 的 CLI 子进程，回读音频进 SAVE_DIR。
 
         隔离 venv 里的 CLI 是 4.57.3 原生推理（无兼容层），产物即正式音频；

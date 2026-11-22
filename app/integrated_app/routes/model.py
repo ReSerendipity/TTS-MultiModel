@@ -38,6 +38,7 @@ import asyncio
 import json
 import logging
 import os
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -194,6 +195,7 @@ async def load_model_endpoint(request: Request, engine: str = Form("voxcpm2")) -
 
         log_audit("model_load", detail=f"engine={engine}", outcome="attempt")
         loop = asyncio.get_running_loop()
+        load_fn: Callable[..., Any]
         if engine == "indextts2":
             load_fn = load_indextts2
         elif engine == "indextts20":
