@@ -103,3 +103,23 @@ class TestFullInstallerUpdateRoute:
         # 安装段不得删整个安装目录（只有 Uninstall 段才允许）
         install_section = nsi.split('Section "TTSMultiModel 桌面版"', 1)[1].split('Section "Uninstall"', 1)[0]
         assert 'RMDir /r "$INSTDIR"' not in install_section, "安装段会删整个安装目录，老用户重装会丢 runtime/model/data"
+
+
+class TestAutoRelaunchContract:
+    """自更新七步的第 7 步：Rust 传 /RELAUNCH ↔ NSIS 检测 /RELAUNCH 成对存在。"""
+
+    def test_rust_passes_relaunch_flag(self):
+        src = _read("desktop/src-tauri/src/updater.rs")
+        assert '"/RELAUNCH"' in src, "更新器未向安装器传 /RELAUNCH 标志"
+        assert '"/S"' in src, "更新器未传 /S 静默标志"
+        assert "std::process::exit(0)" in src, "更新器未有序退出（仍在依赖 KillRunning 强杀）"
+
+    def test_nsis_detects_relaunch_and_execs_app(self):
+        nsi = _read("scripts/installer/setup.nsi")
+        assert '${StrStr} $0 "$CMDLINE" "/RELAUNCH"' in nsi, "NSIS 未检测 /RELAUNCH 标志"
+        assert r"""Exec '"$INSTDIR\TTSMultiModel.exe"'""" in nsi, "NSIS 未在装完后拉起主程序（第 7 步自动重启缺失）"
+
+    def test_frontend_announces_auto_restart(self):
+        js = _read("desktop/src/desktop-bridge.js")
+        assert 'listen("update-installing"' in js, "前端未监听 update-installing"
+        assert "自动" in js and "重新启动" in js, "前端提示未说明会自动重启"

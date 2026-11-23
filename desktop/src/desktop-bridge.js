@@ -323,12 +323,12 @@
       else tryShowOnUpdateWindow(info);
     });
     listen("update-progress", function (p) { renderProgress(p); });
-    // 单一路线：下载完整安装包后启动 NSIS，应用会被安装器关闭。
-    // 不会出现 update-done（那时进程已退出），改为提示用户安装完手动重开。
+    // 单一路线：下载完整安装包后以 /S /RELAUNCH 启动 NSIS，应用有序退出。
+    // 不会出现 update-done（那时进程已退出）；安装器带 /RELAUNCH 会在装完后自动拉起应用。
     listen("update-installing", function (r) {
       var body = document.getElementById("sdu-body");
       var actions = document.getElementById("sdu-actions");
-      if (body) body.innerHTML = '<div style="color:#27ae60;font-weight:600;font-size:16px;text-align:center;padding:20px 0">✓ ' + escapeHtml((r && r.message) || "安装程序即将启动，应用会关闭；安装完成后请重新启动。") + "</div>";
+      if (body) body.innerHTML = '<div style="color:#27ae60;font-weight:600;font-size:16px;text-align:center;padding:20px 0">✓ ' + escapeHtml((r && r.message) || "应用即将关闭，安装程序将自动完成更新并重新启动。") + "</div>";
       if (actions) actions.innerHTML = "";
     });
     listen("update-done", function (r) {

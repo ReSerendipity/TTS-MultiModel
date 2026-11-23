@@ -681,23 +681,34 @@ async fn do_update_steps(app: &AppHandle, info: &UpdateInfo) -> Result<()> {
         "update-installing",
         serde_json::json!({
             "version": info.version,
-            "message": "安装程序即将接管，应用会关闭；安装完成后请重新启动 TTS MultiModel。"
+            "message": "应用即将关闭，安装程序将自动完成更新并重新启动 TTS MultiModel。"
         }),
     );
 
     launch_installer(&exe_path)?;
-    log::info!("安装器已启动: {} -> {}", info.current, info.version);
-    Ok(())
+    log::info!("安装器已启动: {} -> {}（即将有序退出，由安装器负责重启）", info.current, info.version);
+
+    // 有序退出：不再依赖安装器 KillRunning 强杀；事件已发出、安装器已独立存活，
+    // 安装器带 /RELAUNCH 标志会在装完后把应用拉起，实现「退出→安装→自动回来」。
+    // 注意：此处退出后 run_update 的 Ok 分支不再执行，update-done 不会发出（前端凭
+    // update-installing 提示即可，新版本启动后版本已更新）。
+    std::process::exit(0);
 }
 
-/// 以独立进程组启动 NSIS 静默安装器：壳被安装器杀掉后它必须继续存活。
+/// 传给安装器的参数：/S 静默 + /RELAUNCH 让安装器装完自动拉起应用。
+/// 抽成纯函数便于单测锁定契约（自写 NSIS 用什么标志就在这里改）。
+fn installer_args() -> Vec<&'static str> {
+    vec!["/S", "/RELAUNCH"]
+}
+
+/// 以独立进程组启动 NSIS 静默安装器：应用有序退出后它必须继续存活。
 #[cfg(windows)]
 fn launch_installer(exe: &Path) -> Result<()> {
     use std::os::windows::process::CommandExt;
     const DETACHED_PROCESS: u32 = 0x0000_0008;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     let mut cmd = std::process::Command::new(exe);
-    cmd.arg("/S")
+    cmd.args(installer_args())
         .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
         .spawn()
         .with_context(|| format!("启动安装器失败: {}", exe.display()))?;
@@ -839,6 +850,15 @@ mod tests {
         assert_eq!(url, "https://example.com/setup.exe");
         assert_eq!(size, 1024);
         assert!(sha_url.ends_with(".exe.sha256"));
+    }
+
+    #[test]
+    fn installer_args_request_silent_and_relaunch() {
+        // 自更新七步的第 5-7 步契约：/S 静默安装 + /RELAUNCH 让 NSIS 装完自动拉起应用。
+        // 改这两个标志时必须同步改 setup.nsi 的 $CMDLINE 检测，否则装完不会自动回来。
+        let args = installer_args();
+        assert!(args.contains(&"/S"), "必须静默安装");
+        assert!(args.contains(&"/RELAUNCH"), "必须让安装器装完自动重启应用");
     }
 
     #[test]

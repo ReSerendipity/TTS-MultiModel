@@ -239,6 +239,16 @@ Section "TTSMultiModel 桌面版" SEC_APP
   ; 卸载器
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
+  ; ---------- 更新器自动重启（自更新七步的第 7 步）----------
+  ; 应用内更新器下载本安装包后以 `/S /RELAUNCH` 启动，安装完自动拉起主程序，
+  ; 实现「点一下 → 退出 → 自动安装 → 自动回来」的无缝闭环；普通安装不带该标志，不受影响。
+  ; 用 $CMDLINE（完整命令行）+ StrStr 检测，避免引入 GetParameters 等额外插件。
+  ${StrStr} $0 "$CMDLINE" "/RELAUNCH"
+  ${If} $0 != ""
+    DetailPrint "更新安装完成，正在重新启动 TTS MultiModel…"
+    Exec '"$INSTDIR\TTSMultiModel.exe"'
+  ${EndIf}
+
   ; 清理临时工具目录
   RMDir /r "$TOOLSDIR"
 SectionEnd
