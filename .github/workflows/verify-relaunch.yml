@@ -21,6 +21,9 @@ jobs:
   verify:
     runs-on: windows-latest
     steps:
+      - name: Checkout (gh CLI needs git repo context)
+        uses: actions/checkout@v4
+
       - name: Resolve version from tag
         id: target
         shell: pwsh
@@ -40,7 +43,7 @@ jobs:
           $tag = "${{ steps.target.outputs.tag }}"
           $ver = "${{ steps.target.outputs.version }}"
           New-Item -ItemType Directory -Path 'dist/verify' -Force | Out-Null
-          gh release download $tag --pattern "TTSMultiModel-Setup-v$ver.exe" --dir 'dist/verify'
+          gh release download $tag --repo "${{ github.repository }}" --pattern "TTSMultiModel-Setup-v$ver.exe" --dir 'dist/verify'
           if ($LASTEXITCODE -ne 0) { throw "下载安装包失败: $tag" }
           $exe = "dist/verify/TTSMultiModel-Setup-v$ver.exe"
           if (-not (Test-Path -LiteralPath $exe)) { throw "未见安装包: $exe" }
