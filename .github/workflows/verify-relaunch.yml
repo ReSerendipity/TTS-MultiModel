@@ -87,14 +87,15 @@ jobs:
         shell: pwsh
         run: |
           $ok = $false
-          $pid = $null
+          # 注意：$pid 是 PowerShell 只读自动变量，必须用别的名字
+          $appPid = $null
           for ($i = 0; $i -lt 60; $i++) {
             $p = Get-Process -Name 'TTSMultiModel' -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($p) { $ok = $true; $pid = $p.Id; break }
+            if ($p) { $ok = $true; $appPid = $p.Id; break }
             Start-Sleep -Seconds 5
           }
           if (-not $ok) { throw "FAIL: 安装器退出后 5 分钟内应用未自动重启（第 7 步缺失）" }
-          Write-Host "PASS: 应用已自动重启，PID=$pid（无需人工点击图标）"
+          Write-Host "PASS: 应用已自动重启，PID=$appPid（无需人工点击图标）"
 
       - name: Assert installed version
         shell: pwsh
