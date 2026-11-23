@@ -2,6 +2,14 @@
 
 > 说明：以下历史条目中提及的 `AGENTS.md` 为**本地维护、不随仓库分发**的资产（`.gitignore` 已忽略）；条目仅为变更发生时的历史记录，clone 读者无需在仓库中查找该文件。同理，条目中提及的 `docs/project/`、`docs/_devarchive/`、`docs/reports/`、`docs/agents/` 等本地文档路径已于 2026-11-04 迁至 `local/docs-archive/`（本地归档，未随仓库发布），条目内路径按迁移前写法原样保留。
 
+## [2.12.6](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.12.5...v2.12.6) (2026-11-23)
+
+
+### Features
+
+* **desktop:** 补齐桌面自更新第七步——安装完自动重启应用。更新器传 `/S /RELAUNCH` 静默安装并有序退出（`std::process::exit(0)`），NSIS 安装段用 `$CMDLINE` + `StrStr` 检测标志后 `Exec` 拉起主程序，实现「点一下 → 退出 → 自动安装 → 自动回来」的完整闭环；不再依赖 KillRunning 强杀。新增 3 项契约测试钉住 Rust/NSIS/前端三处成对存在 ([0a67627](https://github.com/ReSerendipity/TTS-MultiModel/commit/0a67627))
+
+
 ## [2.12.5](https://github.com/ReSerendipity/TTS-MultiModel/compare/v2.12.4...v2.12.5) (2026-11-22)
 
 
