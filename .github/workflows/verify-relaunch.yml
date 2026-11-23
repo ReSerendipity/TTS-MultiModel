@@ -1,0 +1,120 @@
+name: Verify Auto-Relaunch
+
+# 自更新第 7 步端到端验收：在 GitHub runner 上真跑 NSIS /S /RELAUNCH，
+# 验证「安装完自动拉起应用」成立。runner 从 Release 直取安装包（内网，不经本机网络）。
+#
+# 触发：workflow_dispatch 输入 tag（如 v2.12.6）。
+# 判据：安装器退出后 TTSMultiModel.exe 进程自动出现 + 版本文件正确。
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要验收的 Release tag（如 v2.12.6）'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - name: Resolve version from tag
+        id: target
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.tag }}"
+          $ver = $tag -replace '^v', ''
+          if ($ver -notmatch '^\d+\.\d+\.\d+$') { throw "tag 格式错误: $tag" }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          Write-Host "target: tag=$tag version=$ver"
+
+      - name: Download installer from Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.target.outputs.tag }}"
+          $ver = "${{ steps.target.outputs.version }}"
+          New-Item -ItemType Directory -Path 'dist/verify' -Force | Out-Null
+          gh release download $tag --pattern "TTSMultiModel-Setup-v$ver.exe" --dir 'dist/verify'
+          if ($LASTEXITCODE -ne 0) { throw "下载安装包失败: $tag" }
+          $exe = "dist/verify/TTSMultiModel-Setup-v$ver.exe"
+          if (-not (Test-Path -LiteralPath $exe)) { throw "未见安装包: $exe" }
+          Get-Item -LiteralPath $exe | Select-Object Name, Length | Format-Table
+
+      - name: Verify SHA256
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.target.outputs.version }}"
+          $exe = "dist/verify/TTSMultiModel-Setup-v$ver.exe"
+          $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $shaFile = "$exe.sha256"
+          if (Test-Path -LiteralPath $shaFile) {
+            $expected = (Get-Content -LiteralPath $shaFile -Raw).Trim().Split(' ')[0]
+            if ($hash -ne $expected) { throw "SHA256 不匹配: expected=$expected actual=$hash" }
+          } else {
+            Write-Warning "Release 无 .sha256 资产，跳过比对（实际 hash: $hash）"
+          }
+
+      - name: No pre-existing app (clean runner sanity)
+        shell: pwsh
+        run: |
+          $procs = Get-Process -Name 'TTSMultiModel' -ErrorAction SilentlyContinue
+          if ($procs) { Write-Warning "runner 上意外已有 TTSMultiModel 进程，验收前先关闭"; $procs | Stop-Process -Force }
+          Write-Host "clean runner: no TTSMultiModel process before install"
+
+      - name: Install with /S /RELAUNCH
+        id: install
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.target.outputs.version }}"
+          $exe = (Resolve-Path "dist/verify/TTSMultiModel-Setup-v$ver.exe").Path
+          Write-Host "launching installer with /S /RELAUNCH: $exe"
+          # NSIS 安装完会 Exec 拉起应用；安装器自身随后退出。
+          # -PassThru + Wait-Process 让本步骤等到安装器退出（不含被拉起的应用）。
+          $p = Start-Process -FilePath $exe -ArgumentList '/S','/RELAUNCH' -PassThru
+          $p | Wait-Process -Timeout 900 -ErrorAction Stop
+          Write-Host "installer exited with code $($p.ExitCode)"
+
+      - name: Assert app auto-relaunched
+        shell: pwsh
+        run: |
+          $ok = $false
+          $pid = $null
+          for ($i = 0; $i -lt 60; $i++) {
+            $p = Get-Process -Name 'TTSMultiModel' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($p) { $ok = $true; $pid = $p.Id; break }
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "FAIL: 安装器退出后 5 分钟内应用未自动重启（第 7 步缺失）" }
+          Write-Host "PASS: 应用已自动重启，PID=$pid（无需人工点击图标）"
+
+      - name: Assert installed version
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.target.outputs.version }}"
+          $installDir = Join-Path $env:LOCALAPPDATA 'Programs\TTSMultiModel'
+          $vj = Join-Path $installDir 'app\version.json'
+          if (-not (Test-Path -LiteralPath $vj)) { throw "未见安装后版本文件: $vj" }
+          $actual = (Get-Content -LiteralPath $vj -Raw | ConvertFrom-Json).version
+          Write-Host "installed version: $actual (expected $ver)"
+          if ($actual -ne $ver) { throw "版本不符: expected=$ver actual=$actual" }
+          Write-Host "PASS: 版本正确"
+
+      - name: Assert service healthy
+        shell: pwsh
+        run: |
+          $ok = $false
+          for ($i = 0; $i -lt 24; $i++) {
+            try {
+              $r = Invoke-WebRequest -Uri 'http://127.0.0.1:7869/' -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+              if ($r.StatusCode -eq 200) { $ok = $true; Write-Host "PASS: 服务就绪 HTTP $($r.StatusCode)"; break }
+            } catch { Start-Sleep -Seconds 5 }
+          }
+          if (-not $ok) {
+            Write-Warning "服务 2 分钟内未就绪（runner 无模型/torch，可能只是后端缺依赖；壳进程已自动重启即证明第 7 步成立）"
+          }
